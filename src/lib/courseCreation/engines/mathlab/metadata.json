@@ -1,0 +1,7 @@
+{
+  "name": "MathStudio",
+  "description": "An advanced AI-powered mathematics laboratory featuring step-by-step problem solving, graph visualization, and voice-guided tutoring using Gemini 3 models.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

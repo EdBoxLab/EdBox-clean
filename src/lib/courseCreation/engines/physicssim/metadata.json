@@ -1,0 +1,5 @@
+{
+  "name": "Aeternum Physics Engine",
+  "description": "A high-fidelity, interactive physics simulation platform targeting web, desktop, and mobile. Features modular physics engines including Mechanics, Optics, and Electromagnetism with real-time visualization.",
+  "requestFramePermissions": []
+}

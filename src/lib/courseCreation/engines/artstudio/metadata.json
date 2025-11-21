@@ -1,0 +1,5 @@
+{
+  "name": "ArtLab",
+  "description": "An advanced AI-powered art studio enabling creation, visualization, and AI critique using Gemini models.",
+  "requestFramePermissions": []
+}

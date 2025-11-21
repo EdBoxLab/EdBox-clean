@@ -1,0 +1,5 @@
+{
+  "name": "ChemLab AI",
+  "description": "An advanced, AI-powered chemistry simulation platform featuring interactive Stoichiometry, Titration, and Molecular Visualization modules enriched with real-time Gemini AI tutoring and reasoning.",
+  "requestFramePermissions": []
+}

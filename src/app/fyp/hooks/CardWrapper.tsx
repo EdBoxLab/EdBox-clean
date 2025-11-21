@@ -2,8 +2,9 @@
 import React, { useState, useRef } from 'react';
 import type { FeedItem, Feedback } from '../types';
 import { GenieAvatar } from './GenieAvatar';
-import { ThumbsUpIcon, ThumbsDownIcon, GenieMagicIcon } from '../MediaIcons';
+import { ThumbsUpIcon, ThumbsDownIcon, GenieMagicIcon, BookmarkIcon } from '../MediaIcons';
 import { useSounds } from '../useSounds';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 interface CardWrapperProps {
   item: FeedItem;
@@ -28,8 +29,28 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
   const [opacity, setOpacity] = useState(1);
   const [isSwiping, setIsSwiping] = useState(false);
   const [swipeFeedback, setSwipeFeedback] = useState<'got_it' | 'skip' | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
   const startX = useRef(0);
   const { playSwipe } = useSounds();
+  const supabase = createSupabaseBrowserClient();
+
+  const handleSave = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase.from('saved_feed_items').insert([{
+      user_id: user.id,
+      feed_item_id: item.id,
+      feed_item_type: item.type,
+      content: item,
+    }]);
+
+    if (error) {
+      console.error('Error saving item:', error);
+    } else {
+      setIsSaved(true);
+    }
+  };
 
   const handleSwipeStart = (clientX: number) => {
     setIsSwiping(true);
@@ -138,6 +159,16 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
                 </div>
             </div>
             <div className="flex items-center gap-1 sm:gap-2 pointer-events-auto">
+                 <button
+                    onClick={handleSave}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    disabled={isSaved}
+                    aria-label="Save for later"
+                    className={`p-2 rounded-full transition-colors duration-200 ${isSaved ? 'text-yellow-400' : 'text-white hover:bg-white/10'}`}
+                >
+                    <BookmarkIcon filled={isSaved} />
+                </button>
                 <button
                     onClick={() => onFeedback(item.id, 'like')}
                     onMouseDown={(e) => e.stopPropagation()}

@@ -1,0 +1,5 @@
+{
+  "name": "EdBox Knowledge Feed",
+  "description": "A gamified, TikTok-style vertical learning feed. Swipe through interactive quizzes, video summaries, articles, and daily challenges. Earn XP, build streaks, and get feedback from Genie, your AI learning companion.",
+  "requestFramePermissions": []
+}

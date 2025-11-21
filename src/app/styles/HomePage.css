@@ -1,0 +1,145 @@
+.home-page {
+  background-color: #0f172a;
+  min-height: 100vh;
+  padding: 2rem;
+  color: white;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.header-title h1 {
+  font-size: 1.875rem;
+  font-weight: bold;
+}
+
+.btn-new-course {
+  background-color: #22c55e;
+  color: white;
+  font-weight: bold;
+  padding: 0.75rem 1.5rem;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+}
+
+.course-card {
+  background-color: #1e293b;
+  border-radius: 1rem;
+  padding: 1.5rem;
+}
+
+.course-card-inner {
+  /* Add any perspective or transform styles for the card flip effect if needed */
+}
+
+.course-card-front {
+  /* Styles for the front of the card */
+}
+
+.course-card-image {
+  margin-bottom: 1.5rem;
+}
+
+.course-card-image img {
+  width: 100%;
+  height: auto;
+}
+
+.course-card-content {
+  /* Styles for the content area */
+}
+
+.course-card-title h2 {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.course-card-title p {
+  color: #94a3b8;
+}
+
+.course-card-progress {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.progress-bar {
+  width: 100%;
+  background-color: #334155;
+  height: 0.5rem;
+  border-radius: 9999px;
+}
+
+.progress {
+  background-color: #22c55e;
+  height: 100%;
+  border-radius: 9999px;
+}
+
+.progress-text {
+  color: #94a3b8;
+}
+
+.course-card-stats {
+  margin-top: 1rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #94a3b8;
+}
+
+.course-card-actions {
+  margin-top: 1.5rem;
+}
+
+.btn-start {
+  background-color: #22c55e;
+  color: white;
+  font-weight: bold;
+  padding: 0.75rem 1.5rem;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+}
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #1e293b;
+  display: flex;
+  justify-content: space-around;
+  padding: 1rem 0;
+  border-top: 1px solid #334155;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.nav-item.active {
+  color: white;
+}
+
+.nav-item svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-bottom: 0.25rem;
+}

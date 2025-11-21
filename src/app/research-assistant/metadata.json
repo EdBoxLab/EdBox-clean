@@ -1,0 +1,5 @@
+{
+  "name": "AI Research Assistant",
+  "description": "An emotionally intelligent, source-grounded assistant that produces cited Q&A, briefs, mind maps, flashcards, and more from user-supplied sources. Features interactive learning and ethical design.",
+  "requestFramePermissions": []
+}

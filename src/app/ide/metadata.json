@@ -1,0 +1,5 @@
+{
+  "name": "EdBox IDE System Design",
+  "description": "An interactive system design and architecture plan for the EdBox IDE, a modular interactive learning platform. This app visualizes the IDE's architecture, connection system, tech stack, and features an AI assistant powered by Gemini.",
+  "requestFramePermissions": []
+}

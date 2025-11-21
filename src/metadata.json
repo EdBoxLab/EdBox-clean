@@ -1,0 +1,7 @@
+{
+    "name": "EdBox Advanced Course Creator",
+    "description": "A multi-agent system that generates expert-level, interactive courses from any user request. The application provides a gamified and engaging learning experience with features like progress tracking, recommendations, and a friendly AI assistant.",
+    "requestFramePermissions": [
+      "microphone"
+    ]
+  }

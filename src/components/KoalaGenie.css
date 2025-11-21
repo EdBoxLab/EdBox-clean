@@ -1,0 +1,123 @@
+body {
+  font-family: 'Segoe UI', sans-serif;
+  text-align: center;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body.dark {
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+body:not(.dark) {
+  background-color: #f8fafc;
+  color: #1e293b;
+}
+
+.genie-wrapper {
+  padding: 40px 20px;
+}
+
+.genie-container {
+  position: relative;
+  display: inline-block;
+}
+
+.genie-img {
+  width: 220px;
+  transition: transform 0.3s ease;
+  animation: float 4s ease-in-out infinite;
+  filter: drop-shadow(0 0 12px rgba(56,189,248,0.4));
+  cursor: pointer;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.genie-bubble {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30,41,59,0.9);
+  color: #f1f5f9;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  border: 1px solid #334155;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.genie-bubble.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-6px);
+}
+
+.genie-buttons {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+button {
+  padding: 12px 20px;
+  font-size: 16px;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(59,130,246,0.4);
+  transition: background-color 0.2s ease;
+}
+
+button:hover {
+  background-color: #2563eb;
+}
+
+.quiz-container {
+  background: #1e293b;
+  color: #f1f5f9;
+  padding: 20px;
+  border-radius: 12px;
+  max-width: 400px;
+  margin: 30px auto;
+  box-shadow: 0 0 12px rgba(56,189,248,0.4);
+}
+
+.quiz-container ul {
+  list-style: none;
+  padding: 0;
+}
+
+.quiz-container li {
+  margin: 10px 0;
+  background: #334155;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.quiz-container li:hover {
+  background: #475569;
+}
+
+.genie-glow {
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 10px #3b82f6, 0 0 20px #3b82f6, 0 0 30px #3b82f6;
+  }
+  to {
+    box-shadow: 0 0 20px #3b82f6, 0 0 30px #3b82f6, 0 0 40px #3b82f6;
+  }
+}

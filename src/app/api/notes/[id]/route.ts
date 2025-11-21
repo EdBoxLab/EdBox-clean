@@ -1,9 +1,10 @@
 
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/client';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 // GET a single note by ID
 export async function GET(request: Request, { params }: { params: { id: string } }) {
+  const supabase = await createSupabaseServerClient();
   try {
     const { data: note, error } = await supabase.from('notes').select('*').eq('id', params.id).single();
     if (error) throw error;
@@ -15,6 +16,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 // PUT (update) a note by ID
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
+  const supabase = await createSupabaseServerClient();
   try {
     const { title, content } = await request.json();
     const { data, error } = await supabase.from('notes').update({ title, content }).eq('id', params.id).select();
@@ -27,6 +29,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
 // DELETE a note by ID
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  const supabase = await createSupabaseServerClient();
   try {
     const { error } = await supabase.from('notes').delete().eq('id', params.id);
     if (error) throw error;

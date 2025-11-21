@@ -1,11 +1,12 @@
 
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { Course, CourseArchetype, CourseCategory, CourseFormat, EngineType, LearningMode, Module, RoadmapNode, AgentState, RecommendedFormat, InteractionType } from "./types";
+import { createSupabaseServerClient } from './lib/supabase/server';
 
 const sanitizeForPrompt = (text: string): string => {
   if (!text) return '';
   return text
-    .replace(/\n/g, '\\') // Escape backslashes
+    .replace(/\\/g, '\\') // Escape backslashes
     .replace(/"/g, '\"') // Escape double quotes
     .replace(/\n/g, '\n')
     .replace(/\r/g, '\r')
@@ -64,19 +65,9 @@ export const recommendTopFormats = async (prompt: string, fileTextContent?: stri
 
 const agent_InitialCoursePlanner = async (prompt: string, fileTextContent?: string): Promise<Partial<Course>> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const systemPrompt = `Agent: Initial Course Planner.
-    You have three jobs:
-    1.  **Subject Determination**: Analyze the user's request and any provided document content to define the course's core attributes. If the request is generic, derive 'subject' and 'title' from the document content. Define 'category', 'subject', 'title', 'description', and 'level'.
-    2.  **Engine Selection**: Based on the determined subject and category, select the most appropriate interactive 'engine'. The engine determines the types of hands-on simulations available.
-    3.  **Strategy Definition**: Analyze the title and description to determine the fundamental 'courseArchetype', which influences the educational approach.
+    const systemPrompt = `Agent: Initial Course Planner.\n    You have three jobs:\n    1.  **Subject Determination**: Analyze the user's request and any provided document content to define the course's core attributes. If the request is generic, derive 'subject' and 'title' from the document content. Define 'category', 'subject', 'title', 'description', and 'level'.\n    2.  **Engine Selection**: Based on the determined subject and category, select the most appropriate interactive 'engine'. The engine determines the types of hands-on simulations available.\n    3.  **Strategy Definition**: Analyze the title and description to determine the fundamental 'courseArchetype', which influences the educational approach.\n\n    Respond with a single JSON object containing: 'category', 'subject', 'title', 'description', 'level', 'engine', and 'courseArchetype'.\n    - 'category' must be one of: ${Object.values(CourseCategory).join(', ')}.\n    - 'level' must be one of: Beginner, Intermediate, Advanced.\n    - 'engine' must be one of: ${Object.values(EngineType).join(', ')}.\n    - 'courseArchetype' must be one of: ${Object.values(CourseArchetype).join(', ')}.`;
 
-    Respond with a single JSON object containing: 'category', 'subject', 'title', 'description', 'level', 'engine', and 'courseArchetype'.
-    - 'category' must be one of: ${Object.values(CourseCategory).join(', ')}.
-    - 'level' must be one of: Beginner, Intermediate, Advanced.
-    - 'engine' must be one of: ${Object.values(EngineType).join(', ')}.
-    - 'courseArchetype' must be one of: ${Object.values(CourseArchetype).join(', ')}.`;
-
-    let fileContext = fileTextContent ? `\n\nDocument Content: """${sanitizeForPrompt(fileTextContent.substring(0, 4000))}"""` : '';
+    let fileContext = fileTextContent ? `\\n\\nDocument Content: """${sanitizeForPrompt(fileTextContent.substring(0, 4000))}"""` : '';
     const content = `User Request: "${prompt}"${fileContext}`;
 
     try {
@@ -110,11 +101,7 @@ const agent_InitialCoursePlanner = async (prompt: string, fileTextContent?: stri
 
 const agent_RoadmapDesigner = async (courseInfo: Partial<Course>): Promise<{ roadmap: RoadmapNode[] }> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const systemPrompt = `Agent: Roadmap Designer.
-    Create a structured learning roadmap with 4 stages: Foundations, Core, Advanced, and Capstone.
-    For each stage, define 1-3 relevant module titles.
-    Respond with a JSON object containing a 'roadmap' key. 'roadmap' is an array of objects, each with 'id', 'title', 'level', and a 'modules' array.
-    The 'modules' array should contain objects, each with a unique 'id' and a 'title'.`;
+    const systemPrompt = `Agent: Roadmap Designer.\n    Create a structured learning roadmap with 4 stages: Foundations, Core, Advanced, and Capstone.\n    For each stage, define 1-3 relevant module titles.\n    Respond with a JSON object containing a 'roadmap' key. 'roadmap' is an array of objects, each with 'id', 'title', 'level', and a 'modules' array.\n    The 'modules' array should contain objects, each with a unique 'id' and a 'title'.`;
     
     const content = `Design a roadmap for a ${courseInfo.level} level course titled "${courseInfo.title}" on the subject of ${courseInfo.subject}. The course format is "${courseInfo.format}" and the learning mode is "${courseInfo.mode}".`;
 
@@ -166,23 +153,9 @@ const agent_RoadmapDesigner = async (courseInfo: Partial<Course>): Promise<{ roa
 const agent_ModuleDesigner = async (courseInfo: Partial<Course>, moduleTitle: string): Promise<Module> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const interactionTypes = Object.values(InteractionType).join(', ');
-    const systemPrompt = `Agent: Interactive Experience Designer.
-    Your task is to design a single, engaging learning module based on the provided title and course context.
-    - Create a concise 'content' overview for the module (2-3 sentences).
-    - Design 2-4 diverse, interactive learning 'interactions' that are highly relevant to the module title and the overall course engine.
-    - For each interaction, select the most appropriate 'type' from this list: [${interactionTypes}].
-    - Prioritize engine-specific interactions (e.g., 'physics_sim' for a Physics course, 'coding_studio' for Programming) but also include general types like 'quiz' or 'info'.
-    - Populate all necessary fields for each interaction type (e.g., 'quizOptions' and 'correctAnswer' for a quiz).
-    - Provide a realistic 'estimatedTime' for completing the module (e.g., "15 mins").`;
+    const systemPrompt = `Agent: Interactive Experience Designer.\n    Your task is to design a single, engaging learning module based on the provided title and course context.\n    - Create a concise 'content' overview for the module (2-3 sentences).\n    - Design 2-4 diverse, interactive learning 'interactions' that are highly relevant to the module title and the overall course engine.\n    - For each interaction, select the most appropriate 'type' from this list: [${interactionTypes}].\n    - Prioritize engine-specific interactions (e.g., 'physics_sim' for a Physics course, 'coding_studio' for Programming) but also include general types like 'quiz' or 'info'.\n    - Populate all necessary fields for each interaction type (e.g., 'quizOptions' and 'correctAnswer' for a quiz).\n    - Provide a realistic 'estimatedTime' for completing the module (e.g., "15 mins").`;
 
-    const content = `
-    Course Title: "${courseInfo.title}"
-    Course Subject: "${courseInfo.subject}"
-    Course Engine: "${courseInfo.engine}"
-    Course Format: "${courseInfo.format}"
-    Learning Mode: "${courseInfo.mode}"
-    Module to Design: "${moduleTitle}"
-    `;
+    const content = `\n    Course Title: "${courseInfo.title}"\n    Course Subject: "${courseInfo.subject}"\n    Course Engine: "${courseInfo.engine}"\n    Course Format: "${courseInfo.format}"\n    Learning Mode: "${courseInfo.mode}"\n    Module to Design: "${moduleTitle}"\n    `;
 
     try {
         const response = await ai.models.generateContent({
@@ -266,6 +239,7 @@ export const generateCourse = async (
         { name: 'Roadmap Designer', status: 'pending', message: 'Waiting to start...', percentage: 0 },
         { name: 'Module Designer', status: 'pending', message: 'Waiting to start...', percentage: 0 },
         { name: 'Cover Image Designer', status: 'pending', message: 'Waiting to start...', percentage: 0 },
+        { name: 'Saving Course', status: 'pending', message: 'Waiting to start...', percentage: 0 },
     ];
     onProgress([...agents]);
 
@@ -331,8 +305,18 @@ export const generateCourse = async (
             format,
             mode
         };
+
+        updateAgentState('Saving Course', 'running', 'Saving your new course...', 50);
+        const supabase = createSupabaseServerClient();
+        const { data, error } = await supabase.from('courses').insert([finalCourse]).select();
+
+        if (error) {
+            throw new Error(`Failed to save course: ${error.message}`);
+        }
+
+        updateAgentState('Saving Course', 'complete', 'Course saved successfully!', 100);
         
-        return finalCourse;
+        return data ? data[0] as Course : null;
 
     } catch (error) {
         const runningAgent = agents.find(a => a.status === 'running');

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     try {
         const circleId = parseInt(params.id, 10);
         if (isNaN(circleId)) {
@@ -36,10 +36,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
         if (membersError) throw membersError;
 
-        return NextResponse.json({
-            ...circleDetails,
+        return NextResponse.json(Object.assign({}, circleDetails, {
             members: circleMembers || [],
-        });
+        }));
 
     } catch (error) {
         return NextResponse.json({ error: (error as Error).message }, { status: 500 });

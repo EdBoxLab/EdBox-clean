@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     try {
         const circleId = parseInt(params.id, 10);
         if (isNaN(circleId)) {

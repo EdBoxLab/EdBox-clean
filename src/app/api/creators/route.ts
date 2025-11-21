@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function GET(request: Request) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     if (error) throw error;
     
     // Check which of these creators the current user is following
-    const creatorIds = creators.map(c => c.user_id);
+    const creatorIds = creators.map((c: any) => c.user_id);
     const { data: following, error: followingError } = await supabase
         .from('followers')
         .select('followed_id')
@@ -20,8 +20,8 @@ export async function GET(request: Request) {
 
     if (followingError) throw followingError;
 
-    const followingIds = new Set(following.map(f => f.followed_id));
-    const creatorsWithFollowingStatus = creators.map(c => ({
+    const followingIds = new Set(following.map((f: any) => f.followed_id));
+    const creatorsWithFollowingStatus = creators.map((c: any) => ({
         ...c,
         is_following: followingIds.has(c.user_id),
     }));

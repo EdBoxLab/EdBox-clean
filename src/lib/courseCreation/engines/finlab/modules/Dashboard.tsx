@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card } from '../components/ui/Card';
+import { Card } from '../../../../../components/ui/Card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, Activity } from 'lucide-react';
 

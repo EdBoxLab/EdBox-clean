@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card } from '../components/ui/Card';
+import { Card } from '../../../../../components/ui/Card';
 import { BalanceSheetItem } from '../types';
 import { Plus, Trash2, RefreshCw } from 'lucide-react';
 

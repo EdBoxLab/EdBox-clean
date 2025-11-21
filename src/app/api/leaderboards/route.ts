@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function GET(request: Request) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 
     // We need to know the current user's rank as well, even if they are not in the top 10
     // Let's create another function for that later. For now, we just add the `isUser` flag.
-    const leaderboardUsers = users.map(u => ({ ...u, isUser: u.user_id === user.id }));
+    const leaderboardUsers = users.map((u: any) => ({ ...u, isUser: u.user_id === user.id }));
 
     return NextResponse.json({ users: leaderboardUsers, circles });
 

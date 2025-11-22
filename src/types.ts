@@ -1,4 +1,3 @@
-
 export type Screen = 'allCourses' | 'createCourse' | 'selectFormat' | 'loading' | 'takeCourse' | 'recommendations' | 'moduleView' | 'stats' | 'genieChat';
 
 export enum CourseCategory {
@@ -430,4 +429,20 @@ export interface ResearchPackage {
   audio_dialogue: GeneratedAudio;
   flashcards: Flashcard[];
   quiz: QuizItem[];
+}
+
+export interface User {
+  id: string;
+  email?: string;
+  // Add other user properties as needed
+}
+
+export interface Profile {
+  id: string;
+  username?: string;
+  country?: string;
+  education?: string;
+  age?: number;
+  onboarding_completed?: boolean;
+  // Add other profile properties as needed
 }

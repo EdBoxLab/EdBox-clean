@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const supabase = await createSupabaseServerClient();
     try {
-        const circleId = parseInt(params.id, 10);
+        const { id } = await params;
+        const circleId = parseInt(id, 10);
+        
         if (isNaN(circleId)) {
             return NextResponse.json({ error: 'Invalid circle ID' }, { status: 400 });
         }

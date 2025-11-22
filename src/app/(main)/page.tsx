@@ -1,13 +1,15 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import OnboardingForm from '@/components/OnboardingForm';
-import { motion, useAnimation } from 'framer-motion';
+import { motion, useAnimation, Variants } from 'framer-motion';
 import { ArrowRight, Book, Briefcase, CheckCircle, ChevronLeft, ChevronRight, PlayCircle, Plus, Star, Zap } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const supabase = createSupabaseBrowserClient();
+  const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +46,10 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
+        return;
+      }
       setUser(user);
 
       if (user) {
@@ -53,8 +59,22 @@ const Dashboard: React.FC = () => {
           .select('*')
           .eq('id', user.id)
           .single();
-        if (error && error.code !== 'PGRST116') console.error('Error fetching profile:', error);
-        setProfile(data);
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error fetching profile:', error);
+        } else if (!data) {
+          // Create a profile if it doesn't exist
+          const { data: newProfile, error: insertError } = await supabase
+            .from('profiles')
+            .insert([{ id: user.id, email: user.email }])
+            .single();
+          if (insertError) {
+            console.error('Error creating profile:', insertError);
+          } else {
+            setProfile(newProfile);
+          }
+        } else {
+          setProfile(data);
+        }
         
         // Fetch last activity (dummy implementation)
         setLastActivity({ type: 'course', title: 'Intro to Web Dev', href: '/courses/intro-to-web-dev' });
@@ -73,7 +93,7 @@ const Dashboard: React.FC = () => {
     return <OnboardingForm />;
   }
   
-  const cardVariants = {
+  const cardVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     visible: (i: number) => ({
       opacity: 1,
@@ -105,8 +125,8 @@ const Dashboard: React.FC = () => {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-white">{title}</h2>
           <div className="flex gap-2">
-            <button onClick={() => scroll('left')} className="p-2 bg-gray-800 rounded-full hover:bg-gray-700 transition"><ChevronLeft className="w-5 h-5" /></button>
-            <button onClick={() => scroll('right')} className="p-2 bg-gray-800 rounded-full hover:bg-gray-700 transition"><ChevronRight className="w-5 h-5" /></button>
+            <button onClick={() => scroll('left')} className="p-2 bg-gray-800 rounded-full hover:bg-gray-700 transition" aria-label="Scroll left"><ChevronLeft className="w-5 h-5" /></button>
+            <button onClick={() => scroll('right')} className="p-2 bg-gray-800 rounded-full hover:bg-gray-700 transition" aria-label="Scroll right"><ChevronRight className="w-5 h-5" /></button>
           </div>
         </div>
         <div ref={scrollRef} className="flex gap-4 overflow-x-auto pb-4 scroll-smooth" style={{ scrollbarWidth: 'none', 'msOverflowStyle': 'none' }}>

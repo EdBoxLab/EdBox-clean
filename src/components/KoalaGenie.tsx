@@ -82,11 +82,6 @@ const KoalaGenie = ({ userName = "Inioluwa" }) => {
       </div>
 
       <div className="genie-buttons">
-        <button onClick={handleNudge}>Challenge Me</button>
-        <button onClick={handleQuiz}>Take Logic Quiz</button>
-        <button onClick={toggleTheme}>
-          {darkTheme ? "Switch to Light Theme" : "Switch to Dark Theme"}
-        </button>
       </div>
 
       {showQuiz && (

@@ -17,16 +17,23 @@ export default function SignUpPage() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
     if (error) {
       setError(error.message);
-    } else {
-      // Potentially show a "check your email" message
-      router.push('/');
-      router.refresh();
+    } else if (data.user) {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert([{ id: data.user.id, email: data.user.email }]);
+      if (profileError) {
+        setError(profileError.message);
+      } else {
+        // Potentially show a "check your email" message
+        router.push('/');
+        router.refresh();
+      }
     }
   };
 

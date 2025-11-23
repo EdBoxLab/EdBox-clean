@@ -54,12 +54,15 @@ export const InterestSelector: React.FC<InterestSelectorProps> = ({ onInterestsS
 
   const handleSubmit = () => {
     if (selectedInterests.length >= minSelection) onInterestsSelected(selectedInterests);
+    if (selectedInterests.length >= minSelection) {
+      alert("Select at least 5 interests")
+    }
   };
 
   const canContinue = selectedInterests.length >= minSelection;
 
   const renderSuggestions = (suggestions: string[]) => (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+    <div className="grid grid-cols-2 sm:grid-cols-5 md:grid-cols-4 gap-3">
       {suggestions.map(s => {
         const isSelected = selectedInterests.some(i => i.toLowerCase() === s.toLowerCase());
         return (
@@ -83,7 +86,7 @@ export const InterestSelector: React.FC<InterestSelectorProps> = ({ onInterestsS
 
   return (
     // Root fills viewport and uses column layout so footer can be pinned
-    <div className="min-h-screen flex flex-col bg-slate-900 text-slate-50">
+    <div className="flex flex-col bg-slate-900 text-slate-50">
       {/* Centered responsive container */}
       <div className="flex-1 overflow-auto w-full max-w-5xl mx-auto p-4 sm:p-8">
         <header className="mb-4">
@@ -146,12 +149,12 @@ export const InterestSelector: React.FC<InterestSelectorProps> = ({ onInterestsS
 
         {/* Categories: responsive grid on larger screens */}
         <div className="space-y-4 mb-32 sm:mb-20">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
             {SUGGESTED_INTEREST_CATEGORIES.map(category => {
               const suggestions = (category as any).interests ?? [];
               const isOpen = openCategory === category.name;
               return (
-                <div key={category.name} className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                <div key={category.name} className="bg-slate-900 border border-slate-700 rounded-lg overflow-hidden">
                   <button
                     type="button"
                     onClick={() => setOpenCategory(isOpen ? null : category.name)}
@@ -159,7 +162,7 @@ export const InterestSelector: React.FC<InterestSelectorProps> = ({ onInterestsS
                     aria-expanded={isOpen}
                     aria-controls={`cat-${category.name}`}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <span className="font-semibold">{category.name}</span>
                     </div>
                     <span className={`transform transition-transform ${isOpen ? 'rotate-180' : 'rotate-0'}`}>
@@ -169,7 +172,7 @@ export const InterestSelector: React.FC<InterestSelectorProps> = ({ onInterestsS
 
                   <div
                     id={`cat-${category.name}`}
-                    className={`px-4 pb-4 transition-all ${isOpen ? 'pt-0 max-h-[600px]' : 'max-h-0 overflow-hidden'}`}
+                    className={`px-4 pb-4 transition-all ${isOpen ? 'pt-0 max-h-[500px]' : 'max-h-0 overflow-hidden'}`}
                   >
                     <div className="mt-2">{renderSuggestions(suggestions)}</div>
                   </div>

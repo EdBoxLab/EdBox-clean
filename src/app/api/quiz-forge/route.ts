@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   try {
     const { notes } = await request.json();
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const prompt = `
       Generate a multiple-choice quiz from the following notes. Each question should have four options, and one correct answer.
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
     // Clean the text to ensure it is valid JSON
     const cleanedText = text.replace(/```json\n|```/g, '').trim();
-
+    console.log("result: "+ result+ "response: " + response + "text :"+ text)
     const quiz = JSON.parse(cleanedText);
 
     return NextResponse.json(quiz);

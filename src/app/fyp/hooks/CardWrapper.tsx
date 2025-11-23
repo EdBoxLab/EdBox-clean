@@ -4,7 +4,7 @@ import type { FeedItem, Feedback } from '../types';
 import { GenieAvatar } from './GenieAvatar';
 import { ThumbsUpIcon, ThumbsDownIcon, GenieMagicIcon, BookmarkIcon } from '../MediaIcons';
 import { useSounds } from '../useSounds';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 interface CardWrapperProps {
   item: FeedItem;

@@ -54,6 +54,15 @@ export default function ToolsPage() {
             Generate exhaustive flashcards from an upload or a prompt.
           </p>
         </Link>
+         <Link
+          href="/engines"
+          className="block p-4 sm:p-6 bg-white dark:bg-slate-800 rounded-lg shadow-md hover:shadow-lg transition-shadow"
+        >
+          <h2 className="text-xl sm:text-2xl font-bold mb-2 dark:text-white">Engines</h2>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
+            Access state of the art engines that makes visualizing any learning concepts possible
+          </p>
+        </Link>
       </div>
     </div>
   );

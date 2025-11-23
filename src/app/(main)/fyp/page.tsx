@@ -14,7 +14,7 @@ const welcomeCard: ArticleFeedItem = {
   xp_reward: 10,
   genie_reaction: 'wink',
   theme: 'purple-gradient',
-  title: 'Welcome to your EdBox FYP!',
+  title: 'Welcome to your  For You Page',
   summary: 'Your personalized learning journey starts now. Swipe up to explore, swipe left to skip, and ask Genie for help anytime!',
   full_article_content: `Welcome to EdBox! Here's a quick guide to get you started:
 
@@ -69,9 +69,9 @@ async function decodeAudioData(
 
 const FYPPage: React.FC = () => {
   const [userStats, setUserStats] = useState<UserStats>({
-    xp: 1250,
-    edCoins: 500,
-    streak: 3,
+    xp: 0,
+    edCoins: 0,
+    streak: 0,
   });
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [viewingArticle, setViewingArticle] = useState<ArticleFeedItem | null>(null);

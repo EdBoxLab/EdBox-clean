@@ -1,6 +1,6 @@
-
+/*
 import { GoogleGenAI, Modality, Type } from "@google/genai";
-import { Course, CourseArchetype, CourseCategory, CourseFormat, EngineType, LearningMode, Module, RoadmapNode, AgentState, RecommendedFormat, InteractionType } from "./types";
+import { Course, CourseArchetype, CourseCategory, CourseFormat, EngineType, LearningMode, Module, RoadmapNode, AgentState, RecommendedFormat, InteractionType } from 'types';
 import { createSupabaseServerClient } from './lib/supabase/server';
 
 const sanitizeForPrompt = (text: string): string => {
@@ -327,3 +327,4 @@ export const generateCourse = async (
         return null;
     }
 };
+*/

@@ -87,7 +87,7 @@ export default function CoursesDashboard() {
   };
 
   const handleCreateCourse = () => {
-    router.push('/courses/create');
+    router.push('/creator');
   };
 
   return (
@@ -95,7 +95,7 @@ export default function CoursesDashboard() {
       {/* Create button matches theme accent. Elevated and responsive spacing. */}
       <button
         onClick={handleCreateCourse}
-        className={`fixed sm:absolute bottom-4 sm:bottom-auto right-4 sm:top-6 sm:right-8 ${THEME.buttonFill} ${THEME.buttonHover} text-white px-4 py-2 sm:px-5 sm:py-2.5 text-sm sm:text-base rounded-lg shadow-lg transition`}
+        className={`fixed sm:absolute bottom-3 sm:bottom-auto right-4 sm:top-6 sm:right-8 ${THEME.buttonFill} ${THEME.buttonHover} text-white px-4 py-2 sm:px-5 sm:py-2.5 text-sm sm:text-base rounded-lg shadow-lg transition`}
         aria-label="Create a new course"
       >
         + Create New Course

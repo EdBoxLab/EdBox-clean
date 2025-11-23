@@ -21,7 +21,7 @@ export default function AuthCallbackPage() {
       if (user) {
         setMessage('Your email has been confirmed! Redirecting...');
         setTimeout(() => {
-          router.push('/');
+          router.push('/home');
           router.refresh();
         }, 2000);
       } else {

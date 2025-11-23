@@ -106,6 +106,7 @@ export default function NotesPage() {
               <div className="flex gap-2">
                 {isEditing ? (
                   <button
+                  title='save-button'
                     onClick={handleSaveNote}
                     className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
                   >
@@ -113,6 +114,7 @@ export default function NotesPage() {
                   </button>
                 ) : (
                   <button
+                  title='edit-button'
                     onClick={() => setIsEditing(true)}
                     className="p-2 bg-gray-200 rounded-lg hover:bg-gray-300"
                   >
@@ -120,6 +122,7 @@ export default function NotesPage() {
                   </button>
                 )}
                 <button
+                  title='delete-button'
                   onClick={() => handleDeleteNote(selectedNote.id)}
                   className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
                 >
@@ -129,6 +132,7 @@ export default function NotesPage() {
             </div>
             {isEditing ? (
               <textarea
+              title='edited-content'
                 value={editedContent}
                 onChange={(e) => setEditedContent(e.target.value)}
                 className="w-full h-full p-2 border rounded-lg"

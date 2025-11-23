@@ -12,7 +12,7 @@ const jsonModel = genAI.getGenerativeModel({
 });
 
 // Model for text-only output
-const textModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const textModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },

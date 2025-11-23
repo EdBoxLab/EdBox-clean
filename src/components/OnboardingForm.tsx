@@ -47,7 +47,7 @@ const OnboardingForm = () => {
         <h2 className="text-2xl font-bold mb-4">Complete Your Profile</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label htmlFor="country" className="block text-sm font-medium text-gray-700">Country</label>
+            <label htmlFor="country" className="block text-sm font-medium text-black-700">Country</label>
             <input
               type="text"
               id="country"
@@ -57,7 +57,7 @@ const OnboardingForm = () => {
             />
           </div>
           <div className="mb-4">
-            <label htmlFor="education" className="block text-sm font-medium text-gray-700">Education Level</label>
+            <label htmlFor="education" className="block text-sm font-medium text-black-700">Education Level</label>
             <input
               type="text"
               id="education"
@@ -67,7 +67,7 @@ const OnboardingForm = () => {
             />
           </div>
           <div className="mb-4">
-            <label htmlFor="age" className="block text-sm font-medium text-gray-700">Age</label>
+            <label htmlFor="age" className="block text-sm font-medium text-black-700">Age</label>
             <input
               type="number"
               id="age"

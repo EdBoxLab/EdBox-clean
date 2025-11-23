@@ -40,7 +40,7 @@ const ResearchHub: React.FC<{
                                      <p className="text-sm text-brand-subtext mt-1 truncate">Goal: {pkg.goal}</p>
                                      <p className="text-xs text-gray-400 mt-2">{new Date(pkg.id).toLocaleString()}</p>
                                  </button>
-                                 <button onClick={(e) => { e.stopPropagation(); onDelete(pkg.id); }} className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-100 transition-colors">
+                                 <button title='stop' onClick={(e) => { e.stopPropagation(); onDelete(pkg.id); }} className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-100 transition-colors">
                                      <TrashIcon className="h-5 w-5" />
                                  </button>
                              </div>

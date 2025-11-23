@@ -62,7 +62,7 @@ const engines = [
         title: "Writing Studio",
         description: "Enhance your writing skills with AI-powered assistance.",
         icon: <PenTool className="h-8 w-8 text-indigo-500" />,
-        href: "/writing-studio",
+        href: "/writingstudio",
     },
 ];
 

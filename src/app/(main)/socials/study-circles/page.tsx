@@ -4,7 +4,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Users, Plus, Hash, LogIn, LogOut, Loader2, Send } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 
-const CircleCard = ({ circle, onJoin, onLeave, isProcessing, onSelect }: { circle: any, onJoin: (id: string) => void, onLeave: (id: string) => void, isProcessing: boolean, onSelect: (circle: any) => void }) => (
+const CircleCard = ({ circle, onJoin, onLeave, isProcessing, onSelect }: { 
+  circle: any, 
+  onJoin: (id: number) => void, 
+  onLeave: (id: number) => void, 
+  isProcessing: boolean, 
+  onSelect: (circle: any) => void 
+}) => (
   <div className="bg-gray-800 p-4 rounded-lg flex items-start space-x-4">
     <div className="flex-1 cursor-pointer" onClick={() => onSelect(circle)}>
         <div className="flex items-start space-x-4">
@@ -109,7 +115,7 @@ const CircleChat = ({ circle, onBack, session }: { circle: any, onBack: () => vo
             try {
                 const response = await fetch(`/api/study-circles/${circle.id}/messages`);
                 const data = await response.json();
-                setMessages(data);
+                setMessages(Array.isArray(data) ? data : []);
             } catch (error) {
                 console.error("Failed to fetch messages:", error);
             } finally {
@@ -133,7 +139,7 @@ const CircleChat = ({ circle, onBack, session }: { circle: any, onBack: () => vo
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [circle.id, supabase]);
+    }, [circle.id]);
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -181,7 +187,7 @@ export default function StudyCirclesPage() {
   const [selectedCircle, setSelectedCircle] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [processingId, setProcessingId] = useState<number | null>(null);
   const [session, setSession] = useState<any>(null);
 
    useEffect(() => {
@@ -217,23 +223,37 @@ export default function StudyCirclesPage() {
     setCircles(prev => [circleWithDetails, ...prev].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
   };
 
-  const handleJoin = async (id: string) => {
+  const handleJoin = async (id: number) => {
     setProcessingId(id);
     setCircles(circles.map(c => c.id === id ? { ...c, is_member: true, member_count: c.member_count + 1 } : c));
     try {
-        await fetch(`/api/study-circles/${id}/members`, { method: 'POST' });
+        const response = await fetch(`/api/study-circles/${id}/members`, { method: 'POST' });
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('Join error:', error);
+            // Rollback on error
+            setCircles(circles.map(c => c.id === id ? { ...c, is_member: false, member_count: c.member_count - 1 } : c));
+        }
     } catch (error) {
+        console.error('Join error:', error);
         setCircles(circles.map(c => c.id === id ? { ...c, is_member: false, member_count: c.member_count - 1 } : c));
     }
     setProcessingId(null);
   };
 
-  const handleLeave = async (id: string) => {
+  const handleLeave = async (id: number) => {
     setProcessingId(id);
     setCircles(circles.map(c => c.id === id ? { ...c, is_member: false, member_count: c.member_count - 1 } : c));
     try {
-        await fetch(`/api/study-circles/${id}/members`, { method: 'DELETE' });
+        const response = await fetch(`/api/study-circles/${id}/members`, { method: 'DELETE' });
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('Leave error:', error);
+            // Rollback on error
+            setCircles(circles.map(c => c.id === id ? { ...c, is_member: true, member_count: c.member_count + 1 } : c));
+        }
     } catch (error) {
+        console.error('Leave error:', error);
         setCircles(circles.map(c => c.id === id ? { ...c, is_member: true, member_count: c.member_count + 1 } : c));
     }
     setProcessingId(null);

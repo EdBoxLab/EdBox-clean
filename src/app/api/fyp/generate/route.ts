@@ -16,7 +16,7 @@ const singleItemSchema = {
         // Story
         slides: {
             type: Type.ARRAY,
-            description: "Required for 'story' type. An array of 5-20 slide objects.",
+            description: "Required for 'story' type. An array of 5-15 slide objects.",
             items: {
                 type: Type.OBJECT,
                 properties: {
@@ -86,7 +86,7 @@ const parseOrRepairJson = async (text: string, ai: any): Promise<any> => {
 try {
   // Call the API with the repair prompt.
   const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3',
       contents: prompt,
   });
   

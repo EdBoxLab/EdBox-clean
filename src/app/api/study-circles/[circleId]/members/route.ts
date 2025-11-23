@@ -1,44 +1,120 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
-// Join a circle
-export async function POST(request: Request, { params }: { params: { circleId: string } }) {
-  const supabase = createSupabaseServerClient();
+// GET all messages for a circle
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const supabase = await createSupabaseServerClient();
+    const { id } = await params;
+    
+    const circleId = parseInt(id, 10);
 
-    const circleId = params.circleId;
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    const { error } = await supabase.from('circle_members').insert({ circle_id: circleId, user_id: user.id });
-    if (error) throw error;
+    // Verify user is a member
+    const { data: memberCheck } = await supabase
+      .from('circle_members')
+      .select('user_id')
+      .eq('circle_id', circleId)
+      .eq('user_id', user.id)
+      .maybeSingle();
 
-    return NextResponse.json({ message: 'Successfully joined circle' });
+    if (!memberCheck) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Get messages
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('circle_id', circleId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Fetch messages error:', error);
+      return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
+    }
+
+    return NextResponse.json(data || [], { status: 200 });
 
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+    console.error('Messages GET error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' }, 
+      { status: 500 }
+    );
   }
 }
 
-// Leave a circle
-export async function DELETE(request: Request, { params }: { params: { circleId: string } }) {
-  const supabase = createSupabaseServerClient();
+// POST a new message
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const supabase = await createSupabaseServerClient();
+    const { id } = await params;
+    
+    const circleId = parseInt(id, 10);
 
-    const circleId = params.circleId;
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    const { error } = await supabase
+    // Verify user is a member
+    const { data: memberCheck } = await supabase
       .from('circle_members')
-      .delete()
-      .match({ circle_id: circleId, user_id: user.id });
-      
-    if (error) throw error;
+      .select('user_id')
+      .eq('circle_id', circleId)
+      .eq('user_id', user.id)
+      .maybeSingle();
 
-    return NextResponse.json({ message: 'Successfully left circle' });
+    if (!memberCheck) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { content, username } = await request.json();
+
+    if (!content || !username) {
+      return NextResponse.json(
+        { error: 'Message content and username are required' }, 
+        { status: 400 }
+      );
+    }
+
+    // Insert message
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([{ 
+        content, 
+        user_id: user.id, 
+        circle_id: circleId, 
+        username 
+      }])
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('Insert message error:', error);
+      return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });
+    }
+
+    return NextResponse.json(data, { status: 201 });
 
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+    console.error('Messages POST error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' }, 
+      { status: 500 }
+    );
   }
 }

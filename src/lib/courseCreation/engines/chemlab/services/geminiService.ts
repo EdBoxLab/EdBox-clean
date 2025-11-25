@@ -4,7 +4,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 const getApiKey = (): string => {
   // In a real environment, this comes from process.env.API_KEY
   // For this specific runtime environment, we assume it is available
-  return process.env.API_KEY || '';
+  return process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
 };
 
 const SYSTEM_INSTRUCTION = `

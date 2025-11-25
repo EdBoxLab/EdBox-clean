@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 
 // --- Configuration ---
-const API_KEY = process.env.API_KEY;
+const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
 // XML Spec Mapping
 const THEME_BG = "#28282d";

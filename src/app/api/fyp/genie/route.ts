@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Feed item is required.' }, { status: 400 });
         }
 
-        const ai = new GoogleGenAI(process.env.API_KEY as string);
+        const ai = new GoogleGenAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY as string);
 
         let contentPrompt = '';
         switch (item.type) {

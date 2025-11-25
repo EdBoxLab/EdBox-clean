@@ -5,7 +5,7 @@ const MODEL_FAST = "gemini-2.5-flash";
 
 // Helper to initialize AI client safely within function scope
 // This prevents "process is not defined" errors at module load time
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getAI = () => new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
 
 /**
  * Analyzes the syntax of a sentence and returns a hierarchical tree structure.

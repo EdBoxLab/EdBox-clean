@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 // Initialize Gemini Client
 // Note: In a real app, ensure the key is securely proxied. 
 // Here we assume process.env.API_KEY is available as per instructions.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
 
 export const generateCodeAnalysis = async (code: string, language: string) => {
   try {

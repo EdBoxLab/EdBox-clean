@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 
 // --- Gemini API Configuration ---
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
 
 // --- Types ---
 

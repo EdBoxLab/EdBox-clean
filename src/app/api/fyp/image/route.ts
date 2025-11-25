@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Prompt is required.' }, { status: 400 });
         }
 
-        const ai = new GoogleGenAI(process.env.API_KEY as string);
+        const ai = new GoogleGenAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY as string);
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: {

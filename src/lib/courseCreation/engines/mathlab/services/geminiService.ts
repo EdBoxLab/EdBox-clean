@@ -3,7 +3,7 @@ import { REASONING_MODEL, TTS_MODEL } from "../constants";
 import { MathSolution, ToolType, Point, GeometryElement } from "../types";
 
 // Initialize the client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY});
 
 // Robust Regex-based parser for streaming JSON data
 const extractPointsFromStream = (text: string): Point[] => {

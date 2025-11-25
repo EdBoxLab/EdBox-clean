@@ -16,7 +16,7 @@ const App: React.FC = () => {
 
   // Check for API Key on mount
   useEffect(() => {
-    if (!process.env.API_KEY) {
+    if (!process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
         console.warn("No API_KEY found in env.");
     }
   }, []);

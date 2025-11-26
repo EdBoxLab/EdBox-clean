@@ -1,61 +1,63 @@
+
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Users, Plus, Hash, LogIn, LogOut, Loader2, Send } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 
-const CircleCard = ({ circle, onJoin, onLeave, isProcessing, onSelect }: { 
-  circle: any, 
-  onJoin: (id: number) => void, 
-  onLeave: (id: number) => void, 
-  isProcessing: boolean, 
-  onSelect: (circle: any) => void 
-}) => (
-  <div className="bg-gray-800 p-4 rounded-lg flex items-start space-x-4">
-    <div className="flex-1 cursor-pointer" onClick={() => onSelect(circle)}>
-        <div className="flex items-start space-x-4">
-            <div className="bg-purple-500 p-3 rounded-full">
-                <Hash className="h-6 w-6 text-white" />
-            </div>
-            <div>
-                <h3 className="font-bold text-lg text-white">{circle.name}</h3>
-                <p className="text-sm text-gray-400">{circle.description}</p>
-                <div className="flex items-center text-xs text-gray-500 mt-2">
-                    <Users className="h-4 w-4 mr-1.5" />
-                    <span>{circle.member_count} Members</span>
-                </div>
-            </div>
+const CircleList = ({ circles, onSelectCircle, selectedCircle, onJoin, onLeave, isProcessing, onNewCircle }) => (
+    <div className="flex flex-col bg-gray-800 w-1/3 p-4 space-y-4">
+        <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Study Circles</h2>
+            <button onClick={onNewCircle} className="p-2 bg-purple-600 rounded-full hover:bg-purple-700">
+                <Plus size={20} />
+            </button>
         </div>
+        {circles.map(circle => (
+            <div 
+                key={circle.id} 
+                className={`flex items-center space-x-4 p-3 rounded-lg cursor-pointer ${selectedCircle?.id === circle.id ? 'bg-gray-700' : 'hover:bg-gray-700'}`}
+                onClick={() => onSelectCircle(circle)}
+            >
+                <div className="bg-purple-500 p-3 rounded-full">
+                    <Hash className="h-6 w-6 text-white" />
+                </div>
+                <div className="flex-1">
+                    <h3 className="font-bold text-lg text-white">{circle.name}</h3>
+                    <div className="flex items-center text-xs text-gray-500 mt-1">
+                        <Users className="h-4 w-4 mr-1.5" />
+                        <span>{circle.member_count} Members</span>
+                    </div>
+                </div>
+                {!selectedCircle || selectedCircle.id !== circle.id && (
+                    circle.is_member ? (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); onLeave(circle.id); }}
+                            disabled={isProcessing}
+                            className="p-2 rounded-md bg-red-600 hover:bg-red-700 transition-colors flex items-center text-sm disabled:opacity-50">
+                            <LogOut className="h-4 w-4"/>
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); onJoin(circle.id); }}
+                            disabled={isProcessing}
+                            className="p-2 rounded-md bg-green-600 hover:bg-green-700 transition-colors flex items-center text-sm disabled:opacity-50">
+                            <LogIn className="h-4 w-4"/>
+                        </button>
+                    )
+                )}
+            </div>
+        ))}
     </div>
-    <div className="flex flex-col items-end">
-        { circle.is_member ? (
-            <button 
-                onClick={() => onLeave(circle.id)}
-                disabled={isProcessing}
-                className="py-2 px-4 rounded-md bg-red-600 hover:bg-red-700 transition-colors flex items-center text-sm disabled:opacity-50">
-                <LogOut className="h-4 w-4 mr-1.5"/>
-                Leave
-            </button>
-        ) : (
-            <button 
-                onClick={() => onJoin(circle.id)}
-                disabled={isProcessing}
-                className="py-2 px-4 rounded-md bg-green-600 hover:bg-green-700 transition-colors flex items-center text-sm disabled:opacity-50">
-                <LogIn className="h-4 w-4 mr-1.5"/>
-                Join
-            </button>
-        )}
-    </div>
-  </div>
 );
 
-const CreateCircleModal = ({ onClose, onCircleCreated }: { onClose: () => void, onCircleCreated: (newCircle: any) => void }) => {
+const CreateCircleModal = ({ onClose, onCircleCreated }) => {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
         setError('');
@@ -76,7 +78,7 @@ const CreateCircleModal = ({ onClose, onCircleCreated }: { onClose: () => void, 
             onCircleCreated(newCircle);
             onClose();
         } catch (err) {
-            setError((err as Error).message);
+            setError(err.message);
         } finally {
             setIsLoading(false);
         }
@@ -100,8 +102,8 @@ const CreateCircleModal = ({ onClose, onCircleCreated }: { onClose: () => void, 
     );
 };
 
-const CircleChat = ({ circle, onBack, session }: { circle: any, onBack: () => void, session: any }) => {
-    const [messages, setMessages] = useState<any[]>([]);
+const CircleChat = ({ circle, session }) => {
+    const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -112,6 +114,8 @@ const CircleChat = ({ circle, onBack, session }: { circle: any, onBack: () => vo
 
     useEffect(() => {
         const fetchMessages = async () => {
+            if (!circle) return;
+            setIsLoading(true);
             try {
                 const response = await fetch(`/api/study-circles/${circle.id}/messages`);
                 const data = await response.json();
@@ -123,13 +127,15 @@ const CircleChat = ({ circle, onBack, session }: { circle: any, onBack: () => vo
             }
         };
         fetchMessages();
-    }, [circle.id]);
+    }, [circle?.id]);
 
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
 
     useEffect(() => {
+        if (!circle) return;
+
         const channel = supabase.channel(`realtime:messages:circle=${circle.id}`)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `circle_id=eq.${circle.id}` }, (payload) => {
                 setMessages(messages => [...messages, payload.new]);
@@ -139,9 +145,9 @@ const CircleChat = ({ circle, onBack, session }: { circle: any, onBack: () => vo
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [circle.id]);
+    }, [circle?.id]);
 
-    const handleSendMessage = async (e: React.FormEvent) => {
+    const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!newMessage.trim()) return;
 
@@ -157,38 +163,62 @@ const CircleChat = ({ circle, onBack, session }: { circle: any, onBack: () => vo
         }
     };
 
-    return (
-        <div className="p-8 text-white flex flex-col h-[calc(100vh-10rem)]">
-            <button onClick={onBack} className="mb-4 bg-gray-700 p-2 rounded-lg hover:bg-gray-600 self-start">← Back to Circles</button>
-            <h1 className="text-3xl font-bold text-purple-400">{circle.name}</h1>
-            <p className="text-gray-400 mt-1">{circle.description}</p>
+    if (!circle) {
+        return (
+            <div className="flex-1 p-8 text-white flex flex-col items-center justify-center bg-gray-900">
+                <Hash size={48} className="text-gray-600 mb-4" />
+                <h2 className="text-2xl font-bold text-gray-400">Select a circle to start chatting</h2>
+            </div>
+        );
+    }
+    
+    if (!circle.is_member) {
+        return (
+            <div className="flex-1 p-8 text-white flex flex-col items-center justify-center bg-gray-900">
+                 <h1 className="text-2xl font-bold text-red-400">Access Denied</h1>
+                 <p className="text-gray-400 mt-2">You must be a member of this circle to view the chat.</p>
+            </div>
+        )
+    }
 
-            <div className="flex-1 mt-6 overflow-y-auto pr-4">
-                {isLoading ? <Loader2 className="h-8 w-8 animate-spin" /> : messages.map(msg => (
-                    <div key={msg.id} className="mb-4">
-                        <span className="font-bold text-purple-300">{msg.username}</span>
-                        <p className="text-gray-300">{msg.content}</p>
-                        <span className="text-xs text-gray-500">{new Date(msg.created_at).toLocaleTimeString()}</span>
+    return (
+        <div className="flex-1 flex flex-col h-screen bg-gray-900 text-white">
+            <header className="p-4 bg-gray-800 border-b border-gray-700">
+                <h1 className="text-xl font-bold text-purple-400">{circle.name}</h1>
+                <p className="text-sm text-gray-400">{circle.description}</p>
+            </header>
+
+            <div className="flex-1 p-6 overflow-y-auto">
+                {isLoading ? <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div> : messages.map(msg => (
+                    <div key={msg.id} className={`flex mb-4 ${msg.user_id === session.user.id ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`p-3 rounded-lg max-w-lg ${msg.user_id === session.user.id ? 'bg-purple-600' : 'bg-gray-700'}`}>
+                            <p className="font-bold text-purple-300">{msg.username}</p>
+                            <p className="text-white">{msg.content}</p>
+                            <p className="text-xs text-gray-400 mt-1 text-right">{new Date(msg.created_at).toLocaleTimeString()}</p>
+                        </div>
                     </div>
                 ))}
-                 <div ref={messagesEndRef} />
+                <div ref={messagesEndRef} />
             </div>
 
-            <form onSubmit={handleSendMessage} className="mt-4 flex space-x-2">
-                <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} className="flex-1 bg-gray-700 rounded-md px-4 py-2" placeholder="Type a message..." />
-                <button type="submit" className="bg-purple-600 px-4 py-2 rounded-md"><Send className="h-5 w-5"/></button>
-            </form>
+            <footer className="p-4 bg-gray-800 border-t border-gray-700">
+                <form onSubmit={handleSendMessage} className="flex space-x-2">
+                    <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} className="flex-1 bg-gray-700 rounded-md px-4 py-2" placeholder="Type a message..." />
+                    <button type="submit" className="bg-purple-600 px-4 py-2 rounded-md"><Send className="h-5 w-5"/></button>
+                </form>
+            </footer>
         </div>
     );
 }
 
+
 export default function StudyCirclesPage() {
-  const [circles, setCircles] = useState<any[]>([]);
-  const [selectedCircle, setSelectedCircle] = useState<any>(null);
+  const [circles, setCircles] = useState([]);
+  const [selectedCircle, setSelectedCircle] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [processingId, setProcessingId] = useState<number | null>(null);
-  const [session, setSession] = useState<any>(null);
+  const [processingId, setProcessingId] = useState(null);
+  const [session, setSession] = useState(null);
 
    useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -202,11 +232,15 @@ export default function StudyCirclesPage() {
 
 
   const fetchCircles = async () => {
+    setIsLoading(true);
     try {
       const response = await fetch('/api/study-circles');
       if (!response.ok) throw new Error('Network response was not ok');
       const data = await response.json();
       setCircles(data);
+      if (!selectedCircle && data.length > 0) {
+        setSelectedCircle(data[0]);
+      }
     } catch (error) {
       console.error("Failed to fetch circles:", error);
     } finally {
@@ -216,80 +250,70 @@ export default function StudyCirclesPage() {
 
   useEffect(() => {
     fetchCircles();
+
+    const channel = supabase.channel('realtime:circles')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'study_circles' }, fetchCircles)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'circle_members' }, fetchCircles)
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
   }, []);
 
-  const handleCircleCreated = (newCircle: any) => {
+  const handleCircleCreated = (newCircle) => {
     const circleWithDetails = { ...newCircle, member_count: 1, is_member: true };
     setCircles(prev => [circleWithDetails, ...prev].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+    setSelectedCircle(circleWithDetails);
   };
 
-  const handleJoin = async (id: number) => {
+  const handleJoin = async (id) => {
     setProcessingId(id);
-    setCircles(circles.map(c => c.id === id ? { ...c, is_member: true, member_count: c.member_count + 1 } : c));
+    // UI update is now handled by realtime subscription
     try {
-        const response = await fetch(`/api/study-circles/${id}/members`, { method: 'POST' });
-        if (!response.ok) {
-            const error = await response.json();
-            console.error('Join error:', error);
-            // Rollback on error
-            setCircles(circles.map(c => c.id === id ? { ...c, is_member: false, member_count: c.member_count - 1 } : c));
-        }
+        await fetch(`/api/study-circles/${id}/members`, { method: 'POST' });
     } catch (error) {
         console.error('Join error:', error);
-        setCircles(circles.map(c => c.id === id ? { ...c, is_member: false, member_count: c.member_count - 1 } : c));
     }
     setProcessingId(null);
   };
 
-  const handleLeave = async (id: number) => {
+  const handleLeave = async (id) => {
     setProcessingId(id);
-    setCircles(circles.map(c => c.id === id ? { ...c, is_member: false, member_count: c.member_count - 1 } : c));
+    // UI update is now handled by realtime subscription
+    if (selectedCircle && selectedCircle.id === id) {
+        setSelectedCircle(null);
+    }
     try {
-        const response = await fetch(`/api/study-circles/${id}/members`, { method: 'DELETE' });
-        if (!response.ok) {
-            const error = await response.json();
-            console.error('Leave error:', error);
-            // Rollback on error
-            setCircles(circles.map(c => c.id === id ? { ...c, is_member: true, member_count: c.member_count + 1 } : c));
-        }
+        await fetch(`/api/study-circles/${id}/members`, { method: 'DELETE' });
     } catch (error) {
         console.error('Leave error:', error);
-        setCircles(circles.map(c => c.id === id ? { ...c, is_member: true, member_count: c.member_count + 1 } : c));
     }
     setProcessingId(null);
   };
 
-  if (selectedCircle) {
-      if (!selectedCircle.is_member) {
-          return (
-            <div className="p-8 text-white">
-                <button onClick={() => setSelectedCircle(null)} className="mb-4 bg-gray-700 p-2 rounded-lg hover:bg-gray-600">← Back to Circles</button>
-                <h1 className="text-2xl font-bold text-red-400">Access Denied</h1>
-                <p className="text-gray-400 mt-2">You must be a member of this circle to view the chat.</p>
-            </div>
-          )
-      }
-      return <CircleChat circle={selectedCircle} onBack={() => setSelectedCircle(null)} session={session} />;
-  }
-
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Study Circles</h1>
-          <button onClick={() => setIsModalOpen(true)} className="bg-purple-600 py-2 px-4 rounded-lg flex items-center"><Plus className="h-5 w-5 mr-2" />Create Circle</button>
+    <div className="flex h-screen bg-gray-900 text-white">
+      {isLoading ? (
+        <div className="flex justify-center items-center w-full">
+          <Loader2 className="h-12 w-12 animate-spin" />
         </div>
+      ) : (
+        <>
+          <CircleList 
+            circles={circles}
+            onSelectCircle={setSelectedCircle}
+            selectedCircle={selectedCircle}
+            onJoin={handleJoin}
+            onLeave={handleLeave}
+            isProcessing={!!processingId}
+            onNewCircle={() => setIsModalOpen(true)}
+          />
+          <CircleChat circle={selectedCircle} session={session} />
+        </>
+      )}
 
-        {isLoading ? <div className="flex justify-center"><Loader2 className="h-12 w-12 animate-spin" /></div> : (
-            <div className="space-y-4">
-              {circles.map(circle => (
-                <CircleCard key={circle.id} circle={circle} onJoin={handleJoin} onLeave={handleLeave} isProcessing={processingId === circle.id} onSelect={setSelectedCircle} />
-              ))}
-            </div>
-        )}
-
-        {isModalOpen && <CreateCircleModal onClose={() => setIsModalOpen(false)} onCircleCreated={handleCircleCreated} />}
-      </div>
+      {isModalOpen && <CreateCircleModal onClose={() => setIsModalOpen(false)} onCircleCreated={handleCircleCreated} />}
     </div>
   );
 }

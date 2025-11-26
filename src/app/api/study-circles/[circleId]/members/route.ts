@@ -1,119 +1,104 @@
+
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
-// GET all messages for a circle
-export async function GET(
+// POST - Add a member to a circle
+export async function POST(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { circleId: string } }
 ) {
   try {
     const supabase = await createSupabaseServerClient();
-    const { id } = await params;
+    const { circleId } = params;
     
-    const circleId = parseInt(id, 10);
+    const numericCircleId = parseInt(circleId, 10);
+    if (isNaN(numericCircleId)) {
+        return NextResponse.json({ error: 'Invalid circle ID' }, { status: 400 });
+    }
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify user is a member
-    const { data: memberCheck } = await supabase
+    // Check if user is already a member
+    const { data: existingMember, error: checkError } = await supabase
       .from('circle_members')
       .select('user_id')
-      .eq('circle_id', circleId)
+      .eq('circle_id', numericCircleId)
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (!memberCheck) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (checkError) {
+        console.error('Error checking membership:', checkError);
+        return NextResponse.json({ error: 'Failed to process membership' }, { status: 500 });
     }
 
-    // Get messages
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('circle_id', circleId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      console.error('Fetch messages error:', error);
-      return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
+    if (existingMember) {
+        return NextResponse.json({ message: 'User is already a member' }, { status: 200 });
     }
 
-    return NextResponse.json(data || [], { status: 200 });
+    // Add user to the circle
+    const { error: insertError } = await supabase
+      .from('circle_members')
+      .insert({
+        circle_id: numericCircleId,
+        user_id: user.id,
+      });
+
+    if (insertError) {
+      console.error('Error joining circle:', insertError);
+      return NextResponse.json({ error: 'Failed to join circle' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, message: 'Successfully joined circle' }, { status: 201 });
 
   } catch (error) {
-    console.error('Messages GET error:', error);
+    console.error('Join circle error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' }, 
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );
   }
 }
 
-// POST a new message
-export async function POST(
+// DELETE - Remove a member from a circle
+export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { circleId: string } }
 ) {
   try {
     const supabase = await createSupabaseServerClient();
-    const { id } = await params;
-    
-    const circleId = parseInt(id, 10);
+    const { circleId } = params;
+
+    const numericCircleId = parseInt(circleId, 10);
+    if (isNaN(numericCircleId)) {
+        return NextResponse.json({ error: 'Invalid circle ID' }, { status: 400 });
+    }
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify user is a member
-    const { data: memberCheck } = await supabase
+    // Remove user from the circle
+    const { error: deleteError } = await supabase
       .from('circle_members')
-      .select('user_id')
-      .eq('circle_id', circleId)
-      .eq('user_id', user.id)
-      .maybeSingle();
+      .delete()
+      .eq('circle_id', numericCircleId)
+      .eq('user_id', user.id);
 
-    if (!memberCheck) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (deleteError) {
+      console.error('Error leaving circle:', deleteError);
+      return NextResponse.json({ error: 'Failed to leave circle' }, { status: 500 });
     }
 
-    const { content, username } = await request.json();
-
-    if (!content || !username) {
-      return NextResponse.json(
-        { error: 'Message content and username are required' }, 
-        { status: 400 }
-      );
-    }
-
-    // Insert message
-    const { data, error } = await supabase
-      .from('messages')
-      .insert([{ 
-        content, 
-        user_id: user.id, 
-        circle_id: circleId, 
-        username 
-      }])
-      .select()
-      .single();
-      
-    if (error) {
-      console.error('Insert message error:', error);
-      return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });
-    }
-
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json({ success: true, message: 'Successfully left circle' }, { status: 200 });
 
   } catch (error) {
-    console.error('Messages POST error:', error);
+    console.error('Leave circle error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' }, 
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );
   }

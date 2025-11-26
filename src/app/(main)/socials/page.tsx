@@ -1,10 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { ElementType } from 'react';
 import Link from 'next/link';
-import { Users, Star, Shuffle, Trophy } from 'lucide-react';
+import { Users, Star, Trophy } from 'lucide-react';
 
-const FeatureCard = ({ title, description, href, icon: Icon }: { title: string, description: string, href?: string, icon: React.ElementType }) => {
+const FeatureCard = ({ title, description, href, icon: Icon }: { title: string, description: string, href?: string, icon: ElementType }) => {
     const content = (
         <div className="feature-placeholder">
             <Icon className="mx-auto mb-4 h-12 w-12 text-purple-400" />
@@ -79,7 +79,7 @@ export default function SocialPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
             <FeatureCard 
                 title="Study Circles" 
                 description="Small, invite-only learning squads." 
@@ -91,12 +91,6 @@ export default function SocialPage() {
                 description="Follow your favorite creators." 
                 href="/socials/creator-profiles"
                 icon={Star}
-            />
-            <FeatureCard 
-                title="Content Remix" 
-                description="Remix flashcards and quizzes." 
-                href="/socials/content-remix"
-                icon={Shuffle}
             />
             <FeatureCard 
                 title="Leaderboards" 

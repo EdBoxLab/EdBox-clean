@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       .select('circle_id');
 
     if (memberCountsError) {
-      console.error('❌ Member counts error:', memberCountsError);
+      console.error(' Member counts error:', memberCountsError);
     }
 
     console.log('5. Getting user memberships...');
@@ -58,7 +58,7 @@ export async function GET(request: Request) {
       .eq('user_id', user.id);
 
     if (membershipsError) {
-      console.error('❌ Memberships error:', membershipsError);
+      console.error(' Memberships error:', membershipsError);
     }
 
     console.log('✓ User memberships:', userMemberships?.length);
@@ -91,8 +91,8 @@ export async function GET(request: Request) {
     });
 
   } catch (error) {
-    console.error('❌ FULL ERROR:', error);
-    console.error('❌ ERROR STACK:', (error as Error).stack);
+    console.error(' FULL ERROR:', error);
+    console.error(' ERROR STACK:', (error as Error).stack);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal server error' }, 
       { status: 500 }

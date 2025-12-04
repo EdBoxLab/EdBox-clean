@@ -1,5 +1,5 @@
+"use client"
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { createRoot } from "react-dom/client";
 import { GoogleGenAI, Type, Modality, LiveServerMessage } from "@google/genai";
 import {
   BookOpen,
@@ -822,6 +822,5 @@ const WriteLab = () => {
     </div>
   );
 };
-const root = createRoot(document.getElementById("root")!);
-root.render(<WriteLab />);
-export default root ;
+
+export default WriteLab;

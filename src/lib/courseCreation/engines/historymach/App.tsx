@@ -1,6 +1,5 @@
-
+"use client"
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { createRoot } from "react-dom/client";
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import {
   Clock,
@@ -1135,6 +1134,4 @@ const App = () => {
   );
 };
 
-const root = createRoot(document.getElementById("root")!);
-root.render(<App />);
 export default App ;

@@ -55,12 +55,12 @@ const SideMenu = () => {
       href: '/feed',
       label: 'Feed',
       icon: <Sparkles className="w-6 h-6" />,
-    },
+    },/*
      {
       href: '/saved',
       label: 'Saved',
       icon: <BookmarkIcon filled={false} />
-    },
+    },*/
     {
       href: '/tools',
       label: 'Tools',

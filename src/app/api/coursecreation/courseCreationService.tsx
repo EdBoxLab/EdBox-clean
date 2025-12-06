@@ -1,357 +1,574 @@
-// app/api/generate-course/route.ts
+// app/api/learning-path/generate/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI, Modality, Type } from "@google/genai";
-import { Course, CourseArchetype, CourseCategory, CourseFormat, EngineType, LearningMode, Module, RoadmapNode, AgentState, RecommendedFormat, InteractionType } from '@/app/api/coursecreation/types';
+import { GoogleGenAI, Type } from "@google/genai";
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
+// ============= TYPES =============
+
+enum LearningContext {
+  HighSchool = "high_school",
+  College = "college",
+  JobSeeking = "job_seeking",
+  BuildingProjects = "building_projects"
+}
+
+enum EngineType {
+  CodeStudio = "codestudio",
+  LinguaLab = "lingualab",
+  ArtStudio = "artstudio",
+  HistoryMach = "historymach",
+  PhysicsEngine = "physicsengine",
+  ChemLab = "chemlab",
+  MathLab = "mathlab",
+  FinLab = "finlab",
+  WritingStudio = "writingstudio"
+}
+
+interface MicroSkill {
+  id: string;
+  name: string;
+  description: string;
+  engine: EngineType;
+  estimatedMinutes: number; // 2-5 minutes
+  prerequisites: string[]; // Other skill IDs
+  masteryThreshold: {
+    minChallenges: number;
+    minConfidence: number;
+    minSuccessRate: number;
+  };
+  challengeTypes: string[];
+  xpReward: number;
+}
+
+interface SkillPath {
+  id: string;
+  name: string;
+  description: string;
+  skills: MicroSkill[];
+}
+
+interface MiniProject {
+  id: string;
+  name: string;
+  description: string;
+  unlocksAfter: string[]; // Skill IDs
+  engine: EngineType;
+  estimatedMinutes: number;
+  xpReward: number;
+  shareTemplate: string;
+}
+
+interface SkillGraph {
+  id: string;
+  userId: string;
+  goal: string;
+  context: LearningContext;
+  totalSkills: number;
+  estimatedHours: string;
+  skillPaths: SkillPath[];
+  miniProjects: MiniProject[];
+  capstoneProject: MiniProject;
+  createdAt: string;
+}
+
+interface LearnerState {
+  id: string;
+  userId: string;
+  skillGraphId: string;
+  skillMastery: Record<string, {
+    confidence: number;
+    challengesCompleted: number;
+    successRate: number;
+    timeSpent: number;
+    lastPracticed: string | null;
+    isMastered: boolean;
+  }>;
+  currentSkill: string | null;
+  streak: number;
+  totalXP: number;
+  level: number;
+  badges: string[];
+  startedAt: string;
+}
+
 // ============= API KEY MANAGEMENT =============
-const getApiKeys = () => {
-  const keys = [
-    process.env.GEMINI_API_KEY_1,
-    process.env.GEMINI_API_KEY_2,
-    process.env.GEMINI_API_KEY_3,
-    process.env.GEMINI_API_KEY_4,
-    process.env.GEMINI_API_KEY_5,
-  ].filter((key): key is string => Boolean(key));
 
-  console.log('🔑 Server-side keys check:', {
-    totalKeys: keys.length,
-    key1: process.env.GEMINI_API_KEY_1 ? '✅' : '❌',
-    key2: process.env.GEMINI_API_KEY_2 ? '✅' : '❌',
-  });
-
-  if (keys.length === 0) {
-    throw new Error('No API keys configured');
-  }
-  return keys;
-};
+const API_KEYS = [
+  process.env.GEMINI_API_KEY_1,
+  process.env.GEMINI_API_KEY_2,
+  process.env.GEMINI_API_KEY_3,
+  process.env.GEMINI_API_KEY_4,
+  process.env.GEMINI_API_KEY_5,
+].filter(Boolean) as string[];
 
 let currentKeyIndex = 0;
+
 const getNextApiKey = (): string => {
-  const keys = getApiKeys();
-  const key = keys[currentKeyIndex];
-  currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+  if (API_KEYS.length === 0) throw new Error('No API keys configured');
+  const key = API_KEYS[currentKeyIndex];
+  currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
   return key;
 };
 
-const createAIClient = () => new GoogleGenAI({ apiKey: getNextApiKey() });
+const createAI = () => new GoogleGenAI({ apiKey: getNextApiKey() });
 
-// ============= RETRY LOGIC =============
-const retryWithBackoff = async <T,>(
+// ============= RETRY WITH EXPONENTIAL BACKOFF =============
+
+async function retryWithBackoff<T>(
   fn: () => Promise<T>,
-  maxRetries: number = 3,
-  baseDelay: number = 1000
-): Promise<T> => {
-  for (let i = 0; i < maxRetries; i++) {
+  maxRetries = 3,
+  baseDelay = 1000
+): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await fn();
     } catch (error: any) {
-      const isRateLimitError = error?.message?.includes('429') || error?.message?.includes('RESOURCE_EXHAUSTED');
-      const isLastRetry = i === maxRetries - 1;
-      if (isLastRetry || !isRateLimitError) throw error;
-
-      let retryDelay = baseDelay * Math.pow(2, i);
-      if (error?.message?.includes('retry in')) {
-        const match = error.message.match(/retry in ([\d.]+)s/);
-        if (match) retryDelay = parseFloat(match[1]) * 1000;
+      const isRateLimitError = 
+        error?.message?.includes('429') || 
+        error?.message?.includes('RESOURCE_EXHAUSTED');
+      
+      const isLastAttempt = attempt === maxRetries - 1;
+      
+      if (isLastAttempt || !isRateLimitError) {
+        throw error;
       }
-      console.log(`⏳ Retry in ${retryDelay}ms... (${i + 1}/${maxRetries})`);
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
+
+      // Exponential backoff with jitter
+      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+      console.log(`⏳ Retry ${attempt + 1}/${maxRetries} in ${Math.round(delay)}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
   throw new Error('Max retries exceeded');
-};
+}
 
-const sanitizeForPrompt = (text: string): string => {
-  if (!text) return '';
-  return text
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r')
-    .replace(/\t/g, '\\t');
-};
+// ============= AI GENERATION FUNCTIONS =============
 
-// ============= AGENT FUNCTIONS =============
-const agent_InitialCoursePlanner = async (prompt: string, fileTextContent?: string): Promise<Partial<Course>> => {
-  const ai = createAIClient();
-  const systemPrompt = `Agent: Initial Course Planner.\nAnalyze the user's request and define the course's core attributes. Respond with JSON containing: category, subject, title, description, level, engine, courseArchetype.\n- category: ${Object.values(CourseCategory).join(', ')}\n- level: Beginner, Intermediate, Advanced\n- engine: ${Object.values(EngineType).join(', ')}\n- courseArchetype: ${Object.values(CourseArchetype).join(', ')}`;
+/**
+ * Step 1: Analyze user's goal and context to determine learning intent
+ */
+async function analyzeGoal(
+  goal: string,
+  context: LearningContext,
+  timeAvailable?: string,
+  uploadedFileContent?: string
+): Promise<{
+  parsedGoal: string;
+  domain: string;
+  targetProficiency: string;
+  estimatedTotalHours: number;
+  recommendedEngine: EngineType;
+}> {
+  const ai = createAI();
+  
+  const systemPrompt = `You are an expert learning path designer for Gen Z students (16-24).
 
-  let fileContext = fileTextContent ? `\n\nDocument: """${sanitizeForPrompt(fileTextContent.substring(0, 4000))}"""` : '';
+Analyze the user's goal and determine:
+1. What they actually want to learn (be specific)
+2. Which domain this falls under
+3. Target proficiency level they need
+4. Realistic time estimate (in hours)
+5. Best engine for this learning goal
+
+Context about the user:
+- Situation: ${context}
+- They prefer bite-sized learning (2-5 min micro-skills)
+- They want to BUILD, not just learn theory
+- They're on mobile often
+
+Available engines:
+- codestudio: Programming, web dev, algorithms, APIs
+- lingualab: Language learning, conversation, pronunciation
+- artstudio: Digital art, drawing, design
+- historymach: History, geography, timelines
+- physicsengine: Physics simulations, experiments
+- chemlab: Chemistry experiments, reactions
+- mathlab: Math problem-solving, graphing, statistics
+- finlab: Finance, investing, business concepts
+- writingstudio: Writing, content creation, journalism
+
+Respond ONLY with valid JSON.`;
+
+  const fileContext = uploadedFileContent 
+    ? `\n\nUploaded document context: ${uploadedFileContent.substring(0, 3000)}` 
+    : '';
 
   return retryWithBackoff(async () => {
     const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash-exp',
-      contents: `User: "${prompt}"${fileContext}`,
+      contents: `Goal: "${goal}"${fileContext}`,
       config: {
         systemInstruction: systemPrompt,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            category: { type: Type.STRING },
-            subject: { type: Type.STRING },
-            title: { type: Type.STRING },
-            description: { type: Type.STRING },
-            level: { type: Type.STRING },
-            engine: { type: Type.STRING },
-            courseArchetype: { type: Type.STRING },
+            parsedGoal: { type: Type.STRING },
+            domain: { type: Type.STRING },
+            targetProficiency: { type: Type.STRING },
+            estimatedTotalHours: { type: Type.NUMBER },
+            recommendedEngine: { type: Type.STRING },
           },
-          required: ['category', 'subject', 'title', 'description', 'level', 'engine', 'courseArchetype']
+          required: ['parsedGoal', 'domain', 'targetProficiency', 'estimatedTotalHours', 'recommendedEngine']
         }
-      },
+      }
     });
+    
     return JSON.parse(response.text);
   });
-};
+}
 
-const agent_RoadmapDesigner = async (courseInfo: Partial<Course>): Promise<{ roadmap: RoadmapNode[] }> => {
-  const ai = createAIClient();
-  const systemPrompt = `Agent: Roadmap Designer.\nCreate a structured learning roadmap with 4 stages: Foundations, Core, Advanced, and Capstone.\nFor each stage, define 1-3 relevant module titles.\nRespond with JSON containing a 'roadmap' array.`;
+/**
+ * Step 2: Generate personalized skill graph (the core learning path)
+ */
+async function generateSkillGraph(
+  parsedGoal: string,
+  domain: string,
+  context: LearningContext,
+  targetProficiency: string,
+  primaryEngine: EngineType
+): Promise<{
+  skillPaths: SkillPath[];
+  miniProjects: MiniProject[];
+  capstoneProject: MiniProject;
+}> {
+  const ai = createAI();
+
+  // Personalization based on context
+  const contextualGuidance = {
+    [LearningContext.HighSchool]: `
+- Keep language simple and encouraging
+- More scaffolding in early skills
+- Focus on portfolio building for college apps
+- Include fun, shareable projects`,
+    
+    [LearningContext.College]: `
+- Assume some technical background
+- Focus on internship-ready skills
+- Include hackathon-worthy projects
+- Career-oriented outcomes`,
+    
+    [LearningContext.JobSeeking]: `
+- Interview-focused skills
+- Industry-standard projects
+- Resume-worthy outcomes
+- Fast-track to job readiness`,
+    
+    [LearningContext.BuildingProjects]: `
+- Emphasize shipping and launching
+- MVP-focused projects
+- Monetization strategies
+- Full-stack capabilities`
+  };
+
+  const systemPrompt = `You are an expert curriculum designer for Gen Z learners.
+
+Create a skill graph with MICRO-SKILLS (2-5 minutes each).
+
+CRITICAL RULES:
+1. Each micro-skill = ONE atomic capability (not a broad topic)
+2. Skills must be DEMONSTRABLE in an engine
+3. Total 12-20 micro-skills (not more!)
+4. Organize into 3-5 logical skill paths
+5. Include 2-3 mini-projects (5-15 min each)
+6. One epic capstone project (20-40 min)
+
+Target: ${parsedGoal}
+Domain: ${domain}
+Proficiency: ${targetProficiency}
+Primary Engine: ${primaryEngine}
+
+PERSONALIZATION:
+${contextualGuidance[context]}
+
+Micro-skill naming: Be SPECIFIC and ACTION-oriented
+❌ Bad: "Learn Variables"
+✅ Good: "Declare and Use Variables"
+
+❌ Bad: "Understanding Functions"  
+✅ Good: "Write Your First Function"
+
+Each skill unlocks when prerequisites are mastered.
+
+Respond ONLY with valid JSON.`;
 
   return retryWithBackoff(async () => {
     const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash-exp',
-      contents: `Design a roadmap for a ${courseInfo.level} course: "${courseInfo.title}" on ${courseInfo.subject}. Format: ${courseInfo.format}, Mode: ${courseInfo.mode}`,
+      contents: systemPrompt,
       config: {
-        systemInstruction: systemPrompt,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            roadmap: {
+            skillPaths: {
               type: Type.ARRAY,
               items: {
                 type: Type.OBJECT,
                 properties: {
                   id: { type: Type.STRING },
-                  title: { type: Type.STRING },
-                  level: { type: Type.STRING },
-                  modules: {
+                  name: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  skills: {
                     type: Type.ARRAY,
                     items: {
                       type: Type.OBJECT,
                       properties: {
                         id: { type: Type.STRING },
-                        title: { type: Type.STRING },
+                        name: { type: Type.STRING },
+                        description: { type: Type.STRING },
+                        engine: { type: Type.STRING },
+                        estimatedMinutes: { type: Type.NUMBER },
+                        prerequisites: { type: Type.ARRAY, items: { type: Type.STRING } },
+                        masteryThreshold: {
+                          type: Type.OBJECT,
+                          properties: {
+                            minChallenges: { type: Type.NUMBER },
+                            minConfidence: { type: Type.NUMBER },
+                            minSuccessRate: { type: Type.NUMBER }
+                          },
+                          required: ['minChallenges', 'minConfidence', 'minSuccessRate']
+                        },
+                        challengeTypes: { type: Type.ARRAY, items: { type: Type.STRING } },
+                        xpReward: { type: Type.NUMBER }
                       },
-                      required: ['id', 'title'],
-                    },
+                      required: ['id', 'name', 'description', 'engine', 'estimatedMinutes', 'prerequisites', 'masteryThreshold', 'challengeTypes', 'xpReward']
+                    }
                   }
                 },
-                required: ['id', 'title', 'level', 'modules']
+                required: ['id', 'name', 'description', 'skills']
               }
-            }
-          },
-          required: ['roadmap']
-        }
-      },
-    });
-    return JSON.parse(response.text);
-  });
-};
-
-const agent_ModuleDesigner = async (courseInfo: Partial<Course>, moduleTitle: string): Promise<Module> => {
-  const ai = createAIClient();
-  const interactionTypes = Object.values(InteractionType).join(', ');
-  const systemPrompt = `Agent: Interactive Experience Designer.\nDesign an engaging learning module. Create concise content (2-3 sentences) and 2-4 diverse interactions. Select appropriate interaction types: [${interactionTypes}]`;
-
-  return retryWithBackoff(async () => {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
-      contents: `Course: "${courseInfo.title}" (${courseInfo.subject})\nEngine: ${courseInfo.engine}, Format: ${courseInfo.format}\nModule: "${moduleTitle}"`,
-      config: {
-        systemInstruction: systemPrompt,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            id: { type: Type.STRING },
-            title: { type: Type.STRING },
-            estimatedTime: { type: Type.STRING },
-            content: { type: Type.STRING },
-            interactions: {
+            },
+            miniProjects: {
               type: Type.ARRAY,
               items: {
                 type: Type.OBJECT,
                 properties: {
                   id: { type: Type.STRING },
-                  type: { type: Type.STRING },
-                  title: { type: Type.STRING },
-                  content: { type: Type.STRING },
+                  name: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  unlocksAfter: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  engine: { type: Type.STRING },
+                  estimatedMinutes: { type: Type.NUMBER },
+                  xpReward: { type: Type.NUMBER },
+                  shareTemplate: { type: Type.STRING }
                 },
-                required: ['id', 'type', 'title', 'content']
+                required: ['id', 'name', 'description', 'unlocksAfter', 'engine', 'estimatedMinutes', 'xpReward', 'shareTemplate']
               }
             },
-            isCompleted: { type: Type.BOOLEAN },
-            completedInteractionIds: { type: Type.ARRAY, items: { type: Type.STRING } }
+            capstoneProject: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                name: { type: Type.STRING },
+                description: { type: Type.STRING },
+                unlocksAfter: { type: Type.ARRAY, items: { type: Type.STRING } },
+                engine: { type: Type.STRING },
+                estimatedMinutes: { type: Type.NUMBER },
+                xpReward: { type: Type.NUMBER },
+                shareTemplate: { type: Type.STRING }
+              },
+              required: ['id', 'name', 'description', 'unlocksAfter', 'engine', 'estimatedMinutes', 'xpReward', 'shareTemplate']
+            }
           },
-          required: ['id', 'title', 'estimatedTime', 'content', 'interactions']
+          required: ['skillPaths', 'miniProjects', 'capstoneProject']
         }
       }
     });
-    const moduleData = JSON.parse(response.text);
-    moduleData.isCompleted = false;
-    moduleData.completedInteractionIds = [];
-    return moduleData;
+
+    return JSON.parse(response.text);
   });
-};
+}
 
-const agent_CoverImageDesigner = async (courseInfo: Partial<Course>): Promise<{ coverImageUrl: string }> => {
-  const ai = createAIClient();
-  const prompt = `Vibrant educational cover image for: "${courseInfo.title}". Minimalist, inspiring, teal and indigo colors. Digital art, vector illustration.`;
+// ============= MAIN ENDPOINT =============
 
-  return retryWithBackoff(async () => {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
-      contents: { parts: [{ text: prompt }] },
-      config: { responseModalities: [Modality.IMAGE] },
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { 
+      goal, 
+      context = LearningContext.College, 
+      timeAvailable,
+      uploadedFile 
+    } = body;
+
+    // Validation
+    if (!goal || typeof goal !== 'string' || goal.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'Goal is required and must be a non-empty string' },
+        { status: 400 }
+      );
+    }
+
+    console.log('🚀 Starting learning path generation...');
+    console.log(`📝 Goal: "${goal}"`);
+    console.log(`👤 Context: ${context}`);
+
+    // Get user ID from auth
+    const supabase = await createSupabaseServerClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    // STEP 1: Analyze goal
+    console.log('🧠 Step 1: Analyzing goal...');
+    const analysis = await analyzeGoal(
+      goal,
+      context,
+      timeAvailable,
+      uploadedFile?.content
+    );
+    
+    console.log(`✅ Analysis complete:`, {
+      domain: analysis.domain,
+      engine: analysis.recommendedEngine,
+      hours: analysis.estimatedTotalHours
     });
 
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        return { coverImageUrl: `data:image/png;base64,${part.inlineData.data}` };
-      }
-    }
-    throw new Error("No image generated");
-  }, 3, 2000).catch(() => {
-    return { coverImageUrl: `https://placehold.co/600x400/1e1b4b/2dd4bf?text=${encodeURIComponent(courseInfo.title || 'Course')}` };
-  });
-};
+    // STEP 2: Generate skill graph
+    console.log('🗺️ Step 2: Generating skill graph...');
+    const skillGraphData = await generateSkillGraph(
+      analysis.parsedGoal,
+      analysis.domain,
+      context,
+      analysis.targetProficiency,
+      analysis.recommendedEngine as EngineType
+    );
 
-// ============= RECOMMEND FORMATS =============
+    // Count total skills
+    const totalSkills = skillGraphData.skillPaths.reduce(
+      (sum, path) => sum + path.skills.length,
+      0
+    );
+
+    console.log(`✅ Skill graph generated: ${totalSkills} micro-skills`);
+
+    // STEP 3: Build final skill graph
+    const skillGraph: SkillGraph = {
+      id: `sg_${Date.now()}_${user.id.substring(0, 8)}`,
+      userId: user.id,
+      goal: analysis.parsedGoal,
+      context,
+      totalSkills,
+      estimatedHours: `${Math.ceil(analysis.estimatedTotalHours)}-${Math.ceil(analysis.estimatedTotalHours * 1.3)} hours`,
+      skillPaths: skillGraphData.skillPaths,
+      miniProjects: skillGraphData.miniProjects,
+      capstoneProject: skillGraphData.capstoneProject,
+      createdAt: new Date().toISOString()
+    };
+
+    // STEP 4: Initialize learner state
+    console.log('👤 Step 3: Initializing learner state...');
+    const allSkills = skillGraphData.skillPaths.flatMap(path => path.skills);
+    
+    const skillMastery: LearnerState['skillMastery'] = {};
+    allSkills.forEach(skill => {
+      skillMastery[skill.id] = {
+        confidence: 0.0,
+        challengesCompleted: 0,
+        successRate: 0.0,
+        timeSpent: 0,
+        lastPracticed: null,
+        isMastered: false
+      };
+    });
+
+    const learnerState: LearnerState = {
+      id: `ls_${Date.now()}_${user.id.substring(0, 8)}`,
+      userId: user.id,
+      skillGraphId: skillGraph.id,
+      skillMastery,
+      currentSkill: null, // Will be set when user starts first session
+      streak: 0,
+      totalXP: 0,
+      level: 1,
+      badges: [],
+      startedAt: new Date().toISOString()
+    };
+
+    // STEP 5: Save to database
+    console.log('💾 Step 4: Saving to database...');
+    
+    const { error: graphError } = await supabase
+      .from('skill_graphs')
+      .insert([skillGraph]);
+
+    if (graphError) {
+      console.error('❌ Failed to save skill graph:', graphError);
+      throw new Error(`Database error: ${graphError.message}`);
+    }
+
+    const { error: stateError } = await supabase
+      .from('learner_states')
+      .insert([learnerState]);
+
+    if (stateError) {
+      console.error('❌ Failed to save learner state:', stateError);
+      throw new Error(`Database error: ${stateError.message}`);
+    }
+
+    console.log('✅ Learning path generated successfully!');
+
+    // STEP 6: Return response
+    return NextResponse.json({
+      success: true,
+      skillGraph: {
+        ...skillGraph,
+        // Add some UI-friendly computed properties
+        readySkills: allSkills.filter(s => s.prerequisites.length === 0).length,
+        totalProjects: skillGraphData.miniProjects.length + 1, // +1 for capstone
+      },
+      learnerState: {
+        id: learnerState.id,
+        totalSkills,
+        masteredSkills: 0,
+        currentLevel: 1,
+        totalXP: 0,
+        streak: 0
+      }
+    });
+
+  } catch (error: any) {
+    console.error('❌ Learning path generation failed:', error);
+    
+    return NextResponse.json({
+      success: false,
+      error: error.message || 'Failed to generate learning path',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    }, { status: 500 });
+  }
+}
+
+// ============= GET ENDPOINT (For recommendations) =============
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
 
-  if (action === 'recommend') {
+  if (action === 'test') {
+    // Health check endpoint
     try {
-      const prompt = searchParams.get('prompt') || '';
-      const ai = createAIClient();
-      const formats = Object.values(CourseFormat).join(', ');
-      const systemPrompt = `You are an expert instructional designer. Recommend the top 4 most effective course formats. Respond with JSON: {"recommendations": [{"format": "...", "description": "..."}]}. Formats: ${formats}`;
-
-      const response = await retryWithBackoff(async () => {
-        const res = await ai.models.generateContent({
-          model: 'gemini-2.0-flash-exp',
-          contents: `User request: "${prompt}"`,
-          config: {
-            systemInstruction: systemPrompt,
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                recommendations: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      format: { type: Type.STRING },
-                      description: { type: Type.STRING }
-                    },
-                    required: ['format', 'description']
-                  }
-                }
-              },
-              required: ['recommendations']
-            }
-          }
-        });
-        return JSON.parse(res.text.trim());
-      }, 3, 2000);
-
+      const keysAvailable = API_KEYS.length;
       return NextResponse.json({ 
         success: true, 
-        recommendations: response.recommendations.slice(0, 4) 
+        keysAvailable,
+        message: `${keysAvailable} API key(s) configured`
       });
     } catch (error) {
-      return NextResponse.json({ success: false, error: 'Failed to load recommendations' }, { status: 500 });
+      return NextResponse.json({ 
+        success: false, 
+        error: 'No API keys configured' 
+      }, { status: 500 });
     }
   }
 
-  // Test endpoint
-  try {
-    const keys = getApiKeys();
-    return NextResponse.json({ success: true, keysFound: keys.length });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: 'No API keys found' }, { status: 500 });
-  }
-}
-
-// ============= GENERATE COURSE =============
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { prompt, format, mode, file } = body;
-
-    if (!prompt) {
-      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
-    }
-
-    console.log('🚀 Starting course generation...');
-    let course: Partial<Course> = { format, mode };
-
-    // Agent 1: Initial Course Planner
-    console.log('📋 Agent 1: Planning course...');
-    const initialInfo = await agent_InitialCoursePlanner(prompt, file?.content);
-    course = { ...course, ...initialInfo };
-
-    // Agent 2: Roadmap Designer
-    console.log('🗺️ Agent 2: Designing roadmap...');
-    const roadmapInfo = await agent_RoadmapDesigner(course);
-    course.roadmap = roadmapInfo.roadmap;
-
-    // Agent 3: Module Designer
-    console.log('📚 Agent 3: Designing modules...');
-    const finalRoadmap: RoadmapNode[] = [];
-    for (const stage of course.roadmap) {
-      const newStage = { ...stage, modules: [] as Module[] };
-      for (const preModule of stage.modules) {
-        const newModule = await agent_ModuleDesigner(course, preModule.title);
-        newStage.modules.push(newModule);
-      }
-      finalRoadmap.push(newStage);
-    }
-    course.roadmap = finalRoadmap;
-
-    // Agent 4: Cover Image
-    console.log('🎨 Agent 4: Creating cover image...');
-    const { coverImageUrl } = await agent_CoverImageDesigner(course);
-
-    // Build final course
-    const finalCourse: Course = {
-      id: Date.now().toString(),
-      title: course.title || 'Untitled Course',
-      description: course.description || '',
-      subject: course.subject || 'General',
-      category: course.category || CourseCategory.Other,
-      engine: course.engine || EngineType.Default,
-      level: course.level || 'Beginner',
-      progress: 0,
-      roadmap: course.roadmap || [],
-      gamification: { xp: 0, streak: 0, edCoins: 100, badges: [] },
-      lastActivity: 'Not Started',
-      coverImageUrl,
-      courseArchetype: course.courseArchetype || CourseArchetype.Academic,
-      format,
-      mode
-    };
-
-    // Save to Supabase
-    console.log('💾 Saving to database...');
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase.from('courses').insert([finalCourse]).select();
-
-    if (error) throw new Error(`Database error: ${error.message}`);
-
-    console.log('✅ Course generated successfully!');
-    return NextResponse.json({ success: true, course: data[0] });
-
-  } catch (error) {
-    console.error('❌ Course generation failed:', error);
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
-  }
+  return NextResponse.json({ 
+    error: 'Invalid action. Use POST to generate learning paths.' 
+  }, { status: 400 });
 }

@@ -31,8 +31,8 @@ export function UserMenu() {
 
     // Fetch initial user
     const fetchUser = async () => {
-        const { data } = await supabase.auth.getUser();
-        setUser(data.user);
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
     }
     fetchUser();
 
@@ -59,16 +59,24 @@ export function UserMenu() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>
-        <UserAvatar user={user} />
+      <DropdownMenuTrigger asChild>
+        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-left">
+          <UserAvatar user={user} />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-zinc-200 truncate">{user.email}</div>
+            <div className="text-xs text-zinc-500 truncate">Free Plan</div>
+          </div>
+        </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push('/settings')}>
+      <DropdownMenuContent align="end" className="w-56 bg-[#18181b] border-zinc-800">
+        <DropdownMenuLabel className="text-zinc-200">{user.email}</DropdownMenuLabel>
+        <DropdownMenuSeparator className="bg-zinc-800" />
+        <DropdownMenuItem onClick={() => router.push('/settings')} className="text-zinc-300 focus:bg-zinc-800 focus:text-white">
           Settings
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+        <DropdownMenuItem onClick={handleLogout} className="text-zinc-300 focus:bg-zinc-800 focus:text-white">
+          Logout
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

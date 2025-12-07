@@ -31,7 +31,7 @@ export default function OnboardingFlow() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900/20 to-gray-900 text-white">
+    <div className="min-h-full bg-gradient-to-br from-gray-900 via-blue-900/20 to-gray-900 text-white rounded-3xl">
       <div className="max-w-4xl mx-auto px-4 py-8 md:py-12">
         {/* Header with Back Button */}
         <div className="mb-8 flex items-center justify-between">
@@ -46,19 +46,18 @@ export default function OnboardingFlow() {
               Back
             </button>
           )}
-          
+
           {/* Progress Dots */}
           <div className="flex gap-2 ml-auto">
             {[1, 2, 3].map((dot) => (
               <div
                 key={dot}
-                className={`h-2 rounded-full transition-all ${
-                  dot === step
+                className={`h-2 rounded-full transition-all ${dot === step
                     ? 'w-8 bg-blue-500'
                     : dot < step
-                    ? 'w-2 bg-blue-500'
-                    : 'w-2 bg-gray-700'
-                }`}
+                      ? 'w-2 bg-blue-500'
+                      : 'w-2 bg-gray-700'
+                  }`}
               />
             ))}
           </div>
@@ -67,7 +66,7 @@ export default function OnboardingFlow() {
         {/* Step Content */}
         <AnimatePresence mode="wait">
           {step === 1 && (
-            <Step1Goal 
+            <Step1Goal
               key="step1"
               goal={goal}
               setGoal={setGoal}
@@ -76,14 +75,14 @@ export default function OnboardingFlow() {
             />
           )}
           {step === 2 && (
-            <Step2Context 
+            <Step2Context
               key="step2"
               context={context}
               setContext={setContext}
             />
           )}
           {step === 3 && (
-            <Step3Time 
+            <Step3Time
               key="step3"
               timeAvailable={timeAvailable}
               setTimeAvailable={setTimeAvailable}
@@ -136,7 +135,7 @@ export default function OnboardingFlow() {
             className="mt-12 p-5 bg-gray-800/50 rounded-2xl border border-gray-700"
           >
             <p className="text-sm text-gray-400">
-              <span className="font-bold text-white">💡 Pro tip:</span> The more specific you are, the better! 
+              <span className="font-bold text-white">💡 Pro tip:</span> The more specific you are, the better!
               Instead of "learn coding", try "build a personal portfolio website" or "create an AI chatbot".
             </p>
           </motion.div>

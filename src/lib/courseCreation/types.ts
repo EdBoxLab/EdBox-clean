@@ -147,3 +147,84 @@ export interface AgentState {
   message: string;
   percentage: number;
 }
+
+// ==========================================
+// ENGINE-NATIVE LEARNING TYPES (NEW)
+// ==========================================
+
+export interface SkillNode {
+  id: string;
+  title: string;
+  description: string;
+  category: CourseCategory;
+  engine: EngineType;
+  level: string; // 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert';
+  estimatedMinutes: number;
+  prerequisites: string[]; // IDs of other SkillNodes
+  masteryThreshold: {
+    minSuccessRate: number;
+    challengesRequired: number;
+  };
+  xpReward: number;
+  vectorEmbedding?: number[]; // For AI similarity matching
+}
+
+export interface SkillGraph {
+  id: string;
+  userId: string;
+  goal: string;
+  nodes: SkillNode[];
+  edges: { from: string; to: string }[]; // Directed graph
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Challenge {
+  id: string;
+  skillId: string;
+  title: string;
+  description: string;
+  engine: EngineType;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+
+  // Context for the AI to generate the challenge
+  context?: string;
+
+  // Engine-specific payload
+  starterCode?: string; // For Coding
+  initialState?: any; // For Physics/Chem/Math
+  validationCriteria: {
+    type: 'output_match' | 'function_test' | 'ai_eval' | 'value_check';
+    expected?: any;
+    rubric?: string; // For AI eval
+  }[];
+
+  hints: string[];
+  explanation: string;
+}
+
+export interface UserCompetency {
+  userId: string;
+  skillId: string;
+  masteryLevel: number; // 0.0 to 1.0
+  challengesCompleted: string[];
+  lastPracticed: string;
+  provenBy: {
+    challengeId: string;
+    timestamp: string;
+    artifactUrl?: string; // Link to saved code/project
+  }[];
+}
+
+export interface PortfolioItem {
+  id: string;
+  userId: string;
+  title: string;
+  description: string;
+  skillsDemonstrated: string[]; // Skill IDs
+  engine: EngineType;
+  artifactUrl: string; // URL to the project/creation
+  thumbnailUrl: string;
+  aiAssessment?: string; // Summary of what this proves
+  createdAt: string;
+}

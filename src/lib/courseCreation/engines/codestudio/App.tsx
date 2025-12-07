@@ -6,12 +6,21 @@ import { Console } from './components/Console';
 import { SCENES } from './constants';
 import { Language, LogEntry, VisualizationMode, ChartDataPoint } from './types';
 import { generateCodeAnalysis, simulateExecution, optimizeCode, instrumentCode } from './services/geminiService';
+import { Challenge } from '../../types';
 
-export default function App() {
+export default function App({ challenge }: { challenge?: Challenge | null }) {
   // -- State --
   const [activeSceneId, setActiveSceneId] = useState(SCENES[0].id);
-  const [code, setCode] = useState(SCENES[0].code);
+  const [code, setCode] = useState(challenge?.starterCode || SCENES[0].code);
   const [language, setLanguage] = useState<Language>(SCENES[0].language);
+
+  useEffect(() => {
+    if (challenge && challenge.starterCode) {
+      setCode(challenge.starterCode);
+      // Logic to detect language from engine/context could go here
+      // setLanguage(challenge.engine === 'Coding' ? Language.JavaScript : Language.Python); 
+    }
+  }, [challenge]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [vizData, setVizData] = useState<ChartDataPoint[]>([]);
   const [vizMode, setVizMode] = useState<VisualizationMode>(SCENES[0].defaultViz);
@@ -42,7 +51,7 @@ export default function App() {
       setAnalysis(null);
       setIsDebugMode(false);
       setCurrentLine(null);
-      
+
       // Auto-switch tabs based on scene type
       if (scene.defaultViz !== VisualizationMode.None) {
         setActiveTab('visualizer');
@@ -53,11 +62,11 @@ export default function App() {
   };
 
   // -- Execution Logic --
-  
+
   const runJavaScript = async (codeToRun: string, debug = false) => {
     setLogs([]);
     setVizData([]); // Reset viz
-    
+
     // If not debugging, switch to console or visualizer
     if (!debug) {
       if (vizMode !== VisualizationMode.None) setActiveTab('visualizer');
@@ -67,7 +76,7 @@ export default function App() {
     try {
       // Define Environment Helpers
       const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-      
+
       const visualize = (type: string, data: any) => {
         // This function runs in the user's code scope
         if (type === 'chart') {
@@ -95,16 +104,16 @@ export default function App() {
           console.log('[User Code]', ...args); // also log to real console for dev debugging
         },
         error: (...args: any[]) => {
-           const msg = args.join(' ');
-           addLog('error', msg);
+          const msg = args.join(' ');
+          addLog('error', msg);
         },
         warn: (...args: any[]) => {
-           const msg = args.join(' ');
-           addLog('warn', msg);
+          const msg = args.join(' ');
+          addLog('warn', msg);
         },
         info: (...args: any[]) => {
-            const msg = args.join(' ');
-            addLog('info', msg);
+          const msg = args.join(' ');
+          addLog('info', msg);
         }
       };
 
@@ -126,16 +135,16 @@ export default function App() {
 
       // Create the function with injected dependencies
       const func = new Function(
-        'log', 
-        'sleep', 
-        'visualize', 
-        'step', 
+        'log',
+        'sleep',
+        'visualize',
+        'step',
         'console', // Inject our custom console
         wrappedCode
       );
 
       await func(legacyLog, sleep, visualize, step, customConsole);
-      
+
       addLog('system', 'Execution finished.');
       if (debug) {
         setIsDebugMode(false);
@@ -169,7 +178,7 @@ export default function App() {
 
     setIsDebugMode(true);
     addLog('system', 'Preparing debugger...');
-    
+
     try {
       // Instrument code via Gemini
       const instrumented = await instrumentCode(code);
@@ -211,20 +220,12 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30">
-      
+    <div className="flex flex-col h-full bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30 rounded-xl overflow-hidden">
+
       {/* -- HEADER -- */}
-      <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center px-4 justify-between shrink-0 overflow-x-auto gap-4">
+      <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center px-4 justify-between shrink-0 overflow-x-auto gap-4 rounded-t-xl">
         <div className="flex items-center gap-3 min-w-max">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/20">
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="font-bold text-slate-100 tracking-tight">CodeLab Studio</h1>
-            <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">AI-Powered Runtime</p>
-          </div>
+          {/* Space reserved for future toolbar items or just empty if branding removed */}
         </div>
 
         <div className="flex items-center gap-2 bg-slate-950/50 p-1 rounded-lg border border-slate-800 min-w-max">
@@ -232,11 +233,10 @@ export default function App() {
             <button
               key={scene.id}
               onClick={() => handleSceneChange(scene.id)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                activeSceneId === scene.id 
-                  ? 'bg-slate-800 text-white shadow-sm' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${activeSceneId === scene.id
+                ? 'bg-slate-800 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
             >
               {scene.name}
             </button>
@@ -244,8 +244,8 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-2 min-w-max">
-           {/* Run Button */}
-           <button
+          {/* Run Button */}
+          <button
             onClick={handleRun}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded shadow-lg shadow-emerald-900/20 transition-all active:scale-95"
           >
@@ -260,11 +260,10 @@ export default function App() {
             <button
               onClick={isDebugMode ? undefined : handleDebug}
               disabled={isDebugMode}
-              className={`flex items-center gap-2 px-4 py-2 border border-slate-700 rounded text-xs font-bold transition-all ${
-                isDebugMode 
-                  ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/50' 
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 border border-slate-700 rounded text-xs font-bold transition-all ${isDebugMode
+                ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/50'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
+                }`}
             >
               {isDebugMode ? (
                 <>
@@ -289,11 +288,10 @@ export default function App() {
             <button
               onClick={handleNextStep}
               disabled={!isWaitingForStep}
-              className={`px-4 py-2 rounded text-xs font-bold transition-all ${
-                isWaitingForStep
-                  ? 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.3)]'
-                  : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-              }`}
+              className={`px-4 py-2 rounded text-xs font-bold transition-all ${isWaitingForStep
+                ? 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.3)]'
+                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                }`}
             >
               NEXT STEP →
             </button>
@@ -324,12 +322,12 @@ export default function App() {
 
       {/* -- MAIN VERTICAL SPLIT -- */}
       <div className="flex-1 flex flex-col min-h-0">
-        
+
         {/* TOP: Code Editor */}
         <div className="h-[55%] min-h-[200px] border-b border-slate-800 relative">
-          <CodeEditor 
-            code={code} 
-            language={language} 
+          <CodeEditor
+            code={code}
+            language={language}
             onChange={setCode}
             highlightedLine={currentLine}
           />
@@ -347,31 +345,28 @@ export default function App() {
           <div className="flex border-b border-slate-800 bg-slate-900/50">
             <button
               onClick={() => setActiveTab('console')}
-              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${
-                activeTab === 'console' 
-                  ? 'border-blue-500 text-blue-400 bg-slate-800/50' 
-                  : 'border-transparent text-slate-500 hover:text-slate-300'
-              }`}
+              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'console'
+                ? 'border-blue-500 text-blue-400 bg-slate-800/50'
+                : 'border-transparent text-slate-500 hover:text-slate-300'
+                }`}
             >
               Console
             </button>
             <button
               onClick={() => setActiveTab('visualizer')}
-              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${
-                activeTab === 'visualizer' 
-                  ? 'border-blue-500 text-blue-400 bg-slate-800/50' 
-                  : 'border-transparent text-slate-500 hover:text-slate-300'
-              }`}
+              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'visualizer'
+                ? 'border-blue-500 text-blue-400 bg-slate-800/50'
+                : 'border-transparent text-slate-500 hover:text-slate-300'
+                }`}
             >
               Visualizer
             </button>
             <button
               onClick={() => setActiveTab('analysis')}
-              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${
-                activeTab === 'analysis' 
-                  ? 'border-blue-500 text-blue-400 bg-slate-800/50' 
-                  : 'border-transparent text-slate-500 hover:text-slate-300'
-              }`}
+              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'analysis'
+                ? 'border-blue-500 text-blue-400 bg-slate-800/50'
+                : 'border-transparent text-slate-500 hover:text-slate-300'
+                }`}
             >
               AI Analysis
             </button>
@@ -382,22 +377,22 @@ export default function App() {
             {activeTab === 'console' && (
               <Console logs={logs} onClear={() => setLogs([])} />
             )}
-            
+
             {activeTab === 'visualizer' && (
-              <Visualizer 
-                mode={vizMode} 
-                data={vizData} 
+              <Visualizer
+                mode={vizMode}
+                data={vizData}
                 htmlContent={language === Language.HTML ? code : undefined}
               />
             )}
-            
+
             {activeTab === 'analysis' && (
               <div className="h-full overflow-y-auto p-6 bg-slate-900">
                 {isAnalyzing ? (
-                   <div className="flex items-center gap-3 text-slate-400 animate-pulse">
-                     <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-                     Analyzing code structure...
-                   </div>
+                  <div className="flex items-center gap-3 text-slate-400 animate-pulse">
+                    <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                    Analyzing code structure...
+                  </div>
                 ) : analysis ? (
                   <div className="prose prose-invert prose-sm max-w-none">
                     <ReactMarkdown>{analysis}</ReactMarkdown>

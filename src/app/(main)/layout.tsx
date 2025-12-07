@@ -12,15 +12,11 @@ export default function MainAppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="min-h-screen bg-[#09090b]">
       <SideMenu />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-200 dark:bg-gray-800 p-2 sm:p-4 md:p-6">
-          {children}
-        </main>
-        <Footer />
-      </div>
+      <main className="lg:pl-64 min-h-screen overflow-x-hidden overflow-y-auto bg-[#09090b] pb-20 lg:pb-0">
+        {children}
+      </main>
       <div className="fixed bottom-4 right-4 z-50">
         <KoalaGenie />
       </div>

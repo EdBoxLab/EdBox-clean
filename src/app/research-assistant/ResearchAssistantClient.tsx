@@ -32,18 +32,18 @@ const ResearchHub: React.FC<{
             ) : (
                 <div className="space-y-4">
                     {packages.sort((a, b) => b.id - a.id).map(pkg => (
-                         <div key={pkg.id} className="bg-white rounded-xl shadow-md p-4 group hover:shadow-lg transition-shadow">
-                             <div className="flex justify-between items-start">
-                                 <button onClick={() => onSelect(pkg.id)} className="text-left flex-1">
-                                     <h3 className="text-xl font-bold text-brand-text group-hover:text-brand-blue transition-colors">{pkg.title}</h3>
-                                     <p className="text-sm text-brand-subtext mt-1 truncate">Goal: {pkg.goal}</p>
-                                     <p className="text-xs text-gray-400 mt-2">{new Date(pkg.id).toLocaleString()}</p>
-                                 </button>
-                                 <button onClick={(e) => { e.stopPropagation(); onDelete(pkg.id); }} className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-100 transition-colors">
-                                     <TrashIcon className="h-5 w-5" />
-                                 </button>
-                             </div>
-                         </div>
+                        <div key={pkg.id} className="bg-white rounded-xl shadow-md p-4 group hover:shadow-lg transition-shadow">
+                            <div className="flex justify-between items-start">
+                                <button onClick={() => onSelect(pkg.id)} className="text-left flex-1">
+                                    <h3 className="text-xl font-bold text-brand-text group-hover:text-brand-blue transition-colors">{pkg.title}</h3>
+                                    <p className="text-sm text-brand-subtext mt-1 truncate">Goal: {pkg.goal}</p>
+                                    <p className="text-xs text-gray-400 mt-2">{new Date(pkg.id).toLocaleString()}</p>
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); onDelete(pkg.id); }} className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-100 transition-colors">
+                                    <TrashIcon className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
                     ))}
                 </div>
             )}
@@ -83,7 +83,7 @@ const ResearchCreation: React.FC<{
             }
 
             const result = await response.json();
-            
+
             const newPackage: ResearchPackage = {
                 id: Date.now(),
                 goal: goal,
@@ -112,29 +112,29 @@ const ResearchCreation: React.FC<{
             </div>
         );
     }
-    
+
     return (
-         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
-             <button onClick={onBack} className="lg:col-span-12 flex items-center text-sm font-medium text-brand-subtext hover:text-brand-text">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
+            <button onClick={onBack} className="lg:col-span-12 flex items-center text-sm font-medium text-brand-subtext hover:text-brand-text">
                 <ChevronLeftIcon className="h-5 w-5 mr-1" /> Back to Library
-             </button>
+            </button>
             <aside className="lg:col-span-4 xl:col-span-3 space-y-8">
-              <SourceUploader onSourcesChanged={setSources} />
+                <SourceUploader onSourcesChanged={setSources} />
             </aside>
             <div className="lg:col-span-8 xl:col-span-9 space-y-8">
                 {error && (
                     <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative" role="alert">
                         <span className="block sm:inline">{error}</span>
                         <button onClick={() => setError(null)} className="absolute top-0 bottom-0 right-0 px-4 py-3" aria-label="Close">
-                          <span className="text-2xl" aria-hidden="true">&times;</span>
+                            <span className="text-2xl" aria-hidden="true">&times;</span>
                         </button>
                     </div>
                 )}
-              <ControlPanel 
-                onGenerate={handleGenerate} 
-                isLoading={!!loadingStatus} 
-                disabled={sources.length === 0}
-              />
+                <ControlPanel
+                    onGenerate={handleGenerate}
+                    isLoading={!!loadingStatus}
+                    disabled={sources.length === 0}
+                />
             </div>
         </div>
     );
@@ -188,7 +188,7 @@ const ResearchAssistantPage: React.FC = () => {
         const newHistory = researchHistory.filter(p => p.id !== id);
         setResearchHistory(newHistory);
     };
-    
+
     const handleSelectPackage = (id: number) => {
         setCurrentPackageId(id);
         setView('results');
@@ -206,7 +206,7 @@ const ResearchAssistantPage: React.FC = () => {
                 return currentPackage ? (
                     <div className="animate-fade-in">
                         <button onClick={() => setView('hub')} className="mb-4 flex items-center text-sm font-medium text-brand-subtext hover:text-brand-text">
-                           <ChevronLeftIcon className="h-5 w-5 mr-1" /> Back to Library
+                            <ChevronLeftIcon className="h-5 w-5 mr-1" /> Back to Library
                         </button>
                         <ResearchResults pkg={currentPackage} />
                     </div>
@@ -215,23 +215,13 @@ const ResearchAssistantPage: React.FC = () => {
         }
     };
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-      <header className="bg-white shadow-sm sticky top-0 z-20">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <LogoIcon className="h-8 w-8 text-brand-blue" />
-            <h1 className="text-xl font-bold text-brand-text">AI Research Companion</h1>
-          </div>
-          <span className="text-sm font-medium text-brand-subtext">Expert-Level Synthesis & Multimodal Learning</span>
+    return (
+        <div className="min-h-full flex flex-col font-sans">
+            <main className="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+                {renderContent()}
+            </main>
         </div>
-      </header>
-
-      <main className="flex-grow max-w-screen-2xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-        {renderContent()}
-      </main>
-    </div>
-  );
+    );
 };
 
 export default ResearchAssistantPage;

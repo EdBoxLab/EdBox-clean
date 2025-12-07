@@ -47,7 +47,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
 
   const loadMoreLessons = useCallback(async (initial = false) => {
     if (processingRef.current) return;
-    
+
     processingRef.current = true;
     if (initial) setLoading(true);
 
@@ -57,7 +57,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       }
 
       const lessonBatchRaw = await generateLessonBatch(preferences.interests, likedTopics);
-      
+
       const newLessons: Lesson[] = lessonBatchRaw.map(l => ({
         id: crypto.randomUUID(),
         ...l,
@@ -68,19 +68,19 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
 
       const mediaPromises = newLessons.map(async (lesson) => {
         const imagePromise = generateLessonImage(lesson.visualPrompt);
-        
+
         // Only generate audio for video type to save resources/time
         const audioPromise = lesson.type === 'video' && lesson.script
           ? generateLessonAudio(lesson.script, audioContextRef.current!)
           : Promise.resolve(undefined);
 
         const [imageUrl, audioBuffer] = await Promise.all([imagePromise, audioPromise]);
-        
+
         return { ...lesson, imageUrl, audioBuffer };
       });
 
       const processedLessons = await Promise.all(mediaPromises);
-      
+
       setLessons(prev => [...prev, ...processedLessons]);
     } catch (err) {
       console.error("Failed to load lessons", err);
@@ -123,10 +123,10 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     <div
       ref={feedRef}
       onScroll={handleScroll}
-      className="h-screen w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar bg-background"
+      className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar bg-transparent"
     >
       {lessons.map((lesson, index) => (
-        <div key={lesson.id} className="h-screen w-full snap-center relative">
+        <div key={lesson.id} className="h-full w-full snap-center relative">
           <LessonCard
             lesson={lesson}
             isActive={index === activeIndex}

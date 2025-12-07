@@ -6,17 +6,17 @@ import { Users, Plus, Hash, LogIn, LogOut, Loader2, Send } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 
 const CircleList = ({ circles, onSelectCircle, selectedCircle, onJoin, onLeave, isProcessing, onNewCircle }) => (
-    <div className="flex flex-col bg-gray-800 w-1/3 p-4 space-y-4">
+    <div className="flex flex-col border-r border-zinc-800 w-1/3 p-4 space-y-4">
         <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">Study Circles</h2>
-            <button onClick={onNewCircle} className="p-2 bg-purple-600 rounded-full hover:bg-purple-700">
+            <button onClick={onNewCircle} className="p-2 border border-zinc-700 hover:border-zinc-500 rounded-md transition">
                 <Plus size={20} />
             </button>
         </div>
         {circles.map(circle => (
-            <div 
-                key={circle.id} 
-                className={`flex items-center space-x-4 p-3 rounded-lg cursor-pointer ${selectedCircle?.id === circle.id ? 'bg-gray-700' : 'hover:bg-gray-700'}`}
+            <div
+                key={circle.id}
+                className={`flex items-center space-x-4 p-3 rounded-lg cursor-pointer border transition ${selectedCircle?.id === circle.id ? 'border-zinc-600 bg-zinc-900/50' : 'border-transparent hover:border-zinc-700'}`}
                 onClick={() => onSelectCircle(circle)}
             >
                 <div className="bg-purple-500 p-3 rounded-full">
@@ -31,18 +31,18 @@ const CircleList = ({ circles, onSelectCircle, selectedCircle, onJoin, onLeave, 
                 </div>
                 {!selectedCircle || selectedCircle.id !== circle.id && (
                     circle.is_member ? (
-                        <button 
+                        <button
                             onClick={(e) => { e.stopPropagation(); onLeave(circle.id); }}
                             disabled={isProcessing}
                             className="p-2 rounded-md bg-red-600 hover:bg-red-700 transition-colors flex items-center text-sm disabled:opacity-50">
-                            <LogOut className="h-4 w-4"/>
+                            <LogOut className="h-4 w-4" />
                         </button>
                     ) : (
-                        <button 
+                        <button
                             onClick={(e) => { e.stopPropagation(); onJoin(circle.id); }}
                             disabled={isProcessing}
                             className="p-2 rounded-md bg-green-600 hover:bg-green-700 transition-colors flex items-center text-sm disabled:opacity-50">
-                            <LogIn className="h-4 w-4"/>
+                            <LogIn className="h-4 w-4" />
                         </button>
                     )
                 )}
@@ -86,7 +86,7 @@ const CreateCircleModal = ({ onClose, onCircleCreated }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-            <div className="bg-gray-800 p-6 rounded-lg max-w-sm w-full">
+            <div className="border border-zinc-800 p-6 rounded-lg max-w-sm w-full">
                 <h2 className="text-xl font-bold mb-4">Create a New Study Circle</h2>
                 <form onSubmit={handleSubmit}>
                     <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2" required />
@@ -165,25 +165,25 @@ const CircleChat = ({ circle, session }) => {
 
     if (!circle) {
         return (
-            <div className="flex-1 p-8 text-white flex flex-col items-center justify-center bg-gray-900">
+            <div className="flex-1 p-8 text-white flex flex-col items-center justify-center bg-[#09090b]">
                 <Hash size={48} className="text-gray-600 mb-4" />
                 <h2 className="text-2xl font-bold text-gray-400">Select a circle to start chatting</h2>
             </div>
         );
     }
-    
+
     if (!circle.is_member) {
         return (
-            <div className="flex-1 p-8 text-white flex flex-col items-center justify-center bg-gray-900">
-                 <h1 className="text-2xl font-bold text-red-400">Access Denied</h1>
-                 <p className="text-gray-400 mt-2">You must be a member of this circle to view the chat.</p>
+            <div className="flex-1 p-8 text-white flex flex-col items-center justify-center bg-[#09090b]">
+                <h1 className="text-2xl font-bold text-red-400">Access Denied</h1>
+                <p className="text-gray-400 mt-2">You must be a member of this circle to view the chat.</p>
             </div>
         )
     }
 
     return (
-        <div className="flex-1 flex flex-col h-screen bg-gray-900 text-white">
-            <header className="p-4 bg-gray-800 border-b border-gray-700">
+        <div className="flex-1 flex flex-col h-screen bg-[#09090b] text-white">
+            <header className="p-4 border-b border-zinc-800">
                 <h1 className="text-xl font-bold text-purple-400">{circle.name}</h1>
                 <p className="text-sm text-gray-400">{circle.description}</p>
             </header>
@@ -201,10 +201,10 @@ const CircleChat = ({ circle, session }) => {
                 <div ref={messagesEndRef} />
             </div>
 
-            <footer className="p-4 bg-gray-800 border-t border-gray-700">
+            <footer className="p-4 border-t border-zinc-800">
                 <form onSubmit={handleSendMessage} className="flex space-x-2">
                     <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} className="flex-1 bg-gray-700 rounded-md px-4 py-2" placeholder="Type a message..." />
-                    <button type="submit" className="bg-purple-600 px-4 py-2 rounded-md"><Send className="h-5 w-5"/></button>
+                    <button type="submit" className="bg-purple-600 px-4 py-2 rounded-md"><Send className="h-5 w-5" /></button>
                 </form>
             </footer>
         </div>
@@ -213,107 +213,107 @@ const CircleChat = ({ circle, session }) => {
 
 
 export default function StudyCirclesPage() {
-  const [circles, setCircles] = useState([]);
-  const [selectedCircle, setSelectedCircle] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [processingId, setProcessingId] = useState(null);
-  const [session, setSession] = useState(null);
+    const [circles, setCircles] = useState([]);
+    const [selectedCircle, setSelectedCircle] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [processingId, setProcessingId] = useState(null);
+    const [session, setSession] = useState(null);
 
-   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        setSession(session);
-    });
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
 
-    return () => subscription.unsubscribe();
-  }, []);
+        return () => subscription.unsubscribe();
+    }, []);
 
 
-  const fetchCircles = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch('/api/study-circles');
-      if (!response.ok) throw new Error('Network response was not ok');
-      const data = await response.json();
-      setCircles(data);
-      if (!selectedCircle && data.length > 0) {
-        setSelectedCircle(data[0]);
-      }
-    } catch (error) {
-      console.error("Failed to fetch circles:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCircles();
-
-    const channel = supabase.channel('realtime:circles')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'study_circles' }, fetchCircles)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'circle_members' }, fetchCircles)
-        .subscribe();
-
-    return () => {
-        supabase.removeChannel(channel);
+    const fetchCircles = async () => {
+        setIsLoading(true);
+        try {
+            const response = await fetch('/api/study-circles');
+            if (!response.ok) throw new Error('Network response was not ok');
+            const data = await response.json();
+            setCircles(data);
+            if (!selectedCircle && data.length > 0) {
+                setSelectedCircle(data[0]);
+            }
+        } catch (error) {
+            console.error("Failed to fetch circles:", error);
+        } finally {
+            setIsLoading(false);
+        }
     };
-  }, []);
 
-  const handleCircleCreated = (newCircle) => {
-    const circleWithDetails = { ...newCircle, member_count: 1, is_member: true };
-    setCircles(prev => [circleWithDetails, ...prev].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
-    setSelectedCircle(circleWithDetails);
-  };
+    useEffect(() => {
+        fetchCircles();
 
-  const handleJoin = async (id) => {
-    setProcessingId(id);
-    // UI update is now handled by realtime subscription
-    try {
-        await fetch(`/api/study-circles/${id}/members`, { method: 'POST' });
-    } catch (error) {
-        console.error('Join error:', error);
-    }
-    setProcessingId(null);
-  };
+        const channel = supabase.channel('realtime:circles')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'study_circles' }, fetchCircles)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'circle_members' }, fetchCircles)
+            .subscribe();
 
-  const handleLeave = async (id) => {
-    setProcessingId(id);
-    // UI update is now handled by realtime subscription
-    if (selectedCircle && selectedCircle.id === id) {
-        setSelectedCircle(null);
-    }
-    try {
-        await fetch(`/api/study-circles/${id}/members`, { method: 'DELETE' });
-    } catch (error) {
-        console.error('Leave error:', error);
-    }
-    setProcessingId(null);
-  };
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, []);
 
-  return (
-    <div className="flex h-screen bg-gray-900 text-white">
-      {isLoading ? (
-        <div className="flex justify-center items-center w-full">
-          <Loader2 className="h-12 w-12 animate-spin" />
+    const handleCircleCreated = (newCircle) => {
+        const circleWithDetails = { ...newCircle, member_count: 1, is_member: true };
+        setCircles(prev => [circleWithDetails, ...prev].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+        setSelectedCircle(circleWithDetails);
+    };
+
+    const handleJoin = async (id) => {
+        setProcessingId(id);
+        // UI update is now handled by realtime subscription
+        try {
+            await fetch(`/api/study-circles/${id}/members`, { method: 'POST' });
+        } catch (error) {
+            console.error('Join error:', error);
+        }
+        setProcessingId(null);
+    };
+
+    const handleLeave = async (id) => {
+        setProcessingId(id);
+        // UI update is now handled by realtime subscription
+        if (selectedCircle && selectedCircle.id === id) {
+            setSelectedCircle(null);
+        }
+        try {
+            await fetch(`/api/study-circles/${id}/members`, { method: 'DELETE' });
+        } catch (error) {
+            console.error('Leave error:', error);
+        }
+        setProcessingId(null);
+    };
+
+    return (
+        <div className="flex h-screen bg-[#09090b] text-white">
+            {isLoading ? (
+                <div className="flex justify-center items-center w-full">
+                    <Loader2 className="h-12 w-12 animate-spin" />
+                </div>
+            ) : (
+                <>
+                    <CircleList
+                        circles={circles}
+                        onSelectCircle={setSelectedCircle}
+                        selectedCircle={selectedCircle}
+                        onJoin={handleJoin}
+                        onLeave={handleLeave}
+                        isProcessing={!!processingId}
+                        onNewCircle={() => setIsModalOpen(true)}
+                    />
+                    <CircleChat circle={selectedCircle} session={session} />
+                </>
+            )}
+
+            {isModalOpen && <CreateCircleModal onClose={() => setIsModalOpen(false)} onCircleCreated={handleCircleCreated} />}
         </div>
-      ) : (
-        <>
-          <CircleList 
-            circles={circles}
-            onSelectCircle={setSelectedCircle}
-            selectedCircle={selectedCircle}
-            onJoin={handleJoin}
-            onLeave={handleLeave}
-            isProcessing={!!processingId}
-            onNewCircle={() => setIsModalOpen(true)}
-          />
-          <CircleChat circle={selectedCircle} session={session} />
-        </>
-      )}
-
-      {isModalOpen && <CreateCircleModal onClose={() => setIsModalOpen(false)} onCircleCreated={handleCircleCreated} />}
-    </div>
-  );
+    );
 }

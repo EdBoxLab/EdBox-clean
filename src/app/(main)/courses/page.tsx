@@ -47,14 +47,14 @@ const CourseCard = ({
   onSelect: (id: string) => void;
 }) => (
   <div
-    className="bg-gray-800 rounded-2xl overflow-hidden border border-gray-700 hover:border-blue-500 transition-all cursor-pointer h-full flex flex-col"
+    className="border-2 border-zinc-700 hover:border-indigo-500 bg-zinc-900/30 rounded-2xl overflow-hidden transition-all cursor-pointer h-full flex flex-col hover:shadow-lg hover:shadow-indigo-900/20"
     onClick={() => onSelect(course.id)}
     aria-label={`Open course ${course.title}`}
     role="button"
   >
-    {/* Consistent visual accent tied to theme */}
+    {/* Subtle header with gradient accent */}
     <div
-      className={`w-full h-24 sm:h-28 ${THEME.primaryFill} flex items-center justify-center font-bold text-lg sm:text-xl`}
+      className="w-full h-24 sm:h-28 border-b-2 border-zinc-700 bg-gradient-to-br from-indigo-600/20 to-purple-600/20 flex items-center justify-center font-bold text-lg sm:text-xl text-indigo-300"
     >
       {course.title.split(' ')[0]}
     </div>
@@ -91,11 +91,11 @@ export default function CoursesDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-3 sm:p-6 md:p-8 relative">
+    <div className="min-h-screen bg-[#09090b] text-white p-3 sm:p-6 md:p-8 relative">
       {/* Create button matches theme accent. Elevated and responsive spacing. */}
       <button
         onClick={handleCreateCourse}
-        className={`fixed sm:absolute bottom-3 sm:bottom-auto right-4 sm:top-6 sm:right-8 ${THEME.buttonFill} ${THEME.buttonHover} text-white px-4 py-2 sm:px-5 sm:py-2.5 text-sm sm:text-base rounded-lg shadow-lg transition`}
+        className="fixed sm:absolute bottom-3 sm:bottom-auto right-4 sm:top-6 sm:right-8 border border-zinc-700 hover:border-zinc-500 text-zinc-200 hover:text-white px-4 py-2 sm:px-5 sm:py-2.5 text-sm sm:text-base rounded-lg transition"
         aria-label="Create a new course"
       >
         + Create New Course

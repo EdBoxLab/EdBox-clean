@@ -1,10 +1,11 @@
 'use client';
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { SourceUploader } from './SourceUploader';
 import { ControlPanel } from './ChatInterface';
 import { ResearchResults, SkeletonLoader } from './ArtifactRenderer';
 import type { Source, ResearchPackage, CitationStyle } from '../types';
-import { LogoIcon, PlusIcon, TrashIcon, ChevronLeftIcon } from './Icons';
+import { Plus, Trash2, ChevronLeft, BookOpen, Search, FileText } from 'lucide-react';
 
 type View = 'hub' | 'create' | 'results';
 
@@ -16,32 +17,59 @@ const ResearchHub: React.FC<{
     onDelete: (id: number) => void;
 }> = ({ packages, onNew, onSelect, onDelete }) => {
     return (
-        <div className="max-w-4xl mx-auto w-full space-y-8 animate-fade-in">
+        <div className="max-w-7xl mx-auto w-full space-y-8 animate-fade-in p-4 sm:p-6 lg:p-8">
             <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold text-brand-text">My Research Library</h2>
-                <button onClick={onNew} className="flex items-center justify-center px-4 py-2 font-semibold text-white bg-brand-blue rounded-lg hover:bg-opacity-90 transition-colors">
-                    <PlusIcon className="h-5 w-5 mr-2" /> New Research
+                <div>
+                    <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400 mb-2">
+                        Research Assistant
+                    </h2>
+                    <p className="text-zinc-400">Manage your research projects and sources</p>
+                </div>
+                <button
+                    onClick={onNew}
+                    className="flex items-center justify-center px-4 py-2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 transition-colors shadow-lg shadow-blue-900/20"
+                >
+                    <Plus className="h-5 w-5 mr-2" /> New Research
                 </button>
             </div>
+
             {packages.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-xl shadow-md">
-                    <LogoIcon className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-lg font-medium text-gray-900">Your Library is Empty</h3>
-                    <p className="mt-1 text-sm text-gray-500">Start a new research project to begin.</p>
+                <div className="text-center py-20 bg-zinc-900/50 border border-zinc-800 rounded-2xl">
+                    <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Search className="h-8 w-8 text-zinc-400" />
+                    </div>
+                    <h3 className="text-xl font-medium text-white">Your Library is Empty</h3>
+                    <p className="mt-2 text-zinc-500">Start a new research project to begin analyzing sources.</p>
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {packages.sort((a, b) => b.id - a.id).map(pkg => (
-                        <div key={pkg.id} className="bg-white rounded-xl shadow-md p-4 group hover:shadow-lg transition-shadow">
-                            <div className="flex justify-between items-start">
-                                <button onClick={() => onSelect(pkg.id)} className="text-left flex-1">
-                                    <h3 className="text-xl font-bold text-brand-text group-hover:text-brand-blue transition-colors">{pkg.title}</h3>
-                                    <p className="text-sm text-brand-subtext mt-1 truncate">Goal: {pkg.goal}</p>
-                                    <p className="text-xs text-gray-400 mt-2">{new Date(pkg.id).toLocaleString()}</p>
+                        <div
+                            key={pkg.id}
+                            onClick={() => onSelect(pkg.id)}
+                            className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 group hover:border-blue-500/50 hover:bg-zinc-900 transition-all cursor-pointer relative"
+                        >
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="p-3 bg-blue-500/10 rounded-lg">
+                                    <BookOpen className="w-6 h-6 text-blue-400" />
+                                </div>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onDelete(pkg.id); }}
+                                    className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                >
+                                    <Trash2 className="h-5 w-5" />
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); onDelete(pkg.id); }} className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-100 transition-colors">
-                                    <TrashIcon className="h-5 w-5" />
-                                </button>
+                            </div>
+
+                            <h3 className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors mb-2 line-clamp-2">
+                                {pkg.title || 'Untitled Research'}
+                            </h3>
+                            <p className="text-sm text-zinc-400 mb-4 line-clamp-2">Goal: {pkg.goal}</p>
+
+                            <div className="flex items-center text-xs text-zinc-500 pt-4 border-t border-zinc-800">
+                                <span>{new Date(pkg.id).toLocaleDateString()}</span>
+                                <span className="mx-2">•</span>
+                                <span>{pkg.sources.length} Sources</span>
                             </div>
                         </div>
                     ))}
@@ -107,34 +135,44 @@ const ResearchCreation: React.FC<{
 
     if (loadingStatus) {
         return (
-            <div className="flex justify-center items-center h-full">
+            <div className="flex justify-center items-center h-[calc(100vh-100px)]">
                 <SkeletonLoader status={loadingStatus} />
             </div>
         );
     }
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
-            <button onClick={onBack} className="lg:col-span-12 flex items-center text-sm font-medium text-brand-subtext hover:text-brand-text">
-                <ChevronLeftIcon className="h-5 w-5 mr-1" /> Back to Library
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 animate-fade-in">
+            <button
+                onClick={onBack}
+                className="mb-6 flex items-center text-sm font-medium text-zinc-400 hover:text-white transition-colors"
+            >
+                <ChevronLeft className="h-5 w-5 mr-1" /> Back to Library
             </button>
-            <aside className="lg:col-span-4 xl:col-span-3 space-y-8">
-                <SourceUploader onSourcesChanged={setSources} />
-            </aside>
-            <div className="lg:col-span-8 xl:col-span-9 space-y-8">
-                {error && (
-                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative" role="alert">
-                        <span className="block sm:inline">{error}</span>
-                        <button onClick={() => setError(null)} className="absolute top-0 bottom-0 right-0 px-4 py-3" aria-label="Close">
-                            <span className="text-2xl" aria-hidden="true">&times;</span>
-                        </button>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                <aside className="lg:col-span-4 xl:col-span-3 space-y-6">
+                    <SourceUploader onSourcesChanged={setSources} />
+                </aside>
+
+                <div className="lg:col-span-8 xl:col-span-9 space-y-6">
+                    {error && (
+                        <div className="bg-red-500/10 border border-red-500/50 text-red-200 px-4 py-3 rounded-xl relative" role="alert">
+                            <span className="block sm:inline">{error}</span>
+                            <button onClick={() => setError(null)} className="absolute top-0 bottom-0 right-0 px-4 py-3">
+                                <span className="text-xl">&times;</span>
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
+                        <ControlPanel
+                            onGenerate={handleGenerate}
+                            isLoading={!!loadingStatus}
+                            disabled={sources.length === 0}
+                        />
                     </div>
-                )}
-                <ControlPanel
-                    onGenerate={handleGenerate}
-                    isLoading={!!loadingStatus}
-                    disabled={sources.length === 0}
-                />
+                </div>
             </div>
         </div>
     );
@@ -204,9 +242,12 @@ const ResearchAssistantPage: React.FC = () => {
                 return <ResearchCreation onBack={() => setView('hub')} onPackageGenerated={handleAddPackage} />;
             case 'results':
                 return currentPackage ? (
-                    <div className="animate-fade-in">
-                        <button onClick={() => setView('hub')} className="mb-4 flex items-center text-sm font-medium text-brand-subtext hover:text-brand-text">
-                            <ChevronLeftIcon className="h-5 w-5 mr-1" /> Back to Library
+                    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 animate-fade-in">
+                        <button
+                            onClick={() => setView('hub')}
+                            className="mb-6 flex items-center text-sm font-medium text-zinc-400 hover:text-white transition-colors"
+                        >
+                            <ChevronLeft className="h-5 w-5 mr-1" /> Back to Library
                         </button>
                         <ResearchResults pkg={currentPackage} />
                     </div>
@@ -216,10 +257,8 @@ const ResearchAssistantPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-full flex flex-col font-sans">
-            <main className="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-                {renderContent()}
-            </main>
+        <div className="min-h-screen bg-[#09090b] text-white font-sans">
+            {renderContent()}
         </div>
     );
 };

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Feed from '@/components/feed/Feed';
-import Onboarding from '@/app/fyp/hooks/Onboarding';
+import Onboarding from '@/components/feed/Onboarding';
 import type { UserPreferences } from '@/types/feed';
 import { supabase } from '@/lib/supabase/client';
 import { getUserPreferences, saveUserPreferences } from '@/services/userPreferencesService';
@@ -20,7 +20,7 @@ export default function FeedPage() {
       try {
         // Check if user is authenticated
         const { data: { user: currentUser } } = await supabase.auth.getUser();
-        
+
         if (!currentUser) {
           // Redirect to login if not authenticated
           router.push('/login');
@@ -31,7 +31,7 @@ export default function FeedPage() {
 
         // Fetch user preferences from Supabase
         const userPrefs = await getUserPreferences(currentUser.id);
-        
+
         if (userPrefs && userPrefs.onboarded) {
           setPreferences(userPrefs);
         } else {
@@ -53,7 +53,7 @@ export default function FeedPage() {
 
     // Save to Supabase
     const success = await saveUserPreferences(user.id, prefs);
-    
+
     if (success) {
       setPreferences(prefs);
     } else {

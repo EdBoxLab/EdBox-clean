@@ -25,6 +25,7 @@ import {
   ArrowRight,
   Loader2
 } from "lucide-react";
+import { Challenge } from '../../types';
 
 // --- Gemini API Configuration ---
 const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
@@ -249,8 +250,8 @@ const SidebarItem = ({ icon: Icon, label, active, onClick, collapsed }: any) => 
   <button
     onClick={onClick}
     className={`flex items-center w-full p-3 mb-2 rounded-lg transition-all duration-200 group ${active
-        ? "bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-l-2 border-amber-500"
-        : "text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-gray-200 border-l-2 border-transparent"
+      ? "bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-l-2 border-amber-500"
+      : "text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-gray-200 border-l-2 border-transparent"
       } ${collapsed ? "justify-center px-2" : "justify-start px-4"}`}
     title={collapsed ? label : ""}
   >
@@ -532,8 +533,8 @@ const MapView = ({ events, onExploreCountry }: { events: HistoryEvent[], onExplo
                       d={path}
                       style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
                       className={`transition-all duration-500 ease-out ${isSelected
-                          ? "fill-gray-600 dark:fill-gray-600 stroke-amber-500 stroke-[1.5] scale-105"
-                          : "fill-gray-300 dark:fill-[#2a2a2e] stroke-gray-50 dark:stroke-[#3f3f46] stroke-[0.5] hover:fill-gray-400 dark:hover:fill-gray-700"
+                        ? "fill-gray-600 dark:fill-gray-600 stroke-amber-500 stroke-[1.5] scale-105"
+                        : "fill-gray-300 dark:fill-[#2a2a2e] stroke-gray-50 dark:stroke-[#3f3f46] stroke-[0.5] hover:fill-gray-400 dark:hover:fill-gray-700"
                         }`}
                     />
                     {showLabel && !isSelected && (
@@ -772,7 +773,7 @@ const AnalysisView = ({ events, currentModule }: { events: HistoryEvent[], curre
   );
 }
 
-const App = () => {
+const App: React.FC<{ challenge?: Challenge | null }> = ({ challenge }) => {
   const [viewMode, setViewMode] = useState<AppState["viewMode"]>("timeline");
   const [currentModule, setCurrentModule] = useState<HistoryModule | null>(null);
   const [events, setEvents] = useState<HistoryEvent[]>([]);

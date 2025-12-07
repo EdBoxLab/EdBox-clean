@@ -91,12 +91,6 @@ export default function SocialPage() {
             href="/socials/creator-profiles"
             icon={Star}
           />
-          <FeatureCard
-            title="Leaderboards"
-            description="Compete on streaks and XP."
-            href="/socials/leaderboards"
-            icon={Trophy}
-          />
         </div>
       </div>
     </div>

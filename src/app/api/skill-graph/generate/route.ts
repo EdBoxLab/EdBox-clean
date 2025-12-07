@@ -1,14 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import {
-    SkillGraph,
-    SkillNode,
-    EngineType,
-    CourseCategory
-} from '@/lib/courseCreation/types';
+
+// ============= TYPES =============
+
+enum LearningContext {
+    HighSchool = "high_school",
+    College = "college",
+    JobSeeking = "job_seeking",
+    BuildingProjects = "building_projects"
+}
+
+interface MicroSkill {
+    id: string;
+    title: string;
+    description: string;
+    engine: string;
+    level: string;
+    estimatedMinutes: number;
+    prerequisites: string[];
+    masteryThreshold: {
+        minChallenges: number;
+        minConfidence: number;
+        minSuccessRate: number;
+    };
+    challengeTypes: string[];
+    xpReward: number;
+}
+
+interface SkillPath {
+    id: string;
+    name: string;
+    description: string;
+    skills: MicroSkill[];
+}
+
+interface MiniProject {
+    id: string;
+    name: string;
+    description: string;
+    unlocksAfter: string[];
+    engine: string;
+    estimatedMinutes: number;
+    xpReward: number;
+    shareTemplate: string;
+}
 
 // ============= API KEY MANAGEMENT =============
+
 const GROQ_API_KEYS = [
     process.env.Grok_API_Key_1,
     process.env.Grok_API_Key_2,
@@ -25,156 +64,217 @@ const getApiKey = () => {
     return key;
 };
 
-// ============= AI GENERATION LOGIC =============
+// ============= CONTEXT PERSONALIZATION =============
 
-async function analyzeGoalAndGenerateGraph(
-    goal: string,
-    context: string
-): Promise<{ nodes: SkillNode[]; edges: { from: string; to: string }[] }> {
+const getContextGuidance = (context: LearningContext) => {
+    const guidance = {
+        [LearningContext.HighSchool]: `
+- Keep language simple and encouraging
+- More scaffolding in early skills
+- Focus on portfolio building for college apps
+- Include fun, shareable projects`,
 
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("No Groq API Key provided");
+        [LearningContext.College]: `
+- Assume some technical background
+- Focus on internship-ready skills
+- Include hackathon-worthy projects
+- Career-oriented outcomes`,
 
-    const groq = new Groq({ apiKey });
+        [LearningContext.JobSeeking]: `
+- Interview-focused skills
+- Industry-standard projects
+- Resume-worthy outcomes
+- Fast-track to job readiness`,
 
-    const systemPrompt = `You are a learning architect for an "Engine-Native" EdTech platform.
-  Instead of courses, we build "Skill Graphs" where users learn by doing in interactive engines.
-  
-  Engines Available:
-  - Coding (Python/JS) -> 'Coding'
-  - Math (Graphing/Solver) -> 'Math'
-  - Physics (Simulations) -> 'Physics'
-  - Chemistry (Lab) -> 'Chemistry'
-  - Writing/Lang -> 'Language'
-  - Financial Sim -> 'Finance'
-  - History/Geo -> 'History'
-  
-  User Goal: "${goal}"
-  Context: "${context}"
-  
-  Generate a Directed Acyclic Graph (DAG) of MICRO-SKILLS (15-30 mins each) to achieve this goal.
-  Each skill MUST be demonstrable in one of the engines.
-  
-  Output ONLY valid JSON in this exact format (no markdown, no code blocks):
-  {
-    "nodes": [
-      {
-        "id": "skill_1",
-        "title": "Action-oriented Title",
-        "description": "Brief description of the task",
-        "engine": "Coding",
-        "category": "Technology",
-        "estimatedMinutes": 20,
-        "xpReward": 100,
-        "level": "Beginner"
-      }
-    ],
-    "edges": [
-      { "from": "skill_1", "to": "skill_2" }
-    ]
-  }`;
+        [LearningContext.BuildingProjects]: `
+- Emphasize shipping and launching
+- MVP-focused projects
+- Monetization strategies
+- Full-stack capabilities`
+    };
 
-    const response = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-            {
-                role: 'system',
-                content: 'You are a JSON-only API. Return valid JSON without markdown formatting.'
-            },
-            {
-                role: 'user',
-                content: systemPrompt
-            }
-        ],
-        temperature: 0.7,
-        max_tokens: 4000,
-    });
+    return guidance[context];
+};
 
-    const text = response.choices[0]?.message?.content || "{}";
-
-    // Clean up any markdown formatting
-    const cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-
-    return JSON.parse(cleanedText);
-}
-
-// ============= ROUTE HANDLER =============
+// ============= MAIN GENERATION =============
 
 export async function POST(request: NextRequest) {
     try {
-        const { goal, context } = await request.json();
-
-        if (!goal) return NextResponse.json({ error: "Goal is required" }, { status: 400 });
-
-        // Authentication check
         const supabase = await createSupabaseServerClient();
         const { data: { user } } = await supabase.auth.getUser();
 
-        if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
 
-        console.log(`Generating Skill Graph for: ${goal}`);
+        const { goal, context = LearningContext.College } = await request.json();
 
-        const graphData = await analyzeGoalAndGenerateGraph(goal, context || "General Learning");
+        if (!goal) {
+            return NextResponse.json({ error: 'Goal is required' }, { status: 400 });
+        }
 
-        // Construct the full SkillGraph object
-        const skillGraph: SkillGraph = {
-            id: crypto.randomUUID(),
-            userId: user.id,
-            goal,
-            nodes: graphData.nodes.map((node: any) => ({
-                ...node,
-                // Ensure defaults if AI misses fields
-                masteryThreshold: { minSuccessRate: 0.8, challengesRequired: 3 },
-                prerequisites: [] // populated by edges logic below if needed, or edges handles it
-            })),
-            edges: graphData.edges,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
+        const apiKey = getApiKey();
+        if (!apiKey) throw new Error("No Groq API Key provided");
 
-        // Populate prerequisites in nodes based on edges for easier frontend traversal
-        skillGraph.edges.forEach(edge => {
-            const targetNode = skillGraph.nodes.find(n => n.id === edge.to);
-            if (targetNode) {
-                if (!targetNode.prerequisites) targetNode.prerequisites = [];
-                targetNode.prerequisites.push(edge.from);
-            }
+        const groq = new Groq({ apiKey });
+
+        // Generate comprehensive skill graph with Groq
+        const systemPrompt = `You are an expert curriculum designer for Gen Z learners.
+
+Create a comprehensive skill graph with:
+- 3-5 Skill Paths (groups of related micro-skills)
+- 12-20 total Micro-Skills (2-5 minutes each)
+- 2-3 Mini Projects (5-15 min each)
+- 1 Capstone Project (20-40 min)
+
+CRITICAL RULES:
+1. Each micro-skill = ONE atomic capability
+2. Skills must be DEMONSTRABLE in an engine
+3. Action-oriented naming (e.g., "Write Your First Function" not "Learn Functions")
+4. Include prerequisites, mastery thresholds, challenge types
+5. Projects unlock after specific skills
+
+Goal: "${goal}"
+Context: ${context}
+
+PERSONALIZATION:
+${getContextGuidance(context as LearningContext)}
+
+Available engines:
+- Coding: Programming, web dev, APIs
+- Default: Writing, content creation
+- Math: Problem-solving, statistics
+- Language: Conversation, pronunciation
+- Physics: Simulations, experiments
+- Chemistry: Reactions, experiments
+- Finance: Investing, business
+- Art: Digital art, design
+- History: Timelines, geography
+
+Return ONLY valid JSON (no markdown):
+{
+  "skillPaths": [
+    {
+      "id": "path_1",
+      "name": "Path Name",
+      "description": "What this path teaches",
+      "skills": [
+        {
+          "id": "skill_1",
+          "title": "Action-Oriented Title",
+          "description": "What you'll do",
+          "engine": "Coding",
+          "level": "Beginner",
+          "estimatedMinutes": 3,
+          "prerequisites": [],
+          "masteryThreshold": {
+            "minChallenges": 2,
+            "minConfidence": 0.7,
+            "minSuccessRate": 0.6
+          },
+          "challengeTypes": ["coding", "debugging"],
+          "xpReward": 50
+        }
+      ]
+    }
+  ],
+  "miniProjects": [
+    {
+      "id": "project_1",
+      "name": "Project Name",
+      "description": "Build something cool",
+      "unlocksAfter": ["skill_3", "skill_4"],
+      "engine": "Coding",
+      "estimatedMinutes": 10,
+      "xpReward": 200,
+      "shareTemplate": "I just built {project}!"
+    }
+  ],
+  "capstoneProject": {
+    "id": "capstone",
+    "name": "Epic Final Project",
+    "description": "Showcase everything",
+    "unlocksAfter": ["skill_10", "skill_11"],
+    "engine": "Coding",
+    "estimatedMinutes": 30,
+    "xpReward": 500,
+    "shareTemplate": "I completed {goal}!"
+  }
+}`;
+
+        const response = await groq.chat.completions.create({
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+                { role: 'system', content: 'You are a JSON-only API. Return valid JSON without markdown formatting.' },
+                { role: 'user', content: systemPrompt }
+            ],
+            temperature: 0.8,
+            max_tokens: 4000,
         });
 
-        // Save to Database
-        const { data: savedGraph, error: dbError } = await supabase
+        const text = response.choices[0]?.message?.content || "{}";
+        const cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const graphData = JSON.parse(cleanedText);
+
+        // Flatten skills for database storage
+        const allSkills: MicroSkill[] = [];
+        const edges: Array<{ source: string, target: string }> = [];
+
+        graphData.skillPaths.forEach((path: SkillPath) => {
+            path.skills.forEach((skill: MicroSkill) => {
+                allSkills.push(skill);
+
+                // Create edges from prerequisites
+                skill.prerequisites.forEach(prereq => {
+                    edges.push({ source: prereq, target: skill.id });
+                });
+            });
+        });
+
+        // Save to database
+        const { data: savedGraph, error: saveError } = await supabase
             .from('skill_graphs')
             .insert({
                 user_id: user.id,
-                goal: skillGraph.goal,
-                nodes: skillGraph.nodes,
-                edges: skillGraph.edges,
+                goal,
+                nodes: allSkills,
+                edges,
+                metadata: {
+                    context,
+                    skillPaths: graphData.skillPaths,
+                    miniProjects: graphData.miniProjects,
+                    capstoneProject: graphData.capstoneProject,
+                    totalSkills: allSkills.length,
+                    estimatedHours: Math.ceil(allSkills.reduce((sum, s) => sum + s.estimatedMinutes, 0) / 60)
+                }
             })
             .select()
             .single();
 
-        if (dbError) {
-            console.error("Database Error:", dbError);
-            throw new Error("Failed to save skill graph to database");
+        if (saveError) {
+            console.error('Database save error:', saveError);
+            throw new Error('Failed to save skill graph');
         }
 
-        // Return the saved graph with database-generated ID
-        const finalGraph: SkillGraph = {
-            id: savedGraph.id,
-            userId: savedGraph.user_id,
-            goal: savedGraph.goal,
-            nodes: savedGraph.nodes,
-            edges: savedGraph.edges,
-            createdAt: savedGraph.created_at,
-            updatedAt: savedGraph.updated_at,
-        };
-
-        return NextResponse.json({ success: true, graph: finalGraph });
+        return NextResponse.json({
+            success: true,
+            graph: {
+                id: savedGraph.id,
+                userId: savedGraph.user_id,
+                goal: savedGraph.goal,
+                nodes: savedGraph.nodes,
+                edges: savedGraph.edges,
+                skillPaths: graphData.skillPaths,
+                miniProjects: graphData.miniProjects,
+                capstoneProject: graphData.capstoneProject,
+                createdAt: savedGraph.created_at
+            }
+        });
 
     } catch (error: any) {
-        console.error("Skill Graph Generation Error:", error);
+        console.error('Skill Graph Generation Error:', error);
         return NextResponse.json(
-            { error: error.message || "Failed to generate skill graph" },
+            { error: error.message || 'Failed to generate skill graph' },
             { status: 500 }
         );
     }

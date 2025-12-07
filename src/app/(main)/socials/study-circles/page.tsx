@@ -2,8 +2,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Hash, LogIn, LogOut, Loader2, Send } from 'lucide-react';
+import { Users, Plus, Hash, LogIn, LogOut, Loader2, Send, Share2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 const CircleList = ({ circles, onSelectCircle, selectedCircle, onJoin, onLeave, isProcessing, onNewCircle }) => (
     <div className="flex flex-col border-r border-zinc-800 w-1/3 p-4 space-y-4">
@@ -163,6 +164,13 @@ const CircleChat = ({ circle, session }) => {
         }
     };
 
+    const copyInviteLink = () => {
+        const url = `${window.location.origin}/socials/study-circles?id=${circle.id}`;
+        navigator.clipboard.writeText(url);
+        // Could add a toast here
+        alert('Invite link copied to clipboard!');
+    };
+
     if (!circle) {
         return (
             <div className="flex-1 p-8 text-white flex flex-col items-center justify-center bg-[#09090b]">
@@ -183,9 +191,19 @@ const CircleChat = ({ circle, session }) => {
 
     return (
         <div className="flex-1 flex flex-col h-screen bg-[#09090b] text-white">
-            <header className="p-4 border-b border-zinc-800">
-                <h1 className="text-xl font-bold text-purple-400">{circle.name}</h1>
-                <p className="text-sm text-gray-400">{circle.description}</p>
+            <header className="p-4 border-b border-zinc-800 flex justify-between items-center">
+                <div>
+                    <h1 className="text-xl font-bold text-purple-400">{circle.name}</h1>
+                    <p className="text-sm text-gray-400">{circle.description}</p>
+                </div>
+                <button
+                    onClick={copyInviteLink}
+                    className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors flex items-center space-x-2 text-sm"
+                    title="Copy invite link"
+                >
+                    <Share2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Invite</span>
+                </button>
             </header>
 
             <div className="flex-1 p-6 overflow-y-auto">
@@ -220,6 +238,9 @@ export default function StudyCirclesPage() {
     const [processingId, setProcessingId] = useState(null);
     const [session, setSession] = useState(null);
 
+    const searchParams = useSearchParams();
+    const router = useRouter();
+
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
 
@@ -238,7 +259,16 @@ export default function StudyCirclesPage() {
             if (!response.ok) throw new Error('Network response was not ok');
             const data = await response.json();
             setCircles(data);
-            if (!selectedCircle && data.length > 0) {
+
+            // Check for invite ID
+            const inviteId = searchParams.get('id');
+            if (inviteId) {
+                const targetCircle = data.find(c => c.id === inviteId);
+                if (targetCircle) {
+                    setSelectedCircle(targetCircle);
+                }
+            } else if (!selectedCircle && data.length > 0) {
+                // Only default select if no invite ID and no existing selection
                 setSelectedCircle(data[0]);
             }
         } catch (error) {

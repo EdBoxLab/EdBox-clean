@@ -4,8 +4,9 @@ import ArtCanvas, { ArtCanvasHandle } from './components/ArtCanvas';
 import AIPanel from './components/AIPanel';
 import { DrawingState, BrushType } from './types';
 import { MonitorPlay, Sparkles, Menu } from 'lucide-react';
+import { Challenge } from '../../types';
 
-const App: React.FC = () => {
+const App: React.FC<{ challenge?: Challenge | null }> = ({ challenge }) => {
   const [state, setState] = useState<DrawingState>({
     isDrawing: false,
     color: '#000000',

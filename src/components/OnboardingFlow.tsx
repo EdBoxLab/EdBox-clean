@@ -32,13 +32,12 @@ export const OnboardingFlow = () => {
 
             if (!response.ok) throw new Error(data.error || 'Failed to generate path');
 
-            // Success! Redirect to the skill graph
-            // Assuming the response contains { startSkillId: ... } or just redirect to graph view
-            console.log("Graph generated:", data);
-
-            // In a real app, we'd redirect to /learn or /dashboard
-            // router.push('/dashboard'); 
-            setStep(3); // Show success state for now
+            // Redirect to the generated course page
+            if (data.graph?.id) {
+                router.push(`/courses/${data.graph.id}`);
+            } else {
+                throw new Error('No course ID returned');
+            }
 
         } catch (err: any) {
             setError(err.message);

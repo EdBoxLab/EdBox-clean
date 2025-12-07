@@ -22,6 +22,7 @@ import {
   AtomicConfig
 } from './types';
 import { Settings, Play, Activity, ArrowLeft, Zap, Wind, Sun, Waves, GitBranch, Hammer, Atom } from 'lucide-react';
+import { Challenge } from '../../types';
 
 // --- DEFAULTS ---
 const DEFAULT_PENDULUM: DoublePendulumConfig = {
@@ -66,7 +67,7 @@ const DEFAULT_ATOMIC: AtomicConfig = {
 
 type ViewMode = 'setup' | 'result';
 
-export const App: React.FC = () => {
+export const App: React.FC<{ challenge?: Challenge | null }> = ({ challenge }) => {
   const [activeModuleId, setActiveModuleId] = useState('mechanics');
   const [viewMode, setViewMode] = useState<ViewMode>('setup');
   const [status, setStatus] = useState<SimulationStatus>(SimulationStatus.PAUSED);

@@ -8,8 +8,9 @@ import { StatesOfMatterModule } from './components/modules/StatesOfMatter';
 import { ChemicalMixerModule } from './components/modules/ChemicalMixer';
 import { ChatInterface } from './components/ChatInterface';
 import { ModuleType } from './types';
+import { Challenge } from '../../types';
 
-const App: React.FC = () => {
+const App: React.FC<{ challenge?: Challenge | null }> = ({ challenge }) => {
   const [activeModule, setActiveModule] = useState<ModuleType>(ModuleType.CHEMICAL_MIXER);
   const [currentContext, setCurrentContext] = useState<any>(null);
   const [targetMoleculeId, setTargetMoleculeId] = useState<string | null>(null);

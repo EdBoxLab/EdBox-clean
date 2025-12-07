@@ -6,8 +6,9 @@ import { CorporateFinance } from './modules/CorporateFinance';
 import { Investments } from './modules/Investments';
 import { AITutor } from './components/AITutor';
 import { ModuleType } from './types';
+import { Challenge } from '../../types';
 
-const App: React.FC = () => {
+const App: React.FC<{ challenge?: Challenge | null }> = ({ challenge }) => {
   const [currentModule, setCurrentModule] = useState<ModuleType>(ModuleType.DASHBOARD);
 
   const renderModule = () => {

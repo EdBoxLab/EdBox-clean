@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import OnboardingForm from '@/components/OnboardingForm';
 import { motion, useAnimation, Variants } from 'framer-motion';
-import { ArrowRight, Book, Briefcase, CheckCircle, ChevronLeft, ChevronRight, PlayCircle, Plus, Star, Zap } from 'lucide-react';
+import { ArrowRight, Book, Briefcase, CheckCircle, ChevronLeft, ChevronRight, PlayCircle, Plus, Star, Zap, FileText, Layout, PenTool } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const supabase = createSupabaseBrowserClient();
@@ -13,86 +13,104 @@ const Dashboard: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [lastActivity, setLastActivity] = useState<any>(null);
-  
-  // Dummy data for demonstration
-  const courses = [
-    { id: 1, title: 'Intro to Web Dev', progress: 50, icon: <Book className="w-8 h-8 text-indigo-300" /> },
-    { id: 2, title: 'Advanced React', progress: 20, icon: <Zap className="w-8 h-8 text-green-300" /> },
-    { id: 3, title: 'Supabase Mastery', progress: 75, icon: <Briefcase className="w-8 h-8 text-red-300" /> },
+  const [courses, setCourses] = useState<any[]>([]);
+  const [notes, setNotes] = useState<any[]>([]);
+  const [recentCourse, setRecentCourse] = useState<any>(null);
+
+  // Static tools for the explore section
+  const tools = [
+    { id: 't1', title: 'Research Assistant', type: 'Tool', href: '/research-assistant', icon: <Layout className="w-8 h-8 text-blue-300" /> },
+    { id: 't2', title: 'Note Taker', type: 'Tool', href: '/tools/notes', icon: <FileText className="w-8 h-8 text-green-300" /> },
+    { id: 't3', title: 'Study Kit', type: 'Tool', href: '/tools/study-kit', icon: <Zap className="w-8 h-8 text-yellow-300" /> },
   ];
 
-  const exploreItems = {
-    notes: [
-      { id: 'n1', title: 'React Hooks Cheatsheet', type: 'Note' },
-      { id: 'n2', title: 'CSS Flexbox Guide', type: 'Note' },
-      { id: 'n3', title: 'Next.js Routing Explained', type: 'Note' },
-      { id: 'n4', title: 'JavaScript ES6 Features', type: 'Note' },
-    ],
-    quizzes: [
-      { id: 'q1', title: 'JavaScript Fundamentals Quiz', type: 'Quiz' },
-      { id: 'q2', title: 'React Component Lifecycle', type: 'Quiz' },
-      { id: 'q3', title: 'Advanced SQL Queries', type: 'Quiz' },
-      { id: 'q4', title: 'Web Accessibility Basics', type: 'Quiz' },
-    ],
-    tools: [
-      { id: 't1', title: 'Code Playground', type: 'Tool' },
-      { id: 't2', title: 'JSON Formatter', type: 'Tool' },
-      { id: 't3', title: 'Color Palette Generator', type: 'Tool' },
-      { id: 't4', title: 'Regex Tester', type: 'Tool' },
-    ]
-  };
-
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
-        return;
-      }
-      setUser(user);
+    const fetchData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          router.push('/login');
+          return;
+        }
+        setUser(user);
 
-      if (user) {
         // Fetch profile
-        const { data, error } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error fetching profile:', error);
-        } else if (!data) {
-          // Create a profile if it doesn't exist
-          const { data: newProfile, error: insertError } = await supabase
+
+        if (profileData) {
+          setProfile(profileData);
+        } else if (!profileError || profileError.code === 'PGRST116') {
+          // Create a profile if it doesn't exist (handling race conditions or first login)
+          const { data: newProfile } = await supabase
             .from('profiles')
             .insert([{ id: user.id, email: user.email }])
+            .select()
             .single();
-          if (insertError) {
-            console.error('Error creating profile:', insertError);
-          } else {
-            setProfile(newProfile);
-          }
-        } else {
-          setProfile(data);
+          if (newProfile) setProfile(newProfile);
         }
-        
-        // Fetch last activity (dummy implementation)
-        setLastActivity({ type: 'course', title: 'Intro to Web Dev', href: '/courses/intro-to-web-dev' });
+
+        // Fetch Courses (Skill Graphs)
+        const coursesRes = await fetch('/api/skill-graph/list');
+        const coursesJson = await coursesRes.json();
+
+        if (coursesJson.success && coursesJson.courses) {
+          const mappedCourses = coursesJson.courses.map((c: any) => ({
+            id: c.id,
+            title: c.topic || 'Untitled Course', // Assuming 'topic' is the name field, fallback if not
+            progress: Math.round((coursesJson.progress?.[c.id] || 0) * 100),
+            icon: <Book className="w-8 h-8 text-indigo-300" />,
+            href: `/learning-path/${c.id}` // Assuming this is the link
+          }));
+          setCourses(mappedCourses);
+
+          // Set the most recent course as "Continue Where You Left Off"
+          if (mappedCourses.length > 0) {
+            // Sorting by simple assumption or just taking the first one if the API ordered them by date (which it does: order('created_at', { ascending: false }))
+            // Ideally we'd have a 'last_accessed_at' field, but newest created is a decent proxy for now or the one with highest progress not 100%
+            setRecentCourse({
+              type: 'course',
+              title: mappedCourses[0].title,
+              href: mappedCourses[0].href,
+              progress: mappedCourses[0].progress
+            });
+          }
+        }
+
+        // Fetch Notes
+        const notesRes = await fetch('/api/notes');
+        const notesJson = await notesRes.json();
+        if (notesJson.notes) {
+          setNotes(notesJson.notes.map((n: any) => ({
+            id: n.id,
+            title: n.title || 'Untitled Note',
+            type: 'Note',
+            href: `/tools/notes?id=${n.id}` // Link to open the specific note
+          })));
+        }
+
+      } catch (error) {
+        console.error("Error loading dashboard data:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
-    fetchUserProfile();
-  }, [supabase]);
+    fetchData();
+  }, [supabase, router]);
 
   if (loading) {
-    return <div className="flex justify-center items-center min-h-screen bg-gray-900 text-white">Loading...</div>;
+    return <div className="flex justify-center items-center min-h-screen bg-[#09090b] text-white">Loading...</div>;
   }
 
   if (!profile || !profile.onboarding_completed) {
+    // If we confirm profile exists but onboarding isn't done
     return <OnboardingForm />;
   }
-  
+
   const cardVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     visible: (i: number) => ({
@@ -106,7 +124,7 @@ const Dashboard: React.FC = () => {
     })
   };
 
-  const ExploreRow = ({ title, items }: { title: string, items: {id: string, title: string, type: string}[] }) => {
+  const ExploreRow = ({ title, items, emptyMessage }: { title: string, items: { id: string, title?: string, type?: string, href?: string, icon?: React.ReactNode }[], emptyMessage?: string }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const scroll = (direction: 'left' | 'right') => {
@@ -119,34 +137,49 @@ const Dashboard: React.FC = () => {
         });
       }
     };
-  
+
+    if (!items || items.length === 0) {
+      return (
+        <div className="mb-12">
+          <h2 className="text-2xl font-bold text-white mb-4">{title}</h2>
+          <p className="text-gray-500 italic">{emptyMessage || "No items found."}</p>
+        </div>
+      )
+    }
+
     return (
       <div className="mb-12">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-white">{title}</h2>
-          <div className="flex gap-2">
-            <button onClick={() => scroll('left')} className="p-2 bg-gray-800 rounded-full hover:bg-gray-700 transition" aria-label="Scroll left"><ChevronLeft className="w-5 h-5" /></button>
-            <button onClick={() => scroll('right')} className="p-2 bg-gray-800 rounded-full hover:bg-gray-700 transition" aria-label="Scroll right"><ChevronRight className="w-5 h-5" /></button>
-          </div>
+          {items.length > 3 && (
+            <div className="flex gap-2">
+              <button onClick={() => scroll('left')} className="p-1.5 border border-zinc-700 rounded-md hover:border-zinc-500 transition text-zinc-400 hover:text-zinc-200" aria-label="Scroll left"><ChevronLeft className="w-4 h-4" /></button>
+              <button onClick={() => scroll('right')} className="p-1.5 border border-zinc-700 rounded-md hover:border-zinc-500 transition text-zinc-400 hover:text-zinc-200" aria-label="Scroll right"><ChevronRight className="w-4 h-4" /></button>
+            </div>
+          )}
         </div>
         <div ref={scrollRef} className="flex gap-4 overflow-x-auto pb-4 scroll-smooth" style={{ scrollbarWidth: 'none', 'msOverflowStyle': 'none' }}>
           {items.map((item, i) => (
-            <motion.div
-              key={item.id}
-              className="flex-shrink-0 w-64 h-40 bg-gray-800 rounded-lg p-4 flex flex-col justify-between"
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              custom={i}
-            >
-              <div>
-                <p className="text-sm text-gray-400">{item.type}</p>
-                <h3 className="font-bold text-lg text-white mt-1">{item.title}</h3>
-              </div>
-              <Link href="#" className="flex items-center gap-2 text-indigo-400 hover:text-indigo-300">
-                Open <ArrowRight className="w-4 h-4" />
-              </Link>
-            </motion.div>
+            <Link href={item.href || '#'} key={item.id} className="block">
+              <motion.div
+                className="flex-shrink-0 w-64 h-40 border border-zinc-800 hover:border-zinc-700 rounded-lg p-4 flex flex-col justify-between transition-colors bg-zinc-900/50"
+                variants={cardVariants}
+                initial="hidden"
+                animate="visible"
+                custom={i}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400">{item.type}</p>
+                    <h3 className="font-bold text-lg text-white mt-1 line-clamp-2">{item.title}</h3>
+                  </div>
+                  {item.icon && <div className="ml-2">{item.icon}</div>}
+                </div>
+                <div className="flex items-center gap-2 text-indigo-400 hover:text-indigo-300 text-sm mt-2">
+                  Open <ArrowRight className="w-4 h-4" />
+                </div>
+              </motion.div>
+            </Link>
           ))}
         </div>
       </div>
@@ -155,66 +188,79 @@ const Dashboard: React.FC = () => {
 
 
   return (
-    <div className="min-h-full bg-gray-900 text-white p-4 sm:p-6 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-12">
-          <h1 className="text-4xl font-extrabold text-white mb-2">Welcome, {profile?.username || user?.email}!</h1>
-          <p className="text-lg text-gray-400">Let's continue your learning journey.</p>
-        </div>
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
+      <div className="mb-12">
+        <h1 className="text-4xl font-extrabold text-white mb-2">Welcome, {profile?.username || user?.email?.split('@')[0]}!</h1>
+        <p className="text-lg text-gray-400">Let's continue your learning journey.</p>
+      </div>
 
-        {/* Course Overview */}
+      {/* Continue Where You Left Off */}
+      {recentCourse && (
         <div className="mb-12">
-          <h2 className="text-2xl font-bold text-white mb-4">Your Courses</h2>
+          <h2 className="text-2xl font-bold text-white mb-4">Continue Learning</h2>
+          <Link href={recentCourse.href} className="block">
+            <motion.div
+              className="bg-gradient-to-r from-indigo-900/80 to-purple-900/80 border border-indigo-500/30 rounded-xl p-6 sm:p-8 flex justify-between items-center group hover:border-indigo-500/50 transition-all"
+              whileHover={{ scale: 1.01 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div>
+                <p className="text-sm uppercase tracking-wider text-indigo-200 font-semibold mb-1">{recentCourse.type}</p>
+                <h3 className="text-2xl sm:text-3xl font-bold text-white mb-2">{recentCourse.title}</h3>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-indigo-200">{recentCourse.progress}% Complete</span>
+                  <div className="w-24 sm:w-32 bg-indigo-950 rounded-full h-1.5">
+                    <div className="bg-indigo-400 h-1.5 rounded-full" style={{ width: `${recentCourse.progress}%` }}></div>
+                  </div>
+                </div>
+              </div>
+              <PlayCircle className="w-12 h-12 sm:w-16 sm:h-16 text-white opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all" />
+            </motion.div>
+          </Link>
+        </div>
+      )}
+
+      {/* Course Overview */}
+      <div className="mb-12">
+        <h2 className="text-2xl font-bold text-white mb-4">Your Courses</h2>
+        {courses.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {courses.map((course, i) => (
-              <motion.div 
-                key={course.id}
-                className="bg-gray-800 rounded-lg p-6 flex items-center gap-6"
-                variants={cardVariants}
-                initial="hidden"
-                animate="visible"
-                custom={i}
-              >
-                {course.icon}
-                <div className="flex-grow">
-                  <h3 className="font-bold text-xl text-white">{course.title}</h3>
-                  <div className="w-full bg-gray-700 rounded-full h-2.5 mt-2">
-                    <div className="bg-indigo-500 h-2.5 rounded-full" style={{ width: `${course.progress}%` }}></div>
+              <Link href={course.href} key={course.id}>
+                <motion.div
+                  className="bg-zinc-900/50 border border-zinc-800 hover:border-zinc-600 rounded-lg p-6 flex items-center gap-6 cursor-pointer transition-colors"
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate="visible"
+                  custom={i}
+                >
+                  {course.icon}
+                  <div className="flex-grow">
+                    <h3 className="font-bold text-xl text-white line-clamp-1">{course.title}</h3>
+                    <div className="w-full bg-zinc-700 rounded-full h-2.5 mt-2">
+                      <div className="bg-indigo-500 h-2.5 rounded-full" style={{ width: `${course.progress}%` }}></div>
+                    </div>
+                    <p className="text-sm text-gray-400 mt-1">{course.progress}% complete</p>
                   </div>
-                  <p className="text-sm text-gray-400 mt-1">{course.progress}% complete</p>
-                </div>
-              </motion.div>
+                </motion.div>
+              </Link>
             ))}
           </div>
-        </div>
-        
-        {/* Continue Where You Left Off */}
-        {lastActivity && (
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold text-white mb-4">Continue Where You Left Off</h2>
-            <Link href={lastActivity.href} className="block">
-              <motion.div
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-8 flex justify-between items-center"
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div>
-                  <p className="text-sm uppercase tracking-wider text-indigo-200">{lastActivity.type}</p>
-                  <h3 className="text-3xl font-bold text-white mt-1">{lastActivity.title}</h3>
-                </div>
-                <PlayCircle className="w-16 h-16 text-white opacity-80" />
-              </motion.div>
+        ) : (
+          <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-8 text-center">
+            <p className="text-gray-400 mb-4">You haven't enrolled in any courses yet.</p>
+            <Link href="/learning-path/create" className="inline-flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
+              <Plus className="w-4 h-4" /> Create Your First Course
             </Link>
           </div>
         )}
+      </div>
 
-        {/* Explore Section */}
-        <div>
-            <h2 className="text-3xl font-bold text-white mb-6">Explore</h2>
-            <ExploreRow title="Your Notes" items={exploreItems.notes} />
-            <ExploreRow title="Quizzes" items={exploreItems.quizzes} />
-            <ExploreRow title="Tools" items={exploreItems.tools} />
-        </div>
+      {/* Explore Section */}
+      <div>
+        <h2 className="text-3xl font-bold text-white mb-6">Explore</h2>
+        <ExploreRow title="Your Notes" items={notes} emptyMessage="No notes created yet. Use the Note Taker to get started!" />
+        <ExploreRow title="Tools" items={tools} />
       </div>
     </div>
   );

@@ -232,7 +232,7 @@ export const ConversationPractice: React.FC = () => {
 
   const fetchCulturalTip = async (lang: string) => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY});
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: `Generate a fascinating, concise cultural fact or language learning tip for a student learning ${lang}. Keep it under 25 words. Do not use markdown.`,
@@ -297,7 +297,7 @@ export const ConversationPractice: React.FC = () => {
     if (isActive) return;
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY});
       
       const inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });

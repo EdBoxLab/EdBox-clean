@@ -11,7 +11,12 @@ export async function GET(request: Request) {
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
+    console.log('Env check:', {
+  hasPublicUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+  hasPublicKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  hasUrl: !!process.env.SUPABASE_URL,
+  hasKey: !!process.env.SUPABASE_ANON_KEY
+});
     // ✅ Changed from 'circles' to 'study_circles'
     const { data: allCircles, error: allCirclesError } = await supabase
       .from('study_circles')

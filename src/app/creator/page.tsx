@@ -1,53 +1,145 @@
 'use client';
 
-import React, { useEffect, useState } from "react";
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useOnboardingFlow } from './hooks/useOnboardingFlow';
+import Step1Goal from './components/Step1Goal';
+import Step2Context from './components/Step2Context';
+import Step3Time from './components/Step3Time';
+import GeneratingView from './components/GeneratingView';
 
-export default function CreatorPage() {
-  const [course, setCourse] = useState<any>(null);
+export default function OnboardingFlow() {
+  const {
+    step,
+    goal,
+    context,
+    timeAvailable,
+    uploadedFile,
+    isGenerating,
+    error,
+    showContinue,
+    setGoal,
+    setContext,
+    setTimeAvailable,
+    handleFileUpload,
+    nextStep,
+    prevStep
+  } = useOnboardingFlow();
 
-  useEffect(() => {
-    // In a real app, you'd fetch this from a database.
-    // For now, we'll simulate fetching from local storage.
-    const storedCourse = localStorage.getItem('generatedCourse');
-    if (storedCourse) {
-      try {
-        setCourse(JSON.parse(storedCourse));
-      } catch (e) {
-        console.error("Error parsing course from local storage", e);
-        // Handle the error, e.g., by clearing the invalid item
-        localStorage.removeItem('generatedCourse');
-      }
-    }
-  }, []);
+  if (isGenerating) {
+    return <GeneratingView isGenerating={isGenerating} />;
+  }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-12">
-          <h1 className="text-5xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-blue-500">
-            Course Creator
-          </h1>
-          <p className="mt-4 text-lg text-gray-400 max-w-2xl mx-auto">
-            Create, manage, and publish your interactive learning experiences.
-          </p>
+    <div className="min-h-full bg-gradient-to-br from-gray-900 via-blue-900/20 to-gray-900 text-white rounded-3xl">
+      <div className="max-w-4xl mx-auto px-4 py-8 md:py-12">
+        {/* Header with Back Button */}
+        <div className="mb-8 flex items-center justify-between">
+          {step > 1 && (
+            <button
+              onClick={prevStep}
+              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back
+            </button>
+          )}
+
+          {/* Progress Dots */}
+          <div className="flex gap-2 ml-auto">
+            {[1, 2, 3].map((dot) => (
+              <div
+                key={dot}
+                className={`h-2 rounded-full transition-all ${dot === step
+                    ? 'w-8 bg-blue-500'
+                    : dot < step
+                      ? 'w-2 bg-blue-500'
+                      : 'w-2 bg-gray-700'
+                  }`}
+              />
+            ))}
+          </div>
         </div>
 
-        <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-700">
-            <h2 className="text-3xl font-bold mb-6">Your Course</h2>
-            {course ? (
-                <div className="space-y-4">
-                    <h3 className="text-2xl font-bold text-teal-400">{course.title}</h3>
-                    <p className="text-gray-300">{course.description}</p>
-                    {/* We will render the rest of the course content here */}
-                </div>
-            ) : (
-                <div className="text-center py-12">
-                    <p className="text-gray-400 text-lg">You haven't created a course yet.</p>
-                    <p className="text-gray-500 mt-2">Use the Genie chat to generate a new course!</p>
-                    {/* We can add a button here to start the creation process */}
-                </div>
-            )}
-        </div>
+        {/* Step Content */}
+        <AnimatePresence mode="wait">
+          {step === 1 && (
+            <Step1Goal
+              key="step1"
+              goal={goal}
+              setGoal={setGoal}
+              uploadedFile={uploadedFile}
+              handleFileUpload={handleFileUpload}
+            />
+          )}
+          {step === 2 && (
+            <Step2Context
+              key="step2"
+              context={context}
+              setContext={setContext}
+            />
+          )}
+          {step === 3 && (
+            <Step3Time
+              key="step3"
+              timeAvailable={timeAvailable}
+              setTimeAvailable={setTimeAvailable}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Error Message */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mt-6 p-4 bg-red-500/10 border border-red-500 rounded-xl text-red-200 flex items-center gap-3"
+            >
+              <span className="text-2xl">⚠️</span>
+              <span>{error}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Continue Button */}
+        <AnimatePresence>
+          {showContinue && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mt-8"
+            >
+              <motion.button
+                onClick={nextStep}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full py-5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-2xl font-bold text-lg shadow-lg shadow-blue-500/30 transition-all"
+              >
+                {step === 3 ? "Let's Go! 🚀" : "Continue →"}
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Tip (only on step 1) */}
+        {step === 1 && !isGenerating && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="mt-12 p-5 bg-gray-800/50 rounded-2xl border border-gray-700"
+          >
+            <p className="text-sm text-gray-400">
+              <span className="font-bold text-white">💡 Pro tip:</span> The more specific you are, the better!
+              Instead of "learn coding", try "build a personal portfolio website" or "create an AI chatbot".
+            </p>
+          </motion.div>
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 
 import React, { useState, useCallback } from 'react';
-import { Sidebar } from './components/Sidebar';
 import { StoichiometryModule } from './components/modules/Stoichiometry';
 import { TitrationModule } from './components/modules/Titration';
 import { MoleculeViewer } from './components/modules/MoleculeViewer';
@@ -9,8 +8,9 @@ import { StatesOfMatterModule } from './components/modules/StatesOfMatter';
 import { ChemicalMixerModule } from './components/modules/ChemicalMixer';
 import { ChatInterface } from './components/ChatInterface';
 import { ModuleType } from './types';
+import { Challenge } from '../../types';
 
-const App: React.FC = () => {
+const App: React.FC<{ challenge?: Challenge | null }> = ({ challenge }) => {
   const [activeModule, setActiveModule] = useState<ModuleType>(ModuleType.CHEMICAL_MIXER);
   const [currentContext, setCurrentContext] = useState<any>(null);
   const [targetMoleculeId, setTargetMoleculeId] = useState<string | null>(null);
@@ -21,21 +21,18 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen bg-slate-950 text-white overflow-hidden selection:bg-blue-500/30">
-      
-      {/* Navigation Sidebar */}
-      <Sidebar activeModule={activeModule} onModuleChange={setActiveModule} />
+    <div className="flex flex-col h-full bg-transparent text-white overflow-hidden selection:bg-blue-500/30">
 
       {/* Main Content Area */}
       <main className="flex-1 relative flex flex-col h-full overflow-hidden">
-        
+
         {/* Top bar (mobile mostly, or global status) */}
         <div className="h-16 border-b border-slate-800 flex items-center px-6 bg-slate-900/50 backdrop-blur shrink-0">
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-                <span>Module</span>
-                <span>/</span>
-                <span className="text-white font-medium">{activeModule}</span>
-            </div>
+          <div className="flex items-center gap-2 text-sm text-slate-400">
+            <span>Module</span>
+            <span>/</span>
+            <span className="text-white font-medium">{activeModule}</span>
+          </div>
         </div>
 
         {/* Module Container */}
@@ -48,8 +45,8 @@ const App: React.FC = () => {
               <TitrationModule setContext={handleContextUpdate} />
             )}
             {activeModule === ModuleType.MOLECULAR_VIEWER && (
-              <MoleculeViewer 
-                setContext={handleContextUpdate} 
+              <MoleculeViewer
+                setContext={handleContextUpdate}
                 targetMoleculeId={targetMoleculeId}
               />
             )}
@@ -60,8 +57,8 @@ const App: React.FC = () => {
               <StatesOfMatterModule setContext={handleContextUpdate} />
             )}
             {activeModule === ModuleType.CHEMICAL_MIXER && (
-              <ChemicalMixerModule 
-                setContext={handleContextUpdate} 
+              <ChemicalMixerModule
+                setContext={handleContextUpdate}
                 onNavigate={setActiveModule}
                 onInspectMolecule={setTargetMoleculeId}
               />
@@ -72,7 +69,7 @@ const App: React.FC = () => {
 
       {/* AI Assistant Overlay */}
       <ChatInterface contextData={currentContext} />
-      
+
     </div>
   );
 };

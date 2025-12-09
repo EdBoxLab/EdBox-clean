@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, UserPlus, UserCheck, Users } from 'lucide-react';
 
 const CreatorCard = ({ creator, onFollow, onUnfollow, isProcessing }: { creator: any, onFollow: (id: string) => void, onUnfollow: (id: string) => void, isProcessing: boolean }) => (
-    <div className="bg-gray-800 p-5 rounded-lg text-center transition-all hover:scale-105">
+    <div className="border border-zinc-800 hover:border-zinc-700 p-5 rounded-lg text-center transition-all">
         <img src={creator.avatar_url || 'https://i.pravatar.cc/150?u=a-creator'} alt={creator.username} className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-purple-500" />
         <h3 className="font-bold text-xl text-white">{creator.username}</h3>
         <p className="text-sm text-gray-400 mt-1 mb-3">{creator.bio || 'A passionate learner and creator.'}</p>
@@ -13,19 +13,19 @@ const CreatorCard = ({ creator, onFollow, onUnfollow, isProcessing }: { creator:
             <span>{creator.follower_count.toLocaleString()} Followers</span>
         </div>
         {creator.is_following ? (
-            <button 
+            <button
                 onClick={() => onUnfollow(creator.user_id)}
                 disabled={isProcessing}
                 className="w-full py-2 px-4 rounded-md bg-gray-600 hover:bg-gray-700 transition-colors flex items-center justify-center text-sm disabled:opacity-50">
-                <UserCheck className="h-4 w-4 mr-1.5"/>
+                <UserCheck className="h-4 w-4 mr-1.5" />
                 Following
             </button>
         ) : (
-            <button 
+            <button
                 onClick={() => onFollow(creator.user_id)}
                 disabled={isProcessing}
                 className="w-full py-2 px-4 rounded-md bg-purple-600 hover:bg-purple-700 transition-colors flex items-center justify-center text-sm disabled:opacity-50">
-                <UserPlus className="h-4 w-4 mr-1.5"/>
+                <UserPlus className="h-4 w-4 mr-1.5" />
                 Follow
             </button>
         )}
@@ -84,7 +84,7 @@ export default function CreatorProfilesPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white p-8">
+        <div className="min-h-screen bg-[#09090b] text-white p-8">
             <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-12">
                     <h1 className="text-5xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500">

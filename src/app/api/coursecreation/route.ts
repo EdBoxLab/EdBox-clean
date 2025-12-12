@@ -1,8 +1,9 @@
 // app/api/learning-path/generate/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { generateWithRetry } from '@/lib/ai-providers';
 
 // ============= TYPES =============
 
@@ -160,8 +161,6 @@ async function analyzeGoal(
   estimatedTotalHours: number;
   recommendedEngine: EngineType;
 }> {
-  const ai = createAI();
-
   const systemPrompt = `Role: {Act as an expert learning path designer for Gen Z students (16–24). You are not just a planner, but a motivational architect who designs practical, build-focused learning journeys.}
 
 Expertise: {Analyze user goals deeply, translate vague ambitions into specific skills, and map them to the right domain, proficiency level, realistic time estimate, and best engine. Always optimize for bite-sized (2–5 min) micro-skills, mobile-first learning, and building tangible outcomes.}
@@ -175,7 +174,7 @@ Constraints: {Never output vague or generic paths. Always be specific, practical
 Goal: {Provide a JSON learning path analysis with 5 fields: actual_goal, domain, target_proficiency, time_estimate_hours, best_engine.}
 
 Engagement Rules:
-- **Specificity**: Translate broad goals into concrete skills (e.g., “learn coding” → “build a responsive website”).  
+- **Specificity**: Translate broad goals into concrete skills (e.g., "learn coding" → "build a responsive website").  
 - **Builder Focus**: Emphasize creation, projects, and applied learning.  
 - **Realism**: Time estimates must be achievable for Gen Z students.  
 - **Motivation**: Design paths that feel exciting and rewarding.  
@@ -188,29 +187,27 @@ Return: {Valid JSON object with keys: actual_goal, domain, target_proficiency, t
     ? `\n\nUploaded document context: ${uploadedFileContent.substring(0, 3000)}`
     : '';
 
-  return retryWithBackoff(async () => {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
-      contents: `Goal: "${goal}"${fileContext}`,
-      config: {
-        systemInstruction: systemPrompt,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            parsedGoal: { type: Type.STRING },
-            domain: { type: Type.STRING },
-            targetProficiency: { type: Type.STRING },
-            estimatedTotalHours: { type: Type.NUMBER },
-            recommendedEngine: { type: Type.STRING },
-          },
-          required: ['parsedGoal', 'domain', 'targetProficiency', 'estimatedTotalHours', 'recommendedEngine']
-        }
-      }
-    });
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      parsedGoal: { type: Type.STRING },
+      domain: { type: Type.STRING },
+      targetProficiency: { type: Type.STRING },
+      estimatedTotalHours: { type: Type.NUMBER },
+      recommendedEngine: { type: Type.STRING },
+    },
+    required: ['parsedGoal', 'domain', 'targetProficiency', 'estimatedTotalHours', 'recommendedEngine']
+  };
 
-    return JSON.parse(response.text);
+  const result = await generateWithRetry({
+    prompt: `Goal: "${goal}"${fileContext}`,
+    systemPrompt,
+    schema,
+    temperature: 1.0,
+    maxTokens: 4000,
   });
+
+  return JSON.parse(result.text);
 }
 
 /**
@@ -227,8 +224,6 @@ async function generateSkillGraph(
   miniProjects: MiniProject[];
   capstoneProject: MiniProject;
 }> {
-  const ai = createAI();
-
   // Personalization based on context
   const contextualGuidance = {
     [LearningContext.HighSchool]: `
@@ -287,16 +282,18 @@ Each skill unlocks when prerequisites are mastered.
 
 Respond ONLY with valid JSON.`;
 
-  return retryWithBackoff(async () => {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
-      contents: systemPrompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      skillPaths: {
+        type: Type.ARRAY,
+        items: {
           type: Type.OBJECT,
           properties: {
-            skillPaths: {
+            id: { type: Type.STRING },
+            name: { type: Type.STRING },
+            description: { type: Type.STRING },
+            skills: {
               type: Type.ARRAY,
               items: {
                 type: Type.OBJECT,
@@ -304,75 +301,72 @@ Respond ONLY with valid JSON.`;
                   id: { type: Type.STRING },
                   name: { type: Type.STRING },
                   description: { type: Type.STRING },
-                  skills: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        id: { type: Type.STRING },
-                        name: { type: Type.STRING },
-                        description: { type: Type.STRING },
-                        engine: { type: Type.STRING },
-                        estimatedMinutes: { type: Type.NUMBER },
-                        prerequisites: { type: Type.ARRAY, items: { type: Type.STRING } },
-                        masteryThreshold: {
-                          type: Type.OBJECT,
-                          properties: {
-                            minChallenges: { type: Type.NUMBER },
-                            minConfidence: { type: Type.NUMBER },
-                            minSuccessRate: { type: Type.NUMBER }
-                          },
-                          required: ['minChallenges', 'minConfidence', 'minSuccessRate']
-                        },
-                        challengeTypes: { type: Type.ARRAY, items: { type: Type.STRING } },
-                        xpReward: { type: Type.NUMBER }
-                      },
-                      required: ['id', 'name', 'description', 'engine', 'estimatedMinutes', 'prerequisites', 'masteryThreshold', 'challengeTypes', 'xpReward']
-                    }
-                  }
-                },
-                required: ['id', 'name', 'description', 'skills']
-              }
-            },
-            miniProjects: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  id: { type: Type.STRING },
-                  name: { type: Type.STRING },
-                  description: { type: Type.STRING },
-                  unlocksAfter: { type: Type.ARRAY, items: { type: Type.STRING } },
                   engine: { type: Type.STRING },
                   estimatedMinutes: { type: Type.NUMBER },
-                  xpReward: { type: Type.NUMBER },
-                  shareTemplate: { type: Type.STRING }
+                  prerequisites: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  masteryThreshold: {
+                    type: Type.OBJECT,
+                    properties: {
+                      minChallenges: { type: Type.NUMBER },
+                      minConfidence: { type: Type.NUMBER },
+                      minSuccessRate: { type: Type.NUMBER }
+                    },
+                    required: ['minChallenges', 'minConfidence', 'minSuccessRate']
+                  },
+                  challengeTypes: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  xpReward: { type: Type.NUMBER }
                 },
-                required: ['id', 'name', 'description', 'unlocksAfter', 'engine', 'estimatedMinutes', 'xpReward', 'shareTemplate']
+                required: ['id', 'name', 'description', 'engine', 'estimatedMinutes', 'prerequisites', 'masteryThreshold', 'challengeTypes', 'xpReward']
               }
-            },
-            capstoneProject: {
-              type: Type.OBJECT,
-              properties: {
-                id: { type: Type.STRING },
-                name: { type: Type.STRING },
-                description: { type: Type.STRING },
-                unlocksAfter: { type: Type.ARRAY, items: { type: Type.STRING } },
-                engine: { type: Type.STRING },
-                estimatedMinutes: { type: Type.NUMBER },
-                xpReward: { type: Type.NUMBER },
-                shareTemplate: { type: Type.STRING }
-              },
-              required: ['id', 'name', 'description', 'unlocksAfter', 'engine', 'estimatedMinutes', 'xpReward', 'shareTemplate']
             }
           },
-          required: ['skillPaths', 'miniProjects', 'capstoneProject']
+          required: ['id', 'name', 'description', 'skills']
         }
+      },
+      miniProjects: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            id: { type: Type.STRING },
+            name: { type: Type.STRING },
+            description: { type: Type.STRING },
+            unlocksAfter: { type: Type.ARRAY, items: { type: Type.STRING } },
+            engine: { type: Type.STRING },
+            estimatedMinutes: { type: Type.NUMBER },
+            xpReward: { type: Type.NUMBER },
+            shareTemplate: { type: Type.STRING }
+          },
+          required: ['id', 'name', 'description', 'unlocksAfter', 'engine', 'estimatedMinutes', 'xpReward', 'shareTemplate']
+        }
+      },
+      capstoneProject: {
+        type: Type.OBJECT,
+        properties: {
+          id: { type: Type.STRING },
+          name: { type: Type.STRING },
+          description: { type: Type.STRING },
+          unlocksAfter: { type: Type.ARRAY, items: { type: Type.STRING } },
+          engine: { type: Type.STRING },
+          estimatedMinutes: { type: Type.NUMBER },
+          xpReward: { type: Type.NUMBER },
+          shareTemplate: { type: Type.STRING }
+        },
+        required: ['id', 'name', 'description', 'unlocksAfter', 'engine', 'estimatedMinutes', 'xpReward', 'shareTemplate']
       }
-    });
+    },
+    required: ['skillPaths', 'miniProjects', 'capstoneProject']
+  };
 
-    return JSON.parse(response.text);
+  const result = await generateWithRetry({
+    prompt: systemPrompt,
+    systemPrompt: '',
+    schema,
+    temperature: 1.0,
+    maxTokens: 8000,
   });
+
+  return JSON.parse(result.text);
 }
 
 // ============= MAIN ENDPOINT =============

@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from "@google/genai";
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { Challenge, EngineType } from '@/lib/courseCreation/types';
-
-// ============= API KEY MANAGEMENT =============
-const API_KEYS = [
-    process.env.GEMINI_API_KEY_1,
-    process.env.GEMINI_API_KEY_2,
-    process.env.GEMINI_API_KEY,
-].filter(Boolean) as string[];
-
-const getApiKey = () => API_KEYS[Math.floor(Math.random() * API_KEYS.length)];
-
-// ============= ROUTE HANDLER =============
+import { generateWithRetry } from '@/lib/ai-providers';
 
 export async function POST(request: NextRequest) {
     try {
@@ -24,9 +13,6 @@ export async function POST(request: NextRequest) {
         const { data: { user } } = await supabase.auth.getUser();
 
         if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-        if (!getApiKey()) return NextResponse.json({ error: "Configuration Error" }, { status: 500 });
-        const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
         console.log(`Generating challenge for skill: ${skillTitle} (${engine})`);
 
@@ -53,16 +39,15 @@ export async function POST(request: NextRequest) {
     }
     `;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash-exp',
-            contents: systemPrompt,
-            config: {
-                responseMimeType: "application/json",
-            }
+        const result = await generateWithRetry({
+            prompt: systemPrompt,
+            systemPrompt: '',
+            schema: {},
+            temperature: 0.9,
+            maxTokens: 2000,
         });
 
-        const text = response.text || "{}";
-        const challengeData = JSON.parse(text);
+        const challengeData = JSON.parse(result.text);
 
         return NextResponse.json({ success: true, challenge: challengeData });
 

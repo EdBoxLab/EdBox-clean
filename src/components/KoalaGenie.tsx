@@ -46,7 +46,7 @@ export default function AIGenie() {
       setMessages([{
         id: 'welcome',
         role: 'assistant',
-        content: "Hi! I'm your AI learning assistant. Ask me anything about your courses or research!",
+        content: "Hey there! 👋 I'm Genie, your AI study buddy! I know all about your study sets, notes, and courses. Ask me anything - let's ace this together!",
         created_at: new Date().toISOString()
       }]);
     }
@@ -92,7 +92,7 @@ export default function AIGenie() {
     setMessages([{
       id: 'welcome',
       role: 'assistant',
-      content: "Hi! I'm your AI learning assistant. Ask me anything about your courses or research!",
+      content: "Hey there! 👋 I'm Genie, your AI study buddy! I know all about your study sets, notes, and courses. Ask me anything - let's ace this together!",
       created_at: new Date().toISOString()
     }]);
     setShowChatList(false);
@@ -178,7 +178,7 @@ export default function AIGenie() {
               </button>
               <div className="min-w-0 flex-1">
                 <h3 className="font-semibold text-white text-sm truncate">{currentChatTitle}</h3>
-                <p className="text-xs text-indigo-100">AI Assistant</p>
+                <p className="text-xs text-indigo-100">Genie - Your Study Buddy</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -237,7 +237,7 @@ export default function AIGenie() {
                   {message.role === 'user' ? (
                     <User className="w-3.5 h-3.5 text-white" />
                   ) : (
-                    <Bot className="w-3.5 h-3.5 text-white" />
+                    <Sparkles className="w-3.5 h-3.5 text-white" />
                   )}
                 </div>
 
@@ -255,7 +255,7 @@ export default function AIGenie() {
             {isSending && (
               <div className="flex gap-2">
                 <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center">
-                  <Bot className="w-3.5 h-3.5 text-white" />
+                  <Sparkles className="w-3.5 h-3.5 text-white" />
                 </div>
                 <div className="bg-zinc-800/90 backdrop-blur-sm border border-zinc-700/50 rounded-2xl px-3 py-2">
                   <div className="flex gap-1">

@@ -1,234 +1,302 @@
-import { Metadata } from 'next';
-import { seoConfig } from '@/lib/seo/config';
-import { FAQSchema, ArticleSchema } from '@/lib/seo/structured-data';
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
-
-export const metadata: Metadata = {
-  title: 'About EdBox - The Future of AI-Powered Learning',
-  description: 'Learn about EdBox, the revolutionary AI-powered education platform transforming how students learn. Discover our mission to democratize quality education worldwide with personalized, adaptive, and engaging learning experiences.',
-  keywords: [
-    ...seoConfig.defaultKeywords,
-    'about edbox',
-    'education mission',
-    'AI education platform',
-    'learning technology',
-    'edtech innovation',
-    'personalized education',
-  ],
-  openGraph: {
-    title: 'About EdBox - The Future of AI-Powered Learning',
-    description: 'Discover how EdBox is revolutionizing education with AI-powered personalized learning',
-    url: `${seoConfig.siteUrl}/about`,
-  },
-};
-
-const faqData = [
-  {
-    question: 'What is EdBox?',
-    answer: 'EdBox is the most advanced AI-powered learning platform that provides personalized education experiences. We combine cutting-edge artificial intelligence with proven pedagogical methods to create custom courses, interactive study materials, and adaptive learning paths for students of all levels.',
-  },
-  {
-    question: 'How is EdBox different from Coursera, Udemy, or Khan Academy?',
-    answer: 'Unlike traditional online learning platforms, EdBox uses advanced AI to create fully personalized learning experiences. Our 10+ specialized learning engines (MathLab, CodeStudio, BioNexus, etc.) adapt to your learning style, provide real-time AI tutoring, generate custom content, and track your skill mastery. Best of all, EdBox is completely free and accessible to everyone.',
-  },
-  {
-    question: 'What subjects can I learn on EdBox?',
-    answer: 'EdBox covers all major subjects including Mathematics, Physics, Chemistry, Biology, Computer Science, Programming, Languages, Finance, History, Writing, and Art & Design. Our AI engines can generate courses on virtually any topic you want to learn.',
-  },
-  {
-    question: 'Is EdBox really free?',
-    answer: 'Yes! EdBox is completely free to use. We believe quality education should be accessible to everyone, regardless of their financial situation. Our mission is to democratize learning and make world-class education available to all.',
-  },
-  {
-    question: 'How does AI-powered learning work?',
-    answer: 'EdBox uses state-of-the-art AI models to analyze your learning patterns, strengths, and areas for improvement. The AI creates personalized study paths, generates custom practice problems, provides instant feedback, and adapts the difficulty level in real-time to optimize your learning efficiency.',
-  },
-  {
-    question: 'Can I create my own courses on EdBox?',
-    answer: 'Absolutely! EdBox empowers both learners and educators. You can create custom courses using our 10+ specialized engines, share your knowledge with the community, and even collaborate with others in study circles. Our AI assists you in building comprehensive, engaging educational content.',
-  },
-  {
-    question: 'Does EdBox work offline?',
-    answer: 'Yes! EdBox is a Progressive Web App (PWA) that caches essential content and study materials for offline access. You can continue learning even without an internet connection, and your progress will sync automatically when you reconnect.',
-  },
-  {
-    question: 'How does EdBox track my progress?',
-    answer: 'EdBox uses a sophisticated competency-based tracking system that monitors your skill development across subjects. You earn XP, unlock achievements, and can visualize your learning journey through interactive skill graphs and progress analytics.',
-  },
-];
+import { motion } from 'framer-motion';
+import { 
+  Sparkles, Brain, Zap, Users, Target, BookOpen, 
+  GraduationCap, Globe, Award, MessageCircle, 
+  ArrowRight, Check, Star 
+} from 'lucide-react';
 
 export default function AboutPage() {
+  const [hoveredFeature, setHoveredFeature] = useState<number | null>(null);
+
+  const features = [
+    {
+      icon: <Brain className="w-8 h-8" />,
+      title: 'AI-Powered Learning',
+      description: 'Personalized content generation adapts to your unique learning style and pace',
+      color: 'from-indigo-500 to-purple-500'
+    },
+    {
+      icon: <Zap className="w-8 h-8" />,
+      title: 'Instant Study Tools',
+      description: 'Generate flashcards, quizzes, and study guides from any content in seconds',
+      color: 'from-purple-500 to-pink-500'
+    },
+    {
+      icon: <Users className="w-8 h-8" />,
+      title: 'Study Circles',
+      description: 'Collaborate with peers, share resources, and learn together in communities',
+      color: 'from-pink-500 to-red-500'
+    },
+    {
+      icon: <Target className="w-8 h-8" />,
+      title: 'Adaptive Learning Paths',
+      description: 'Smart algorithms create personalized study paths based on your goals and progress',
+      color: 'from-red-500 to-orange-500'
+    },
+    {
+      icon: <MessageCircle className="w-8 h-8" />,
+      title: 'AI Study Assistant',
+      description: 'Chat with Genie, your 24/7 AI tutor that answers questions and explains concepts',
+      color: 'from-orange-500 to-yellow-500'
+    },
+    {
+      icon: <Award className="w-8 h-8" />,
+      title: 'Track Your Progress',
+      description: 'Comprehensive analytics and achievements keep you motivated and on track',
+      color: 'from-yellow-500 to-green-500'
+    }
+  ];
+
+  const stats = [
+    { value: '100K+', label: 'Active Learners', icon: <Users className="w-5 h-5" /> },
+    { value: '500K+', label: 'Study Sets Created', icon: <BookOpen className="w-5 h-5" /> },
+    { value: '2M+', label: 'AI Conversations', icon: <MessageCircle className="w-5 h-5" /> },
+    { value: '95%', label: 'Success Rate', icon: <Award className="w-5 h-5" /> }
+  ];
+
+  const benefits = [
+    'Learn at your own pace with AI-generated content',
+    'Save hours on study material preparation',
+    'Join a community of passionate learners',
+    'Track progress with detailed analytics',
+    'Access powerful learning tools for free',
+    'Available 24/7 across all devices'
+  ];
+
   return (
-    <>
-      <FAQSchema questions={faqData} />
-      <ArticleSchema
-        title="About EdBox - The Future of AI-Powered Learning"
-        description="Learn about EdBox's mission to revolutionize education"
-        datePublished="2024-01-01"
-        dateModified={new Date().toISOString()}
-        author="EdBox Team"
-      />
-      
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-        <div className="max-w-4xl mx-auto px-4 py-16">
-          <header className="text-center mb-16">
-            <h1 className="text-5xl font-bold text-white mb-6">
-              Welcome to EdBox
-            </h1>
-            <p className="text-xl text-blue-200">
-              The Future of AI-Powered Learning
-            </p>
-          </header>
-
-          <section className="mb-16 bg-white/10 backdrop-blur-sm rounded-2xl p-8">
-            <h2 className="text-3xl font-bold text-white mb-6">Our Mission</h2>
-            <p className="text-lg text-gray-200 mb-4">
-              At EdBox, we believe that <strong className="text-blue-300">quality education should be accessible to everyone, everywhere, at any time</strong>. We're revolutionizing online learning by combining cutting-edge artificial intelligence with proven educational methodologies to create the most personalized, engaging, and effective learning platform in the world.
-            </p>
-            <p className="text-lg text-gray-200">
-              Our mission is to <strong className="text-blue-300">democratize education</strong> and empower learners of all ages, backgrounds, and skill levels to achieve their full potential through AI-powered personalized learning experiences.
-            </p>
-          </section>
-
-          <section className="mb-16 bg-white/10 backdrop-blur-sm rounded-2xl p-8">
-            <h2 className="text-3xl font-bold text-white mb-6">Why EdBox?</h2>
-            <div className="grid gap-6">
-              <div className="border-l-4 border-blue-400 pl-6">
-                <h3 className="text-xl font-semibold text-blue-300 mb-2">🤖 Advanced AI-Powered Learning</h3>
-                <p className="text-gray-200">
-                  Our proprietary AI analyzes your learning patterns and creates fully customized educational experiences that adapt to your unique needs, learning style, and pace.
-                </p>
+    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-indigo-950 to-zinc-950 text-white">
+      {/* Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-800/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-white" />
               </div>
-              <div className="border-l-4 border-green-400 pl-6">
-                <h3 className="text-xl font-semibold text-green-300 mb-2">🎯 Personalized Learning Paths</h3>
-                <p className="text-gray-200">
-                  No two learners are alike. EdBox generates personalized study paths based on your goals, current knowledge, and preferred learning methods.
-                </p>
-              </div>
-              <div className="border-l-4 border-purple-400 pl-6">
-                <h3 className="text-xl font-semibold text-purple-300 mb-2">🚀 10+ Specialized Learning Engines</h3>
-                <p className="text-gray-200">
-                  MathLab, CodeStudio, BioNexus, ChemLab, FinLab, LinguaLab, PhysicsSim, WritingStudio, HistoryMach, and ArtStudio - each optimized for its subject domain.
-                </p>
-              </div>
-              <div className="border-l-4 border-yellow-400 pl-6">
-                <h3 className="text-xl font-semibold text-yellow-300 mb-2">💡 Real-Time AI Tutoring</h3>
-                <p className="text-gray-200">
-                  Get instant help whenever you're stuck. Our AI tutors provide step-by-step explanations, alternative approaches, and personalized hints.
-                </p>
-              </div>
-              <div className="border-l-4 border-pink-400 pl-6">
-                <h3 className="text-xl font-semibold text-pink-300 mb-2">🌐 Completely Free & Accessible</h3>
-                <p className="text-gray-200">
-                  Unlike paid platforms like Coursera or Udemy, EdBox is 100% free. No hidden fees, no premium tiers - just unlimited learning for everyone.
-                </p>
-              </div>
-              <div className="border-l-4 border-cyan-400 pl-6">
-                <h3 className="text-xl font-semibold text-cyan-300 mb-2">📱 Works Offline</h3>
-                <p className="text-gray-200">
-                  Our Progressive Web App technology lets you learn anywhere, even without internet. Your progress syncs automatically when you reconnect.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section className="mb-16 bg-white/10 backdrop-blur-sm rounded-2xl p-8">
-            <h2 className="text-3xl font-bold text-white mb-6">EdBox vs. Traditional Platforms</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-gray-200">
-                <thead className="border-b border-blue-400">
-                  <tr>
-                    <th className="pb-3">Feature</th>
-                    <th className="pb-3">EdBox</th>
-                    <th className="pb-3">Coursera/Udemy</th>
-                    <th className="pb-3">Khan Academy</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/10">
-                  <tr>
-                    <td className="py-3">AI-Personalized Learning</td>
-                    <td className="text-green-400 font-bold">✓ Advanced</td>
-                    <td className="text-red-400">✗</td>
-                    <td className="text-yellow-400">Limited</td>
-                  </tr>
-                  <tr>
-                    <td className="py-3">Custom Course Creation</td>
-                    <td className="text-green-400 font-bold">✓ Full Control</td>
-                    <td className="text-yellow-400">Instructor Only</td>
-                    <td className="text-red-400">✗</td>
-                  </tr>
-                  <tr>
-                    <td className="py-3">Real-Time AI Tutoring</td>
-                    <td className="text-green-400 font-bold">✓</td>
-                    <td className="text-red-400">✗</td>
-                    <td className="text-red-400">✗</td>
-                  </tr>
-                  <tr>
-                    <td className="py-3">Adaptive Practice</td>
-                    <td className="text-green-400 font-bold">✓ AI-Generated</td>
-                    <td className="text-yellow-400">Static</td>
-                    <td className="text-yellow-400">Limited</td>
-                  </tr>
-                  <tr>
-                    <td className="py-3">Cost</td>
-                    <td className="text-green-400 font-bold">FREE</td>
-                    <td className="text-red-400">$$$</td>
-                    <td className="text-green-400">FREE</td>
-                  </tr>
-                  <tr>
-                    <td className="py-3">Offline Access</td>
-                    <td className="text-green-400 font-bold">✓ Full PWA</td>
-                    <td className="text-yellow-400">Limited</td>
-                    <td className="text-red-400">✗</td>
-                  </tr>
-                  <tr>
-                    <td className="py-3">Subject Coverage</td>
-                    <td className="text-green-400 font-bold">Unlimited</td>
-                    <td className="text-green-400">Wide</td>
-                    <td className="text-yellow-400">K-12 Focus</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section className="mb-16 bg-white/10 backdrop-blur-sm rounded-2xl p-8">
-            <h2 className="text-3xl font-bold text-white mb-6">Frequently Asked Questions</h2>
-            <div className="space-y-6">
-              {faqData.map((faq, index) => (
-                <details key={index} className="group">
-                  <summary className="text-lg font-semibold text-blue-300 cursor-pointer list-none flex items-center justify-between">
-                    {faq.question}
-                    <span className="text-2xl group-open:rotate-180 transition-transform">›</span>
-                  </summary>
-                  <p className="mt-3 text-gray-200 pl-4 border-l-2 border-blue-400">
-                    {faq.answer}
-                  </p>
-                </details>
-              ))}
-            </div>
-          </section>
-
-          <section className="mb-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-center">
-            <h2 className="text-3xl font-bold text-white mb-4">Ready to Transform Your Learning?</h2>
-            <p className="text-xl text-blue-100 mb-6">
-              Join thousands of learners who are already experiencing the future of education with EdBox.
-            </p>
-            <div className="flex gap-4 justify-center flex-wrap">
-              <Link href="/signup" className="bg-white text-blue-600 px-8 py-3 rounded-lg font-bold hover:bg-blue-50 transition">
-                Get Started Free
+              <span className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                EdBox
+              </span>
+            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/login"
+                className="px-4 py-2 text-sm font-medium text-zinc-300 hover:text-white transition"
+              >
+                Log In
               </Link>
-              <Link href="/fyp" className="bg-blue-800 text-white px-8 py-3 rounded-lg font-bold hover:bg-blue-700 transition">
-                Explore Features
+              <Link
+                href="/signup"
+                className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-lg text-sm font-semibold transition shadow-lg shadow-indigo-500/30"
+              >
+                Sign Up
               </Link>
             </div>
-          </section>
-
-          <footer className="text-center text-gray-400">
-            <p>EdBox © 2024 - Empowering learners worldwide with AI-powered education</p>
-          </footer>
+          </div>
         </div>
-      </div>
-    </>
+      </nav>
+
+      {/* Hero Section */}
+      <section className="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        {/* Animated background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-1/2 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute top-1/2 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        </div>
+
+        <div className="relative max-w-7xl mx-auto text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-full mb-6">
+              <Globe className="w-4 h-4 text-indigo-400" />
+              <span className="text-sm text-indigo-300 font-medium">Trusted by learners worldwide</span>
+            </div>
+
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6">
+              <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                Learn Smarter,
+              </span>
+              <br />
+              <span className="text-white">Not Harder</span>
+            </h1>
+
+            <p className="text-xl text-zinc-400 max-w-3xl mx-auto mb-8">
+              EdBox is your AI-powered learning companion that transforms how you study. 
+              Create personalized study materials, collaborate with peers, and achieve your goals faster.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                href="/signup"
+                className="group flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl text-lg font-semibold transition shadow-2xl shadow-indigo-500/50"
+              >
+                Get Started Free
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" />
+              </Link>
+              <Link
+                href="/demo-course"
+                className="px-8 py-4 bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-lg font-semibold transition"
+              >
+                Try Demo
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8 border-y border-zinc-800/50 bg-zinc-900/30">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+            {stats.map((stat, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="text-center"
+              >
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <div className="text-indigo-400">{stat.icon}</div>
+                  <div className="text-4xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                    {stat.value}
+                  </div>
+                </div>
+                <div className="text-zinc-400 text-sm">{stat.label}</div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl sm:text-5xl font-bold mb-4">
+              <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                Powerful Features
+              </span>
+            </h2>
+            <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
+              Everything you need to supercharge your learning journey
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map((feature, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                onMouseEnter={() => setHoveredFeature(index)}
+                onMouseLeave={() => setHoveredFeature(null)}
+                className="relative group"
+              >
+                <div className={`absolute inset-0 bg-gradient-to-r ${feature.color} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity blur-xl`} />
+                <div className="relative bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/50 rounded-2xl p-6 hover:border-indigo-500/50 transition-all">
+                  <div className={`w-16 h-16 bg-gradient-to-r ${feature.color} rounded-xl flex items-center justify-center mb-4 text-white`}>
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">{feature.title}</h3>
+                  <p className="text-zinc-400 text-sm">{feature.description}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Benefits Section */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-indigo-950/30 to-purple-950/30">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold mb-4">
+              <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                Why Choose EdBox?
+              </span>
+            </h2>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            {benefits.map((benefit, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="flex items-start gap-3 p-4 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/50 rounded-xl hover:border-indigo-500/50 transition"
+              >
+                <div className="w-6 h-6 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                  <Check className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-zinc-300">{benefit}</span>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            className="relative bg-gradient-to-br from-indigo-900/50 to-purple-900/50 backdrop-blur-xl border border-indigo-500/30 rounded-3xl p-12 text-center overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
+            
+            <div className="relative">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl mb-6 shadow-2xl shadow-indigo-500/50">
+                <GraduationCap className="w-10 h-10 text-white" />
+              </div>
+
+              <h2 className="text-4xl font-bold mb-4">
+                Ready to Transform Your Learning?
+              </h2>
+              <p className="text-xl text-zinc-300 mb-8 max-w-2xl mx-auto">
+                Join thousands of students achieving their academic goals with EdBox
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Link
+                  href="/signup"
+                  className="group flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl text-lg font-semibold transition shadow-2xl shadow-indigo-500/50"
+                >
+                  Start Learning Now
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" />
+                </Link>
+                <Link
+                  href="/login"
+                  className="px-8 py-4 bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-lg font-semibold transition"
+                >
+                  Sign In
+                </Link>
+              </div>
+
+              <div className="flex items-center justify-center gap-2 mt-8 text-sm text-zinc-400">
+                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                <span>Free forever · No credit card required</span>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-zinc-800/50 bg-zinc-900/30 py-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto text-center text-zinc-500 text-sm">
+          <p>© 2025 EdBox. Empowering learners worldwide with AI.</p>
+        </div>
+      </footer>
+    </div>
   );
 }

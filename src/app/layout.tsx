@@ -90,9 +90,8 @@ export default function RootLayout({
       <head>
         <meta name="theme-color" content="#3b82f6" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-192x192.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-192x192.png" />
+        <link rel="apple-touch-icon" href="/logo.jpg" />
+        <link rel="icon" type="image/x-icon" href="/logo.ico" />
         <OrganizationSchema />
         <WebsiteSchema />
         <SoftwareApplicationSchema />

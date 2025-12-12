@@ -102,8 +102,8 @@ Be concise, help with code and curriculum, ask clarifying questions only when ne
 
         // Create Groq client at request-time (prevents server import-time crash)
         const groqApiKey =
-            process.env.GROQ_API_KEY ??
-            process.env.GROQ_API_KEY_3 ??
+            process.env.GROQ_API_KEY ?? 
+            process.env.GROQ_API_KEY_3 ?? 
             process.env.GROQ_API_KEY_4;
 
         if (!groqApiKey) {
@@ -136,7 +136,7 @@ Be concise, help with code and curriculum, ask clarifying questions only when ne
         } as any);
 
         const aiResponse =
-            (completion as any)?.choices?.[0]?.message?.content ??
+            (completion as any)?.choices?.[0]?.message?.content ?? 
             "I apologize, I couldn't generate a response.";
 
         // Save AI response
@@ -202,5 +202,100 @@ export async function GET(request: NextRequest) {
     } catch (error: any) {
         console.error('Chat GET error:', error);
         return NextResponse.json({ error: 'Failed to fetch conversations' }, { status: 500 });
+    }
+}
+
+// DELETE endpoint to delete a conversation
+export async function DELETE(request: NextRequest) {
+    try {
+        const supabase = await createSupabaseServerClient();
+
+        const {
+            data: { user },
+            error: userError,
+        } = await supabase.auth.getUser();
+        if (userError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { searchParams } = new URL(request.url);
+        const conversationId = searchParams.get('conversationId');
+
+        if (!conversationId) {
+            return NextResponse.json({ error: 'conversationId is required' }, { status: 400 });
+        }
+
+        // Verify ownership
+        const { data: conversation } = await supabase
+            .from('chat_conversations')
+            .select('user_id')
+            .eq('id', conversationId)
+            .single();
+
+        if (!conversation || conversation.user_id !== user.id) {
+            return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+        }
+
+        // Delete messages first (cascade might not be configured)
+        await supabase
+            .from('chat_messages')
+            .delete()
+            .eq('conversation_id', conversationId);
+
+        // Delete conversation
+        const { error } = await supabase
+            .from('chat_conversations')
+            .delete()
+            .eq('id', conversationId)
+            .eq('user_id', user.id);
+
+        if (error) throw error;
+
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        console.error('Chat DELETE error:', error);
+        return NextResponse.json({ error: 'Failed to delete conversation' }, { status: 500 });
+    }
+}
+
+// PATCH endpoint to rename a conversation
+export async function PATCH(request: NextRequest) {
+    try {
+        const supabase = await createSupabaseServerClient();
+
+        const {
+            data: { user },
+            error: userError,
+        } = await supabase.auth.getUser();
+        if (userError || !user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        let body: any;
+        try {
+            body = await request.json();
+        } catch (e) {
+            return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+        }
+
+        const { conversationId, title } = body ?? {};
+
+        if (!conversationId || !title || typeof title !== 'string' || !title.trim()) {
+            return NextResponse.json({ error: 'conversationId and title are required' }, { status: 400 });
+        }
+
+        // Update conversation title with ownership check
+        const { error } = await supabase
+            .from('chat_conversations')
+            .update({ title: title.trim() })
+            .eq('id', conversationId)
+            .eq('user_id', user.id);
+
+        if (error) throw error;
+
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        console.error('Chat PATCH error:', error);
+        return NextResponse.json({ error: 'Failed to rename conversation' }, { status: 500 });
     }
 }

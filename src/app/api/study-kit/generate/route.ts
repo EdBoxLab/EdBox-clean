@@ -1,50 +1,39 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// app/api/study-kit/generate/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import Groq from 'groq-sdk';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+type ContentType = 'quizzes' | 'flashcards' | 'mindmaps' | 'notes';
 
-const supabase = createServerClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-// ----------------------
-//  UTILS
-// ----------------------
 function extractJSON(text: string) {
   try {
     const fenced = text.match(/```json([\s\S]*?)```/i);
     const raw = fenced ? fenced[1] : text;
-    return JSON.parse(
-      raw
-        .replace(/^[\s\n]*```(\w+)?|```$/g, "")
-        .replace(/\n/g, "")
-        .replace(/,\s*}/g, "}")
-        .replace(/,\s*]/g, "]")
-        .trim()
-    );
+    const fixed = raw
+      .replace(/[\n\r]+/g, '')
+      .replace(/,\s*}/g, '}')
+      .replace(/,\s*]/g, ']');
+    return JSON.parse(fixed);
   } catch {
-    return text; // fallback
+    return text; // fallback to raw string if JSON parsing fails
   }
 }
 
-function buildPrompt(type: string, prompt: string) {
+function buildPrompt(type: ContentType, prompt: string) {
   const base = `Base content:\n"${prompt}"\n\n`;
   switch (type) {
-    case "quizzes":
-      return base + `Generate EXACTLY 5 MCQ questions as strict JSON array.`;
-    case "flashcards":
-      return base + `Generate EXACTLY 10 flashcards as strict JSON array.`;
-    case "mindmaps":
-      return base + `Generate a mindmap in strict JSON format.`;
-    case "notes":
-      return base + `Generate structured notes in markdown headings.`;
+    case 'quizzes':
+      return base + 'Generate EXACTLY 5 MCQ questions as strict JSON array.';
+    case 'flashcards':
+      return base + 'Generate EXACTLY 10 flashcards as strict JSON array.';
+    case 'mindmaps':
+      return base + 'Generate a mindmap in strict JSON format.';
+    case 'notes':
+      return base + 'Generate structured notes in markdown headings.';
   }
 }
 
-// Retry wrapper for transient errors
-async function retry<T>(fn: () => Promise<T>, attempts = 2, delay = 500) {
+async function retry<T>(fn: () => Promise<T>, attempts = 3, delay = 500) {
   let lastError: any;
   for (let i = 0; i < attempts; i++) {
     try {
@@ -57,95 +46,117 @@ async function retry<T>(fn: () => Promise<T>, attempts = 2, delay = 500) {
   throw lastError;
 }
 
-// ----------------------
-//  ROUTE HANDLER
-// ----------------------
 export async function POST(request: NextRequest) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const supabase = await createSupabaseServerClient();
 
-    const { prompt, contentTypes, fileName } = await request.json();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
+
+    const { prompt, contentTypes, fileName } = body ?? {};
     if (!prompt || !contentTypes?.length)
-      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+      return NextResponse.json({ error: 'Prompt and content types are required' }, { status: 400 });
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-pro-latest",
-      temperature: 0.7,
-      reasoning: true
-    });
+    const groqApiKey =
+      process.env.GROQ_API_KEY ?? process.env.GROQ_API_KEY_3 ?? process.env.GROQ_API_KEY_4;
 
-    // ----------------------
-    // Parallel & cached generation
-    // ----------------------
+    if (!groqApiKey) {
+      return NextResponse.json(
+        { error: 'GROQ API key not configured. Set up GROQ_API_KEY in .env.local' },
+        { status: 500 }
+      );
+    }
+
+    const groq = new Groq({ apiKey: groqApiKey });
+    const model = process.env.GROQ_MODEL ?? 'llama-3.1-8b-instant';
+
+    // Generate content per type in parallel
     const results = await Promise.all(
-      contentTypes.map(async (type: string) => {
-        const key = `cache:${session.user.id}:${type}:${prompt.slice(0, 50)}`;
-        // check cache (you can implement Redis or Supabase KV here)
-        // const cached = await getCache(key);
-        const cached = null;
-        if (cached) return { type, content: cached };
-
+      contentTypes.map(async (type: ContentType) => {
         const output = await retry(async () => {
-          const r = await model.generateText({ prompt: buildPrompt(type, prompt) });
-          return type === "notes" ? r.text() : extractJSON(r.text());
-        }, 3, 500);
+          const completion = await groq.chat.completions.create({
+            messages: [
+              {
+                role: 'system',
+                content:
+                  'You are a study-kit AI assistant. Generate quizzes, flashcards, mindmaps, or notes in strict JSON or markdown format as requested.',
+              },
+              { role: 'user', content: buildPrompt(type, prompt) },
+            ],
+            model,
+            temperature: 0.7,
+            max_tokens: 1000,
+          } as any);
 
-        // set cache here if using Redis/Supabase KV
-        // await setCache(key, output, 3600);
+          const text = (completion as any)?.choices?.[0]?.message?.content ?? '';
+          return type === 'notes' ? text : extractJSON(text);
+        }, 3, 500);
 
         return { type, content: output };
       })
     );
 
-    const generatedContent = Object.fromEntries(results.map(r => [r.type, r.content]));
+    const generatedContent = Object.fromEntries(results.map((r) => [r.type, r.content]));
 
     const { data: studyKit, error: dbError } = await supabase
-      .from("study_kit_content")
+      .from('study_kit_content')
       .insert({
-        user_id: session.user.id,
+        user_id: user.id,
         title: prompt.slice(0, 100),
-        source_type: fileName ? "file" : "text",
+        source_type: fileName ? 'file' : 'text',
         source_content: prompt,
         file_name: fileName || null,
         content_types: contentTypes,
-        generated_content: generatedContent
+        generated_content: generatedContent,
       })
       .select()
       .single();
 
     if (dbError) throw dbError;
 
-    return NextResponse.json({
-      success: true,
-      id: studyKit.id,
-      content: generatedContent
-    });
-
+    return NextResponse.json({ success: true, id: studyKit.id, content: generatedContent });
   } catch (error: any) {
-    console.error("UltraMode POST Error:", error);
+    console.error('Study Kit POST Error:', error);
     return NextResponse.json(
-      { error: "Failed to generate study kit", details: error?.message },
+      { error: 'Failed to generate study kit', details: error?.message },
       { status: 500 }
     );
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const supabase = await createSupabaseServerClient();
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { data, error } = await supabase
-      .from("study_kit_content")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .order("created_at", { ascending: false });
+      .from('study_kit_content')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
     return NextResponse.json({ studyKits: data });
-  } catch (error) {
-    console.error("UltraMode GET Error:", error);
-    return NextResponse.json({ error: "Failed to fetch", details: error?.message }, { status: 500 });
+  } catch (error: any) {
+    console.error('Study Kit GET Error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch study kits', details: error?.message },
+      { status: 500 }
+    );
   }
 }

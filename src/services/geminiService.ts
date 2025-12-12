@@ -1,6 +1,7 @@
 import { HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import type { Source, ResearchPackage, CitationStyle } from '../app/types';
 import { generateWithRetry } from '../lib/ai-providers';
+import { formatAIText } from '../lib/utils/markdown';
 
 const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -18,7 +19,7 @@ export async function askGenie(prompt: string): Promise<string> {
             temperature: 0.7,
             maxTokens: 1000,
         });
-        return result.text;
+        return formatAIText(result.text);
     } catch (error) {
         console.error("Error asking Genie:", error);
         return "Sorry, I encountered an error. Please check the console for details.";
@@ -113,6 +114,37 @@ export async function generateResearchPackage(
 
         if (!generatedPackage.title || !generatedPackage.summary) {
             throw new Error("AI response is missing required fields (title or summary).");
+        }
+
+        // Clean markdown from all text fields
+        if (generatedPackage.title) {
+            generatedPackage.title = formatAIText(generatedPackage.title);
+        }
+        if (generatedPackage.summary?.one_sentence) {
+            generatedPackage.summary.one_sentence = formatAIText(generatedPackage.summary.one_sentence);
+        }
+        if (generatedPackage.summary?.one_paragraph) {
+            generatedPackage.summary.one_paragraph = formatAIText(generatedPackage.summary.one_paragraph);
+        }
+        if (generatedPackage.summary?.one_page) {
+            generatedPackage.summary.one_page = formatAIText(generatedPackage.summary.one_page);
+        }
+        if (generatedPackage.flashcards) {
+            generatedPackage.flashcards = generatedPackage.flashcards.map((card: any) => ({
+                ...card,
+                question: formatAIText(card.question),
+                answer: formatAIText(card.answer)
+            }));
+        }
+        if (generatedPackage.quiz) {
+            generatedPackage.quiz = generatedPackage.quiz.map((q: any) => ({
+                ...q,
+                question: formatAIText(q.question),
+                answer: formatAIText(q.answer)
+            }));
+        }
+        if (generatedPackage.audio_dialogue?.script) {
+            generatedPackage.audio_dialogue.script = formatAIText(generatedPackage.audio_dialogue.script);
         }
 
         if (!generatedPackage.audio_dialogue) {

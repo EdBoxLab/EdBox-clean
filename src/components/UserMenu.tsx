@@ -71,6 +71,9 @@ export function UserMenu() {
       <DropdownMenuContent align="end" className="w-56 bg-[#18181b] border-zinc-800">
         <DropdownMenuLabel className="text-zinc-200">{user.email}</DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-zinc-800" />
+        <DropdownMenuItem onClick={() => router.push('/profile')} className="text-zinc-300 focus:bg-zinc-800 focus:text-white">
+          Profile
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push('/settings')} className="text-zinc-300 focus:bg-zinc-800 focus:text-white">
           Settings
         </DropdownMenuItem>

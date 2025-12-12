@@ -145,27 +145,43 @@ const ResearchCreation: React.FC<{
         <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 animate-fade-in">
             <button
                 onClick={onBack}
-                className="mb-6 flex items-center text-sm font-medium text-zinc-400 hover:text-white transition-colors"
+                className="mb-6 flex items-center text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors group"
             >
-                <ChevronLeft className="h-5 w-5 mr-1" /> Back to Library
+                <ChevronLeft className="h-5 w-5 mr-1 group-hover:-translate-x-1 transition-transform" /> Back to Library
             </button>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                <aside className="lg:col-span-4 xl:col-span-3 space-y-6">
+            <div className="mb-8">
+                <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 mb-2">
+                    Create Research Package
+                </h2>
+                <p className="text-zinc-400">Upload sources and generate comprehensive research materials</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                <aside className="lg:col-span-5 xl:col-span-4 space-y-6">
                     <SourceUploader onSourcesChanged={setSources} />
                 </aside>
 
-                <div className="lg:col-span-8 xl:col-span-9 space-y-6">
+                <div className="lg:col-span-7 xl:col-span-8 space-y-6">
                     {error && (
-                        <div className="bg-red-500/10 border border-red-500/50 text-red-200 px-4 py-3 rounded-xl relative" role="alert">
+                        <div className="bg-red-500/10 border border-red-500/50 text-red-200 px-4 py-3 rounded-xl relative backdrop-blur-sm" role="alert">
                             <span className="block sm:inline">{error}</span>
-                            <button onClick={() => setError(null)} className="absolute top-0 bottom-0 right-0 px-4 py-3">
+                            <button onClick={() => setError(null)} className="absolute top-0 bottom-0 right-0 px-4 py-3 hover:bg-red-500/20 rounded-r-xl transition-colors">
                                 <span className="text-xl">&times;</span>
                             </button>
                         </div>
                     )}
 
-                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
+                    <div className="bg-gradient-to-br from-zinc-900 via-zinc-900/95 to-zinc-800/50 border border-zinc-700/50 rounded-2xl p-6 shadow-2xl backdrop-blur-sm">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                                <FileText className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-white">Research Configuration</h3>
+                                <p className="text-sm text-zinc-400">Set your research goals and preferences</p>
+                            </div>
+                        </div>
                         <ControlPanel
                             onGenerate={handleGenerate}
                             isLoading={!!loadingStatus}

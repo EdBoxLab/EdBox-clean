@@ -24,7 +24,7 @@ export default function OfflinePage() {
             You&apos;re Offline
           </h1>
           <p className="text-gray-400 text-lg">
-            No internet connection detected. Some features may be limited, but you can still access cached content.
+            No internet connection detected. Some features may be limited, but you can still access your saved stuff.
           </p>
         </div>
 

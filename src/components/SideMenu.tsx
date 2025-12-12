@@ -45,10 +45,16 @@ const SideMenu = () => {
       >
         {/* Header/Logo */}
         <div className="h-16 flex items-center px-6 border-b border-zinc-800 bg-[#18181b]">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold mr-3 shadow-lg shadow-indigo-900/50">
-            E
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-purple-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-purple-900/50">
+              E
+            </div>
+            <span className="text-xl font-bold tracking-tight">
+              <span className="bg-gradient-to-r from-white via-purple-400 to-blue-400 bg-clip-text text-transparent">
+                EdBox
+              </span>
+            </span>
           </div>
-          <span className="text-lg font-bold tracking-tight text-white">EdBox</span>
           <button
             onClick={() => setSidebarOpen(false)}
             className="ml-auto lg:hidden text-zinc-400 hover:text-white"

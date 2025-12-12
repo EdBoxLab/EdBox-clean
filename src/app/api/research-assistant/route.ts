@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateResearchPackage } from '../../../services/geminiService';
 import type { Source, CitationStyle } from '../../../types';
+import { handleAPIError } from '@/lib/utils/errorHandler';
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,13 +11,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing or invalid parameters' }, { status: 400 });
     }
 
-    // No need for a status callback in the backend
     const researchPackage = await generateResearchPackage(goal, audience, citationStyle, sources, () => {});
 
     return NextResponse.json(researchPackage);
   } catch (error) {
-    console.error('Error generating research package:', error);
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    return NextResponse.json({ error: 'Failed to generate research package', details: errorMessage }, { status: 500 });
+    return handleAPIError(error, req);
   }
 }

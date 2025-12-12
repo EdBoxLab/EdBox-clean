@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { generateWithRetry } from '@/lib/ai-providers';
+import { handleAPIError } from '@/lib/utils/errorHandler';
 
 export async function POST(request: NextRequest) {
     try {

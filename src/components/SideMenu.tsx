@@ -9,9 +9,11 @@ import {
   Wrench,
   Users,
   Menu,
-  X
+  X,
+  MessageCircle
 } from 'lucide-react';
 import { UserMenu } from './UserMenu';
+import { ContactSupport } from './ContactSupport';
 
 const NAV_ITEMS = [
   { label: 'Home', icon: Home, href: '/' },
@@ -23,6 +25,7 @@ const NAV_ITEMS = [
 
 const SideMenu = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
   const pathname = usePathname();
 
   return (
@@ -86,8 +89,19 @@ const SideMenu = () => {
           })}
         </nav>
 
-        {/* User Profile Section */}
-        <div className="p-4 border-t border-zinc-800 bg-[#18181b]">
+        {/* Contact Support Button */}
+        <div className="p-4 border-t border-zinc-800">
+          <button
+            onClick={() => setShowSupport(true)}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 border border-zinc-700 hover:border-zinc-600 transition-all duration-200"
+          >
+            <MessageCircle size={18} />
+            <span>Contact Support</span>
+          </button>
+        </div>
+
+        {/* User Menu */}
+        <div className="p-4 border-t border-zinc-800 mt-auto">
           <UserMenu />
         </div>
 
@@ -129,6 +143,10 @@ const SideMenu = () => {
           })}
         </ul>
       </nav>
+
+      {showSupport && (
+        <ContactSupport onClose={() => setShowSupport(false)} />
+      )}
     </>
   );
 };

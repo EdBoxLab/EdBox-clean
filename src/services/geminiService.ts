@@ -1,18 +1,6 @@
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import type { Source, ResearchPackage, CitationStyle } from '../app/types';
-
-const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || "");
-
-// Model for JSON output
-const jsonModel = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
-    generationConfig: {
-        responseMimeType: "application/json",
-    }
-});
-
-// Model for text-only output
-const textModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+import { generateWithRetry } from '../lib/ai-providers';
 
 const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -21,12 +9,16 @@ const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
 ];
 
-// Function for the Genie Assistant Chatbot
 export async function askGenie(prompt: string): Promise<string> {
     try {
-        const result = await textModel.generateContent(prompt);
-        const response = await result.response;
-        return response.text();
+        const result = await generateWithRetry({
+            prompt,
+            systemPrompt: 'You are Genie, a helpful AI learning assistant. Provide clear, concise, and educational responses.',
+            schema: {},
+            temperature: 0.7,
+            maxTokens: 1000,
+        });
+        return result.text;
     } catch (error) {
         console.error("Error asking Genie:", error);
         return "Sorry, I encountered an error. Please check the console for details.";
@@ -107,16 +99,18 @@ export async function generateResearchPackage(
 
     try {
         setStatus("Synthesizing information and generating initial draft...");
-        const result = await jsonModel.generateContent(prompt);
-        const response = await result.response;
-        const jsonText = response.text();
+        const result = await generateWithRetry({
+            prompt,
+            systemPrompt: 'You are an expert research assistant. Generate comprehensive research packages with proper citations.',
+            schema: {},
+            temperature: 0.7,
+            maxTokens: 8000,
+        });
         
         setStatus("Parsing and validating the research package...");
-        // Handle potential markdown backticks in the response
-        const cleanJsonText = jsonText.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
+        const cleanJsonText = result.text.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
         const generatedPackage = JSON.parse(cleanJsonText);
 
-        // Basic validation - can be expanded
         if (!generatedPackage.title || !generatedPackage.summary) {
             throw new Error("AI response is missing required fields (title or summary).");
         }
@@ -130,8 +124,8 @@ export async function generateResearchPackage(
         }
 
         setStatus("Finalizing visual and audio components...");
-        generatedPackage.image.image_base64 = null; // Placeholder
-        generatedPackage.audio_dialogue.audio_base64 = null; // Placeholder
+        generatedPackage.image.image_base64 = null;
+        generatedPackage.audio_dialogue.audio_base64 = null;
 
         setStatus("Almost there...");
 

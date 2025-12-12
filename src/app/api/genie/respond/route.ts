@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import Groq from 'groq-sdk';
-
-const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY,
-});
+import { generateWithRetry } from '@/lib/ai-providers';
 
 export async function POST(request: NextRequest) {
     try {
@@ -15,7 +11,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Message required' }, { status: 400 });
         }
 
-        // Fetch User Profile for Personalization
         const { data: { session } } = await supabase.auth.getSession();
         let userProfileContext = '';
 
@@ -53,14 +48,15 @@ User said: "${userMessage}"
 
 Respond naturally as if speaking to them:`;
 
-        const completion = await groq.chat.completions.create({
-            messages: [{ role: 'system', content: systemPrompt }],
-            model: 'llama3-70b-8192',
+        const result = await generateWithRetry({
+            prompt: userMessage,
+            systemPrompt,
+            schema: {},
             temperature: 0.7,
-            max_tokens: 150, // Strict limit for voice
+            maxTokens: 150,
         });
 
-        const genieResponse = completion.choices[0]?.message?.content || "I'm here to help! What would you like to know?";
+        const genieResponse = result.text || "I'm here to help! What would you like to know?";
 
         return NextResponse.json({
             success: true,

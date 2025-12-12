@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import Groq from 'groq-sdk';
+import { generateWithRetry } from '@/lib/ai-providers';
 
 type ContentType = 'quizzes' | 'flashcards' | 'mindmaps' | 'notes';
 
@@ -33,19 +33,6 @@ function buildPrompt(type: ContentType, prompt: string) {
   }
 }
 
-async function retry<T>(fn: () => Promise<T>, attempts = 3, delay = 500) {
-  let lastError: any;
-  for (let i = 0; i < attempts; i++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
-      await new Promise((res) => setTimeout(res, delay));
-    }
-  }
-  throw lastError;
-}
-
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient();
@@ -64,33 +51,17 @@ export async function POST(request: NextRequest) {
     if (!prompt || !contentTypes?.length)
       return NextResponse.json({ error: 'Prompt and content types are required' }, { status: 400 });
 
-    const groqApiKey = process.env.GROQ_API_KEY ?? process.env.GROQ_API_KEY_3;
-    if (!groqApiKey) return NextResponse.json({ error: 'GROQ API key missing' }, { status: 500 });
-
-    const groq = new Groq({ apiKey: groqApiKey });
-    const model = process.env.GROQ_MODEL ?? 'llama3-7b-4096';
-
     const results = await Promise.all(
       contentTypes.map(async (type: ContentType) => {
-        const output = await retry(async () => {
-          const completion = await groq.chat.completions.create({
-            messages: [
-              {
-                role: 'system',
-                content:
-                  'You are a study-kit AI assistant. Generate quizzes, flashcards, mindmaps, or notes in strict JSON or markdown format.',
-              },
-              { role: 'user', content: buildPrompt(type, prompt) },
-            ],
-            model,
-            temperature: 0.7,
-            max_tokens: 1000,
-          } as any);
+        const result = await generateWithRetry({
+          prompt: buildPrompt(type, prompt),
+          systemPrompt: 'You are a study-kit AI assistant. Generate quizzes, flashcards, mindmaps, or notes in strict JSON or markdown format.',
+          schema: {},
+          temperature: 0.7,
+          maxTokens: 1000,
+        });
 
-          const text = (completion as any)?.choices?.[0]?.message?.content ?? '';
-          return type === 'notes' ? text : extractJSON(text);
-        }, 3, 500);
-
+        const output = type === 'notes' ? result.text : extractJSON(result.text);
         return { type, content: output };
       })
     );

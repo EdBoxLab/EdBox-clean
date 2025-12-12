@@ -1,14 +1,9 @@
-
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
-const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
+import { generateWithRetry } from '@/lib/ai-providers';
 
 export async function POST(request: Request) {
   try {
     const { notes } = await request.json();
-
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const prompt = `
       Generate a multiple-choice quiz from the following notes. Each question should have four options, and one correct answer.
@@ -35,13 +30,17 @@ export async function POST(request: Request) {
       ${notes}
     `;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = await response.text();
+    const result = await generateWithRetry({
+      prompt,
+      systemPrompt: 'You are an expert at creating educational quizzes. Generate clear multiple-choice questions with four options each.',
+      schema: {},
+      temperature: 0.7,
+      maxTokens: 2000,
+    });
 
     // Clean the text to ensure it is valid JSON
-    const cleanedText = text.replace(/```json\n|```/g, '').trim();
-    console.log("result: "+ result+ "response: " + response + "text :"+ text)
+    const cleanedText = result.text.replace(/```json\n|```/g, '').trim();
+    console.log("AI response:", result.text);
     const quiz = JSON.parse(cleanedText);
 
     return NextResponse.json(quiz);

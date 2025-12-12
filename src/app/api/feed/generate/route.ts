@@ -1,12 +1,7 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
+import { Type } from "@google/genai";
 import { NextResponse } from "next/server";
+import { generateWithRetry } from '@/lib/ai-providers';
 
-// Initialize Gemini with server-side key
-const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
-
-// Helper for retries with exponential backoff (Server-side version)
 async function retryOperation<T>(operation: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
     try {
         return await operation();
@@ -32,8 +27,6 @@ export async function POST(req: Request) {
         if (!interests || !Array.isArray(interests)) {
             return NextResponse.json({ error: "Invalid interests provided" }, { status: 400 });
         }
-
-        const model = "gemini-2.5-flash";
 
         const prompt = `
 Role: {Act as a viral content architect with 30+ years in emotional design, specializing in dopamine-driven engagement.}
@@ -69,91 +62,74 @@ Return strictly a JSON array of objects.
 `;
 
         const feedItems = await retryOperation(async () => {
-            const response = await ai.models.generateContent({
-                model,
-                contents: prompt,
-                config: {
-                    maxOutputTokens: 8192,
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                type: { type: Type.STRING, enum: ["story", "infographic", "video", "quiz", "article", "challenge", "fact", "meme"] },
-                                topic: { type: Type.STRING },
-                                title: { type: Type.STRING },
-                                // Common fields
-                                xp_reward: { type: Type.INTEGER },
-                                genie_reaction: { type: Type.STRING },
-                                theme: { type: Type.STRING },
-
-                                // Type specific fields
-                                script: { type: Type.STRING }, // Video
-                                points: { type: Type.ARRAY, items: { type: Type.STRING } }, // Infographic
-
-                                // Story
-                                slides: {
-                                    type: Type.ARRAY,
-                                    items: {
-                                        type: Type.OBJECT,
-                                        properties: {
-                                            text: { type: Type.STRING },
-                                            visualDetail: { type: Type.STRING },
-                                            image_prompt: { type: Type.STRING }
-                                        }
-                                    }
-                                },
-
-                                // Quiz
-                                question: { type: Type.STRING }, // Also for Challenge
-                                options: { type: Type.ARRAY, items: { type: Type.STRING } },
-                                answer: { type: Type.STRING }, // Also for Challenge
-                                correctIndex: { type: Type.INTEGER },
-                                explanation: { type: Type.STRING }, // Also for Fact
-
-                                // Challenge
-                                time_limit: { type: Type.INTEGER },
-                                streak_bonus: { type: Type.BOOLEAN },
-
-                                // Meme
-                                concept: { type: Type.STRING },
-                                meme_template: { type: Type.STRING },
-                                top_text: { type: Type.STRING },
-                                bottom_text: { type: Type.STRING },
-
-                                // Article
-                                summary: { type: Type.STRING },
-                                full_article_content: { type: Type.STRING },
-
-                                keyTakeaway: { type: Type.STRING },
-                                visualPrompt: { type: Type.STRING },
-                                likes: { type: Type.INTEGER },
-                                shares: { type: Type.INTEGER },
-                                comments: {
-                                    type: Type.ARRAY,
-                                    items: {
-                                        type: Type.OBJECT,
-                                        properties: {
-                                            id: { type: Type.STRING },
-                                            username: { type: Type.STRING },
-                                            text: { type: Type.STRING },
-                                            avatar: { type: Type.STRING }
-                                        }
+            const result = await generateWithRetry({
+                prompt,
+                systemPrompt: '',
+                schema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            type: { type: Type.STRING, enum: ["story", "infographic", "video", "quiz", "article", "challenge", "fact", "meme"] },
+                            topic: { type: Type.STRING },
+                            title: { type: Type.STRING },
+                            xp_reward: { type: Type.INTEGER },
+                            genie_reaction: { type: Type.STRING },
+                            theme: { type: Type.STRING },
+                            script: { type: Type.STRING },
+                            points: { type: Type.ARRAY, items: { type: Type.STRING } },
+                            slides: {
+                                type: Type.ARRAY,
+                                items: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        text: { type: Type.STRING },
+                                        visualDetail: { type: Type.STRING },
+                                        image_prompt: { type: Type.STRING }
                                     }
                                 }
                             },
-                            required: ["type", "topic", "title", "visualPrompt", "xp_reward", "theme"]
-                        }
+                            question: { type: Type.STRING },
+                            options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                            answer: { type: Type.STRING },
+                            correctIndex: { type: Type.INTEGER },
+                            explanation: { type: Type.STRING },
+                            time_limit: { type: Type.INTEGER },
+                            streak_bonus: { type: Type.BOOLEAN },
+                            concept: { type: Type.STRING },
+                            meme_template: { type: Type.STRING },
+                            top_text: { type: Type.STRING },
+                            bottom_text: { type: Type.STRING },
+                            summary: { type: Type.STRING },
+                            full_article_content: { type: Type.STRING },
+                            keyTakeaway: { type: Type.STRING },
+                            visualPrompt: { type: Type.STRING },
+                            likes: { type: Type.INTEGER },
+                            shares: { type: Type.INTEGER },
+                            comments: {
+                                type: Type.ARRAY,
+                                items: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        id: { type: Type.STRING },
+                                        username: { type: Type.STRING },
+                                        text: { type: Type.STRING },
+                                        avatar: { type: Type.STRING }
+                                    }
+                                }
+                            }
+                        },
+                        required: ["type", "topic", "title", "visualPrompt", "xp_reward", "theme"]
                     }
-                }
+                },
+                temperature: 1.0,
+                maxTokens: 8192,
             });
 
-            if (!response.text) throw new Error("No text returned from Gemini");
+            if (!result.text) throw new Error("No text returned from AI");
 
             try {
-                const data = JSON.parse(response.text);
-                // Add IDs server-side or client-side? Server-side is fine.
+                const data = JSON.parse(result.text);
                 return data.map((item: any) => ({
                     ...item,
                     id: crypto.randomUUID(),

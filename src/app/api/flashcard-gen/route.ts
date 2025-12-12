@@ -1,14 +1,9 @@
-
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
-const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
+import { generateWithRetry } from '@/lib/ai-providers';
 
 export async function POST(request: Request) {
   try {
     const { notes } = await request.json();
-
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
     const prompt = `
       Generate flashcards from the following notes. Each flashcard should be a question and an answer, separated by a colon.
@@ -21,13 +16,16 @@ export async function POST(request: Request) {
       ${notes}
     `;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = await response.text();
+    const result = await generateWithRetry({
+      prompt,
+      systemPrompt: 'You are an expert at creating educational flashcards. Generate concise, clear questions and answers.',
+      schema: {},
+      temperature: 0.7,
+      maxTokens: 2000,
+    });
 
     // Clean the text to ensure it is valid JSON
-    const cleanedText = text.replace(/```json\n|```/g, '').trim();
-
+    const cleanedText = result.text.replace(/```json\n|```/g, '').trim();
     const flashcards = JSON.parse(cleanedText);
 
     return NextResponse.json({ flashcards });

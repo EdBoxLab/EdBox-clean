@@ -1,4 +1,3 @@
-// app/api/study-kit/generate/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import Groq from 'groq-sdk';
@@ -9,13 +8,14 @@ function extractJSON(text: string) {
   try {
     const fenced = text.match(/```json([\s\S]*?)```/i);
     const raw = fenced ? fenced[1] : text;
-    const fixed = raw
-      .replace(/[\n\r]+/g, '')
-      .replace(/,\s*}/g, '}')
-      .replace(/,\s*]/g, ']');
-    return JSON.parse(fixed);
+    return JSON.parse(
+      raw
+        .replace(/[\n\r]+/g, '')
+        .replace(/,\s*}/g, '}')
+        .replace(/,\s*]/g, ']')
+    );
   } catch {
-    return text; // fallback to raw string if JSON parsing fails
+    return text;
   }
 }
 
@@ -50,10 +50,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient();
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     let body: any;
@@ -67,20 +64,12 @@ export async function POST(request: NextRequest) {
     if (!prompt || !contentTypes?.length)
       return NextResponse.json({ error: 'Prompt and content types are required' }, { status: 400 });
 
-    const groqApiKey =
-      process.env.GROQ_API_KEY ?? process.env.GROQ_API_KEY_3 ?? process.env.GROQ_API_KEY_4;
-
-    if (!groqApiKey) {
-      return NextResponse.json(
-        { error: 'GROQ API key not configured. Set up GROQ_API_KEY in .env.local' },
-        { status: 500 }
-      );
-    }
+    const groqApiKey = process.env.GROQ_API_KEY ?? process.env.GROQ_API_KEY_3;
+    if (!groqApiKey) return NextResponse.json({ error: 'GROQ API key missing' }, { status: 500 });
 
     const groq = new Groq({ apiKey: groqApiKey });
-    const model = process.env.GROQ_MODEL ?? 'llama-3.1-8b-instant';
+    const model = process.env.GROQ_MODEL ?? 'llama3-7b-4096';
 
-    // Generate content per type in parallel
     const results = await Promise.all(
       contentTypes.map(async (type: ContentType) => {
         const output = await retry(async () => {
@@ -89,7 +78,7 @@ export async function POST(request: NextRequest) {
               {
                 role: 'system',
                 content:
-                  'You are a study-kit AI assistant. Generate quizzes, flashcards, mindmaps, or notes in strict JSON or markdown format as requested.',
+                  'You are a study-kit AI assistant. Generate quizzes, flashcards, mindmaps, or notes in strict JSON or markdown format.',
               },
               { role: 'user', content: buildPrompt(type, prompt) },
             ],
@@ -106,7 +95,7 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    const generatedContent = Object.fromEntries(results.map((r) => [r.type, r.content]));
+    const generatedContent = Object.fromEntries(results.map(r => [r.type, r.content]));
 
     const { data: studyKit, error: dbError } = await supabase
       .from('study_kit_content')
@@ -127,21 +116,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, id: studyKit.id, content: generatedContent });
   } catch (error: any) {
     console.error('Study Kit POST Error:', error);
-    return NextResponse.json(
-      { error: 'Failed to generate study kit', details: error?.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to generate study kit', details: error?.message }, { status: 500 });
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient();
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { data, error } = await supabase
@@ -154,9 +136,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ studyKits: data });
   } catch (error: any) {
     console.error('Study Kit GET Error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch study kits', details: error?.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch study kits', details: error?.message }, { status: 500 });
   }
 }

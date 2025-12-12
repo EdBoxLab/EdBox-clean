@@ -1,98 +1,109 @@
 'use client';
 
-import React, { ElementType } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import { Users, Star, Trophy } from 'lucide-react';
+import { Users, Star, ArrowRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 
-const FeatureCard = ({ title, description, href, icon: Icon }: { title: string, description: string, href?: string, icon: ElementType }) => {
-  const content = (
-    <div className="feature-placeholder">
-      <Icon className="mx-auto mb-4 h-12 w-12 text-purple-400" />
-      <h2>{title}</h2>
-      <p>{description}</p>
-    </div>
-  );
-
-  if (href) {
-    return <Link href={href} passHref>{content}</Link>;
-  }
-  return content;
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.15, duration: 0.5, ease: "easeOut" }
+  })
 };
 
+const FeatureCard = ({ 
+  title, 
+  description, 
+  href, 
+  icon: Icon,
+  index,
+  gradient
+}: { 
+  title: string;
+  description: string;
+  href: string;
+  icon: React.ElementType;
+  index: number;
+  gradient: string;
+}) => {
+  return (
+    <Link href={href}>
+      <motion.div
+        className={`${gradient} border border-opacity-30 rounded-xl p-8 group hover:border-opacity-50 transition-all cursor-pointer h-full flex flex-col justify-between`}
+        variants={cardVariants}
+        initial="hidden"
+        animate="visible"
+        custom={index}
+        whileHover={{ scale: 1.02 }}
+        transition={{ duration: 0.2 }}
+      >
+        <div>
+          <Icon className="w-12 h-12 text-white opacity-80 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-3">{title}</h2>
+          <p className="text-gray-300 text-base leading-relaxed">{description}</p>
+        </div>
+        <div className="flex items-center gap-2 text-white opacity-80 group-hover:opacity-100 text-sm mt-6 group-hover:gap-3 transition-all">
+          Explore <ArrowRight className="w-4 h-4" />
+        </div>
+      </motion.div>
+    </Link>
+  );
+};
 
 export default function SocialPage() {
-  return (
-    <div className="min-h-screen bg-[#09090b] text-white p-3 sm:p-6 md:p-8">
-      <style jsx>{`
-        .feature-placeholder {
-          background: transparent;
-          border: 1px solid rgb(39 39 42);
-          border-radius: 12px;
-          padding: 16px;
-          text-align: center;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          transition: border-color 0.2s ease-in-out;
-        }
-        @media (min-width: 640px) {
-          .feature-placeholder {
-            padding: 24px;
-          }
-        }
-        .feature-placeholder:hover {
-            border-color: rgb(63 63 70);
-        }
-        .feature-placeholder h2 {
-            font-size: 1.25rem;
-            font-weight: bold;
-            margin-bottom: 8px;
-            color: #A78BFA;
-        }
-        @media (min-width: 640px) {
-          .feature-placeholder h2 {
-            font-size: 1.5rem;
-          }
-        }
-        .feature-placeholder p {
-          font-size: 0.875rem;
-        }
-        @media (min-width: 640px) {
-          .feature-placeholder p {
-            font-size: 1rem;
-          }
-        }
-        a {
-            text-decoration: none;
-            color: inherit;
-        }
-      `}</style>
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-8 sm:mb-12">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
-            Socials
-          </h1>
-          <p className="mt-3 sm:mt-4 text-sm sm:text-base md:text-lg text-gray-400 max-w-2xl mx-auto px-4">
-            Learn together, compete for glory, and share your favorite moments. Welcome to the social side of learning.
-          </p>
-        </div>
+  const features = [
+    {
+      title: 'Study Circles',
+      description: 'Join small, invite-only learning squads. Collaborate with peers, share resources, and achieve your goals together.',
+      href: '/socials/study-circles',
+      icon: Users,
+      gradient: 'bg-gradient-to-br from-blue-900/80 to-cyan-900/80 border-blue-500/30'
+    },
+    {
+      title: 'Creator Profiles',
+      description: 'Follow your favorite creators, discover new content, and stay updated with the latest learning materials.',
+      href: '/socials/creator-profiles',
+      icon: Star,
+      gradient: 'bg-gradient-to-br from-purple-900/80 to-pink-900/80 border-purple-500/30'
+    }
+  ];
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
-          <FeatureCard
-            title="Study Circles"
-            description="Small, invite-only learning squads."
-            href="/socials/study-circles"
-            icon={Users}
-          />
-          <FeatureCard
-            title="Creator Profiles"
-            description="Follow your favorite creators."
-            href="/socials/creator-profiles"
-            icon={Star}
-          />
-        </div>
+  return (
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
+      <motion.div 
+        className="mb-12"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      >
+        <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4">
+          Connect & Learn Together
+        </h1>
+        <p className="text-lg text-gray-400 max-w-3xl">
+          Join a vibrant community of learners. Collaborate in study circles, follow inspiring creators, and share your learning journey.
+        </p>
+      </motion.div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+        {features.map((feature, index) => (
+          <FeatureCard key={feature.title} {...feature} index={index} />
+        ))}
       </div>
+
+      <motion.div 
+        className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-8 text-center"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.4, duration: 0.5 }}
+      >
+        <h3 className="text-xl font-bold text-white mb-2">More Features Coming Soon</h3>
+        <p className="text-gray-400">
+          We're building an amazing social learning experience. Stay tuned for leaderboards, challenges, and more!
+        </p>
+      </motion.div>
     </div>
   );
 }

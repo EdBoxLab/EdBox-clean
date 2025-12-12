@@ -1,0 +1,9 @@
+node_modules
+.next
+.env*.local
+*.log
+.DS_Store
+coverage
+.vscode
+.idea
+load-test.js

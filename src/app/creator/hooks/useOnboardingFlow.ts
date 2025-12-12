@@ -31,15 +31,14 @@ export function useOnboardingFlow() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       
-      // Validate size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File too big! Keep it under 5MB 📦');
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+      if (file.size > MAX_FILE_SIZE) {
+        setError('File size exceeds 10MB. Please upload in smaller batches or reduce file size.');
         return;
       }
       
       setUploadedFile(file);
       
-      // Extract text from file
       const text = await file.text();
       setGoal(text.substring(0, 500));
     }

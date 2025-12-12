@@ -26,7 +26,10 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ onSourcesChanged
   const [showTextArea, setShowTextArea] = useState<boolean>(false);
   const [textContent, setTextContent] = useState<string>('');
   const [viewingSource, setViewingSource] = useState<Source | null>(null);
+  const [error, setError] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
   const addSource = useCallback((newSource: Source) => {
     const updatedSources = [...sources, newSource];
@@ -41,13 +44,23 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ onSourcesChanged
   }, [sources, onSourcesChanged]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setError('');
     if (event.target.files) {
       const file = event.target.files[0];
       if (file) {
+        if (file.size > MAX_FILE_SIZE) {
+          setError(`File size exceeds 10MB. Please upload in smaller batches or reduce file size.`);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+        
         const reader = new FileReader();
         reader.onload = (e) => {
           const content = e.target?.result as string;
           addSource({ id: `file-${Date.now()}`, name: file.name, type: 'file', content });
+        };
+        reader.onerror = () => {
+          setError('Failed to read file. Please try again.');
         };
         reader.readAsText(file);
       }
@@ -71,6 +84,13 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ onSourcesChanged
           <FileIcon className="h-5 w-5 mr-2 text-brand-blue" />
           Manage Sources
         </h2>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start">
+            <span className="text-sm">{error}</span>
+          </div>
+        )}
+
         <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
           {sources.map((source, index) => (
             <div key={index} className="flex items-center justify-between bg-gray-100 p-3 rounded-lg animate-fade-in group">
@@ -109,7 +129,13 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ onSourcesChanged
         )}
 
         <div className="flex space-x-2">
-          <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.webp,.csv,.md"
+            className="hidden" 
+          />
           <button onClick={() => fileInputRef.current?.click()} className="flex-1 flex items-center justify-center px-4 py-2 text-sm font-medium text-brand-blue bg-blue-100 rounded-lg hover:bg-blue-200 transition-colors">
               <PlusIcon className="h-4 w-4 mr-2" /> Upload File
           </button>
@@ -117,6 +143,10 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ onSourcesChanged
               <PlusIcon className="h-4 w-4 mr-2" /> Add Text
           </button>
         </div>
+        
+        <p className="text-xs text-gray-500 text-center">
+          Supports PDF, Word, PowerPoint, images, text files • Max 10MB
+        </p>
       </div>
     </>
   );

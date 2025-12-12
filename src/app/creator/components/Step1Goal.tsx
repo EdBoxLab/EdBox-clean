@@ -83,7 +83,7 @@ I want to make digital art 🎨"
           type="file"
           id="file-upload"
           onChange={handleFileUpload}
-          accept=".txt,.pdf,.doc,.docx,.md"
+          accept=".txt,.pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.webp,.md"
           className="hidden"
         />
         <label
@@ -104,7 +104,7 @@ I want to make digital art 🎨"
                 Job description, project brief, or learning plan
               </p>
               <p className="text-xs text-gray-600 mt-2">
-                PDF, TXT, DOC • Max 5MB
+                PDF, Word, PowerPoint, images, text files • Max 10MB
               </p>
             </div>
           </div>

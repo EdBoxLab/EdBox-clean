@@ -19,6 +19,9 @@ export default function StudyKitPage() {
     const [isDragging, setIsDragging] = useState(false);
     const [generatedContent, setGeneratedContent] = useState<any>(null);
     const [activeTab, setActiveTab] = useState<string | null>(null);
+    const [error, setError] = useState<string>('');
+
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
     const toggleContentType = (id: string) => {
         setSelectedTypes(prev =>
@@ -27,16 +30,28 @@ export default function StudyKitPage() {
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setError('');
         if (e.target.files && e.target.files[0]) {
-            setUploadedFile(e.target.files[0]);
+            const file = e.target.files[0];
+            if (file.size > MAX_FILE_SIZE) {
+                setError('File size exceeds 10MB. Please upload in smaller batches or reduce file size.');
+                return;
+            }
+            setUploadedFile(file);
         }
     };
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
+        setError('');
         if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            setUploadedFile(e.dataTransfer.files[0]);
+            const file = e.dataTransfer.files[0];
+            if (file.size > MAX_FILE_SIZE) {
+                setError('File size exceeds 10MB. Please upload in smaller batches or reduce file size.');
+                return;
+            }
+            setUploadedFile(file);
         }
     };
 
@@ -121,6 +136,12 @@ export default function StudyKitPage() {
                                     Or Upload Material
                                 </h2>
 
+                                {error && (
+                                    <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                                        <span className="text-sm">{error}</span>
+                                    </div>
+                                )}
+
                                 <div
                                     onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                                     onDragLeave={() => setIsDragging(false)}
@@ -148,13 +169,13 @@ export default function StudyKitPage() {
                                         <>
                                             <Upload className="w-12 h-12 text-zinc-500 mx-auto mb-4" />
                                             <p className="text-zinc-400 mb-2">Drag & drop your file here</p>
-                                            <p className="text-sm text-zinc-500 mb-4">Supports PDF, PPTX, DOCX, images</p>
+                                            <p className="text-sm text-zinc-500 mb-4">Supports PDF, PPTX, DOCX, images • Max 10MB</p>
                                             <label className="inline-block px-6 py-2 border border-zinc-700 hover:border-indigo-500 rounded-lg cursor-pointer transition">
                                                 <span className="text-zinc-300">Browse Files</span>
                                                 <input
                                                     type="file"
                                                     onChange={handleFileChange}
-                                                    accept=".pdf,.pptx,.docx,.jpg,.jpeg,.png"
+                                                    accept=".pdf,.pptx,.ppt,.docx,.doc,.jpg,.jpeg,.png,.gif,.bmp,.webp,.txt,.md,.csv"
                                                     className="hidden"
                                                 />
                                             </label>

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { requireAdmin } from '@/lib/auth/admin';
+import { requireAdmin, updateAdminLastLogin } from '@/lib/auth/admin';
 
 export async function GET(request: NextRequest) {
     try {
-        // Check admin access
         await requireAdmin();
+        await updateAdminLastLogin();
 
         const supabase = await createSupabaseServerClient();
 

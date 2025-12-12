@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import { useOnboardingFlow } from './hooks/useOnboardingFlow';
 import Step1Goal from './components/Step1Goal';
 import Step2Context from './components/Step2Context';
@@ -9,6 +10,7 @@ import Step3Time from './components/Step3Time';
 import GeneratingView from './components/GeneratingView';
 
 export default function OnboardingFlow() {
+  const router = useRouter();
   const {
     step,
     goal,
@@ -35,17 +37,15 @@ export default function OnboardingFlow() {
       <div className="max-w-4xl mx-auto px-4 py-8 md:py-12">
         {/* Header with Back Button */}
         <div className="mb-8 flex items-center justify-between">
-          {step > 1 && (
-            <button
-              onClick={prevStep}
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Back
-            </button>
-          )}
+          <button
+            onClick={step > 1 ? prevStep : () => router.push('/')}
+            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
 
           {/* Progress Dots */}
           <div className="flex gap-2 ml-auto">

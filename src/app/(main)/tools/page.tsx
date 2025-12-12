@@ -7,7 +7,6 @@ import {
   PencilSquareIcon,
   ClipboardDocumentListIcon,
   RectangleStackIcon,
-  Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 
 const tools = [
@@ -50,16 +49,6 @@ const tools = [
     gradient: 'from-pink-600/20 to-rose-600/20',
     iconColor: 'text-pink-400',
     borderHover: 'hover:border-pink-500',
-  },
-  {
-    id: 'engines',
-    href: '/engines',
-    title: 'Engines',
-    description: 'Access state of the art engines that make visualizing any learning concepts possible.',
-    icon: Cog6ToothIcon,
-    gradient: 'from-yellow-600/20 to-orange-600/20',
-    iconColor: 'text-yellow-400',
-    borderHover: 'hover:border-yellow-500',
   },
 ];
 

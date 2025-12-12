@@ -1,7 +1,12 @@
 'use client';
 
-import { App as PhysicsSimApp } from '@/lib/courseCreation/engines/physicssim/App';
+import PhysicsSimApp from '@/lib/courseCreation/engines/physicssim/App';
+import { NavigationTracker } from '@/components/NavigationTracker';
 
 export default function PhysicsSimPage() {
-    return <PhysicsSimApp />;
+    return (
+        <NavigationTracker title="Physics Simulator">
+            <PhysicsSimApp />
+        </NavigationTracker>
+    );
 }

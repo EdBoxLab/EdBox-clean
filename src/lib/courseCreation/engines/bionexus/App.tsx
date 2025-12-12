@@ -5,8 +5,9 @@ import ModuleCard from './components/ModuleCard';
 import AIAssistant from './components/AIAssistant';
 import DataVisualizer from './components/DataVisualizer';
 import { ArrowLeft, GraduationCap, Stethoscope, Microscope, BookOpen, Info, Bot, MessageSquare, Menu } from 'lucide-react';
+import { Challenge } from '../../types';
 
-const App: React.FC = () => {
+const App: React.FC<{ challenge?: Challenge | null }> = ({ challenge }) => {
   const [activeTier, setActiveTier] = useState<TierType>(TierType.STUDENT);
   const [activeModule, setActiveModule] = useState<BioModule | null>(null);
   const [isAIOpen, setIsAIOpen] = useState(false);

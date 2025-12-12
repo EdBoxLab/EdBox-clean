@@ -1,349 +1,602 @@
-
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Hash, LogIn, LogOut, Loader2, Send, Share2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { Users, Plus, MessageCircle, Video, Phone, Search, Send, Sparkles, ArrowLeft, MoreVertical, Share2, UserPlus, Clock } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useSearchParams, useRouter } from 'next/navigation';
 
-const CircleList = ({ circles, onSelectCircle, selectedCircle, onJoin, onLeave, isProcessing, onNewCircle }) => (
-    <div className="flex flex-col border-r border-zinc-800 w-1/3 p-4 space-y-4">
-        <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Study Circles</h2>
-            <button onClick={onNewCircle} className="p-2 border border-zinc-700 hover:border-zinc-500 rounded-md transition">
-                <Plus size={20} />
-            </button>
-        </div>
-        {circles.map(circle => (
-            <div
-                key={circle.id}
-                className={`flex items-center space-x-4 p-3 rounded-lg cursor-pointer border transition ${selectedCircle?.id === circle.id ? 'border-zinc-600 bg-zinc-900/50' : 'border-transparent hover:border-zinc-700'}`}
-                onClick={() => onSelectCircle(circle)}
-            >
-                <div className="bg-purple-500 p-3 rounded-full">
-                    <Hash className="h-6 w-6 text-white" />
-                </div>
-                <div className="flex-1">
-                    <h3 className="font-bold text-lg text-white">{circle.name}</h3>
-                    <div className="flex items-center text-xs text-gray-500 mt-1">
-                        <Users className="h-4 w-4 mr-1.5" />
-                        <span>{circle.member_count} Members</span>
-                    </div>
-                </div>
-                {!selectedCircle || selectedCircle.id !== circle.id && (
-                    circle.is_member ? (
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onLeave(circle.id); }}
-                            disabled={isProcessing}
-                            className="p-2 rounded-md bg-red-600 hover:bg-red-700 transition-colors flex items-center text-sm disabled:opacity-50">
-                            <LogOut className="h-4 w-4" />
-                        </button>
-                    ) : (
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onJoin(circle.id); }}
-                            disabled={isProcessing}
-                            className="p-2 rounded-md bg-green-600 hover:bg-green-700 transition-colors flex items-center text-sm disabled:opacity-50">
-                            <LogIn className="h-4 w-4" />
-                        </button>
-                    )
+// Dashboard View Component
+const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }) => {
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredCircles = circles.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950/20 to-slate-950 text-white">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-white/5">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                {session?.user?.user_metadata?.avatar_url ? (
+                  <img src={session.user.user_metadata.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  <span className="font-bold text-sm">{session?.user?.email?.[0].toUpperCase()}</span>
                 )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 font-medium">Good day,</p>
+                <h2 className="text-white text-lg font-bold leading-tight">
+                  {session?.user?.user_metadata?.full_name || 'Student'} ⚡️
+                </h2>
+              </div>
             </div>
-        ))}
-    </div>
-);
-
-const CreateCircleModal = ({ onClose, onCircleCreated }) => {
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setError('');
-
-        try {
-            const response = await fetch('/api/study-circles', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, description }),
-            });
-
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.error || 'Failed to create circle');
-            }
-
-            const newCircle = await response.json();
-            onCircleCreated(newCircle);
-            onClose();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-            <div className="border border-zinc-800 p-6 rounded-lg max-w-sm w-full">
-                <h2 className="text-xl font-bold mb-4">Create a New Study Circle</h2>
-                <form onSubmit={handleSubmit}>
-                    <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2" required />
-                    <textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full mt-4 bg-gray-700 border border-gray-600 rounded-md px-3 py-2" rows={3} required />
-                    {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-                    <div className="flex justify-end space-x-2 mt-4">
-                        <button type="button" onClick={onClose} className="py-2 px-4 rounded-md bg-gray-600">Cancel</button>
-                        <button type="submit" disabled={isLoading} className="py-2 px-4 rounded-md bg-purple-600">Create</button>
-                    </div>
-                </form>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="w-10 h-10 rounded-full bg-purple-500/10 hover:bg-purple-500/20 flex items-center justify-center transition-colors">
+                <Search className="w-5 h-5" />
+              </button>
+              <button 
+                onClick={onNewCircle}
+                className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white pl-3 pr-4 py-2 rounded-full transition-all shadow-lg shadow-purple-500/30">
+                <Plus className="w-5 h-5" />
+                <span className="text-sm font-bold">Create</span>
+              </button>
             </div>
+          </div>
         </div>
-    );
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 py-6 pb-32">
+        {/* Live Circles Section */}
+        <section className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              Live Rooms 
+              <span className="animate-pulse text-red-500 text-[10px] font-black tracking-widest uppercase bg-red-500/10 px-2 py-1 rounded border border-red-500/20">
+                Live
+              </span>
+            </h2>
+            <button className="text-purple-400 text-sm font-semibold hover:text-purple-300">See all</button>
+          </div>
+          <div className="flex overflow-x-auto gap-4 pb-4 no-scrollbar">
+            <div className="flex flex-col items-center gap-2 w-20 shrink-0">
+              <div className="w-16 h-16 rounded-full border-2 border-dashed border-white/20 flex items-center justify-center bg-white/5 hover:bg-white/10 hover:border-white/40 transition-all cursor-pointer">
+                <Plus className="w-6 h-6 text-white/50" />
+              </div>
+              <p className="text-white/60 text-xs font-medium text-center">Start Room</p>
+            </div>
+            {filteredCircles.slice(0, 5).map(circle => (
+              <div 
+                key={circle.id} 
+                onClick={() => onSelectCircle(circle)}
+                className="flex flex-col items-center gap-2 w-20 shrink-0 group cursor-pointer">
+                <div className="relative w-16 h-16 rounded-full p-[2px] bg-gradient-to-tr from-purple-500 to-pink-500">
+                  <div className="w-full h-full bg-gradient-to-br from-purple-700 to-purple-900 rounded-full flex items-center justify-center text-2xl font-bold border-2 border-slate-950">
+                    {circle.name[0]}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-[10px] font-bold px-1.5 rounded-full border border-slate-950 flex items-center gap-0.5">
+                    {circle.member_count}
+                  </div>
+                </div>
+                <p className="text-white text-xs font-medium text-center truncate w-full group-hover:text-purple-400 transition-colors">
+                  {circle.name}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Circles Feed */}
+        <section className="space-y-6">
+          <h2 className="text-2xl font-bold">Your Circles</h2>
+          
+          {filteredCircles.length === 0 ? (
+            <div className="text-center py-16">
+              <Users className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+              <h3 className="text-xl font-bold text-gray-400 mb-2">No circles yet</h3>
+              <p className="text-gray-500 mb-6">Create your first study circle to get started!</p>
+              <button 
+                onClick={onNewCircle}
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-purple-500/30">
+                <Plus className="w-5 h-5" />
+                Create Circle
+              </button>
+            </div>
+          ) : (
+            filteredCircles.map(circle => (
+              <div key={circle.id} className="relative flex flex-col bg-gradient-to-br from-purple-900/20 to-pink-900/10 rounded-2xl overflow-hidden border border-purple-500/20 shadow-xl hover:border-purple-500/40 transition-all group">
+                {/* Header Banner */}
+                <div className="relative h-32 bg-gradient-to-r from-purple-600/30 to-pink-600/30 backdrop-blur-sm">
+                  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMDUiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-50"></div>
+                  {circle.is_member && (
+                    <div className="absolute top-3 right-3 bg-green-500/20 backdrop-blur-md px-3 py-1 rounded-lg border border-green-500/30 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                      <span className="text-xs font-bold text-green-300 uppercase tracking-wider">Member</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Circle Info */}
+                <div className="px-6 pb-6 -mt-10 relative z-10 flex flex-col gap-4">
+                  <div className="flex items-end justify-between">
+                    <div className="flex items-end gap-3">
+                      <div className="w-20 h-20 rounded-2xl border-4 border-slate-950 bg-gradient-to-br from-purple-600 to-pink-600 shadow-2xl flex items-center justify-center text-3xl font-black">
+                        {circle.name[0]}
+                      </div>
+                      <div className="mb-2">
+                        <h3 className="text-white text-xl font-bold leading-tight">{circle.name}</h3>
+                        <p className="text-white/50 text-sm font-medium flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          {circle.member_count} Members • Invite Only
+                        </p>
+                      </div>
+                    </div>
+                    <button className="mb-2 w-9 h-9 flex items-center justify-center rounded-full bg-white/5 text-white/70 hover:bg-white/10 transition-colors">
+                      <MoreVertical className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {circle.description && (
+                    <p className="text-gray-400 text-sm">{circle.description}</p>
+                  )}
+
+                  {/* Action Bar */}
+                  {circle.is_member ? (
+                    <div className="flex items-center gap-2 pt-2">
+                      <button 
+                        onClick={() => onSelectCircle(circle)}
+                        className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-500/30">
+                        <MessageCircle className="w-4 h-4" />
+                        Chat
+                      </button>
+                      <button className="flex-1 bg-white/5 hover:bg-white/10 text-white h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors border border-white/10">
+                        <Video className="w-4 h-4" />
+                        Join Call
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => {
+                        fetch(`/api/study-circles/${circle.id}/members`, { method: 'POST' })
+                          .then(() => window.location.reload());
+                      }}
+                      className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-500/30">
+                      <UserPlus className="w-4 h-4" />
+                      Join Circle
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </section>
+      </div>
+
+      {/* Background Gradient Effects */}
+      <div className="fixed top-0 left-0 w-full h-screen pointer-events-none -z-10 overflow-hidden">
+        <div className="absolute top-[-10%] left-[-20%] w-[600px] h-[600px] bg-purple-600/20 rounded-full blur-[120px] opacity-40"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-pink-600/10 rounded-full blur-[100px] opacity-30"></div>
+      </div>
+    </div>
+  );
 };
 
-const CircleChat = ({ circle, session }) => {
-    const [messages, setMessages] = useState([]);
-    const [newMessage, setNewMessage] = useState('');
-    const [isLoading, setIsLoading] = useState(true);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+// Chat View Component
+const CircleChat = ({ circle, onBack, session }) => {
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
-    useEffect(() => {
-        const fetchMessages = async () => {
-            if (!circle) return;
-            setIsLoading(true);
-            try {
-                const response = await fetch(`/api/study-circles/${circle.id}/messages`);
-                const data = await response.json();
-                setMessages(Array.isArray(data) ? data : []);
-            } catch (error) {
-                console.error("Failed to fetch messages:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchMessages();
-    }, [circle?.id]);
-
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
-
-    useEffect(() => {
-        if (!circle) return;
-
-        const channel = supabase.channel(`realtime:messages:circle=${circle.id}`)
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `circle_id=eq.${circle.id}` }, (payload) => {
-                setMessages(messages => [...messages, payload.new]);
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [circle?.id]);
-
-    const handleSendMessage = async (e) => {
-        e.preventDefault();
-        if (!newMessage.trim()) return;
-
-        try {
-            await fetch(`/api/study-circles/${circle.id}/messages`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: newMessage, username: session.user.user_metadata.full_name || 'Anonymous' }),
-            });
-            setNewMessage('');
-        } catch (error) {
-            console.error("Error sending message:", error);
-        }
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!circle) return;
+      setIsLoading(true);
+      try {
+        const response = await fetch(`/api/study-circles/${circle.id}/messages`);
+        const data = await response.json();
+        setMessages(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Failed to fetch messages:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
+    fetchMessages();
+  }, [circle?.id]);
 
-    const copyInviteLink = () => {
-        const url = `${window.location.origin}/socials/study-circles?id=${circle.id}`;
-        navigator.clipboard.writeText(url);
-        // Could add a toast here
-        alert('Invite link copied to clipboard!');
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  useEffect(() => {
+    if (!circle) return;
+
+    const channel = supabase.channel(`realtime:messages:circle=${circle.id}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'messages', 
+        filter: `circle_id=eq.${circle.id}` 
+      }, (payload) => {
+        setMessages(messages => [...messages, payload.new]);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
     };
+  }, [circle?.id]);
 
-    if (!circle) {
-        return (
-            <div className="flex-1 p-8 text-white flex flex-col items-center justify-center bg-[#09090b]">
-                <Hash size={48} className="text-gray-600 mb-4" />
-                <h2 className="text-2xl font-bold text-gray-400">Select a circle to start chatting</h2>
-            </div>
-        );
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+
+    try {
+      await fetch(`/api/study-circles/${circle.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          content: newMessage, 
+          username: session?.user?.user_metadata?.full_name || session?.user?.email || 'Anonymous'
+        }),
+      });
+      setNewMessage('');
+    } catch (error) {
+      console.error("Error sending message:", error);
     }
+  };
 
-    if (!circle.is_member) {
-        return (
-            <div className="flex-1 p-8 text-white flex flex-col items-center justify-center bg-[#09090b]">
-                <h1 className="text-2xl font-bold text-red-400">Access Denied</h1>
-                <p className="text-gray-400 mt-2">You must be a member of this circle to view the chat.</p>
-            </div>
-        )
-    }
+  const copyInviteLink = () => {
+    const url = `${window.location.origin}/socials/study-circles?id=${circle.id}`;
+    navigator.clipboard.writeText(url);
+    alert('Invite link copied to clipboard!');
+  };
 
-    return (
-        <div className="flex-1 flex flex-col h-screen bg-[#09090b] text-white">
-            <header className="p-4 border-b border-zinc-800 flex justify-between items-center">
-                <div>
-                    <h1 className="text-xl font-bold text-purple-400">{circle.name}</h1>
-                    <p className="text-sm text-gray-400">{circle.description}</p>
-                </div>
-                <button
-                    onClick={copyInviteLink}
-                    className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors flex items-center space-x-2 text-sm"
-                    title="Copy invite link"
-                >
-                    <Share2 className="h-4 w-4" />
-                    <span className="hidden sm:inline">Invite</span>
-                </button>
-            </header>
+  if (!circle) return null;
 
-            <div className="flex-1 p-6 overflow-y-auto">
-                {isLoading ? <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div> : messages.map(msg => (
-                    <div key={msg.id} className={`flex mb-4 ${msg.user_id === session.user.id ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`p-3 rounded-lg max-w-lg ${msg.user_id === session.user.id ? 'bg-purple-600' : 'bg-gray-700'}`}>
-                            <p className="font-bold text-purple-300">{msg.username}</p>
-                            <p className="text-white">{msg.content}</p>
-                            <p className="text-xs text-gray-400 mt-1 text-right">{new Date(msg.created_at).toLocaleTimeString()}</p>
-                        </div>
-                    </div>
-                ))}
-                <div ref={messagesEndRef} />
-            </div>
-
-            <footer className="p-4 border-t border-zinc-800">
-                <form onSubmit={handleSendMessage} className="flex space-x-2">
-                    <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} className="flex-1 bg-gray-700 rounded-md px-4 py-2" placeholder="Type a message..." />
-                    <button type="submit" className="bg-purple-600 px-4 py-2 rounded-md"><Send className="h-5 w-5" /></button>
-                </form>
-            </footer>
+  return (
+    <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-purple-950/20 to-slate-950 text-white flex flex-col z-50">
+      {/* Top Bar */}
+      <header className="flex items-center justify-between px-4 py-3 bg-slate-950/80 backdrop-blur-xl border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={onBack}
+            className="w-10 h-10 -ml-2 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center font-bold">
+            {circle.name[0]}
+          </div>
+          <div>
+            <h1 className="text-base font-bold leading-tight">{circle.name}</h1>
+            <span className="text-xs text-purple-400 font-medium flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+              {circle.member_count} Online • AI Active
+            </span>
+          </div>
         </div>
+        <div className="flex items-center gap-1">
+          <button className="w-10 h-10 rounded-full hover:bg-white/10 text-purple-400 transition-colors flex items-center justify-center">
+            <Video className="w-6 h-6" />
+          </button>
+          <button 
+            onClick={copyInviteLink}
+            className="w-10 h-10 rounded-full hover:bg-white/10 transition-colors flex items-center justify-center">
+            <Share2 className="w-5 h-5" />
+          </button>
+        </div>
+      </header>
+
+      {/* Chat Stream */}
+      <main className="flex-1 overflow-y-auto p-4 space-y-6">
+        <div className="flex justify-center">
+          <span className="text-xs font-medium text-gray-500 bg-white/5 px-3 py-1 rounded-full">
+            Today {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <MessageCircle className="w-16 h-16 mb-4 text-gray-600" />
+            <h3 className="text-xl font-bold text-gray-400 mb-2">No messages yet</h3>
+            <p className="text-gray-500">Be the first to start the conversation!</p>
+          </div>
+        ) : (
+          messages.map((msg, idx) => {
+            const isUser = msg.user_id === session?.user?.id;
+            const isAI = msg.username?.toLowerCase().includes('ai') || msg.username?.toLowerCase().includes('bot');
+
+            return (
+              <div key={msg.id || idx} className={`flex items-end gap-3 ${isUser ? 'justify-end' : 'justify-start'} group`}>
+                {!isUser && (
+                  <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-sm ${
+                    isAI 
+                      ? 'bg-gradient-to-br from-purple-500 to-pink-500' 
+                      : 'bg-gradient-to-br from-blue-500 to-cyan-500'
+                  }`}>
+                    {isAI ? <Sparkles className="w-4 h-4" /> : msg.username?.[0]?.toUpperCase()}
+                  </div>
+                )}
+                
+                <div className={`flex flex-col gap-1 ${isUser ? 'items-end' : 'items-start'} max-w-[80%]`}>
+                  {!isUser && (
+                    <div className="flex items-center gap-2 ml-1">
+                      <span className="text-xs font-bold text-purple-300">{msg.username}</span>
+                      {isAI && (
+                        <span className="bg-purple-500/20 text-purple-400 text-[9px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">
+                          Bot
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div className={`p-3.5 rounded-2xl text-[15px] leading-relaxed ${
+                    isUser 
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-br-sm shadow-lg shadow-purple-500/20' 
+                      : isAI
+                      ? 'bg-gradient-to-br from-purple-900/40 to-pink-900/20 border border-purple-500/30 text-gray-100 rounded-bl-sm'
+                      : 'bg-white/10 text-gray-100 rounded-bl-sm'
+                  }`}>
+                    {msg.content}
+                  </div>
+                  
+                  <span className={`text-[10px] text-gray-400 ${isUser ? 'mr-1' : 'ml-1'}`}>
+                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+
+                {isUser && (
+                  <div className="w-8 h-8 shrink-0 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center font-bold text-sm">
+                    {session?.user?.email?.[0]?.toUpperCase()}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+        <div ref={messagesEndRef} />
+      </main>
+
+      {/* Bottom Input Area */}
+      <footer className="p-4 border-t border-white/5 bg-slate-950/80 backdrop-blur-xl">
+        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+          <button 
+            type="button"
+            className="w-10 h-10 rounded-full text-gray-400 bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+            <Plus className="w-5 h-5" />
+          </button>
+          
+          <div className="flex-1 bg-white/10 border border-white/10 rounded-3xl px-4 py-2 flex items-center focus-within:border-purple-500/50 focus-within:ring-1 focus-within:ring-purple-500/50 transition-all">
+            <input 
+              className="bg-transparent border-none focus:ring-0 w-full text-base placeholder-gray-500 text-white p-0 h-10" 
+              placeholder="Ask AI or chat..." 
+              type="text"
+              value={newMessage}
+              onChange={e => setNewMessage(e.target.value)}
+            />
+            <button 
+              type="button"
+              className="p-1.5 rounded-full hover:bg-white/10 text-purple-400 transition-colors">
+              <Sparkles className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <button 
+            type="submit"
+            className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg shadow-purple-500/30 flex items-center justify-center transition-all active:scale-95">
+            <Send className="w-5 h-5" />
+          </button>
+        </form>
+      </footer>
+    </div>
+  );
+};
+
+// Create Circle Modal
+const CreateCircleModal = ({ onClose, onCircleCreated }) => {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/study-circles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Failed to create circle');
+      }
+
+      const newCircle = await response.json();
+      onCircleCreated(newCircle);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-gradient-to-br from-slate-900 to-purple-900/20 border border-purple-500/20 p-6 rounded-2xl max-w-md w-full shadow-2xl">
+        <h2 className="text-2xl font-bold mb-6 text-white">Create Study Circle</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Circle Name</label>
+            <input 
+              type="text" 
+              value={name} 
+              onChange={(e) => setName(e.target.value)} 
+              className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all" 
+              placeholder="e.g., Physics 101"
+              required 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+            <textarea 
+              value={description} 
+              onChange={(e) => setDescription(e.target.value)} 
+              className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all" 
+              rows={3}
+              placeholder="What's this circle about?"
+              required 
+            />
+          </div>
+          {error && <p className="text-red-400 text-sm bg-red-500/10 px-3 py-2 rounded-lg">{error}</p>}
+          <div className="flex justify-end gap-3 pt-2">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="px-6 py-3 rounded-xl bg-white/5 hover:bg-white/10 font-bold transition-colors">
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              disabled={isLoading} 
+              className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 font-bold disabled:opacity-50 transition-all shadow-lg shadow-purple-500/30">
+              {isLoading ? 'Creating...' : 'Create Circle'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Main Component with Suspense wrapper for useSearchParams
+function StudyCirclesContent() {
+  const [circles, setCircles] = useState([]);
+  const [selectedCircle, setSelectedCircle] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [session, setSession] = useState(null);
+
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchCircles = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/study-circles');
+      if (!response.ok) throw new Error('Network response was not ok');
+      const data = await response.json();
+      setCircles(data);
+
+      const inviteId = searchParams.get('id');
+      if (inviteId) {
+        const targetCircle = data.find(c => c.id === parseInt(inviteId));
+        if (targetCircle) {
+          setSelectedCircle(targetCircle);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch circles:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCircles();
+
+    const channel = supabase.channel('realtime:circles')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'study_circles' }, fetchCircles)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'circle_members' }, fetchCircles)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const handleCircleCreated = (newCircle) => {
+    const circleWithDetails = { ...newCircle, member_count: 1, is_member: true };
+    setCircles(prev => [circleWithDetails, ...prev]);
+    setSelectedCircle(circleWithDetails);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-gradient-to-br from-slate-950 via-purple-950/20 to-slate-950">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+          <p className="text-gray-400">Loading circles...</p>
+        </div>
+      </div>
     );
+  }
+
+  return (
+    <>
+      {selectedCircle ? (
+        <CircleChat 
+          circle={selectedCircle} 
+          onBack={() => setSelectedCircle(null)}
+          session={session}
+        />
+      ) : (
+        <CirclesDashboard 
+          circles={circles}
+          onSelectCircle={setSelectedCircle}
+          onNewCircle={() => setIsModalOpen(true)}
+          session={session}
+        />
+      )}
+      
+      {isModalOpen && (
+        <CreateCircleModal 
+          onClose={() => setIsModalOpen(false)} 
+          onCircleCreated={handleCircleCreated} 
+        />
+      )}
+    </>
+  );
 }
 
-
 export default function StudyCirclesPage() {
-    const [circles, setCircles] = useState([]);
-    const [selectedCircle, setSelectedCircle] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [processingId, setProcessingId] = useState(null);
-    const [session, setSession] = useState(null);
-
-    const searchParams = useSearchParams();
-    const router = useRouter();
-
-    useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-        });
-
-        return () => subscription.unsubscribe();
-    }, []);
-
-
-    const fetchCircles = async () => {
-        setIsLoading(true);
-        try {
-            const response = await fetch('/api/study-circles');
-            if (!response.ok) throw new Error('Network response was not ok');
-            const data = await response.json();
-            setCircles(data);
-
-            // Check for invite ID
-            const inviteId = searchParams.get('id');
-            if (inviteId) {
-                const targetCircle = data.find(c => c.id === inviteId);
-                if (targetCircle) {
-                    setSelectedCircle(targetCircle);
-                }
-            } else if (!selectedCircle && data.length > 0) {
-                // Only default select if no invite ID and no existing selection
-                setSelectedCircle(data[0]);
-            }
-        } catch (error) {
-            console.error("Failed to fetch circles:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchCircles();
-
-        const channel = supabase.channel('realtime:circles')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'study_circles' }, fetchCircles)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'circle_members' }, fetchCircles)
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, []);
-
-    const handleCircleCreated = (newCircle) => {
-        const circleWithDetails = { ...newCircle, member_count: 1, is_member: true };
-        setCircles(prev => [circleWithDetails, ...prev].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
-        setSelectedCircle(circleWithDetails);
-    };
-
-    const handleJoin = async (id) => {
-        setProcessingId(id);
-        // UI update is now handled by realtime subscription
-        try {
-            await fetch(`/api/study-circles/${id}/members`, { method: 'POST' });
-        } catch (error) {
-            console.error('Join error:', error);
-        }
-        setProcessingId(null);
-    };
-
-    const handleLeave = async (id) => {
-        setProcessingId(id);
-        // UI update is now handled by realtime subscription
-        if (selectedCircle && selectedCircle.id === id) {
-            setSelectedCircle(null);
-        }
-        try {
-            await fetch(`/api/study-circles/${id}/members`, { method: 'DELETE' });
-        } catch (error) {
-            console.error('Leave error:', error);
-        }
-        setProcessingId(null);
-    };
-
-    return (
-        <div className="flex h-screen bg-[#09090b] text-white">
-            {isLoading ? (
-                <div className="flex justify-center items-center w-full">
-                    <Loader2 className="h-12 w-12 animate-spin" />
-                </div>
-            ) : (
-                <>
-                    <CircleList
-                        circles={circles}
-                        onSelectCircle={setSelectedCircle}
-                        selectedCircle={selectedCircle}
-                        onJoin={handleJoin}
-                        onLeave={handleLeave}
-                        isProcessing={!!processingId}
-                        onNewCircle={() => setIsModalOpen(true)}
-                    />
-                    <CircleChat circle={selectedCircle} session={session} />
-                </>
-            )}
-
-            {isModalOpen && <CreateCircleModal onClose={() => setIsModalOpen(false)} onCircleCreated={handleCircleCreated} />}
-        </div>
-    );
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center h-screen bg-gradient-to-br from-slate-950 via-purple-950/20 to-slate-950">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+      </div>
+    }>
+      <StudyCirclesContent />
+    </Suspense>
+  );
 }

@@ -12,7 +12,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from '@/components/ui/Card';
 
 export default function LoginPage() {
   const supabase = createSupabaseBrowserClient();
@@ -57,7 +57,7 @@ export default function LoginPage() {
     }
 
     if (data.user) {
-      // Try to fetch profile metadata, but don’t break if missing
+      // Try to fetch profile metadata, but don't break if missing
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -144,7 +144,7 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter>
           <p className="text-sm text-center w-full">
-            Don’t have an account?{' '}
+            Don't have an account?{' '}
             <a
               href="/signup"
               className="font-semibold text-blue-600 hover:underline"

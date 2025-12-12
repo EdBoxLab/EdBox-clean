@@ -1,16 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { 
   Sparkles, Brain, Zap, Users, Target, BookOpen, 
   GraduationCap, Globe, Award, MessageCircle, 
-  ArrowRight, Check, Star 
+  ArrowRight, Check, Star, AlertCircle 
 } from 'lucide-react';
 
 export default function AboutPage() {
   const [hoveredFeature, setHoveredFeature] = useState<number | null>(null);
+  const [betaStatus, setBetaStatus] = useState<{
+    currentCount: number;
+    isFull: boolean;
+    remainingSpots: number;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/beta-status')
+      .then(res => res.json())
+      .then(data => setBetaStatus(data))
+      .catch(console.error);
+  }, []);
 
   const features = [
     {
@@ -99,6 +111,35 @@ export default function AboutPage() {
         </div>
       </nav>
 
+      {/* Beta Access Alert */}
+      {betaStatus && !betaStatus.isFull && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 w-full max-w-2xl px-4">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 backdrop-blur-xl border border-amber-500/30 rounded-2xl p-4 shadow-2xl"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-white">🎉 Beta Access Open!</h3>
+                <p className="text-sm text-zinc-300">
+                  Only <span className="font-bold text-amber-400">{betaStatus.remainingSpots}</span> spots remaining out of 100
+                </p>
+              </div>
+              <Link
+                href="/signup"
+                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-lg text-sm font-bold transition shadow-lg whitespace-nowrap"
+              >
+                Claim Spot
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
         {/* Animated background */}
@@ -115,7 +156,7 @@ export default function AboutPage() {
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-full mb-6">
               <Globe className="w-4 h-4 text-indigo-400" />
-              <span className="text-sm text-indigo-300 font-medium">Trusted by learners worldwide</span>
+              <span className="text-sm text-indigo-300 font-medium">Beta Access Now Open - Limited to First 100</span>
             </div>
 
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6">
@@ -131,12 +172,32 @@ export default function AboutPage() {
               Create personalized study materials, collaborate with peers, and achieve your goals faster.
             </p>
 
+            {betaStatus && (
+              <div className="mb-6">
+                {!betaStatus.isFull ? (
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/30 rounded-full">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    <span className="text-sm text-green-300 font-medium">
+                      {betaStatus.remainingSpots} / 100 Beta Spots Available
+                    </span>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-full">
+                    <AlertCircle className="w-4 h-4 text-amber-400" />
+                    <span className="text-sm text-amber-300 font-medium">
+                      Beta Full - Join Waitlist for Full Launch
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
                 href="/signup"
                 className="group flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl text-lg font-semibold transition shadow-2xl shadow-indigo-500/50"
               >
-                Get Started Free
+                {betaStatus?.isFull ? 'Join Waitlist' : 'Get Beta Access'}
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" />
               </Link>
               <Link
@@ -263,7 +324,9 @@ export default function AboutPage() {
                 Ready to Transform Your Learning?
               </h2>
               <p className="text-xl text-zinc-300 mb-8 max-w-2xl mx-auto">
-                Join thousands of students achieving their academic goals with EdBox
+                {betaStatus?.isFull 
+                  ? "Join our waitlist to get early access when we launch fully!" 
+                  : "Join the first 100 students to get exclusive beta access"}
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -271,7 +334,7 @@ export default function AboutPage() {
                   href="/signup"
                   className="group flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl text-lg font-semibold transition shadow-2xl shadow-indigo-500/50"
                 >
-                  Start Learning Now
+                  {betaStatus?.isFull ? 'Join Waitlist Now' : 'Start Learning Now'}
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" />
                 </Link>
                 <Link
@@ -284,7 +347,7 @@ export default function AboutPage() {
 
               <div className="flex items-center justify-center gap-2 mt-8 text-sm text-zinc-400">
                 <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                <span>Free forever · No credit card required</span>
+                <span>No credit card required · {betaStatus?.isFull ? 'Get notified at launch' : 'Limited beta spots available'}</span>
               </div>
             </div>
           </motion.div>

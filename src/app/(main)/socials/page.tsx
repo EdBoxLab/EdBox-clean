@@ -69,13 +69,7 @@ export default function SocialPage() {
       icon: MessageCircle,
       gradient: 'bg-gradient-to-br from-green-900/80 to-teal-900/80 border-green-500/30'
     },
-    {
-      title: 'Creator Profiles',
-      description: 'Follow your favorite creators, discover new content, and stay updated with the latest learning materials.',
-      href: '/socials/creator-profiles',
-      icon: Star,
-      gradient: 'bg-gradient-to-br from-purple-900/80 to-pink-900/80 border-purple-500/30'
-    }
+   
   ];
 
   return (

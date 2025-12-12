@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useParams } from 'next/navigation';
+import { XPStreakDisplay } from '@/components/XPStreakDisplay';
 
 // Mock Course Data - In a real app, this would be fetched based on the courseId
 const mockCourseData: { [key: string]: any } = {
@@ -26,7 +27,7 @@ const mockCourseData: { [key: string]: any } = {
     }
 };
 
-const ModuleItem = ({ module, isActive }: { module: any, isActive: boolean }) => (
+const ModuleItem = ({ module, isActive, isCompleted }: { module: any, isActive: boolean, isCompleted?: boolean }) => (
     <div className={`p-4 rounded-lg cursor-pointer transition-all ${isActive ? 'bg-purple-600/30' : 'hover:bg-gray-700/50'}`}>
         <p className={`font-bold ${isActive ? 'text-purple-300' : 'text-gray-300'}`}>{module.title}</p>
         <p className="text-sm text-gray-500">{module.type.charAt(0).toUpperCase() + module.type.slice(1)}</p>
@@ -38,8 +39,36 @@ export default function CoursePlayerPage() {
     const courseId = params.courseId as string;
     const course = mockCourseData[courseId];
 
-    // In a real app, you would have a state for the currently active module
     const [activeModuleId, setActiveModuleId] = React.useState('m1');
+    const [completedModules, setCompletedModules] = React.useState<string[]>([]);
+
+    const handleModuleComplete = async (moduleId: string) => {
+        if (completedModules.includes(moduleId)) return;
+
+        setCompletedModules([...completedModules, moduleId]);
+
+        // Award XP based on module type
+        const module = course.modules.find((m: any) => m.id === moduleId);
+        let xpAmount = 10;
+        
+        if (module?.type === 'challenge') xpAmount = 25;
+        if (module?.type === 'quiz') xpAmount = 20;
+        if (module?.type === 'video') xpAmount = 15;
+
+        try {
+            await fetch('/api/xp/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    xpGained: xpAmount,
+                    activity: `course_module_${module?.type}`,
+                    skillGraphId: courseId
+                })
+            });
+        } catch (error) {
+            console.error('Failed to update XP:', error);
+        }
+    };
 
     if (!course) {
         return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">Course not found.</div>;
@@ -53,10 +82,20 @@ export default function CoursePlayerPage() {
         <aside className="w-1/4 bg-gray-800 p-6 border-r border-gray-700">
             <h2 className="text-2xl font-bold mb-2">{course.title}</h2>
             <p className="text-sm text-gray-400 mb-6">By {course.creator}</p>
+            
+            {/* XP Display */}
+            <div className="mb-6">
+                <XPStreakDisplay showCompact={true} skillGraphId={courseId} />
+            </div>
+
             <div className="space-y-2">
                 {course.modules.map((module: any) => (
                     <div key={module.id} onClick={() => setActiveModuleId(module.id)}>
-                        <ModuleItem module={module} isActive={module.id === activeModuleId} />
+                        <ModuleItem 
+                            module={module} 
+                            isActive={module.id === activeModuleId}
+                            isCompleted={completedModules.includes(module.id)}
+                        />
                     </div>
                 ))}
             </div>
@@ -67,8 +106,22 @@ export default function CoursePlayerPage() {
             {activeModule ? (
                 <div>
                     <h1 className="text-4xl font-bold mb-4">{activeModule.title}</h1>
-                    <p className="text-xl text-gray-400">This is where the <span className="font-mono text-purple-400">{activeModule.type}</span> content will be rendered.</p>
-                    {/* Actual content renderer would go here */}
+                    <p className="text-xl text-gray-400 mb-8">
+                        This is where the <span className="font-mono text-purple-400">{activeModule.type}</span> content will be rendered.
+                    </p>
+
+                    {!completedModules.includes(activeModule.id) && (
+                        <button
+                            onClick={() => handleModuleComplete(activeModule.id)}
+                            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-bold transition-colors"
+                        >
+                            Mark as Complete
+                        </button>
+                    )}
+
+                    {completedModules.includes(activeModule.id) && (
+                        <div className="text-green-400 font-bold">✓ Completed</div>
+                    )}
                 </div>
             ) : (
                  <div className="flex items-center justify-center h-full">

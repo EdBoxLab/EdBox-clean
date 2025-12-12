@@ -16,6 +16,7 @@ import { SkeletonCard } from './SkeletonCard';
 import { GenieResponseView } from './GenieResponseView';
 import { ArticleView } from './ArticleView';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { XPStreakDisplay } from '@/components/XPStreakDisplay';
 
 interface FeedProps {
   preferences: UserPreferences;
@@ -187,7 +188,7 @@ useEffect(() => {
 
   return () => observer.current?.disconnect();
 }, [items, loading, loadMoreItems]);
-
+  
 
 const handleFeedback = async (id: string, feedback: Feedback) => {
   // Optimistic update
@@ -212,20 +213,29 @@ const handleSwipe = async (id: string, action: 'skip' | 'got_it' | 'answered', x
     await trackInteraction(user.id, id, action);
 
     if ((action === 'got_it' || action === 'answered') && xp) {
-      // Update XP locally or via RPC
-      const { error } = await supabase.rpc('increment_user_xp', {
-        p_user_id: user.id,
-        p_xp: xp
-      });
-      if (error) {
-        // Fallback if RPC doesn't exist yet, insert to stats table manually
-        // actually let's assume the migration created the table but we might not have the RPC
-        // We'll insert a record or update. For now relying on trackInteraction to be source of truth?
-        // The plan mentioned 'user_feed_stats'.
-        // Let's trying simple insert to 'user_feed_stats' or just log it.
-        // Ideally we have a Trigger in DB on 'user_feed_interactions' to update stats, 
-        // but for now let's just log success.
-        console.log(`XP gained: ${xp}`);
+      // Update XP using new API
+      try {
+        const response = await fetch('/api/xp/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            xpGained: xp,
+            activity: action === 'got_it' ? 'feed_complete' : 'feed_quiz_correct',
+            skillGraphId: 'default'
+          })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log(`✨ +${xp} XP! Level ${result.xp.level} | ${result.streak} day streak`);
+          
+          // Trigger confetti or level up notification if needed
+          if (result.xp.leveledUp) {
+            console.log('🎉 LEVEL UP!');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to update XP:', error);
       }
     }
   }
@@ -330,6 +340,12 @@ if (loading && items.length === 0) {
 return (
   <>
     <FeedAnimations />
+    
+    {/* XP and Streak Display at top */}
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-40">
+      <XPStreakDisplay showCompact={true} />
+    </div>
+
     <div
       ref={feedRef}
       className="h-full w-full overflow-y-auto snap-y snap-mandatory scroll-smooth bg-gray-950 no-scrollbar"

@@ -1,99 +1,115 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-function getSupabaseClient(request: NextRequest) {
-  return createServerClient({
-    cookies: {
-      get: (name: string) => request.cookies.get(name)?.value,
-      set: (name: string, value: string, options: any) =>
-        request.cookies.set({ name, value, ...options }),
-      remove: (name: string, options: any) =>
-        request.cookies.delete({ name, ...options }),
-    },
-  });
+const supabase = createServerClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// ----------------------
+//  UTILS
+// ----------------------
+function extractJSON(text: string) {
+  try {
+    const fenced = text.match(/```json([\s\S]*?)```/i);
+    const raw = fenced ? fenced[1] : text;
+    return JSON.parse(
+      raw
+        .replace(/^[\s\n]*```(\w+)?|```$/g, "")
+        .replace(/\n/g, "")
+        .replace(/,\s*}/g, "}")
+        .replace(/,\s*]/g, "]")
+        .trim()
+    );
+  } catch {
+    return text; // fallback
+  }
 }
 
+function buildPrompt(type: string, prompt: string) {
+  const base = `Base content:\n"${prompt}"\n\n`;
+  switch (type) {
+    case "quizzes":
+      return base + `Generate EXACTLY 5 MCQ questions as strict JSON array.`;
+    case "flashcards":
+      return base + `Generate EXACTLY 10 flashcards as strict JSON array.`;
+    case "mindmaps":
+      return base + `Generate a mindmap in strict JSON format.`;
+    case "notes":
+      return base + `Generate structured notes in markdown headings.`;
+  }
+}
+
+// Retry wrapper for transient errors
+async function retry<T>(fn: () => Promise<T>, attempts = 2, delay = 500) {
+  let lastError: any;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      await new Promise((res) => setTimeout(res, delay));
+    }
+  }
+  throw lastError;
+}
+
+// ----------------------
+//  ROUTE HANDLER
+// ----------------------
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabaseClient(request);
-
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { prompt, contentTypes, fileName } = await request.json();
+    if (!prompt || !contentTypes?.length)
+      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
-    if (!prompt || !contentTypes || contentTypes.length === 0) {
-      return NextResponse.json(
-        { error: 'Prompt and content types are required' },
-        { status: 400 }
-      );
-    }
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-pro-latest",
+      temperature: 0.7,
+      reasoning: true
+    });
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    const generatedContent: any = {};
+    // ----------------------
+    // Parallel & cached generation
+    // ----------------------
+    const results = await Promise.all(
+      contentTypes.map(async (type: string) => {
+        const key = `cache:${session.user.id}:${type}:${prompt.slice(0, 50)}`;
+        // check cache (you can implement Redis or Supabase KV here)
+        // const cached = await getCache(key);
+        const cached = null;
+        if (cached) return { type, content: cached };
 
-    for (const type of contentTypes) {
-      let typePrompt = '';
+        const output = await retry(async () => {
+          const r = await model.generateText({ prompt: buildPrompt(type, prompt) });
+          return type === "notes" ? r.text() : extractJSON(r.text());
+        }, 3, 500);
 
-      switch (type) {
-        case 'quizzes':
-          typePrompt = `Generate 5 multiple-choice quiz questions based on this content: "${prompt}". 
-          Format as JSON array with structure: [{ question: string, options: string[], correctAnswer: number }]`;
-          break;
+        // set cache here if using Redis/Supabase KV
+        // await setCache(key, output, 3600);
 
-        case 'flashcards':
-          typePrompt = `Generate 10 flashcards based on this content: "${prompt}". 
-          Format as JSON array with structure: [{ front: string, back: string }]`;
-          break;
+        return { type, content: output };
+      })
+    );
 
-        case 'notes':
-          typePrompt = `Create comprehensive study notes based on this content: "${prompt}". 
-          Include main points, key concepts, and important details. Format as structured text with headings.`;
-          break;
-
-        case 'mindmaps':
-          typePrompt = `Create a mind map structure based on this content: "${prompt}". 
-          Format as JSON with structure: { central: string, branches: [{ topic: string, subtopics: string[] }] }`;
-          break;
-      }
-
-      try {
-        const result = await model.generateContent(typePrompt);
-        const response = result.response.text();
-
-        if (type === 'quizzes' || type === 'flashcards' || type === 'mindmaps') {
-          try {
-            const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/) ||
-              response.match(/```\n([\s\S]*?)\n```/);
-            const jsonText = jsonMatch ? jsonMatch[1] : response;
-            generatedContent[type] = JSON.parse(jsonText);
-          } catch {
-            generatedContent[type] = response;
-          }
-        } else {
-          generatedContent[type] = response;
-        }
-      } catch (genError) {
-        console.error(`Error generating ${type}:`, genError);
-        generatedContent[type] = `Error generating ${type}`;
-      }
-    }
+    const generatedContent = Object.fromEntries(results.map(r => [r.type, r.content]));
 
     const { data: studyKit, error: dbError } = await supabase
-      .from('study_kit_content')
+      .from("study_kit_content")
       .insert({
         user_id: session.user.id,
         title: prompt.slice(0, 100),
-        source_type: fileName ? 'file' : 'text',
+        source_type: fileName ? "file" : "text",
         source_content: prompt,
         file_name: fileName || null,
         content_types: contentTypes,
-        generated_content: generatedContent,
+        generated_content: generatedContent
       })
       .select()
       .single();
@@ -102,43 +118,34 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      content: generatedContent,
       id: studyKit.id,
+      content: generatedContent
     });
 
-  } catch (error) {
-    console.error('Study Kit generation error:', error);
+  } catch (error: any) {
+    console.error("UltraMode POST Error:", error);
     return NextResponse.json(
-      { error: 'Failed to generate study kit' },
+      { error: "Failed to generate study kit", details: error?.message },
       { status: 500 }
     );
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const supabase = getSupabaseClient(request);
-
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { data: studyKits, error } = await supabase
-      .from('study_kit_content')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from("study_kit_content")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .order("created_at", { ascending: false });
 
     if (error) throw error;
-
-    return NextResponse.json({ studyKits });
-
+    return NextResponse.json({ studyKits: data });
   } catch (error) {
-    console.error('Study Kit GET error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch study kits' },
-      { status: 500 }
-    );
+    console.error("UltraMode GET Error:", error);
+    return NextResponse.json({ error: "Failed to fetch", details: error?.message }, { status: 500 });
   }
 }

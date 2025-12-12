@@ -84,7 +84,7 @@ export default function CoursesPage() {
             <h2 className="text-2xl font-bold mb-4">No courses yet</h2>
             <p className="text-gray-400 mb-8">Start your first learning path to begin your journey</p>
             <button
-              onClick={() => router.push('/onboarding')}
+              onClick={() => router.push('/creator')}
               className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-colors inline-flex items-center gap-2"
             >
               <Plus className="w-5 h-5" />

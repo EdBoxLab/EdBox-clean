@@ -249,7 +249,7 @@ const Dashboard: React.FC = () => {
         ) : (
           <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-8 text-center">
             <p className="text-gray-400 mb-4">You haven't enrolled in any courses yet.</p>
-            <Link href="/learning-path/create" className="inline-flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
+            <Link href="/creator" className="inline-flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
               <Plus className="w-4 h-4" /> Create Your First Course
             </Link>
           </div>

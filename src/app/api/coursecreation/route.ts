@@ -124,12 +124,12 @@ async function retryWithBackoff<T>(
     try {
       return await fn();
     } catch (error: any) {
-      const isRateLimitError = 
-        error?.message?.includes('429') || 
+      const isRateLimitError =
+        error?.message?.includes('429') ||
         error?.message?.includes('RESOURCE_EXHAUSTED');
-      
+
       const isLastAttempt = attempt === maxRetries - 1;
-      
+
       if (isLastAttempt || !isRateLimitError) {
         throw error;
       }
@@ -161,7 +161,7 @@ async function analyzeGoal(
   recommendedEngine: EngineType;
 }> {
   const ai = createAI();
-  
+
   const systemPrompt = `Role: {Act as an expert learning path designer for Gen Z students (16–24). You are not just a planner, but a motivational architect who designs practical, build-focused learning journeys.}
 
 Expertise: {Analyze user goals deeply, translate vague ambitions into specific skills, and map them to the right domain, proficiency level, realistic time estimate, and best engine. Always optimize for bite-sized (2–5 min) micro-skills, mobile-first learning, and building tangible outcomes.}
@@ -184,8 +184,8 @@ Engagement Rules:
 Return: {Valid JSON object with keys: actual_goal, domain, target_proficiency, time_estimate_hours, best_engine.}
 `;
 
-  const fileContext = uploadedFileContent 
-    ? `\n\nUploaded document context: ${uploadedFileContent.substring(0, 3000)}` 
+  const fileContext = uploadedFileContent
+    ? `\n\nUploaded document context: ${uploadedFileContent.substring(0, 3000)}`
     : '';
 
   return retryWithBackoff(async () => {
@@ -208,7 +208,7 @@ Return: {Valid JSON object with keys: actual_goal, domain, target_proficiency, t
         }
       }
     });
-    
+
     return JSON.parse(response.text);
   });
 }
@@ -236,19 +236,19 @@ async function generateSkillGraph(
 - More scaffolding in early skills
 - Focus on portfolio building for college apps
 - Include fun, shareable projects`,
-    
+
     [LearningContext.College]: `
 - Assume some technical background
 - Focus on internship-ready skills
 - Include hackathon-worthy projects
 - Career-oriented outcomes`,
-    
+
     [LearningContext.JobSeeking]: `
 - Interview-focused skills
 - Industry-standard projects
 - Resume-worthy outcomes
 - Fast-track to job readiness`,
-    
+
     [LearningContext.BuildingProjects]: `
 - Emphasize shipping and launching
 - MVP-focused projects
@@ -380,11 +380,11 @@ Respond ONLY with valid JSON.`;
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { 
-      goal, 
-      context = LearningContext.College, 
+    const {
+      goal,
+      context = LearningContext.College,
       timeAvailable,
-      uploadedFile 
+      uploadedFile
     } = body;
 
     // Validation
@@ -402,7 +402,7 @@ export async function POST(request: NextRequest) {
     // Get user ID from auth
     const supabase = await createSupabaseServerClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -418,7 +418,7 @@ export async function POST(request: NextRequest) {
       timeAvailable,
       uploadedFile?.content
     );
-    
+
     console.log(`✅ Analysis complete:`, {
       domain: analysis.domain,
       engine: analysis.recommendedEngine,
@@ -460,7 +460,7 @@ export async function POST(request: NextRequest) {
     // STEP 4: Initialize learner state
     console.log('👤 Step 3: Initializing learner state...');
     const allSkills = skillGraphData.skillPaths.flatMap(path => path.skills);
-    
+
     const skillMastery: LearnerState['skillMastery'] = {};
     allSkills.forEach(skill => {
       skillMastery[skill.id] = {
@@ -488,7 +488,7 @@ export async function POST(request: NextRequest) {
 
     // STEP 5: Save to database
     console.log('💾 Step 4: Saving to database...');
-    
+
     const { error: graphError } = await supabase
       .from('skill_graphs')
       .insert([skillGraph]);
@@ -530,7 +530,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error('❌ Learning path generation failed:', error);
-    
+
     return NextResponse.json({
       success: false,
       error: error.message || 'Failed to generate learning path',
@@ -549,20 +549,20 @@ export async function GET(request: NextRequest) {
     // Health check endpoint
     try {
       const keysAvailable = API_KEYS.length;
-      return NextResponse.json({ 
-        success: true, 
+      return NextResponse.json({
+        success: true,
         keysAvailable,
         message: `${keysAvailable} API key(s) configured`
       });
     } catch (error) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'No API keys configured' 
+      return NextResponse.json({
+        success: false,
+        error: 'No API keys configured'
       }, { status: 500 });
     }
   }
 
-  return NextResponse.json({ 
-    error: 'Invalid action. Use POST to generate learning paths.' 
+  return NextResponse.json({
+    error: 'Invalid action. Use POST to generate learning paths.'
   }, { status: 400 });
 }

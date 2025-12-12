@@ -1,23 +1,32 @@
+// app/api/notes/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
+// Helper function to create Supabase client for route handlers
+function createClient(request: NextRequest) {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll().map(cookie => ({
+            name: cookie.name,
+            value: cookie.value,
+          }));
+        },
+        setAll(cookiesToSet) {
+          // In route handlers with NextRequest, we can't set cookies
+          // They're read-only. Cookie setting happens in middleware.
+        },
+      },
+    }
+  );
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerClient(
-      {
-        cookies: {
-          get(name: string) {
-            return request.cookies.get(name)?.value;
-          },
-          set(name: string, value: string, options: any) {
-            request.cookies.set({ name, value, ...options });
-          },
-          remove(name: string, options: any) {
-            request.cookies.delete({ name, ...options });
-          },
-        },
-      }
-    );
+    const supabase = createClient(request);
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -41,15 +50,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerClient({
-      cookies: {
-        get: (name: string) => request.cookies.get(name)?.value,
-        set: (name: string, value: string, options: any) =>
-          request.cookies.set({ name, value, ...options }),
-        remove: (name: string, options: any) =>
-          request.cookies.delete({ name, ...options }),
-      },
-    });
+    const supabase = createClient(request);
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -59,7 +60,10 @@ export async function POST(request: NextRequest) {
     const { title, content } = await request.json();
 
     if (!title || !content) {
-      return NextResponse.json({ error: 'Title and content are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Title and content are required' },
+        { status: 400 }
+      );
     }
 
     const { data: note, error } = await supabase
@@ -77,21 +81,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ note });
   } catch (error) {
     console.error('Notes POST error:', error);
-    return NextResponse.json({ error: 'Failed to create note' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to create note' },
+      { status: 500 }
+    );
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = createServerClient({
-      cookies: {
-        get: (name: string) => request.cookies.get(name)?.value,
-        set: (name: string, value: string, options: any) =>
-          request.cookies.set({ name, value, ...options }),
-        remove: (name: string, options: any) =>
-          request.cookies.delete({ name, ...options }),
-      },
-    });
+    const supabase = createClient(request);
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -101,7 +100,10 @@ export async function PUT(request: NextRequest) {
     const { id, title, content } = await request.json();
 
     if (!id || !title || !content) {
-      return NextResponse.json({ error: 'ID, title, and content are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'ID, title, and content are required' },
+        { status: 400 }
+      );
     }
 
     const { data: note, error } = await supabase
@@ -117,21 +119,16 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ note });
   } catch (error) {
     console.error('Notes PUT error:', error);
-    return NextResponse.json({ error: 'Failed to update note' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to update note' },
+      { status: 500 }
+    );
   }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = createServerClient({
-      cookies: {
-        get: (name: string) => request.cookies.get(name)?.value,
-        set: (name: string, value: string, options: any) =>
-          request.cookies.set({ name, value, ...options }),
-        remove: (name: string, options: any) =>
-          request.cookies.delete({ name, ...options }),
-      },
-    });
+    const supabase = createClient(request);
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -142,7 +139,10 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
 
     if (!id) {
-      return NextResponse.json({ error: 'Note ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Note ID is required' },
+        { status: 400 }
+      );
     }
 
     const { error } = await supabase
@@ -156,6 +156,9 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Notes DELETE error:', error);
-    return NextResponse.json({ error: 'Failed to delete note' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to delete note' },
+      { status: 500 }
+    );
   }
 }

@@ -11,40 +11,45 @@ export async function GET(request: Request) {
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    console.log('Env check:', {
-  hasPublicUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-  hasPublicKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  hasUrl: !!process.env.SUPABASE_URL,
-  hasKey: !!process.env.SUPABASE_ANON_KEY
-});
-    // ✅ Changed from 'circles' to 'study_circles'
-    const { data: allCircles, error: allCirclesError } = await supabase
-      .from('study_circles')
-      .select('id, name, description, created_at, creator_id')
-      .order('created_at', { ascending: false });
 
-    if (allCirclesError) {
-      console.error('All circles fetch error:', allCirclesError);
-      return NextResponse.json({ error: 'Failed to fetch circles' }, { status: 500 });
-    }
-
-    // Get member counts for all circles
-    const { data: memberCounts, error: memberCountsError } = await supabase
-      .from('circle_members')
-      .select('circle_id');
-
-    if (memberCountsError) {
-      console.error('Member counts error:', memberCountsError);
-    }
-
-    // Get circles the user is a member of
+    // Get only circles where user is a member
     const { data: userMemberships, error: membershipsError } = await supabase
       .from('circle_members')
-      .select('circle_id')
+      .select('circle_id, is_admin')
       .eq('user_id', user.id);
 
     if (membershipsError) {
       console.error('Memberships error:', membershipsError);
+      return NextResponse.json({ error: 'Failed to fetch memberships' }, { status: 500 });
+    }
+
+    if (!userMemberships || userMemberships.length === 0) {
+      return NextResponse.json([], { status: 200 });
+    }
+
+    const circleIds = userMemberships.map(m => m.circle_id);
+    const adminMap = new Map(userMemberships.map(m => [m.circle_id, m.is_admin]));
+
+    // Fetch only circles user is a member of
+    const { data: circles, error: circlesError } = await supabase
+      .from('study_circles')
+      .select('id, name, description, created_at, creator_id, invite_code')
+      .in('id', circleIds)
+      .order('created_at', { ascending: false });
+
+    if (circlesError) {
+      console.error('Circles fetch error:', circlesError);
+      return NextResponse.json({ error: 'Failed to fetch circles' }, { status: 500 });
+    }
+
+    // Get member counts for circles
+    const { data: memberCounts, error: memberCountsError } = await supabase
+      .from('circle_members')
+      .select('circle_id')
+      .in('circle_id', circleIds);
+
+    if (memberCountsError) {
+      console.error('Member counts error:', memberCountsError);
     }
 
     // Create a map of member counts
@@ -53,14 +58,12 @@ export async function GET(request: Request) {
       countMap[m.circle_id] = (countMap[m.circle_id] || 0) + 1;
     });
 
-    // Create a set of circles the user is a member of
-    const userCircleIds = new Set(userMemberships?.map(m => m.circle_id) || []);
-
-    // Enrich circles with member_count and is_member
-    const enrichedCircles = allCircles?.map(circle => ({
+    // Enrich circles with member_count, is_member, and is_admin
+    const enrichedCircles = circles?.map(circle => ({
       ...circle,
       member_count: countMap[circle.id] || 0,
-      is_member: userCircleIds.has(circle.id),
+      is_member: true,
+      is_admin: adminMap.get(circle.id) || false,
     })) || [];
 
     return NextResponse.json(enrichedCircles, { 
@@ -96,13 +99,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Circle name is required' }, { status: 400 });
     }
 
-    // ✅ Changed from 'circles' to 'study_circles'
+    // Generate unique invite code
+    const { data: inviteCodeData, error: inviteCodeError } = await supabase
+      .rpc('generate_invite_code');
+
+    if (inviteCodeError) {
+      console.error('Generate invite code error:', inviteCodeError);
+      return NextResponse.json({ error: 'Failed to generate invite code' }, { status: 500 });
+    }
+
+    // Create circle with invite code
     const { data: newCircle, error: createError } = await supabase
       .from('study_circles')
       .insert([{ 
         name: name.trim(), 
         description: description?.trim() || null,
-        creator_id: user.id 
+        creator_id: user.id,
+        invite_code: inviteCodeData
       }])
       .select()
       .single();
@@ -112,16 +125,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to create circle' }, { status: 500 });
     }
 
-    // Add creator as a member
+    // Add creator as admin member
     const { error: memberError } = await supabase
       .from('circle_members')
       .insert([{ 
         circle_id: newCircle.id, 
-        user_id: user.id 
+        user_id: user.id,
+        is_admin: true
       }]);
 
     if (memberError) {
-      console.error('Add creator as member error:', memberError);
+      console.error('Add creator as admin error:', memberError);
+      return NextResponse.json({ error: 'Failed to add creator as admin' }, { status: 500 });
     }
 
     return NextResponse.json(newCircle, { 

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Users, Star, ArrowRight } from 'lucide-react';
+import { Users, Star, ArrowRight, MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const cardVariants = {
@@ -61,6 +61,13 @@ export default function SocialPage() {
       href: '/socials/study-circles',
       icon: Users,
       gradient: 'bg-gradient-to-br from-blue-900/80 to-cyan-900/80 border-blue-500/30'
+    },
+    {
+      title: 'Messages',
+      description: 'Connect directly with circle members and friends. Send messages, share content, and collaborate in real-time.',
+      href: '/socials/inbox',
+      icon: MessageCircle,
+      gradient: 'bg-gradient-to-br from-green-900/80 to-teal-900/80 border-green-500/30'
     },
     {
       title: 'Creator Profiles',

@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Type } from "@google/genai";
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { generateWithRetry } from '@/lib/ai-providers';
+import { detectCourseCategory, injectTemplateIntoPrompt, type CourseCategory } from './templates';
+import { checkCache, saveToCache } from '@/lib/ai-cache';
 
 // ============= TYPES =============
 
@@ -160,6 +162,7 @@ async function analyzeGoal(
   targetProficiency: string;
   estimatedTotalHours: number;
   recommendedEngine: EngineType;
+  category: CourseCategory;
 }> {
   const systemPrompt = `Role: {Act as an expert learning path designer for Gen Z students (16–24). You are not just a planner, but a motivational architect who designs practical, build-focused learning journeys.}
 
@@ -207,7 +210,10 @@ Return: {Valid JSON object with keys: actual_goal, domain, target_proficiency, t
     maxTokens: 4000,
   });
 
-  return JSON.parse(result.text);
+  const parsed = JSON.parse(result.text);
+  const category = detectCourseCategory(parsed.parsedGoal, parsed.domain);
+  
+  return { ...parsed, category };
 }
 
 /**
@@ -218,7 +224,8 @@ async function generateSkillGraph(
   domain: string,
   context: LearningContext,
   targetProficiency: string,
-  primaryEngine: EngineType
+  primaryEngine: EngineType,
+  category: CourseCategory
 ): Promise<{
   skillPaths: SkillPath[];
   miniProjects: MiniProject[];
@@ -251,7 +258,7 @@ async function generateSkillGraph(
 - Full-stack capabilities`
   };
 
-  const systemPrompt = `You are an expert curriculum designer for Gen Z learners.
+  const basePrompt = `You are an expert curriculum designer for Gen Z learners.
 
 Create a skill graph with MICRO-SKILLS (2-5 minutes each).
 
@@ -281,6 +288,8 @@ Micro-skill naming: Be SPECIFIC and ACTION-oriented
 Each skill unlocks when prerequisites are mastered.
 
 Respond ONLY with valid JSON.`;
+
+  const systemPrompt = injectTemplateIntoPrompt(basePrompt, category);
 
   const schema = {
     type: Type.OBJECT,
@@ -381,7 +390,6 @@ export async function POST(request: NextRequest) {
       uploadedFile
     } = body;
 
-    // Validation
     if (!goal || typeof goal !== 'string' || goal.trim().length === 0) {
       return NextResponse.json(
         { error: 'Goal is required and must be a non-empty string' },
@@ -393,7 +401,6 @@ export async function POST(request: NextRequest) {
     console.log(`📝 Goal: "${goal}"`);
     console.log(`👤 Context: ${context}`);
 
-    // Get user ID from auth
     const supabase = await createSupabaseServerClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -404,7 +411,70 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // STEP 1: Analyze goal
+    const cached = await checkCache({
+      requestType: 'course_generation',
+      requestData: { goal, context, timeAvailable },
+    });
+
+    if (cached && cached.responseData) {
+      console.log('📦 Returning cached course');
+      
+      const cachedGraph = {
+        ...cached.responseData.skillGraph,
+        id: `sg_${Date.now()}_${user.id.substring(0, 8)}`,
+        userId: user.id,
+        createdAt: new Date().toISOString(),
+      };
+
+      const allSkills = cachedGraph.skillPaths.flatMap((path: any) => path.skills);
+      const skillMastery: LearnerState['skillMastery'] = {};
+      allSkills.forEach((skill: any) => {
+        skillMastery[skill.id] = {
+          confidence: 0.0,
+          challengesCompleted: 0,
+          successRate: 0.0,
+          timeSpent: 0,
+          lastPracticed: null,
+          isMastered: false
+        };
+      });
+
+      const learnerState: LearnerState = {
+        id: `ls_${Date.now()}_${user.id.substring(0, 8)}`,
+        userId: user.id,
+        skillGraphId: cachedGraph.id,
+        skillMastery,
+        currentSkill: null,
+        streak: 0,
+        totalXP: 0,
+        level: 1,
+        badges: [],
+        startedAt: new Date().toISOString()
+      };
+
+      await supabase.from('skill_graphs').insert([cachedGraph]);
+      await supabase.from('learner_states').insert([learnerState]);
+
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        similarity: cached.similarity,
+        skillGraph: {
+          ...cachedGraph,
+          readySkills: allSkills.filter((s: any) => s.prerequisites.length === 0).length,
+          totalProjects: cachedGraph.miniProjects.length + 1,
+        },
+        learnerState: {
+          id: learnerState.id,
+          totalSkills: allSkills.length,
+          masteredSkills: 0,
+          currentLevel: 1,
+          totalXP: 0,
+          streak: 0
+        }
+      });
+    }
+
     console.log('🧠 Step 1: Analyzing goal...');
     const analysis = await analyzeGoal(
       goal,
@@ -416,20 +486,20 @@ export async function POST(request: NextRequest) {
     console.log(`✅ Analysis complete:`, {
       domain: analysis.domain,
       engine: analysis.recommendedEngine,
+      category: analysis.category,
       hours: analysis.estimatedTotalHours
     });
 
-    // STEP 2: Generate skill graph
     console.log('🗺️ Step 2: Generating skill graph...');
     const skillGraphData = await generateSkillGraph(
       analysis.parsedGoal,
       analysis.domain,
       context,
       analysis.targetProficiency,
-      analysis.recommendedEngine as EngineType
+      analysis.recommendedEngine as EngineType,
+      analysis.category
     );
 
-    // Count total skills
     const totalSkills = skillGraphData.skillPaths.reduce(
       (sum, path) => sum + path.skills.length,
       0
@@ -437,7 +507,6 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Skill graph generated: ${totalSkills} micro-skills`);
 
-    // STEP 3: Build final skill graph
     const skillGraph: SkillGraph = {
       id: `sg_${Date.now()}_${user.id.substring(0, 8)}`,
       userId: user.id,
@@ -451,7 +520,6 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString()
     };
 
-    // STEP 4: Initialize learner state
     console.log('👤 Step 3: Initializing learner state...');
     const allSkills = skillGraphData.skillPaths.flatMap(path => path.skills);
 
@@ -472,7 +540,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       skillGraphId: skillGraph.id,
       skillMastery,
-      currentSkill: null, // Will be set when user starts first session
+      currentSkill: null,
       streak: 0,
       totalXP: 0,
       level: 1,
@@ -480,7 +548,6 @@ export async function POST(request: NextRequest) {
       startedAt: new Date().toISOString()
     };
 
-    // STEP 5: Save to database
     console.log('💾 Step 4: Saving to database...');
 
     const { error: graphError } = await supabase
@@ -501,16 +568,34 @@ export async function POST(request: NextRequest) {
       throw new Error(`Database error: ${stateError.message}`);
     }
 
+    await saveToCache(
+      {
+        requestType: 'course_generation',
+        requestData: { goal, context, timeAvailable },
+        category: analysis.category,
+      },
+      {
+        skillGraph: {
+          goal: skillGraph.goal,
+          context: skillGraph.context,
+          totalSkills: skillGraph.totalSkills,
+          estimatedHours: skillGraph.estimatedHours,
+          skillPaths: skillGraph.skillPaths,
+          miniProjects: skillGraph.miniProjects,
+          capstoneProject: skillGraph.capstoneProject,
+        },
+      }
+    );
+
     console.log('✅ Learning path generated successfully!');
 
-    // STEP 6: Return response
     return NextResponse.json({
       success: true,
+      cached: false,
       skillGraph: {
         ...skillGraph,
-        // Add some UI-friendly computed properties
         readySkills: allSkills.filter(s => s.prerequisites.length === 0).length,
-        totalProjects: skillGraphData.miniProjects.length + 1, // +1 for capstone
+        totalProjects: skillGraphData.miniProjects.length + 1,
       },
       learnerState: {
         id: learnerState.id,

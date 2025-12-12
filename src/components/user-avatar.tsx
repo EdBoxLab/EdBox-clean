@@ -1,7 +1,7 @@
 'use client';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { supabase } from '../../lib/supabase/client';
+import { supabase } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
 
 type User = Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'];

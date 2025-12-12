@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useToast } from '@/components/ui/use-toast';
 import { type User } from '@supabase/supabase-js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';

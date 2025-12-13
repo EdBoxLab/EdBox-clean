@@ -19,8 +19,7 @@ const Dashboard: React.FC = () => {
   const [recentCourse, setRecentCourse] = useState<any>(null);
 
   const tools = [
-    { id: 't1', title: 'Research Assistant', type: 'Tool', href: '/research-assistant', icon: <Layout className="w-8 h-8 text-blue-300" /> },
-    { id: 't2', title: 'Note Taker', type: 'Tool', href: '/tools/notes', icon: <FileText className="w-8 h-8 text-green-300" /> },
+        { id: 't2', title: 'Note Taker', type: 'Tool', href: '/tools/notes', icon: <FileText className="w-8 h-8 text-green-300" /> },
     { id: 't3', title: 'Study Kit', type: 'Tool', href: '/tools/study-kit', icon: <Zap className="w-8 h-8 text-yellow-300" /> },
   ];
 

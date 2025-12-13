@@ -11,16 +11,6 @@ import {
 
 const tools = [
   {
-    id: 'research-assistant',
-    href: '/research-assistant',
-    title: 'Research Assistant',
-    description: 'Your AI-powered research assistant.',
-    icon: AcademicCapIcon,
-    gradient: 'from-blue-600/20 to-cyan-600/20',
-    iconColor: 'text-blue-400',
-    borderHover: 'hover:border-blue-500',
-  },
-  {
     id: 'notes',
     href: '/notes',
     title: 'Notes',

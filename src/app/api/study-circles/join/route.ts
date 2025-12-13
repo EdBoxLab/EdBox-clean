@@ -1,31 +1,36 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient();
 
+    // Get authenticated user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { invite_code } = await request.json();
+    // Parse request body
+    const body = await request.json();
+    const invite_code = body?.invite_code?.trim().toUpperCase();
 
-    if (!invite_code || invite_code.trim() === '') {
+    if (!invite_code) {
       return NextResponse.json({ error: 'Invite code is required' }, { status: 400 });
     }
 
+    // Find circle by invite code
     const { data: circle, error: circleError } = await supabase
       .from('study_circles')
       .select('id, name')
-      .eq('invite_code', invite_code.trim().toUpperCase())
+      .eq('invite_code', invite_code)
       .single();
 
     if (circleError || !circle) {
       return NextResponse.json({ error: 'Invalid invite code' }, { status: 404 });
     }
 
+    // Check if user is already a member
     const { data: existingMember, error: checkError } = await supabase
       .from('circle_members')
       .select('user_id')
@@ -46,6 +51,7 @@ export async function POST(request: Request) {
       }, { status: 200 });
     }
 
+    // Add user to circle
     const { error: insertError } = await supabase
       .from('circle_members')
       .insert({

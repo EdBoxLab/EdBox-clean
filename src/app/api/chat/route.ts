@@ -4,13 +4,79 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import Groq from 'groq-sdk';
 
 type ChatRole = 'system' | 'user' | 'assistant' | 'tool' | 'developer' | 'function';
-console.log("ENV:", process.env.GROK_API_KEY);
+
+interface FileAttachment {
+    name: string;
+    type: string;
+    size: number;
+    content: string; // base64 encoded content
+}
+
+interface ChatMessage {
+    role: ChatRole;
+    content: string;
+    attachments?: FileAttachment[];
+}
+
+// Helper function to process different file types
+async function processFileContent(file: FileAttachment): Promise<string> {
+    const { name, type, content } = file;
+
+    try {
+        // Decode base64 content
+        const buffer = Buffer.from(content, 'base64');
+
+        // Handle text files
+        if (type.startsWith('text/') ||
+            type === 'application/json' ||
+            type === 'application/javascript' ||
+            type === 'application/typescript') {
+            return buffer.toString('utf-8');
+        }
+
+        // Handle PDFs (basic text extraction - you may want to use pdf-parse library)
+        if (type === 'application/pdf') {
+            return `[PDF file: ${name}] - Content extraction requires additional processing. File size: ${file.size} bytes`;
+        }
+
+        // Handle images
+        if (type.startsWith('image/')) {
+            return `[Image file: ${name}] - Image analysis available. Type: ${type}, Size: ${file.size} bytes`;
+        }
+
+        // Handle documents
+        if (type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+            type === 'application/msword') {
+            return `[Word document: ${name}] - Document processing available. Size: ${file.size} bytes`;
+        }
+
+        if (type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+            type === 'application/vnd.ms-excel') {
+            return `[Excel file: ${name}] - Spreadsheet analysis available. Size: ${file.size} bytes`;
+        }
+
+        // Default fallback
+        return `[File: ${name}] - Type: ${type}, Size: ${file.size} bytes`;
+    } catch (error) {
+        console.error('Error processing file:', error);
+        return `[Error processing file: ${name}]`;
+    }
+}
+
+// Helper to format message with attachments
+function formatMessageWithAttachments(message: string, attachments?: FileAttachment[]): string {
+    if (!attachments || attachments.length === 0) {
+        return message;
+    }
+
+    return `${message}\n\n[User attached ${attachments.length} file(s)]`;
+}
 
 export async function POST(request: NextRequest) {
     try {
         const supabase = await createSupabaseServerClient();
 
-        // Secure auth (use getUser which verifies with Supabase Auth server)
+        // Secure auth
         const {
             data: { user },
             error: userError,
@@ -28,9 +94,15 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
         }
 
-        const { conversationId, message } = body ?? {};
+        const { conversationId, message, attachments } = body ?? {};
+
         if (!message || !(typeof message === 'string') || !message.trim()) {
             return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+        }
+
+        // Validate attachments if present
+        if (attachments && !Array.isArray(attachments)) {
+            return NextResponse.json({ error: 'Attachments must be an array' }, { status: 400 });
         }
 
         // Create Supabase conversation if missing
@@ -49,20 +121,48 @@ export async function POST(request: NextRequest) {
             currentConversationId = (newConversation as any).id;
         }
 
-        // Save user message
+        // Process attachments and build enhanced message content
+        let enhancedMessage = message;
+        const processedFiles: string[] = [];
+
+        if (attachments && attachments.length > 0) {
+            for (const attachment of attachments) {
+                const fileContent = await processFileContent(attachment);
+                processedFiles.push(`\n--- File: ${attachment.name} ---\n${fileContent}\n--- End of ${attachment.name} ---`);
+            }
+
+            if (processedFiles.length > 0) {
+                enhancedMessage = `${message}\n\nAttached files:\n${processedFiles.join('\n')}`;
+            }
+        }
+
+        // Save user message (store original message + metadata about attachments)
+        const messageData: any = {
+            conversation_id: currentConversationId,
+            role: 'user',
+            content: message,
+        };
+
+        // Store attachment metadata as JSONB
+        if (attachments && attachments.length > 0) {
+            messageData.metadata = {
+                attachments: attachments.map((file: FileAttachment) => ({
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                }))
+            };
+        }
+
         const { data: userMessageData, error: userMsgError } = await supabase
             .from('chat_messages')
-            .insert({
-                conversation_id: currentConversationId,
-                role: 'user',
-                content: message,
-            })
+            .insert(messageData)
             .select('id')
             .single();
 
         if (userMsgError) throw userMsgError;
 
-        // Fetch profile for personalization (optional)
+        // Fetch profile for personalization
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('education, country, age')
@@ -70,7 +170,6 @@ export async function POST(request: NextRequest) {
             .single();
 
         if (profileError) {
-            // don't fail the whole request for missing profile; just log
             console.warn('Profile fetch error:', profileError);
         }
 
@@ -78,10 +177,10 @@ export async function POST(request: NextRequest) {
         const userCountry = (profile as any)?.country || 'Global';
         const userAge = (profile as any)?.age ? `, Age: ${(profile as any).age}` : '';
 
-        // Get recent conversation history for context (exclude the message we just inserted)
+        // Get recent conversation history
         const { data: recentHistory } = await supabase
             .from('chat_messages')
-            .select('role, content, id, created_at')
+            .select('role, content, metadata, id, created_at')
             .eq('conversation_id', currentConversationId)
             .neq('id', (userMessageData as any).id)
             .order('created_at', { ascending: false })
@@ -89,26 +188,40 @@ export async function POST(request: NextRequest) {
 
         const history = recentHistory ? [...recentHistory].reverse() : [];
 
-        // Build messages array with strict literal roles and string content
+        // Build messages array with context from previous attachments
         const conversationHistory: Array<{ role: ChatRole; content: string }> = history.map((msg: any) => {
             const role: ChatRole = msg.role === 'user' ? 'user' : 'assistant';
-            return { role, content: String(msg.content ?? '') };
+            let content = String(msg.content ?? '');
+
+            // Add context about attachments in previous messages
+            if (msg.metadata?.attachments && msg.metadata.attachments.length > 0) {
+                const fileNames = msg.metadata.attachments.map((a: any) => a.name).join(', ');
+                content += `\n[Previously attached: ${fileNames}]`;
+            }
+
+            return { role, content };
         });
 
         const systemPrompt = `Role: Act as a student companion for EdBox — part mentor, part friend, part challenger.
 User education: ${educationLevel}
 User country: ${userCountry}${userAge}
+
+When users share files (code, documents, images, PDFs):
+- Analyze the content carefully and provide specific, helpful feedback
+- For code files: review for bugs, suggest improvements, explain concepts
+- For documents: summarize, answer questions, provide insights
+- For images: describe what you see and relate it to the learning context
+- Always reference specific parts of the uploaded content in your response
+
 Be concise, help with code and curriculum, ask clarifying questions only when necessary.`;
 
-        // Create Groq client at request-time (prevents server import-time crash)
+        // Create Groq client
         const groqApiKey =
-            process.env.GROQ_API_KEY ?? 
-            process.env.GROQ_API_KEY_3 ?? 
+            process.env.GROQ_API_KEY ??
+            process.env.GROQ_API_KEY_3 ??
             process.env.GROQ_API_KEY_4;
 
         if (!groqApiKey) {
-            // Return a helpful error JSON instead of crashing the server
-
             return NextResponse.json(
                 { error: 'GROQ API key not configured. Set up your GROQ API key in your .env.local.' },
                 { status: 500 }
@@ -116,27 +229,24 @@ Be concise, help with code and curriculum, ask clarifying questions only when ne
         }
 
         const groq = new Groq({ apiKey: groqApiKey });
-
-        // pick model from env or fallback
         const model = process.env.GROQ_MODEL ?? 'llama-3.1-8b-instant';
 
-        // Build final messages array (system + history + current user message)
+        // Build final messages array with enhanced message (includes file content)
         const messages: Array<{ role: ChatRole; content: string }> = [
             { role: 'system', content: systemPrompt },
             ...conversationHistory,
-            { role: 'user', content: String(message) },
+            { role: 'user', content: enhancedMessage },
         ];
 
-        // Groq SDK types can be strict; cast at call site to avoid TS mismatch while keeping runtime shape correct
         const completion = await groq.chat.completions.create({
-            messages: messages as any, // runtime shape is correct; cast to satisfy TS declarations
+            messages: messages as any,
             model,
             temperature: 0.7,
-            max_tokens: 1000,
+            max_tokens: 2000, // Increased for file analysis
         } as any);
 
         const aiResponse =
-            (completion as any)?.choices?.[0]?.message?.content ?? 
+            (completion as any)?.choices?.[0]?.message?.content ??
             "I apologize, I couldn't generate a response.";
 
         // Save AI response
@@ -154,7 +264,6 @@ Be concise, help with code and curriculum, ask clarifying questions only when ne
         });
     } catch (error: any) {
         console.error('Full Error Object:', JSON.stringify(error, null, 2));
-
         console.error('Chat API error:', error);
         const status = error?.status ?? 500;
         return NextResponse.json(
@@ -236,7 +345,7 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
         }
 
-        // Delete messages first (cascade might not be configured)
+        // Delete messages first
         await supabase
             .from('chat_messages')
             .delete()

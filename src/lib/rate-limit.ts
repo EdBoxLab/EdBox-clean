@@ -1,9 +1,9 @@
-import { createClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 // Rate Limits for Free Tier
 export const LIMITS = {
     FREE: {
-        COURSES_PER_MONTH: 5,
+        COURSES_PER_MONTH: 10,
         STUDY_KITS_PER_WEEK: 6,
         RESEARCH_PER_WEEK: 1,
     },
@@ -28,7 +28,7 @@ export async function checkRateLimit(
     userId: string,
     usageType: UsageType
 ): Promise<RateLimitResult> {
-    const supabase = await createClient();
+    const supabase = await createServerSupabaseClient();
 
     // Check subscription status
     const { data: subscription } = await supabase
@@ -164,7 +164,7 @@ export async function checkRateLimit(
  * Increment usage counter after successful action
  */
 export async function incrementUsage(userId: string, usageType: UsageType): Promise<void> {
-    const supabase = await createClient();
+    const supabase = await createServerSupabaseClient();
 
     const updates: any = { updated_at: new Date().toISOString() };
 
@@ -196,7 +196,7 @@ export async function incrementUsage(userId: string, usageType: UsageType): Prom
  * Each ad watched gives 1 credit
  */
 export async function grantAdCredit(userId: string, credits: number = 1): Promise<void> {
-    const supabase = await createClient();
+    const supabase = await createServerSupabaseClient();
 
     const { data: usage } = await supabase
         .from('user_usage')

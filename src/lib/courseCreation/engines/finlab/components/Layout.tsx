@@ -51,7 +51,6 @@ export const Layout: React.FC<LayoutProps> = ({ currentModule, onModuleChange, c
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-  return (
     <div className="flex flex-col h-full bg-slate-900 text-slate-200 overflow-hidden">
       {/* Unified Top Toolbar */}
       <header className="h-16 bg-slate-950 border-b border-slate-800 flex items-center justify-between px-4 z-50 shrink-0">

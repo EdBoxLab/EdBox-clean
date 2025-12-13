@@ -87,12 +87,33 @@ export default function AdminDashboard() {
   const fetchUsers = async (page: number) => {
     try {
       const res = await fetch(`/api/admin/users?page=${page}&limit=10`);
-      if (!res.ok) throw new Error('Failed to fetch users');
+      
+      // Check for 403 - redirect if not authorized
+      if (res.status === 403) {
+        console.error('Not authorized - redirecting to home');
+        router.push('/');
+        return;
+      }
+      
+      // Parse the response
       const data = await res.json();
+      
+      // Check if response was successful
+      if (!res.ok) {
+        console.error('API Error:', data);
+        console.error('Status:', res.status);
+        console.error('Error details:', data.details);
+        console.error('Error code:', data.code);
+        throw new Error(data.details || data.error || 'Failed to fetch users');
+      }
+      
+      console.log('✅ Users fetched successfully:', data.users?.length || 0);
       setUsers(data.users || []);
       setTotalPages(data.pagination?.totalPages || 1);
+      setError(''); // Clear any previous errors
     } catch (err: any) {
       console.error('Failed to fetch users:', err);
+      setError(err.message);
     }
   };
 
@@ -131,9 +152,21 @@ export default function AdminDashboard() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-blue-900/20 to-gray-900">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <p className="text-red-400">{error}</p>
+          <p className="text-red-400 text-lg font-semibold mb-2">Error Loading Dashboard</p>
+          <p className="text-gray-400 text-sm mb-4">{error}</p>
+          <button
+            onClick={() => {
+              setError('');
+              setLoading(true);
+              fetchStats();
+              fetchUsers(currentPage);
+            }}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );

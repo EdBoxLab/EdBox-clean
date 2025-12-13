@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, Send, Mic, MicOff, X, Sparkles, User, Bot, Plus, MessageSquare, Loader2, Trash2, Edit2, Check } from 'lucide-react';
+import { MessageCircle, Send, Mic, MicOff, X, Sparkles, User, Bot, Plus, MessageSquare, Loader2, Trash2, Edit2, Check, Paperclip, File, Image as ImageIcon, FileText } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 
 interface Message {
@@ -9,6 +9,11 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   created_at: string;
+  attachments?: Array<{
+    name: string;
+    type: string;
+    size: number;
+  }>;
 }
 
 interface Chat {
@@ -30,8 +35,11 @@ export default function AIGenie() {
   const [isLoadingChats, setIsLoadingChats] = useState(false);
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [isProcessingFiles, setIsProcessingFiles] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch chats on open
   useEffect(() => {
@@ -48,7 +56,7 @@ export default function AIGenie() {
       setMessages([{
         id: 'welcome',
         role: 'assistant',
-        content: "Hey there! 👋 I'm Genie, your AI study buddy! I know all about your study sets, notes, and courses. Ask me anything - let's ace this together!",
+        content: "Hey there! 👋 I'm Genie, your AI study buddy! I know all about your study sets, notes, and courses. Ask me anything - let's ace this together!\n\n💡 You can also upload files (PDF, images, documents) and I'll help you understand them!",
         created_at: new Date().toISOString()
       }]);
     }
@@ -94,9 +102,10 @@ export default function AIGenie() {
     setMessages([{
       id: 'welcome',
       role: 'assistant',
-      content: "Hey there! 👋 I'm Genie, your AI study buddy! I know all about your study sets, notes, and courses. Ask me anything - let's ace this together!",
+      content: "Hey there! 👋 I'm Genie, your AI study buddy! I know all about your study sets, notes, and courses. Ask me anything - let's ace this together!\n\n💡 You can also upload files (PDF, images, documents) and I'll help you understand them!",
       created_at: new Date().toISOString()
     }]);
+    setAttachedFiles([]);
     setShowChatList(false);
   };
 
@@ -151,29 +160,125 @@ export default function AIGenie() {
     }
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || isSending) return;
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    const userMsgContent = input;
+    // Validate file types and sizes
+    const validFiles = files.filter(file => {
+      const validTypes = [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'text/plain',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ];
+      const maxSize = 10 * 1024 * 1024; // 10MB
+
+      if (!validTypes.includes(file.type)) {
+        alert(`${file.name} is not a supported file type`);
+        return false;
+      }
+      if (file.size > maxSize) {
+        alert(`${file.name} is too large (max 10MB)`);
+        return false;
+      }
+      return true;
+    });
+
+    setAttachedFiles(prev => [...prev, ...validFiles]);
+  };
+
+  const removeFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const processFilesForUpload = async (files: File[]) => {
+    const processedFiles = await Promise.all(
+      files.map(async (file) => {
+        // For images, convert to base64
+        if (file.type.startsWith('image/')) {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              resolve({
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                content: reader.result as string
+              });
+            };
+            reader.readAsDataURL(file);
+          });
+        }
+        
+        // For text/PDFs, read as text or base64
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            resolve({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              content: reader.result as string
+            });
+          };
+          
+          if (file.type === 'text/plain') {
+            reader.readAsText(file);
+          } else {
+            reader.readAsDataURL(file);
+          }
+        });
+      })
+    );
+    
+    return processedFiles;
+  };
+
+  const handleSend = async () => {
+    if ((!input.trim() && attachedFiles.length === 0) || isSending) return;
+
+    const userMsgContent = input || '📎 Sent files';
+    const currentFiles = [...attachedFiles];
+    
     setInput('');
+    setAttachedFiles([]);
     setIsSending(true);
+    setIsProcessingFiles(currentFiles.length > 0);
 
     // Optimistic update
     const tempMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
       content: userMsgContent,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      attachments: currentFiles.map(f => ({
+        name: f.name,
+        type: f.type,
+        size: f.size
+      }))
     };
     setMessages(prev => [...prev, tempMsg]);
 
     try {
+      // Process files if any
+      let processedFiles = null;
+      if (currentFiles.length > 0) {
+        processedFiles = await processFilesForUpload(currentFiles);
+      }
+      setIsProcessingFiles(false);
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           conversationId: currentChatId,
-          message: userMsgContent
+          message: userMsgContent,
+          files: processedFiles
         })
       });
 
@@ -195,10 +300,30 @@ export default function AIGenie() {
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      // Remove temp message or show error
+      // Show error message
+      const errorMsg: Message = {
+        id: Date.now().toString() + 'error',
+        role: 'assistant',
+        content: '❌ Sorry, something went wrong. Please try again.',
+        created_at: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsSending(false);
+      setIsProcessingFiles(false);
     }
+  };
+
+  const getFileIcon = (type: string) => {
+    if (type.startsWith('image/')) return <ImageIcon className="w-4 h-4" />;
+    if (type === 'application/pdf') return <FileText className="w-4 h-4" />;
+    return <File className="w-4 h-4" />;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
   const currentChatTitle = chats.find(c => c.id === currentChatId)?.title || 'New Chat';
@@ -216,6 +341,16 @@ export default function AIGenie() {
           <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
         </button>
       )}
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.txt,.doc,.docx"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
 
       {/* Chat Interface - Full Screen on Mobile */}
       {isOpen && (
@@ -253,7 +388,7 @@ export default function AIGenie() {
             </div>
           </div>
 
-          {/* Chat List Sidebar - Improved Design */}
+          {/* Chat List Sidebar */}
           {showChatList && (
             <div className="absolute top-[72px] left-0 right-0 sm:right-auto sm:w-80 bg-zinc-900/98 backdrop-blur-xl border-b sm:border-r border-zinc-700/50 z-10 max-h-[70vh] sm:max-h-96 overflow-y-auto shadow-2xl">
               <div className="p-3 border-b border-zinc-800 bg-zinc-800/50">
@@ -308,7 +443,6 @@ export default function AIGenie() {
                         )}
                       </button>
                       
-                      {/* Action Buttons */}
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         {editingChatId === chat.id ? (
                           <button
@@ -360,14 +494,30 @@ export default function AIGenie() {
                   )}
                 </div>
 
-                <div className={`max-w-[80%] sm:max-w-[85%] ${message.role === 'user'
-                  ? 'bg-indigo-600/90 text-white'
-                  : 'bg-zinc-800/90 text-zinc-100 border border-zinc-700/50'
-                  } backdrop-blur-sm rounded-2xl px-4 py-2.5`}>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-                  <p className="text-[10px] opacity-60 mt-1.5 text-right">
-                    {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
+                <div className={`max-w-[80%] sm:max-w-[85%]`}>
+                  <div className={`${message.role === 'user'
+                    ? 'bg-indigo-600/90 text-white'
+                    : 'bg-zinc-800/90 text-zinc-100 border border-zinc-700/50'
+                    } backdrop-blur-sm rounded-2xl px-4 py-2.5`}>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                    
+                    {/* Show attachments */}
+                    {message.attachments && message.attachments.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-white/10 space-y-1">
+                        {message.attachments.map((file, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-xs opacity-80">
+                            {getFileIcon(file.type)}
+                            <span className="truncate">{file.name}</span>
+                            <span className="text-[10px]">({formatFileSize(file.size)})</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <p className="text-[10px] opacity-60 mt-1.5 text-right">
+                      {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
                 </div>
               </div>
             ))}
@@ -377,20 +527,58 @@ export default function AIGenie() {
                   <Sparkles className="w-4 h-4 text-white" />
                 </div>
                 <div className="bg-zinc-800/90 backdrop-blur-sm border border-zinc-700/50 rounded-2xl px-4 py-2.5">
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
+                  {isProcessingFiles ? (
+                    <p className="text-xs text-zinc-400">Processing files...</p>
+                  ) : (
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
+          {/* File Preview Area */}
+          {attachedFiles.length > 0 && (
+            <div className="px-4 py-2 bg-zinc-800/50 border-t border-zinc-700/50 max-h-32 overflow-y-auto">
+              <div className="flex flex-wrap gap-2">
+                {attachedFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 bg-zinc-900/90 border border-zinc-700/50 rounded-lg px-3 py-2 text-xs group"
+                  >
+                    {getFileIcon(file.type)}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white truncate max-w-[150px]">{file.name}</p>
+                      <p className="text-zinc-500 text-[10px]">{formatFileSize(file.size)}</p>
+                    </div>
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="p-1 hover:bg-zinc-700 rounded transition opacity-0 group-hover:opacity-100"
+                    >
+                      <X className="w-3 h-3 text-zinc-400" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Input Area */}
           <div className="p-4 bg-zinc-900/98 backdrop-blur-sm border-t border-zinc-700/50 shrink-0">
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2.5 rounded-lg transition shrink-0 bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                title="Attach files"
+              >
+                <Paperclip className="w-4 h-4" />
+              </button>
+
               <button
                 onClick={() => setIsVoiceMode(!isVoiceMode)}
                 className={`p-2.5 rounded-lg transition shrink-0 ${isVoiceMode
@@ -412,14 +600,14 @@ export default function AIGenie() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder="Ask me anything..."
+                  placeholder={attachedFiles.length > 0 ? `Ask about ${attachedFiles.length} file(s)...` : "Ask me anything..."}
                   className="flex-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700/50 rounded-lg px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition"
                 />
               )}
 
               <button
                 onClick={handleSend}
-                disabled={!input.trim() || isSending}
+                disabled={(!input.trim() && attachedFiles.length === 0) || isSending}
                 className="p-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-zinc-700 disabled:to-zinc-700 disabled:cursor-not-allowed rounded-lg transition shrink-0"
               >
                 {isSending ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <Send className="w-4 h-4 text-white" />}

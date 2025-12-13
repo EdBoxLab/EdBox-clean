@@ -1,25 +1,26 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function isAdmin(): Promise<boolean> {
-    try {
-        const supabase = await createSupabaseServerClient();
+  try {
+    const supabase = await createSupabaseServerClient();
 
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return false;
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) return false;
 
-        const { data: admin } = await supabase
-            .from('admins')
-            .select('is_active, role')
-            .eq('user_id', session.user.id)
-            .eq('is_active', true)
-            .single();
+    const { data: admin } = await supabase
+      .from('admins')
+      .select('is_active')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .maybeSingle();
 
-        return !!admin;
-    } catch (error) {
-        console.error('Error checking admin status:', error);
-        return false;
-    }
+    return !!admin;
+  } catch (error) {
+    console.error('Error checking admin status:', error);
+    return false;
+  }
 }
+
 
 export async function getAdminRole(): Promise<'super_admin' | 'admin' | 'moderator' | null> {
     try {

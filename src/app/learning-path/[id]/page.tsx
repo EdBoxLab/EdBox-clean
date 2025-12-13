@@ -1,21 +1,22 @@
 // src/app/learning-path/[id]/page.tsx
 import React from 'react';
-import { createServerSupabaseClient } from '@/lib/supabase/server'; // SSR client
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import SkillGraphRenderer from './SkillGraphRenderer';
 import { SkillGraph, Challenge } from '@/lib/courseCreation/types';
 
 interface Props {
-  params: { id: string };
+  params: Promise<{ id: string }>; // params is now a Promise
 }
 
 export default async function LearningPathPage({ params }: Props) {
-  const { id } = params;
+  // Await params first
+  const { id } = await params;
 
   if (!id) {
-    return <div className="text-white">Invalid skill graph ID.</div>;
+    return <div className="text-white p-8">Invalid skill graph ID.</div>;
   }
 
-  // ⚡ Await the async Supabase client
+  // Await the async Supabase client
   const supabase = await createServerSupabaseClient();
 
   // Fetch skill graph
@@ -27,7 +28,13 @@ export default async function LearningPathPage({ params }: Props) {
 
   if (graphError || !graphDataRaw) {
     console.error('Supabase error:', graphError);
-    return <div className="text-white">Skill graph not found.</div>;
+    return (
+      <div className="text-white p-8">
+        <h1 className="text-2xl font-bold mb-4">Skill graph not found</h1>
+        <p className="text-gray-400">Error: {graphError?.message || 'Unknown error'}</p>
+        <p className="text-gray-500 mt-2">ID: {id}</p>
+      </div>
+    );
   }
 
   const graphData: SkillGraph = graphDataRaw as SkillGraph;
@@ -43,9 +50,5 @@ export default async function LearningPathPage({ params }: Props) {
   const challengesMap: Record<string, Challenge> = {};
   challengesData.forEach((c) => (challengesMap[c.skillId] = c));
 
-  return (
-    <div className="min-h-screen bg-gray-900 text-white p-4">
-      <SkillGraphRenderer graph={graphData} challenges={challengesMap} />
-    </div>
-  );
+  return <SkillGraphRenderer graph={graphData} challenges={challengesMap} />;
 }

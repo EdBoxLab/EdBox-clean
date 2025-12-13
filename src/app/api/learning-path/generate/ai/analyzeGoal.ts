@@ -17,7 +17,7 @@ Goal: ${goal}
 Context: ${context}
 ${templateText ? `Template guidance:\n${templateText}` : ""}
 
-Return only JSON: { parsedGoal, domain, targetProficiency, estimatedTotalHours, recommendedEngine }`;
+Return only exact JSON that must contain all : { parsedGoal, domain, targetProficiency, estimatedTotalHours, recommendedEngine }`;
 
   return callAI(
     systemPrompt,

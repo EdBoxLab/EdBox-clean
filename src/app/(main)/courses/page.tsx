@@ -104,7 +104,7 @@ export default function CoursesPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  onClick={() => router.push(`/courses/${course.id}`)}
+                  onClick={() => router.push(`/learning-path/${course.id}`)}
                   className="group cursor-pointer"
                 >
                   <div className="relative bg-gray-800 rounded-2xl p-6 border border-gray-700 hover:border-indigo-500 transition-all hover:shadow-xl hover:shadow-indigo-500/20">
@@ -164,7 +164,7 @@ export default function CoursesPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: courses.length * 0.1 }}
-              onClick={() => router.push('/onboarding')}
+              onClick={() => router.push('/creator')}
               className="cursor-pointer"
             >
               <div className="bg-gray-800/50 border-2 border-dashed border-gray-700 hover:border-indigo-500 rounded-2xl p-6 h-full flex flex-col items-center justify-center text-center transition-all hover:bg-gray-800">

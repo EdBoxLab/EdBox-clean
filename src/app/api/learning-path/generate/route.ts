@@ -52,7 +52,7 @@ function selectBestTemplate(domain: string): string | undefined {
 }
 
 /**
- * Validation & normalization utilities
+ * Validation & normalization
  */
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -181,23 +181,23 @@ export async function POST(req: Request) {
     // Choose template (optional)
     const chosenTemplatePath = body.templatePath || selectBestTemplate(String(context));
 
-    // Generate skill graph from AI (raw)
-    const rawSkillGraph = await generateSkillGraph(goal, context, chosenTemplatePath);
+    // --- FIX: pass 3 arguments to generateSkillGraph ---
+    const rawSkillGraph = await generateSkillGraph(goal, String(context), chosenTemplatePath);
 
     // Normalize to expected schema
     const skillGraphData: SkillGraphData = normalizeSkillGraph(rawSkillGraph);
 
-    // Compute total hours (simple heuristic: 1 hour per skill node)
+    // Compute total hours (1 hour per skill node)
     const totalHours = (skillGraphData.skillPaths ?? []).length;
 
-    // Build graph nodes
+    // Build nodes
     const nodes: any[] = [
       ...skillGraphData.skillPaths.map((s) => ({ id: s.id, name: s.name, type: 'skill' })),
       ...skillGraphData.miniProjects.map((p) => ({ id: p.id, name: p.name, type: 'miniProject' })),
       { id: skillGraphData.capstoneProject.id, name: skillGraphData.capstoneProject.name, type: 'capstone' },
     ];
 
-    // Build graph edges
+    // Build edges
     const edges: any[] = [
       ...skillGraphData.skillPaths.flatMap((s) => (s.prereqs || []).map((pr) => ({ from: pr, to: s.id }))),
       ...skillGraphData.miniProjects.flatMap((p) => (p.skills || []).map((sId) => ({ from: sId, to: p.id }))),
@@ -207,7 +207,7 @@ export async function POST(req: Request) {
       })),
     ];
 
-    // Persist graph — use a server-generated UUID so frontend can route to /learning-path/:id
+    // Persist graph
     const savedId = randomUUID();
 
     const { error: insertError } = await supabase.from('skill_graphs').insert([
@@ -227,7 +227,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Failed to save learning path' }, { status: 500 });
     }
 
-    // Align response with frontend expectations: success flag + skillGraph.id
     return NextResponse.json({
       success: true,
       skillGraph: {

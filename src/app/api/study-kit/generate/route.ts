@@ -23,7 +23,7 @@ function buildPrompt(type: ContentType, prompt: string) {
   const base = `Base content:\n"${prompt}"\n\n`;
   switch (type) {
     case 'quizzes':
-      return base + 'Generate EXACTLY 5 MCQ questions as strict JSON array.';
+      return base + 'Generate EXACTLY 10 MCQ questions as strict JSON array.';
     case 'flashcards':
       return base + 'Generate EXACTLY 10 flashcards as strict JSON array.';
     case 'mindmaps':

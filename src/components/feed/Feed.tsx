@@ -3,9 +3,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { FeedItem, ArticleFeedItem, StoryFeedItem, QuizFeedItem, ChallengeFeedItem, FactFeedItem, Feedback, UserPreferences, AudioGenerationState } from '@/types/feed';
-import { generateFeedBatch, generateLessonImage, persistFeedItems, trackInteraction } from '@/services/feedService';
+import { generateFeedBatch, persistFeedItems, trackInteraction } from '@/services/feedService';
 import { CardWrapper } from './CardWrapper';
 import { QuizCard } from './QuizCard';
+import { VideoCard } from './VideoCard';
 import { ArticleCard } from './ArticleCard';
 import { ChallengeCard } from './ChallengeCard';
 import { FactCard } from './FactCard';
@@ -94,36 +95,11 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       // Persist generated items
       await persistFeedItems(itemBatch, user.id);
 
-      // Process media (Images)
-      const processedItemsPromises = itemBatch.map(async (item) => {
-        let processedItem = { ...item };
+      // Process items (removed client-side image gen)
+      const processedItems = itemBatch.filter(item => item.type !== 'meme');
 
-        // Skip meme items entirely
-        if (item.type === 'meme') {
-          return null;
-        }
 
-        // Generate images for types that need it
-        if ('visualPrompt' in item && item.visualPrompt && !('imageUrl' in item && item.imageUrl)) {
-          const itemWithImage = processedItem as any;
-          itemWithImage.imageGenerationState = 'generating';
-
-          try {
-            const url = await generateLessonImage(item.visualPrompt);
-            itemWithImage.imageUrl = url;
-            itemWithImage.imageGenerationState = 'ready';
-          } catch (e) {
-            console.error("Image gen error", e);
-            itemWithImage.imageGenerationState = 'error';
-          }
-        }
-
-        return processedItem;
-      });
-
-      const processedItems = await Promise.all(processedItemsPromises);
-      const newItems = processedItems.filter((item): item is FeedItem => item !== null);
-
+      const newItems = processedItems;
       setItems(prev => [...prev, ...newItems]);
     } catch (err) {
       console.error("Failed to load feed items", err);
@@ -249,7 +225,10 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     switch (item.type) {
       case 'quiz':
         return <QuizCard item={item as QuizFeedItem} onCorrect={handleCorrectAnswer} onIncorrect={handleIncorrectAnswer} onSwipe={handleSwipe} />;
+      case 'video':
+        return <VideoCard item={item as any} />;
       case 'article':
+
         return (
           <ArticleCard
             item={item as ArticleFeedItem}

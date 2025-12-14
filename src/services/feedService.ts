@@ -78,33 +78,6 @@ export const generateFeedBatch = async (
   });
 };
 
-export const generateLessonImage = async (prompt: string): Promise<string> => {
-  return retryOperation(async () => {
-    try {
-      const model = "gemini-2.5-flash-image";
-      const refinedPrompt = `Cinematic, deep blue and teal lighting, 4k, abstract, minimalism, ${prompt}, dark moody atmosphere. No text.`;
-
-      const response = await ai.models.generateContent({
-        model,
-        contents: refinedPrompt
-      });
-
-      if (response.candidates && response.candidates[0].content.parts) {
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData && part.inlineData.data) {
-            return `data:image/png;base64,${part.inlineData.data}`;
-          }
-        }
-      }
-
-      return `https://picsum.photos/1080/1920?blur=5&random=${Math.random()}`;
-    } catch (e) {
-      console.error("Image gen failed", e);
-      // Fallback instead of throwing for images
-      return `https://picsum.photos/1080/1920?blur=5&random=${Math.random()}`;
-    }
-  });
-};
 
 export const generateLessonAudio = async (text: string, audioContext: AudioContext): Promise<AudioBuffer | undefined> => {
   if (!text) return undefined;

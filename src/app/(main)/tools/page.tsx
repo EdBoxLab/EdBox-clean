@@ -8,6 +8,7 @@ import {
   ClipboardDocumentListIcon,
   RectangleStackIcon,
 } from '@heroicons/react/24/outline';
+import { Zap } from 'lucide-react';
 
 const tools = [
   {
@@ -21,24 +22,14 @@ const tools = [
     borderHover: 'hover:border-green-500',
   },
   {
-    id: 'quiz-forge',
-    href: '/quiz-forge',
-    title: 'Quiz Forge',
-    description: 'Generate exhaustive quizzes of all types from an upload or a prompt.',
-    icon: ClipboardDocumentListIcon,
-    gradient: 'from-indigo-600/20 to-purple-600/20',
-    iconColor: 'text-indigo-400',
-    borderHover: 'hover:border-indigo-500',
-  },
-  {
-    id: 'flashcard-gen',
-    href: '/flashcard-gen',
-    title: 'Flashcard Gen',
-    description: 'Generate exhaustive flashcards from an upload or a prompt.',
-    icon: RectangleStackIcon,
-    gradient: 'from-pink-600/20 to-rose-600/20',
-    iconColor: 'text-pink-400',
-    borderHover: 'hover:border-pink-500',
+    id: 'study-kit',
+    href: '/tools/study-kit',
+    title: 'Study Kit',
+    description: 'AI-powered study tools to help you learn faster and retain more information.',
+    icon: Zap,
+    gradient: 'from-yellow-600/20 to-amber-600/20',
+    iconColor: 'text-yellow-300',
+    borderHover: 'hover:border-yellow-500',
   },
 ];
 

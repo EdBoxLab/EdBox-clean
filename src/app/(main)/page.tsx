@@ -19,7 +19,7 @@ const Dashboard: React.FC = () => {
   const [recentCourse, setRecentCourse] = useState<any>(null);
 
   const tools = [
-        { id: 't2', title: 'Note Taker', type: 'Tool', href: '/tools/notes', icon: <FileText className="w-8 h-8 text-green-300" /> },
+    { id: 't2', title: 'Note Taker', type: 'Tool', href: '/tools/notes', icon: <FileText className="w-8 h-8 text-green-300" /> },
     { id: 't3', title: 'Study Kit', type: 'Tool', href: '/tools/study-kit', icon: <Zap className="w-8 h-8 text-yellow-300" /> },
   ];
 
@@ -54,10 +54,13 @@ const Dashboard: React.FC = () => {
         // Fetch Courses
         const coursesRes = await fetch('/api/skill-graph/list');
         const coursesJson = await coursesRes.json();
+        console.log('Courses API response:', coursesJson); // Debug log
+        
         if (coursesJson.success && coursesJson.courses) {
           const mappedCourses = coursesJson.courses.map((c: any) => ({
             id: c.id,
-            title: c.topic || 'Untitled Course',
+            // Try both 'goal' and 'topic' fields
+            title: c.goal || c.topic || 'Untitled Course',
             progress: Math.round((coursesJson.progress?.[c.id] || 0) * 100),
             icon: <Book className="w-8 h-8 text-indigo-300" />,
             href: `/learning-path/${c.id}`
@@ -87,7 +90,7 @@ const Dashboard: React.FC = () => {
         }
 
         // Fetch Study Kits
-        const kitsRes = await fetch('/api/study-kit/list'); // new endpoint to list user's study kits
+        const kitsRes = await fetch('/api/study-kit/list');
         const kitsJson = await kitsRes.json();
         if (kitsJson.studyKits) {
           setStudyKits(kitsJson.studyKits.map((kit: any) => ({

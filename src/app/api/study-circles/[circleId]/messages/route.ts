@@ -1,33 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase/admin';
 
 // GET - Get all messages for a circle
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ circleId: string }> } // App Router requires params to be a Promise
+  context: { params: Promise<{ circleId: string }> }
 ) {
-  const supabase = await createSupabaseServerClient();
-  const { circleId } = await context.params; // ✅ Await the Promise
+  const supabaseAuth = await createSupabaseServerClient();  // For auth
+  const supabaseAdmin = createServerSupabaseClient();       // For queries (bypasses RLS)
+  
+  const { circleId } = await context.params;
+  const numericCircleId = Number(circleId);
 
   try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify membership
-    const { data: memberCheck } = await supabase
+    // Verify membership using admin client
+    const { data: memberCheck, error: memberError } = await supabaseAdmin
       .from('circle_members')
       .select('user_id')
-      .eq('circle_id', circleId)
+      .eq('circle_id', numericCircleId)
       .eq('user_id', user.id)
       .maybeSingle();
+
+    if (memberError) {
+      console.error('Member check error:', memberError);
+      return NextResponse.json({ error: 'Failed to verify membership' }, { status: 500 });
+    }
 
     if (!memberCheck) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { data, error } = await supabase.rpc('get_messages_for_circle', { p_circle_id: circleId });
+    // Use admin client for RPC call
+    const { data, error } = await supabaseAdmin.rpc('get_messages_for_circle', { 
+      p_circle_id: numericCircleId 
+    });
 
     if (error) {
       console.error('RPC error:', error);
@@ -45,24 +57,32 @@ export async function GET(
 // POST - Post a new message to a circle
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ circleId: string }> } // App Router requires params to be a Promise
+  context: { params: Promise<{ circleId: string }> }
 ) {
-  const supabase = await createSupabaseServerClient();
-  const { circleId } = await context.params; // ✅ Await the Promise
+  const supabaseAuth = await createSupabaseServerClient();  // For auth
+  const supabaseAdmin = createServerSupabaseClient();       // For queries (bypasses RLS)
+  
+  const { circleId } = await context.params;
+  const numericCircleId = Number(circleId);
 
   try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify membership
-    const { data: memberCheck } = await supabase
+    // Verify membership using admin client
+    const { data: memberCheck, error: memberError } = await supabaseAdmin
       .from('circle_members')
       .select('user_id')
-      .eq('circle_id', circleId)
+      .eq('circle_id', numericCircleId)
       .eq('user_id', user.id)
       .maybeSingle();
+
+    if (memberError) {
+      console.error('Member check error:', memberError);
+      return NextResponse.json({ error: 'Failed to verify membership' }, { status: 500 });
+    }
 
     if (!memberCheck) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -74,9 +94,15 @@ export async function POST(
       return NextResponse.json({ error: 'Message content and username are required' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    // Use admin client for insert
+    const { data, error } = await supabaseAdmin
       .from('messages')
-      .insert([{ content, user_id: user.id, circle_id: circleId, username }])
+      .insert([{ 
+        content, 
+        user_id: user.id, 
+        circle_id: numericCircleId, 
+        username 
+      }])
       .select()
       .single();
 

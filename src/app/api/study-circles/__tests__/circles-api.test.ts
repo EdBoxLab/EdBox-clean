@@ -1,3 +1,5 @@
+export {};
+
 jest.mock('next/server', () => ({
   NextResponse: {
     json: (body: any, opts?: any) => ({ status: opts?.status || 200, json: async () => body })

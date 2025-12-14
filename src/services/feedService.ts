@@ -119,7 +119,7 @@ export const persistFeedItems = async (items: FeedItem[], userId?: string) => {
     const key = userId ? `feed_items_${userId}` : 'feed_items_anonymous';
     const rows = items.map(item => ({
       type: item.type,
-      content: item,
+      content: (item as any).content ?? item,
       generated_at: new Date().toISOString()
     }));
 

@@ -1,4 +1,14 @@
-import { persistFeedItems } from '../feedService';
+jest.mock('@google/genai', () => ({
+  GoogleGenAI: jest.fn().mockImplementation(() => ({ models: { generateContent: jest.fn() } })),
+  Type: {},
+  Modality: {}
+}));
+
+jest.mock('@/lib/supabase/client', () => ({
+  supabase: { from: jest.fn().mockReturnValue({ insert: jest.fn().mockResolvedValue({ error: null }) }) }
+}));
+
+const { persistFeedItems } = require('../feedService');
 
 describe('persistFeedItems', () => {
   beforeEach(() => {

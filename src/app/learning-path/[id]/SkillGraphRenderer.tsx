@@ -34,7 +34,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
   const [showPrerequisites, setShowPrerequisites] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Array<{
     id: string;
-    type: 'unlock' | 'mastery' | 'xp';
+    type: 'unlock' | 'mastery' | 'xp' | 'error' | 'info';
     message: string;
     skillId?: string;
   }>>([]);
@@ -134,7 +134,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
   };
 
   // Add notification with enhanced animations
-  const addNotification = (type: 'unlock' | 'mastery' | 'xp', message: string, skillId?: string) => {
+  const addNotification = (type: 'unlock' | 'mastery' | 'xp' | 'error' | 'info', message: string, skillId?: string) => {
     const id = Date.now().toString();
     setNotifications(prev => [...prev, { id, type, message, skillId }]);
 
@@ -211,80 +211,154 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
     setPreviousProgressData(progressData);
   }, [progressData, previousProgressData]);
 
-  // Handle skill click with enhanced feedback
-  const handleSkillClick = (skillId: string) => {
+  // State for dynamic sessions
+  const [sessionChallenges, setSessionChallenges] = useState<Challenge[]>([]);
+  const [conceptExplanation, setConceptExplanation] = useState<string>('');
+  const [activeChallengeIndex, setActiveChallengeIndex] = useState<number>(-1); // -1 means showing Concept
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [consecutiveFailures, setConsecutiveFailures] = useState<number>(0);
+
+  // ... inside handleSkillClick
+  const handleSkillClick = async (skillId: string) => {
     const skill = graph.nodes.find((n) => n.id === skillId) || null;
     if (!skill) return;
 
     const skillState = getSkillState(skillId);
-    const progress = getSkillProgress(skillId);
 
-    // If skill is locked, show prerequisites instead of opening challenge
+    // ... [lock check logic as before] ...
     if (skillState === 'locked') {
       const unmetPrereqs = getUnmetPrerequisites(skill);
       if (unmetPrereqs.length > 0) {
         setShowPrerequisites(skillId);
-        // Add haptic feedback for locked skills
-        if (navigator.vibrate) {
-          navigator.vibrate([50, 50, 50]);
-        }
         return;
       }
     }
 
-    // If skill is unlocked or mastered, open the challenge selection
     if (skillState === 'unlocked' || skillState === 'mastered') {
       setSelectedSkill(skill);
+      // Reset session state
+      setSessionChallenges([]);
+      setConceptExplanation('');
+      setActiveChallengeIndex(-1);
+      setConsecutiveFailures(0);
 
-      // Use challenge override if exists, else derive from skill
-      const challenge: Challenge = challenges[skillId] || {
-        skillId: skill.id,
-        title: skill.title,
-        description: skill.description,
-        engine: skill.engine,
-        estimatedMinutes: skill.estimatedMinutes || 20,
-        xpReward: skill.xpReward || 100,
-        validationCriteria: [],
-        starterCode: '',
-        difficulty: 'Easy',
-        hints: [],
-        explanation: '',
-      };
+      const existing = challenges[skillId];
+      if (existing) {
+        // If a single challenge exists in props, wrap it
+        setSessionChallenges([existing]);
+        setConceptExplanation(existing.explanation || "Let's dive in!");
+        setActiveChallengeIndex(0);
+      } else {
+        // Generate dynamic batch
+        setIsGenerating(true);
+        try {
+          // Dynamic import to avoid server-side issues with action in client component
+          const { generateChallengeBatch } = await import('@/app/actions/generate-challenges');
+          const batch = await generateChallengeBatch(skill.id, skill.title, skill.engine);
 
-      setCurrentChallenge(challenge);
-
-      // Add success haptic feedback for accessible skills
-      if (navigator.vibrate) {
-        navigator.vibrate(100);
-      }
-
-      // Show contextual notification for first-time skill access
-      if (progress && progress.challengesCompleted === 0 && skillState === 'unlocked') {
-        addNotification('unlock', `Starting ${skill.title}! Complete challenges to master this skill.`, skillId);
+          setSessionChallenges(batch.challenges);
+          setConceptExplanation(batch.explanation);
+          setActiveChallengeIndex(-1); // Start at explanation
+        } catch (e) {
+          console.error("Generation failed", e);
+          addNotification('error', 'Failed to generate challenges', skillId);
+        } finally {
+          setIsGenerating(false);
+        }
       }
     }
   };
 
-  const handleCloseEngine = () => {
-    setSelectedSkill(null);
-    setCurrentChallenge(null);
+  const handleChallengeSelect = (index: number) => {
+    setActiveChallengeIndex(index);
+    if (index >= 0 && index < sessionChallenges.length) {
+      setCurrentChallenge(sessionChallenges[index]);
+      setConsecutiveFailures(0); // Reset failures on manual switch
+    } else {
+      setCurrentChallenge(null); // Showing explanation
+    }
+  };
+
+  const fetchAdaptiveChallenge = async () => {
+    if (!selectedSkill) return;
+
+    setIsGenerating(true);
+    try {
+      addNotification('info', 'Generating helpful practice challenge...', selectedSkill.id);
+
+      const response = await fetch('/api/challenge/adaptive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          skillId: selectedSkill.id,
+          skillTitle: selectedSkill.title,
+          engine: selectedSkill.engine,
+          userMastery: 0.2, // Low mastery trigger
+          previousAttempts: [{ success: false }, { success: false }] // Mock failure context
+        })
+      });
+
+      const data = await response.json();
+      if (data.success && data.challenge) {
+        const newChallenge = { ...data.challenge, title: `Support: ${data.challenge.title}` };
+
+        // Insert new challenge after current one
+        const newSession = [...sessionChallenges];
+        newSession.splice(activeChallengeIndex + 1, 0, newChallenge);
+        setSessionChallenges(newSession);
+
+        // Move to it
+        setActiveChallengeIndex(prev => prev + 1);
+        setCurrentChallenge(newChallenge);
+        setConsecutiveFailures(0); // Reset after getting help
+      }
+    } catch (error) {
+      console.error("Adaptive generation failed", error);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleChallengeComplete = async (success: boolean) => {
-    if (!selectedSkill || !currentChallenge) return;
+    if (!selectedSkill || activeChallengeIndex === -1) return;
 
-    // Record the attempt
-    await recordChallengeAttempt(
-      currentChallenge.id || `challenge-${selectedSkill.id}-${Date.now()}`,
-      success,
-      progressionGraph,
-      {
-        difficultyLevel: (selectedSkill.level as DifficultyLevel) || 'Medium'
-      }
-    );
+    // Record specific attempt
+    const currentChal = sessionChallenges[activeChallengeIndex];
+    if (currentChal) {
+      await recordChallengeAttempt(
+        currentChal.id,
+        success,
+        progressionGraph,
+        { difficultyLevel: (selectedSkill.level as DifficultyLevel) || 'Medium' }
+      );
+    }
 
-    // Refresh the main graph progress to show updates (e.g. unlock next skill)
+    // Refresh global progress
     await refreshGraphProgress();
+
+    if (success) {
+      setConsecutiveFailures(0);
+      // Auto-advance if successful
+      if (activeChallengeIndex < sessionChallenges.length - 1) {
+        setTimeout(() => handleChallengeSelect(activeChallengeIndex + 1), 1500);
+      } else {
+        addNotification('mastery', 'Session Complete! Great work.', selectedSkill.id);
+      }
+    } else {
+      // Handle Failure
+      const fails = consecutiveFailures + 1;
+      setConsecutiveFailures(fails);
+
+      if (fails >= 2) { // After 2 failures, trigger adaptive help
+        await fetchAdaptiveChallenge();
+      }
+    }
+  };
+
+  // New Render Logic with Sidebar
+  const renderEngineWithSidebar = () => {
+    // ... implementation of sidebar UI + renderEngine()
+    // This will replace the simple renderEngine call in the modal
   };
 
   // Render engine based on type
@@ -832,8 +906,10 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               style={{ zIndex: 1000 - index }}
               className={`bg-gray-800 border rounded-lg p-4 shadow-2xl max-w-sm backdrop-blur-sm ${notification.type === 'unlock' ? 'border-indigo-500 bg-indigo-500/10' :
-                notification.type === 'mastery' ? 'border-green-500 bg-green-500/10' :
-                  'border-yellow-500 bg-yellow-500/10'
+                  notification.type === 'mastery' ? 'border-green-500 bg-green-500/10' :
+                    notification.type === 'error' ? 'border-red-500 bg-red-500/10' :
+                      notification.type === 'info' ? 'border-blue-500 bg-blue-500/10' :
+                        'border-yellow-500 bg-yellow-500/10'
                 }`}
             >
               <div className="flex items-start gap-3">
@@ -842,12 +918,17 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.2, type: "spring", stiffness: 400 }}
                   className={`w-8 h-8 rounded-full flex items-center justify-center ${notification.type === 'unlock' ? 'bg-indigo-500' :
-                    notification.type === 'mastery' ? 'bg-green-500' : 'bg-yellow-500'
+                      notification.type === 'mastery' ? 'bg-green-500' :
+                        notification.type === 'error' ? 'bg-red-500' :
+                          notification.type === 'info' ? 'bg-blue-500' :
+                            'bg-yellow-500'
                     }`}
                 >
                   {notification.type === 'unlock' && <Target className="w-4 h-4 text-white" />}
                   {notification.type === 'mastery' && <CheckCircle className="w-4 h-4 text-white" />}
                   {notification.type === 'xp' && <Trophy className="w-4 h-4 text-white" />}
+                  {notification.type === 'error' && <AlertCircle className="w-4 h-4 text-white" />}
+                  {notification.type === 'info' && <Info className="w-4 h-4 text-white" />}
                 </motion.div>
                 <div className="flex-1">
                   <motion.p
@@ -886,7 +967,10 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
               >
                 <motion.div
                   className={`h-full ${notification.type === 'unlock' ? 'bg-indigo-500' :
-                    notification.type === 'mastery' ? 'bg-green-500' : 'bg-yellow-500'
+                      notification.type === 'mastery' ? 'bg-green-500' :
+                        notification.type === 'error' ? 'bg-red-500' :
+                          notification.type === 'info' ? 'bg-blue-500' :
+                            'bg-yellow-500'
                     }`}
                   initial={{ width: '100%' }}
                   animate={{ width: '0%' }}
@@ -1061,8 +1145,106 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                   <X size={20} />
                 </button>
               </div>
-              <div className="flex-1 overflow-hidden">
-                {renderEngine()}
+              <div className="flex h-full">
+                {/* Sidebar */}
+                <div className="w-64 bg-zinc-900 border-r border-zinc-800 flex flex-col shrink-0">
+                  <div className="p-4 border-b border-zinc-800">
+                    <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">Lesson Plan</h4>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                    {/* Concept / Explanation Item */}
+                    <button
+                      onClick={() => handleChallengeSelect(-1)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors ${activeChallengeIndex === -1 ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'
+                        }`}
+                    >
+                      <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                        <Info size={14} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">Concept</p>
+                        <p className="text-xs opacity-70">Start here</p>
+                      </div>
+                    </button>
+
+                    {/* Challenges List */}
+                    {sessionChallenges.map((chall, idx) => (
+                      <button
+                        key={chall.id}
+                        onClick={() => handleChallengeSelect(idx)}
+                        className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors ${activeChallengeIndex === idx ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'
+                          }`}
+                      >
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${activeChallengeIndex === idx ? 'bg-white/20' : 'bg-zinc-800'
+                          }`}>
+                          <span className="text-xs font-bold">{idx + 1}</span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold truncate">{chall.title}</p>
+                          <p className="text-xs opacity-70">{chall.difficulty}</p>
+                        </div>
+                        {/* You could add a checkmark icon here if completed */}
+                      </button>
+                    ))}
+
+                    {isGenerating && (
+                      <div className="p-4 text-center">
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full mx-auto"
+                        />
+                        <p className="text-xs text-zinc-500 mt-2">Generating...</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Main Content Area */}
+                <div className="flex-1 overflow-hidden bg-zinc-950 relative">
+                  {activeChallengeIndex === -1 ? (
+                    // Explanation View
+                    <div className="h-full p-8 overflow-y-auto max-w-4xl mx-auto">
+                      <div className="mb-8">
+                        <h2 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
+                          {selectedSkill.title}: The Concept
+                        </h2>
+                      </div>
+
+                      {conceptExplanation ? (
+                        <div className="prose prose-invert max-w-none prose-lg">
+                          <div className="whitespace-pre-wrap text-zinc-300 leading-relaxed space-y-6">
+                            {conceptExplanation}
+                          </div>
+                        </div>
+                      ) : isGenerating ? (
+                        <div className="flex flex-col items-center justify-center h-64">
+                          <p className="text-zinc-400 animate-pulse">Designing your lesson plan...</p>
+                        </div>
+                      ) : (
+                        <div className="p-6 bg-zinc-900 rounded-xl border border-zinc-800">
+                          <p className="text-zinc-400">No content available. Select a challenge to begin.</p>
+                        </div>
+                      )}
+
+                      {!isGenerating && sessionChallenges.length > 0 && (
+                        <div className="mt-12 flex justify-end">
+                          <button
+                            onClick={() => handleChallengeSelect(0)}
+                            className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all hover:scale-105"
+                          >
+                            <span>Start First Challenge</span>
+                            <Target size={18} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // Engine View
+                    renderEngine()
+                  )}
+                </div>
               </div>
             </motion.div>
           </motion.div>

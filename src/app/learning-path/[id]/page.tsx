@@ -1,25 +1,21 @@
-// src/app/learning-path/[id]/page.tsx
 import React from 'react';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import SkillGraphRenderer from './SkillGraphRenderer';
 import { SkillGraph, Challenge } from '@/lib/courseCreation/types';
+import SkillGraphWrapper from './SkillGraphWrapper';
 
 interface Props {
-  params: Promise<{ id: string }>; // params is now a Promise
+  params: { id: string };
 }
 
 export default async function LearningPathPage({ params }: Props) {
-  // Await params first
-  const { id } = await params;
+  const { id } = params;
 
   if (!id) {
     return <div className="text-white p-8">Invalid skill graph ID.</div>;
   }
 
-  // Await the async Supabase client
   const supabase = await createServerSupabaseClient();
 
-  // Fetch skill graph
   const { data: graphDataRaw, error: graphError } = await supabase
     .from('skill_graphs')
     .select('*')
@@ -39,10 +35,6 @@ export default async function LearningPathPage({ params }: Props) {
 
   const graphData: SkillGraph = graphDataRaw as SkillGraph;
 
-  // DEBUGGING: Check structure of nodes
-  console.log('Graph Nodes Sample:', graphData.nodes.slice(0, 1));
-
-  // Fetch challenges for the nodes
   const skillIds = graphData.nodes.map((n: any) => n.id);
   const { data: challengesRaw } = await supabase
     .from('challenges')
@@ -53,5 +45,5 @@ export default async function LearningPathPage({ params }: Props) {
   const challengesMap: Record<string, Challenge> = {};
   challengesData.forEach((c) => (challengesMap[c.skillId] = c));
 
-  return <SkillGraphRenderer graph={graphData} challenges={challengesMap} />;
+  return <SkillGraphWrapper graph={graphData} challenges={challengesMap} />;
 }

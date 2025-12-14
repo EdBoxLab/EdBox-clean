@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { Challenge } from '../../types';
 import { motion } from 'framer-motion';
 import { Mic, Volume2, CheckCircle, XCircle, Lightbulb, Trophy, Clock, MessageCircle, Languages } from 'lucide-react';
-import { callGroq } from '../shared/groqService';
 import { evaluateChallenge } from '../../../../app/actions/evaluate-challenge';
 
 interface LinguaLabProps {

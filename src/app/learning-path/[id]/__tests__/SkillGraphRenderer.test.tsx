@@ -36,20 +36,30 @@ describe('SkillGraphRenderer', () => {
         id: 'skill-1',
         title: 'Basic Skill',
         description: 'A basic skill for testing',
+        category: 'Technology' as any,
         prerequisites: [],
         engine: 'codestudio',
         level: 'Beginner',
         estimatedMinutes: 30,
+        masteryThreshold: {
+          minSuccessRate: 0.8,
+          challengesRequired: 3
+        },
         xpReward: 100
       },
       {
         id: 'skill-2',
         title: 'Advanced Skill',
         description: 'An advanced skill for testing',
+        category: 'Technology' as any,
         prerequisites: ['skill-1'],
         engine: 'mathlab',
         level: 'Advanced',
         estimatedMinutes: 45,
+        masteryThreshold: {
+          minSuccessRate: 0.8,
+          challengesRequired: 3
+        },
         xpReward: 200
       }
     ],

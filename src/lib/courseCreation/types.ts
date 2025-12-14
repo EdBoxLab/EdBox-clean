@@ -186,6 +186,8 @@ export interface Challenge {
   description: string;
   engine: string; // Using string to match database storage
   difficulty: 'Easy' | 'Medium' | 'Hard';
+  estimatedMinutes?: number;
+  xpReward?: number;
 
   // Context for the AI to generate the challenge
   context?: string;

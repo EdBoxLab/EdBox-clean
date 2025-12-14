@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export default function FlashcardGenPage() {
   const [notes, setNotes] = useState('');
-  const [flashcards, setFlashcards] = useState([]);
+  const [flashcards, setFlashcards] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   const handleGenerateFlashcards = async () => {

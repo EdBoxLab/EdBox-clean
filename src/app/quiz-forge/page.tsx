@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export default function QuizForgePage() {
   const [notes, setNotes] = useState('');
-  const [quiz, setQuiz] = useState(null);
+  const [quiz, setQuiz] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   const handleCreateQuiz = async () => {

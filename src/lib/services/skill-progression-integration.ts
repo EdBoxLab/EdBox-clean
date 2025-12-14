@@ -52,7 +52,7 @@ export class SkillProgressionIntegration {
       }
 
       // Skill is unlocked - ensure we have challenges available
-      await challengeGenerator.ensurePoolSize(skillId, 5);
+      await challengeGenerator.ensurePoolSize(skillId, undefined, 5);
       const challenges = await challengeGenerator.getChallengePool(skillId);
 
       return {
@@ -100,7 +100,7 @@ export class SkillProgressionIntegration {
   async onSkillUnlocked(skillId: string): Promise<void> {
     try {
       // Pre-generate challenges for newly unlocked skill
-      await challengeGenerator.ensurePoolSize(skillId, 3);
+      await challengeGenerator.ensurePoolSize(skillId, undefined, 3);
       
       // Generate varied challenges for different difficulty levels
       await challengeGenerator.generateVariedChallenges(skillId, 2, 'Easy');
@@ -268,7 +268,7 @@ export class SkillProgressionIntegration {
       // Get challenges for available skills
       for (const skillId of availableSkills.slice(0, limit)) {
         try {
-          await challengeGenerator.ensurePoolSize(skillId, 1);
+          await challengeGenerator.ensurePoolSize(skillId, undefined, 1);
           const challenges = await challengeGenerator.getChallengePool(skillId);
           
           if (challenges.length > 0) {

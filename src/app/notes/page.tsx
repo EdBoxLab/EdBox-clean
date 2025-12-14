@@ -5,8 +5,8 @@ import { Plus, Book, Trash, Edit, Save } from 'lucide-react';
 import { ViewNoteDialog } from '@/components/view-note-dialog';
 
 export default function NotesPage() {
-  const [notes, setNotes] = useState([]);
-  const [selectedNote, setSelectedNote] = useState(null);
+  const [notes, setNotes] = useState<any[]>([]);
+  const [selectedNote, setSelectedNote] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState('');
 
@@ -19,7 +19,7 @@ export default function NotesPage() {
     fetchNotes();
   }, []);
 
-  const handleSelectNote = (note) => {
+  const handleSelectNote = (note: any) => {
     setSelectedNote(note);
     setEditedContent(note.content);
     setIsEditing(false);
@@ -38,7 +38,7 @@ export default function NotesPage() {
     setIsEditing(true);
   };
 
-  const handleDeleteNote = async (id) => {
+  const handleDeleteNote = async (id: any) => {
     await fetch(`/api/notes/${id}`, { method: 'DELETE' });
     setNotes(notes.filter((note) => note.id !== id));
     if (selectedNote && selectedNote.id === id) {

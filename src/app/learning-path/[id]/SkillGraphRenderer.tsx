@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { X, Sparkles, Trophy, Clock, Target, Zap, Lock, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { useMultipleSkillsProgress } from '@/lib/hooks/useProgressTracker';
+import { usePerformanceMonitoring } from '@/lib/hooks/usePerformanceMonitoring';
+import { skillGraphOptimizer } from '@/lib/services/skill-graph-optimizer';
 import type { SkillState, DifficultyLevel } from '@/types/skill-progression';
 import type { SkillGraph as ProgressionSkillGraph } from '@/lib/services/skill-progression-manager';
 
@@ -36,6 +38,24 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
     message: string;
     skillId?: string;
   }>>([]);
+  const [viewport, setViewport] = useState(() => {
+    const progressionGraph = {
+      nodes: graph.nodes.map(node => ({
+        id: node.id,
+        title: node.title,
+        description: node.description,
+        prerequisites: node.prerequisites || [],
+        engine: node.engine || 'default',
+        difficulty: (node.level as DifficultyLevel) || 'Medium'
+      })),
+      edges: graph.edges || []
+    };
+    return skillGraphOptimizer.getOptimalViewport(progressionGraph);
+  });
+  const [optimizedGraph, setOptimizedGraph] = useState<any>(null);
+
+  // Performance monitoring
+  const { timeAsync, timeSync } = usePerformanceMonitoring('SkillGraphRenderer');
 
   // Convert the graph to the format expected by the progress tracker
   const convertToProgressionGraph = (graph: SkillGraph): ProgressionSkillGraph => {
@@ -44,11 +64,11 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
         id: node.id,
         title: node.title,
         description: node.description,
-        prerequisites: node.prerequisites,
-        engine: node.engine,
+        prerequisites: node.prerequisites || [],
+        engine: node.engine || 'default',
         difficulty: (node.level as DifficultyLevel) || 'Medium' // Convert level to difficulty
       })),
-      edges: graph.edges
+      edges: graph.edges || []
     };
   };
 
@@ -56,6 +76,26 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
 
   // Use the progress tracker hook for multiple skills
   const { progressData, loading: progressLoading, error: progressError } = useMultipleSkillsProgress(progressionGraph);
+
+  // Optimize graph for rendering when progress data changes
+  useEffect(() => {
+    if (progressData.length > 0) {
+      timeAsync('graph_optimization', async () => {
+        const skillStates = new Map<string, SkillState>();
+        progressData.forEach(p => {
+          skillStates.set(p.skillId, p.progressData.state || 'locked');
+        });
+
+        const optimized = skillGraphOptimizer.optimizeForRendering(
+          progressionGraph,
+          skillStates,
+          viewport
+        );
+        
+        setOptimizedGraph(optimized);
+      });
+    }
+  }, [progressData, viewport, progressionGraph, timeAsync]);
 
   // Track mouse for background animations
   useEffect(() => {

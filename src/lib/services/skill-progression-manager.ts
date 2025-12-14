@@ -17,6 +17,7 @@ import {
   ProgressTrackingError
 } from '@/types/skill-progression';
 import { skillProgressionDb } from './skill-progression-db';
+import { skillProgressionCache } from './cache-service';
 
 /**
  * Skill graph node representing a skill and its dependencies
@@ -246,6 +247,13 @@ export class SkillProgressionManager {
    */
   async getAllSkillStates(userId: string, skillGraph: SkillGraph): Promise<Map<string, SkillState>> {
     try {
+      // Check cache first
+      const graphId = this.generateGraphId(skillGraph);
+      const cachedStates = skillProgressionCache.getSkillStates(userId, graphId);
+      if (cachedStates) {
+        return cachedStates;
+      }
+
       const skillStates = new Map<string, SkillState>();
 
       // Get all mastered skills for efficiency
@@ -266,6 +274,9 @@ export class SkillProgressionManager {
           skillStates.set(node.id, state);
         }
       }
+
+      // Cache the skill states for faster subsequent access
+      skillProgressionCache.setSkillStates(userId, graphId, skillStates);
 
       return skillStates;
     } catch (error) {
@@ -370,6 +381,34 @@ export class SkillProgressionManager {
 
     collectPrerequisites(skillId);
     return chain;
+  }
+
+  /**
+   * Generate a unique ID for a skill graph for caching purposes
+   */
+  private generateGraphId(skillGraph: SkillGraph): string {
+    // Create a hash based on skill IDs and their prerequisites
+    const graphSignature = skillGraph.nodes
+      .map(node => `${node.id}:${node.prerequisites.sort().join(',')}`)
+      .sort()
+      .join('|');
+    
+    // Simple hash function (for production, consider using a proper hash library)
+    let hash = 0;
+    for (let i = 0; i < graphSignature.length; i++) {
+      const char = graphSignature.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    return `graph_${Math.abs(hash)}`;
+  }
+
+  /**
+   * Invalidate skill states cache when progress changes
+   */
+  invalidateSkillStatesCache(userId: string, graphId?: string): void {
+    skillProgressionCache.invalidateSkillStates(userId, graphId);
   }
 }
 

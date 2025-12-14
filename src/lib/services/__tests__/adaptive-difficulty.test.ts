@@ -82,12 +82,14 @@ describe('AdaptiveDifficultyService Property Tests', () => {
             const filteredAttempts = recentAttempts.map(attempt => ({
               ...attempt,
               userId,
-              skillId
+              skillId,
+              timeSpent: attempt.timeSpent || undefined
             }));
 
             const filteredProgress = allProgress.map(progress => ({
               ...progress,
-              userId
+              userId,
+              lastAttempt: progress.lastAttempt || undefined
             }));
 
             // Setup mocks
@@ -161,7 +163,8 @@ describe('AdaptiveDifficultyService Property Tests', () => {
           async (userId, crossSkillProgress) => {
             const filteredProgress = crossSkillProgress.map(progress => ({
               ...progress,
-              userId
+              userId,
+              lastAttempt: progress.lastAttempt || undefined
             }));
 
             // Setup mocks
@@ -214,6 +217,7 @@ describe('AdaptiveDifficultyService Property Tests', () => {
               ...attempt,
               userId,
               skillId,
+              timeSpent: attempt.timeSpent || undefined,
               // Ensure timestamps are in descending order (most recent first)
               timestamp: new Date(Date.now() - attempts.indexOf(attempt) * 60000)
             }));

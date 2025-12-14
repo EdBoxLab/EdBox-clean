@@ -61,7 +61,7 @@ describe('ChallengeGenerator Property Tests', () => {
   const challengeRequestArb = fc.record({
     skillId: skillIdArb,
     difficultyLevel: difficultyArb,
-    challengeType: fc.option(challengeTypeArb),
+    challengeType: fc.option(challengeTypeArb, { nil: undefined }),
     userHistory: fc.option(fc.array(fc.record({
       id: fc.string(),
       userId: fc.string(),

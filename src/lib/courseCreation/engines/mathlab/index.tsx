@@ -10,6 +10,18 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <App challenge={{
+      id: 'demo-challenge',
+      skillId: 'math-basics',
+      title: 'Math Fundamentals',
+      description: 'Learn basic mathematics',
+      engine: 'mathlab',
+      difficulty: 'Easy',
+      estimatedMinutes: 30,
+      xpReward: 100,
+      validationCriteria: [],
+      hints: ['Start with basic operations'],
+      explanation: 'This is a demo challenge'
+    }} />
   </React.StrictMode>
 );

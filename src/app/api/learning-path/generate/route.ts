@@ -21,6 +21,9 @@ interface ProjectNode {
   id: string;
   name: string;
   skills: string[];
+  estimatedMinutes?: number;
+  xpReward?: number;
+  engine?: string;
 }
 
 interface SkillGraphData {

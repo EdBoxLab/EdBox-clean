@@ -17,6 +17,7 @@ import {
 } from '@/types/skill-progression';
 import { skillProgressionDb } from './skill-progression-db';
 import { skillProgressionManager } from './skill-progression-manager';
+import { skillProgressionCache } from './cache-service';
 
 /**
  * XP calculation configuration
@@ -145,6 +146,9 @@ export class ProgressTracker {
         feedback: options.feedback
       };
 
+      // Invalidate cache since progress has changed
+      this.invalidateProgressCache(userId, skillId);
+
       // Emit progress update event
       await this.emitProgressUpdate(userId, skillId, 'challenge_completed', {
         xpAwarded: totalXP,
@@ -201,6 +205,17 @@ export class ProgressTracker {
     skillGraph?: any
   ): Promise<ProgressDisplayData> {
     try {
+      // Check cache first
+      const cacheKey = `display:${userId}:${skillId}`;
+      const cached = skillProgressionCache.getProgress(userId, skillId);
+      if (cached) {
+        // Return cached display data if available and recent
+        const displayData = this.convertProgressToDisplayData(cached, skillTitle, skillGraph);
+        if (displayData) {
+          return displayData;
+        }
+      }
+
       // Get basic progress summary
       const summary = await this.getProgressSummary(userId, skillId);
       
@@ -218,7 +233,7 @@ export class ProgressTracker {
       // Estimate time to mastery based on current progress and performance
       const estimatedTimeToMastery = this.estimateTimeToMastery(summary, recentPerformance);
 
-      return {
+      const displayData = {
         skillId,
         title: skillTitle,
         progressPercentage: summary.progressPercentage,
@@ -233,6 +248,12 @@ export class ProgressTracker {
         estimatedTimeToMastery,
         recentPerformance
       };
+
+      // Cache the progress data for faster subsequent access
+      // Note: We'll cache the display data instead since summary doesn't have all required fields
+      // This would require converting summary to UserSkillProgress format or using a different cache key
+
+      return displayData;
     } catch (error) {
       throw new ProgressTrackingError(
         `Failed to get progress display data: ${error}`,
@@ -517,6 +538,57 @@ export class ProgressTracker {
    */
   getXPConfig(): XPConfig {
     return { ...this.xpConfig };
+  }
+
+  /**
+   * Convert cached progress data to display data format
+   */
+  private convertProgressToDisplayData(
+    progress: UserSkillProgress, 
+    skillTitle: string, 
+    skillGraph?: any
+  ): ProgressDisplayData | null {
+    try {
+      // Check if cached data is recent enough (within 2 minutes)
+      const cacheAge = Date.now() - new Date(progress.updatedAt).getTime();
+      if (cacheAge > 2 * 60 * 1000) {
+        return null; // Cache too old
+      }
+
+      // Determine skill state
+      let state: 'locked' | 'unlocked' | 'mastered' = 'unlocked';
+      if (progress.masteryAchieved) {
+        state = 'mastered';
+      }
+
+      return {
+        skillId: progress.skillId,
+        title: skillTitle,
+        progressPercentage: (progress.challengesCompleted / progress.challengesRequired) * 100,
+        challengesCompleted: progress.challengesCompleted,
+        challengesRequired: progress.challengesRequired,
+        successRate: progress.successRate,
+        masteryAchieved: progress.masteryAchieved,
+        xpEarned: progress.xpEarned,
+        totalAttempts: progress.totalAttempts,
+        lastAttempt: progress.lastAttempt,
+        state,
+        estimatedTimeToMastery: 0, // Would need to recalculate
+        recentPerformance: {
+          trend: 'stable' as const,
+          streakLength: 0
+        }
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Invalidate cache when progress is updated
+   */
+  private invalidateProgressCache(userId: string, skillId: string): void {
+    skillProgressionCache.invalidateProgress(userId, skillId);
   }
 }
 

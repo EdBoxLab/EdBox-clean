@@ -19,6 +19,7 @@ import {
 import { callGroq } from '@/lib/courseCreation/engines/shared/groqService';
 import { skillProgressionDb } from './skill-progression-db';
 import { adaptiveDifficultyService } from './adaptive-difficulty';
+import { skillProgressionCache } from './cache-service';
 
 /**
  * Challenge template for fallback scenarios
@@ -76,6 +77,19 @@ export class ChallengeGenerator {
    */
   async generateChallenge(request: ChallengeGenerationRequest): Promise<GeneratedChallenge> {
     try {
+      // Check if we have cached challenges available first
+      const cachedPool = skillProgressionCache.getChallengePool(request.skillId);
+      if (cachedPool && cachedPool.length > 0) {
+        // Return a cached challenge that matches the difficulty
+        const matchingChallenge = cachedPool.find(c => c.difficultyLevel === request.difficultyLevel);
+        if (matchingChallenge) {
+          // Remove from cache pool to avoid duplicates
+          const updatedPool = cachedPool.filter(c => c.id !== matchingChallenge.id);
+          skillProgressionCache.setChallengePool(request.skillId, updatedPool);
+          return matchingChallenge;
+        }
+      }
+
       // Apply adaptive difficulty if user ID is provided
       let adjustedRequest = request;
       if (request.userId) {
@@ -84,6 +98,9 @@ export class ChallengeGenerator {
 
       // Try AI generation first
       const challenge = await this.generateWithAI(adjustedRequest);
+      
+      // Cache the generated challenge
+      skillProgressionCache.setChallenge(adjustedRequest.skillId, challenge);
       
       // Add to pool if successful
       await this.addToPool(adjustedRequest.skillId, challenge);

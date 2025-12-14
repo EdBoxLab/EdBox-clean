@@ -39,6 +39,9 @@ export default async function LearningPathPage({ params }: Props) {
 
   const graphData: SkillGraph = graphDataRaw as SkillGraph;
 
+  // DEBUGGING: Check structure of nodes
+  console.log('Graph Nodes Sample:', graphData.nodes.slice(0, 1));
+
   // Fetch challenges for the nodes
   const skillIds = graphData.nodes.map((n: any) => n.id);
   const { data: challengesRaw } = await supabase

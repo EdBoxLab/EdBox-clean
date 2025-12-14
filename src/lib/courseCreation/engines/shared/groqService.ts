@@ -48,10 +48,10 @@ function getNextGroqClient(): Groq {
   if (GROQ_API_KEYS.length === 0) {
     throw new Error('No Groq API keys available');
   }
-  
+
   const apiKey = GROQ_API_KEYS[currentKeyIndex];
   currentKeyIndex = (currentKeyIndex + 1) % GROQ_API_KEYS.length;
-  
+
   return new Groq({
     apiKey,
     dangerouslyAllowBrowser: true // Allow browser usage
@@ -61,10 +61,10 @@ function getNextGroqClient(): Groq {
 export async function callGroq(
   systemPrompt: string,
   userPrompt: string,
-  model: string = 'llama-3.1-70b-versatile'
+  model: string = 'llama-3.1-8b-instant'
 ): Promise<string> {
   const groq = getNextGroqClient();
-  
+
   try {
     const completion = await groq.chat.completions.create({
       messages: [

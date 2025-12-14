@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Challenge } from '@/lib/courseCreation/types';
 import { motion } from 'framer-motion';
 import { Play, CheckCircle, XCircle, Lightbulb, Trophy, Clock, Code, Terminal } from 'lucide-react';
-import { callGroq } from '../shared/groqService';
+import { evaluateChallenge } from '@/app/actions/evaluate-challenge';
 
 interface CodeStudioProps {
   challenge: Challenge;
@@ -40,66 +40,26 @@ export default function CodeStudio({ challenge, onComplete }: CodeStudioProps) {
 
   const handleRun = async () => {
     setState(prev => ({ ...prev, isRunning: true, output: '', testResults: [] }));
-    
+
     try {
-      // Use Groq to evaluate the code
-      const systemPrompt = `You are a code evaluation assistant. Evaluate the provided code against the challenge requirements.
+      const result = await evaluateChallenge(
+        state.code,
+        challenge.title,
+        challenge.description,
+        challenge.validationCriteria
+      );
 
-Challenge: ${challenge.title}
-Description: ${challenge.description}
-Validation Criteria: ${JSON.stringify(challenge.validationCriteria)}
+      setState(prev => ({
+        ...prev,
+        isRunning: false,
+        output: result.output,
+        testResults: result.testResults,
+        isComplete: result.isComplete,
+        isSuccess: result.isSuccess,
+      }));
 
-Analyze the code and return a JSON response with:
-{
-  "success": boolean,
-  "output": "execution output or error message",
-  "testResults": [
-    {"test": "test description", "passed": boolean, "message": "result message"}
-  ],
-  "feedback": "constructive feedback"
-}
-
-Be thorough in your evaluation and provide helpful feedback.`;
-
-      const userPrompt = `Evaluate this code:
-
-\`\`\`javascript
-${state.code}
-\`\`\`
-
-Check if it meets the challenge requirements and provide detailed feedback.`;
-
-      const response = await callGroq(systemPrompt, userPrompt);
-      
-      try {
-        const result = JSON.parse(response);
-        
-        setState(prev => ({
-          ...prev,
-          isRunning: false,
-          output: result.output || 'Code executed successfully',
-          testResults: result.testResults || [],
-          isComplete: true,
-          isSuccess: result.success || false,
-        }));
-        
-        if (onComplete) {
-          onComplete(result.success || false);
-        }
-      } catch (parseError) {
-        // Fallback if JSON parsing fails
-        const success = response.toLowerCase().includes('success') || response.toLowerCase().includes('correct');
-        setState(prev => ({
-          ...prev,
-          isRunning: false,
-          output: response,
-          isComplete: true,
-          isSuccess: success,
-        }));
-        
-        if (onComplete) {
-          onComplete(success);
-        }
+      if (onComplete) {
+        onComplete(result.isSuccess);
       }
     } catch (error) {
       setState(prev => ({
@@ -139,7 +99,7 @@ Check if it meets the challenge requirements and provide detailed feedback.`;
           <div className="flex items-center gap-4 text-sm">
             <div className="flex items-center gap-1 text-blue-400">
               <Clock className="w-4 h-4" />
-              <span>{challenge.estimatedMinutes}m</span>
+              <span>{challenge.estimatedMinutes || 15}m</span>
             </div>
             <div className="flex items-center gap-1 text-yellow-400">
               <Trophy className="w-4 h-4" />
@@ -196,7 +156,7 @@ Check if it meets the challenge requirements and provide detailed feedback.`;
                   </button>
                 )}
               </div>
-              
+
               {state.showHint && challenge.hints.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
@@ -225,7 +185,7 @@ Check if it meets the challenge requirements and provide detailed feedback.`;
               {state.isRunning ? 'Running...' : 'Run Code'}
             </button>
           </div>
-          
+
           <div className="flex-1 bg-gray-800 rounded-lg overflow-hidden">
             <textarea
               value={state.code}
@@ -247,11 +207,32 @@ Check if it meets the challenge requirements and provide detailed feedback.`;
                 <h3 className="text-lg font-semibold">Output</h3>
               </div>
               <div className="bg-gray-800 rounded-lg p-4 h-32 overflow-y-auto">
-                {state.output && (
-                  <pre className="text-sm text-gray-300 whitespace-pre-wrap">{state.output}</pre>
-                )}
-                {!state.output && (
-                  <p className="text-gray-500 text-sm">Output will appear here...</p>
+                {/* Feedback & Output Display */}
+                {state.isComplete ? (
+                  <div className="space-y-4">
+                    {/* Overall feedback */}
+                    {state.isSuccess ? (
+                      <div className="p-3 bg-green-900/30 border border-green-500/30 rounded-lg">
+                        <h4 className="font-bold text-green-400 mb-1">Success!</h4>
+                        <p className="text-sm text-gray-300">{state.testResults[0]?.message || "Great job! You solved the challenge."}</p>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-red-900/30 border border-red-500/30 rounded-lg">
+                        <h4 className="font-bold text-red-400 mb-1">Not quite there yet</h4>
+                        <p className="text-sm text-gray-300">Check the test results below or try a hint.</p>
+                      </div>
+                    )}
+
+                    {/* Console Output */}
+                    {state.output && state.output !== 'Code executed successfully' && (
+                      <div>
+                        <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Console Output</h4>
+                        <pre className="text-sm font-mono text-gray-300 whitespace-pre-wrap bg-black/30 p-2 rounded">{state.output}</pre>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm">Run your code to see results...</p>
                 )}
               </div>
             </div>
@@ -264,9 +245,8 @@ Check if it meets the challenge requirements and provide detailed feedback.`;
                   {state.testResults.map((result, index) => (
                     <div
                       key={index}
-                      className={`flex items-start gap-2 p-3 rounded-lg ${
-                        result.passed ? 'bg-green-900/20 border border-green-600/30' : 'bg-red-900/20 border border-red-600/30'
-                      }`}
+                      className={`flex items-start gap-2 p-3 rounded-lg ${result.passed ? 'bg-green-900/20 border border-green-600/30' : 'bg-red-900/20 border border-red-600/30'
+                        }`}
                     >
                       {result.passed ? (
                         <CheckCircle className="w-5 h-5 text-green-400 mt-0.5" />

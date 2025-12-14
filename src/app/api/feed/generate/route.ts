@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const { interests = [], likedTopics = [] } = body;
 
-        console.log('🚀 Generating feed for:', interests.length, 'interests');
+        console.log('Generating feed for:', interests.length, 'interests');
 
         // 1. Generate text content via Groq
         const textItems = await generateFeedWithGroq(interests, likedTopics);

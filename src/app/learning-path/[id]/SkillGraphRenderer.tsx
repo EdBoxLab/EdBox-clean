@@ -91,7 +91,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
           skillStates,
           viewport
         );
-        
+
         setOptimizedGraph(optimized);
       });
     }
@@ -134,7 +134,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
   const addNotification = (type: 'unlock' | 'mastery' | 'xp', message: string, skillId?: string) => {
     const id = Date.now().toString();
     setNotifications(prev => [...prev, { id, type, message, skillId }]);
-    
+
     // Add celebratory effects for mastery
     if (type === 'mastery') {
       // Trigger confetti-like animation
@@ -147,7 +147,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
           particle.style.left = Math.random() * window.innerWidth + 'px';
           particle.style.top = '20px';
           document.body.appendChild(particle);
-          
+
           // Animate particle
           particle.animate([
             { transform: 'translateY(0) rotate(0deg)', opacity: 1 },
@@ -159,7 +159,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
         }, i * 100);
       }
     }
-    
+
     // Auto-remove after 6 seconds (longer for mastery notifications)
     const duration = type === 'mastery' ? 8000 : 5000;
     setTimeout(() => {
@@ -185,18 +185,18 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
     // Compare current and previous progress to detect changes
     progressData.forEach(current => {
       const previous = previousProgressData.find(p => p.skillId === current.skillId);
-      
+
       if (previous) {
         // Check for skill unlocking
         if (previous.progressData.state === 'locked' && current.progressData.state === 'unlocked') {
           addNotification('unlock', `🎉 ${current.title} unlocked!`, current.skillId);
         }
-        
+
         // Check for mastery achievement
         if (!previous.progressData.masteryAchieved && current.progressData.masteryAchieved) {
           addNotification('mastery', `🏆 ${current.title} mastered!`, current.skillId);
         }
-        
+
         // Check for significant XP gains
         const xpGain = current.progressData.xpEarned - previous.progressData.xpEarned;
         if (xpGain > 0) {
@@ -271,10 +271,10 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
   const renderEngine = () => {
     if (!currentChallenge) return null;
     console.log('Current challenge engine:', currentChallenge.engine);
-    
+
     // Convert engine to string for comparison since it comes from the database as a string
     const engineStr = String(currentChallenge.engine).toLowerCase();
-    
+
     switch (engineStr) {
       case 'codestudio':
         return <CodeStudio challenge={currentChallenge} />;
@@ -348,34 +348,34 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
             {/* Morphing Gradient */}
             <motion.div
               className="absolute inset-0"
-              animate={{ 
+              animate={{
                 background: [
-                  randomGradient(), 
-                  randomGradient(), 
+                  randomGradient(),
+                  randomGradient(),
                   randomGradient()
-                ] 
+                ]
               }}
               transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
               style={{ backgroundSize: '400% 400%' }}
             />
-            
+
             {/* Warping Blobs */}
             <motion.div
               className="absolute w-96 h-96 rounded-full blur-3xl opacity-30"
-              style={{ 
-                background: 'radial-gradient(circle, rgba(255,0,255,0.7) 0%, transparent 70%)', 
-                left: mousePosition.x * 0.05, 
-                top: mousePosition.y * 0.05 
+              style={{
+                background: 'radial-gradient(circle, rgba(255,0,255,0.7) 0%, transparent 70%)',
+                left: mousePosition.x * 0.05,
+                top: mousePosition.y * 0.05
               }}
               animate={{ scale: [1, 1.2, 0.8, 1], x: [0, 50, -50, 0], y: [0, -30, 30, 0] }}
               transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
             />
             <motion.div
               className="absolute w-80 h-80 rounded-full blur-3xl opacity-30"
-              style={{ 
-                background: 'radial-gradient(circle, rgba(0,255,255,0.7) 0%, transparent 70%)', 
-                right: mousePosition.x * 0.03, 
-                bottom: mousePosition.y * 0.03 
+              style={{
+                background: 'radial-gradient(circle, rgba(0,255,255,0.7) 0%, transparent 70%)',
+                right: mousePosition.x * 0.03,
+                bottom: mousePosition.y * 0.03
               }}
               animate={{ scale: [1, 0.8, 1.3, 1], x: [0, -40, 40, 0], y: [0, 40, -40, 0] }}
               transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
@@ -493,12 +493,12 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
             <div className="flex items-center gap-3">
               {(() => {
                 // Find next recommended skill (unlocked but not mastered)
-                const nextSkill = progressData.find(p => 
-                  p.progressData.state === 'unlocked' && 
+                const nextSkill = progressData.find(p =>
+                  p.progressData.state === 'unlocked' &&
                   !p.progressData.masteryAchieved &&
                   p.progressData.challengesCompleted < p.progressData.challengesRequired
                 );
-                
+
                 return nextSkill ? (
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -521,7 +521,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
         </motion.div>
 
         {/* Skill Graph Nodes */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
@@ -531,7 +531,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
             const skillState = getSkillState(skill.id);
             const progress = getSkillProgress(skill.id);
             const unmetPrereqs = getUnmetPrerequisites(skill);
-            
+
             // Determine colors and styles based on state
             const getStateStyles = () => {
               switch (skillState) {
@@ -574,18 +574,18 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                 transition={{ delay: 0.5 + index * 0.1 }}
                 className={`relative group ${skillState === 'locked' ? 'cursor-help' : 'cursor-pointer'}`}
                 onClick={() => handleSkillClick(skill.id)}
-                whileHover={{ 
+                whileHover={{
                   scale: skillState !== 'locked' ? 1.02 : 1,
                   transition: { duration: 0.2 }
                 }}
-                whileTap={{ 
+                whileTap={{
                   scale: skillState !== 'locked' ? 0.98 : 1,
                   transition: { duration: 0.1 }
                 }}
               >
                 {/* Hover glow effect */}
                 <div className={`absolute inset-0 bg-gradient-to-br ${styles.bgGradient} rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
-                
+
                 {/* Subtle glow for unlocked skills */}
                 {skillState === 'unlocked' && progress && progress.challengesCompleted === 0 && (
                   <motion.div
@@ -618,11 +618,11 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                   <motion.div
                     className="absolute inset-0 bg-gradient-to-br from-indigo-400/20 to-purple-400/20 rounded-2xl"
                     initial={{ scale: 0, opacity: 0 }}
-                    animate={{ 
+                    animate={{
                       scale: [0, 1.1, 1],
                       opacity: [0, 0.8, 0]
                     }}
-                    transition={{ 
+                    transition={{
                       duration: 2,
                       repeat: Infinity,
                       repeatDelay: 8,
@@ -630,17 +630,17 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                     }}
                   />
                 )}
-                
+
                 <div className={`relative bg-gray-800 rounded-2xl p-4 md:p-6 border ${styles.borderColor} transition-all duration-300 ${skillState === 'locked' ? 'opacity-60' : ''} overflow-hidden`}>
-                  
+
                   {/* Progress Bar */}
                   <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl overflow-hidden bg-gray-700">
                     <motion.div
                       className={`h-full ${skillState === 'mastered' ? 'bg-green-500' : skillState === 'unlocked' ? 'bg-indigo-500' : 'bg-gray-600'}`}
                       initial={{ width: '0%' }}
-                      animate={{ 
-                        width: skillState === 'mastered' ? '100%' : 
-                               progress ? `${progress.progressPercentage}%` : '0%'
+                      animate={{
+                        width: skillState === 'mastered' ? '100%' :
+                          progress ? `${progress.progressPercentage}%` : '0%'
                       }}
                       transition={{ duration: 1, delay: 0.6 + index * 0.1 }}
                     />
@@ -667,14 +667,14 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                   <div className="mt-2">
                     <div className="flex items-start justify-between mb-3 pr-8">
                       <h3 className={`text-lg md:text-xl font-bold ${skillState === 'locked' ? 'text-gray-400' : 'text-white'} group-hover:${styles.textColor} transition-colors`}>
-                        {skill.title}
+                        {skill.title || (skill as any).name || 'Untitled Skill'}
                       </h3>
                       <div className="flex items-center gap-1 text-xs text-gray-400 bg-gray-700/50 px-2 py-1 rounded-lg">
                         <Clock className="w-3 h-3" />
                         <span>{skill.estimatedMinutes}m</span>
                       </div>
                     </div>
-                    
+
                     <p className="text-gray-400 text-sm mb-4 line-clamp-2">
                       {skill.description}
                     </p>
@@ -690,13 +690,12 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                             {Math.round(progress.progressPercentage)}%
                           </span>
                         </div>
-                        
+
                         {/* Mini progress bar */}
                         <div className="w-full bg-gray-600 rounded-full h-1.5 mb-2">
                           <motion.div
-                            className={`h-1.5 rounded-full ${
-                              skillState === 'mastered' ? 'bg-green-500' : 'bg-indigo-500'
-                            }`}
+                            className={`h-1.5 rounded-full ${skillState === 'mastered' ? 'bg-green-500' : 'bg-indigo-500'
+                              }`}
                             initial={{ width: 0 }}
                             animate={{ width: `${progress.progressPercentage}%` }}
                             transition={{ duration: 1, delay: 0.5 }}
@@ -719,13 +718,12 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                         {/* Performance trend indicator */}
                         {progress.recentPerformance && (
                           <div className="flex items-center gap-1 mt-1">
-                            <div className={`w-2 h-2 rounded-full ${
-                              progress.recentPerformance.trend === 'improving' ? 'bg-green-400' :
-                              progress.recentPerformance.trend === 'declining' ? 'bg-red-400' : 'bg-yellow-400'
-                            }`} />
+                            <div className={`w-2 h-2 rounded-full ${progress.recentPerformance.trend === 'improving' ? 'bg-green-400' :
+                                progress.recentPerformance.trend === 'declining' ? 'bg-red-400' : 'bg-yellow-400'
+                              }`} />
                             <span className="text-xs text-gray-400">
                               {progress.recentPerformance.trend === 'improving' ? 'Improving' :
-                               progress.recentPerformance.trend === 'declining' ? 'Needs focus' : 'Steady'}
+                                progress.recentPerformance.trend === 'declining' ? 'Needs focus' : 'Steady'}
                             </span>
                             {progress.recentPerformance.streakLength > 1 && (
                               <span className="text-xs text-gray-500">
@@ -808,21 +806,19 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
               exit={{ opacity: 0, x: 300, scale: 0.8 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               style={{ zIndex: 1000 - index }}
-              className={`bg-gray-800 border rounded-lg p-4 shadow-2xl max-w-sm backdrop-blur-sm ${
-                notification.type === 'unlock' ? 'border-indigo-500 bg-indigo-500/10' :
-                notification.type === 'mastery' ? 'border-green-500 bg-green-500/10' : 
-                'border-yellow-500 bg-yellow-500/10'
-              }`}
+              className={`bg-gray-800 border rounded-lg p-4 shadow-2xl max-w-sm backdrop-blur-sm ${notification.type === 'unlock' ? 'border-indigo-500 bg-indigo-500/10' :
+                  notification.type === 'mastery' ? 'border-green-500 bg-green-500/10' :
+                    'border-yellow-500 bg-yellow-500/10'
+                }`}
             >
               <div className="flex items-start gap-3">
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.2, type: "spring", stiffness: 400 }}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    notification.type === 'unlock' ? 'bg-indigo-500' :
-                    notification.type === 'mastery' ? 'bg-green-500' : 'bg-yellow-500'
-                  }`}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${notification.type === 'unlock' ? 'bg-indigo-500' :
+                      notification.type === 'mastery' ? 'bg-green-500' : 'bg-yellow-500'
+                    }`}
                 >
                   {notification.type === 'unlock' && <Target className="w-4 h-4 text-white" />}
                   {notification.type === 'mastery' && <CheckCircle className="w-4 h-4 text-white" />}
@@ -855,7 +851,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                   <X className="w-3 h-3" />
                 </button>
               </div>
-              
+
               {/* Progress bar for auto-dismiss */}
               <motion.div
                 className="mt-3 h-1 bg-gray-700 rounded-full overflow-hidden"
@@ -864,10 +860,9 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                 transition={{ delay: 0.4 }}
               >
                 <motion.div
-                  className={`h-full ${
-                    notification.type === 'unlock' ? 'bg-indigo-500' :
-                    notification.type === 'mastery' ? 'bg-green-500' : 'bg-yellow-500'
-                  }`}
+                  className={`h-full ${notification.type === 'unlock' ? 'bg-indigo-500' :
+                      notification.type === 'mastery' ? 'bg-green-500' : 'bg-yellow-500'
+                    }`}
                   initial={{ width: '100%' }}
                   animate={{ width: '0%' }}
                   transition={{ duration: 5, ease: "linear" }}
@@ -898,7 +893,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
               {(() => {
                 const skill = graph.nodes.find(n => n.id === showPrerequisites);
                 const unmetPrereqs = skill ? getUnmetPrerequisites(skill) : [];
-                
+
                 return (
                   <>
                     <div className="flex items-center gap-3 mb-4">
@@ -925,7 +920,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                       {unmetPrereqs.map((prereq, index) => {
                         const prereqState = getSkillState(prereq.id);
                         const prereqProgress = getSkillProgress(prereq.id);
-                        
+
                         return (
                           <motion.div
                             key={prereq.id}
@@ -938,10 +933,9 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                               handleSkillClick(prereq.id);
                             }}
                           >
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all group-hover:scale-110 ${
-                              prereqState === 'mastered' ? 'bg-green-500' :
-                              prereqState === 'unlocked' ? 'bg-indigo-500' : 'bg-gray-600'
-                            }`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all group-hover:scale-110 ${prereqState === 'mastered' ? 'bg-green-500' :
+                                prereqState === 'unlocked' ? 'bg-indigo-500' : 'bg-gray-600'
+                              }`}>
                               {prereqState === 'mastered' ? (
                                 <CheckCircle className="w-4 h-4 text-white" />
                               ) : prereqState === 'unlocked' ? (
@@ -961,10 +955,9 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                                   </p>
                                   {prereqProgress.progressPercentage > 0 && (
                                     <div className="flex-1 max-w-16 bg-gray-600 rounded-full h-1">
-                                      <div 
-                                        className={`h-1 rounded-full ${
-                                          prereqState === 'mastered' ? 'bg-green-500' : 'bg-indigo-500'
-                                        }`}
+                                      <div
+                                        className={`h-1 rounded-full ${prereqState === 'mastered' ? 'bg-green-500' : 'bg-indigo-500'
+                                          }`}
                                         style={{ width: `${prereqProgress.progressPercentage}%` }}
                                       />
                                     </div>

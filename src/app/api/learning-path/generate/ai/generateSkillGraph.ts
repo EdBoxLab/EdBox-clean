@@ -37,9 +37,9 @@ export type CapstoneNode = {
 
 export type SkillGraphData = {
   goal: string;
-  nodes: SkillNode[];
+  skillPaths: SkillNode[];
   miniProjects: MiniProjectNode[];
-  capstone: CapstoneNode;
+  capstoneProject: CapstoneNode;
 };
 
 // ------------------------------------
@@ -90,22 +90,73 @@ function parsePossibleJson(raw: unknown): any {
 // ------------------------------------
 // Helpers
 // ------------------------------------
-const engineMap: Record<string, EngineType> = {
-  Language: EngineType.LinguaLab,
-  LinguaLab: EngineType.LinguaLab,
-  Coding: EngineType.CodeStudio,
-  CodeStudio: EngineType.CodeStudio,
-  Math: EngineType.MathLab,
-  MathLab: EngineType.MathLab,
-  Default: EngineType.FinLab,
-  FinLab: EngineType.FinLab,
-  mathlab:EngineType.MathLab,
-  finlab:EngineType.FinLab,
-};
-
-
 const normalizeArray = (val: any): string[] =>
   Array.isArray(val) ? val.map(String) : [];
+
+/**
+ * Normalizes engine names to valid EngineType enum values
+ * Handles case-insensitive mapping and provides fallback behavior
+ */
+export function normalizeEngine(engine: string): EngineType {
+  if (!engine || typeof engine !== 'string') {
+    console.warn("Invalid engine input, defaulting to FinLab:", engine);
+    return EngineType.FinLab;
+  }
+
+  const normalized = engine.trim().toLowerCase();
+  
+  // Direct enum value mapping (case-insensitive)
+  switch (normalized) {
+    case 'codestudio':
+      return EngineType.CodeStudio;
+    case 'lingualab':
+      return EngineType.LinguaLab;
+    case 'artstudio':
+      return EngineType.ArtStudio;
+    case 'historymach':
+      return EngineType.HistoryMach;
+    case 'physicsengine':
+      return EngineType.PhysicsEngine;
+    case 'chemlab':
+      return EngineType.ChemLab;
+    case 'mathlab':
+      return EngineType.MathLab;
+    case 'finlab':
+      return EngineType.FinLab;
+    case 'writingstudio':
+      return EngineType.WritingStudio;
+    
+    // AI-generated format aliases
+    case 'language':
+    case 'languagelab':
+      return EngineType.LinguaLab;
+    case 'coding':
+    case 'code':
+      return EngineType.CodeStudio;
+    case 'art':
+      return EngineType.ArtStudio;
+    case 'history':
+      return EngineType.HistoryMach;
+    case 'physics':
+      return EngineType.PhysicsEngine;
+    case 'chemistry':
+    case 'chem':
+      return EngineType.ChemLab;
+    case 'math':
+    case 'mathematics':
+      return EngineType.MathLab;
+    case 'finance':
+    case 'financial':
+    case 'default':
+      return EngineType.FinLab;
+    case 'writing':
+      return EngineType.WritingStudio;
+    
+    default:
+      console.warn("Unknown engine string, defaulting to FinLab:", engine);
+      return EngineType.FinLab;
+  }
+}
 
 // ------------------------------------
 // MAIN GENERATOR
@@ -184,37 +235,13 @@ Return VALID JSON only. No markdown. No explanations. No placeholders.
 
     // --- parse JSON ---
     const parsed = parsePossibleJson(raw);
-function normalizeEngine(engine: string): EngineType {
-  const key = engine.trim().toLowerCase();
-  switch (key) {
-    case "languagelab":
-      return EngineType.LinguaLab;
-    case "language":
-      return EngineType.LinguaLab;
-    case "codestudio":
-            return EngineType.CodeStudio;
-    case "coding":
-      return EngineType.CodeStudio;
-    case "mathlab":
-       return EngineType.MathLab;
-    case "math":
-      return EngineType.MathLab;
-    case "finlab":
-            return EngineType.FinLab;
-    case "default":
-      return EngineType.FinLab;
-    default:
-      console.warn("Unknown engine string, defaulting to FinLab:", engine);
-      return EngineType.FinLab;
-  }
-}
 
     // --- normalize nodes ---
     if (parsed.nodes && Array.isArray(parsed.nodes)) {
       const validIds = new Set(parsed.nodes.map((n: any) => String(n.id)));
       console.dir(parsed, { depth: null });
 
-      parsed.nodes = parsed.nodes.map((n: any, i: number, arr: any[]) => {
+      parsed.skillPaths = parsed.nodes.map((n: any, i: number, arr: any[]) => {
         const prereqs =
           normalizeArray(n.prereqs).length > 0
             ? normalizeArray(n.prereqs).filter((id) => validIds.has(id))
@@ -224,6 +251,7 @@ function normalizeEngine(engine: string): EngineType {
 
         return {
           id: String(n.id),
+          name: String(n.title), // Route expects 'name' not 'title'
           title: String(n.title),
           description: String(n.description),
           prereqs,
@@ -232,6 +260,9 @@ function normalizeEngine(engine: string): EngineType {
           xpReward: Number(n.xpReward) || 0,
         };
       });
+      
+      // Remove the original nodes array
+      delete parsed.nodes;
     }
 
     // --- normalize miniProjects ---
@@ -239,6 +270,7 @@ function normalizeEngine(engine: string): EngineType {
 if (parsed.miniProjects && Array.isArray(parsed.miniProjects)) {
   parsed.miniProjects = parsed.miniProjects.map((p: any) => ({
     id: String(p.id),
+    name: String(p.title), // Route expects 'name' not 'title'
     title: String(p.title),
     description: String(p.description),
     skills: normalizeArray(p.skills),
@@ -251,8 +283,9 @@ if (parsed.miniProjects && Array.isArray(parsed.miniProjects)) {
 // --- normalize capstone ---
 if (parsed.capstone) {
   const c = parsed.capstone;
-  parsed.capstone = {
+  parsed.capstoneProject = {
     id: String(c.id),
+    name: String(c.title), // Route expects 'name' not 'title'
     title: String(c.title),
     description: String(c.description),
     skills: normalizeArray(c.skills),
@@ -260,15 +293,18 @@ if (parsed.capstone) {
     estimatedMinutes: Number(c.estimatedMinutes) || 0,
     xpReward: Number(c.xpReward) || 0,
   };
+  
+  // Remove the original capstone field
+  delete parsed.capstone;
 }
 console.dir(parsed, { depth: null });
-parsed.nodes.forEach((n: any, i: number) => {
+parsed.skillPaths?.forEach((n: any, i: number) => {
   console.log(`Node[${i}] engine:`, n.engine, typeof n.engine);
 });
-parsed.miniProjects.forEach((p: any, i: number) => {
+parsed.miniProjects?.forEach((p: any, i: number) => {
   console.log(`Project[${i}] engine:`, p.engine, typeof p.engine);
 });
-console.log("Capstone engine:", parsed.capstone.engine, typeof parsed.capstone.engine);
+console.log("Capstone engine:", parsed.capstoneProject?.engine, typeof parsed.capstoneProject?.engine);
 
     // --- final validation ---
     if (!validateSkillGraphResult(parsed)) {

@@ -114,16 +114,26 @@ export const generateLessonAudio = async (text: string, audioContext: AudioConte
 
 // Database Persistence Helpers
 
-export const persistFeedItems = async (items: FeedItem[], userId: string) => {
-  const rows = items.map(item => ({
-    user_id: userId,
-    type: item.type,
-    content: item,
-    generated_at: new Date().toISOString()
-  }));
+export const persistFeedItems = async (items: FeedItem[], userId?: string) => {
+  try {
+    const key = userId ? `feed_items_${userId}` : 'feed_items_anonymous';
+    const rows = items.map(item => ({
+      type: item.type,
+      content: item,
+      generated_at: new Date().toISOString()
+    }));
 
-  const { error } = await supabase.from('feed_items').insert(rows);
-  if (error) console.error('Failed to persist feed items:', error);
+    // Use localStorage for persistence (client-only)
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const existing = JSON.parse(localStorage.getItem(key) || '[]');
+      localStorage.setItem(key, JSON.stringify([...existing, ...rows]));
+    } else {
+      // Server-side or no localStorage available: log a fallback
+      console.warn('localStorage not available; skipping feed persistence');
+    }
+  } catch (err) {
+    console.error('Failed to persist feed items to localStorage:', err);
+  }
 };
 
 export const trackInteraction = async (userId: string, itemId: string, type: 'like' | 'dislike' | 'save' | 'skip' | 'got_it' | 'answered') => {

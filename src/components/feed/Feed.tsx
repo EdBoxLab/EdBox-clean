@@ -297,19 +297,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
           <p className="text-lg text-gray-400">
             Personalized content to accelerate your learning journey.
           </p>
-          {items.length > 0 && (
-            <div className="mt-4 flex items-center gap-4 text-sm text-gray-500">
-              <span>Batch {currentBatch}</span>
-              <span>•</span>
-              <span>{activeIndex + 1} of {Math.min(currentBatch * 10, items.length)} items</span>
-              <span>•</span>
-              <span className="text-cyan-400">
-                {viewedTypes.size === 0 ? 'Fresh content types' : `${viewedTypes.size}/5 types viewed`}
-              </span>
-              <span>•</span>
-              <span className="text-orange-400">Shorts only 🔥</span>
-            </div>
-          )}
+          {/* Status header removed per product request - no batch/type/shorthand info shown to users */}
         </div>
 
         {/* Feed Grid - consistent with homepage */}

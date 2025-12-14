@@ -1,326 +1,322 @@
-import React, { useState, useCallback } from 'react';
-import {
-  Activity,
-  Mic,
-  Share2,
-  Languages,
-  Play,
-  Square,
-  Settings,
-  Terminal,
-  Network,
-  GitBranch,
-  Type,
-  MessageCircle,
-  Menu
-} from 'lucide-react';
-import { ModuleType, SyntaxNode, PhoneticsAnalysis, SemanticGraph, TranslationResult } from './types';
-import { analyzeSyntax, analyzePhonetics, analyzeSemantics, translateText } from './services/geminiService';
-import { SyntaxTree } from './components/SyntaxTree';
-import { SemanticNetwork } from './components/SemanticNetwork';
-import { ConversationPractice } from './components/ConversationPractice';
-import { Challenge } from '../../types';
+'use client';
 
-const App: React.FC<{ challenge?: Challenge | null }> = ({ challenge }) => {
-  const [activeModule, setActiveModule] = useState<ModuleType>(ModuleType.CONVERSATION);
-  const [inputText, setInputText] = useState(challenge?.description || "The quick brown fox jumps over the lazy dog.");
-  const [loading, setLoading] = useState(false);
+import React, { useState } from 'react';
+import { Challenge } from '@/lib/courseCreation/types';
+import { motion } from 'framer-motion';
+import { Mic, Volume2, CheckCircle, XCircle, Lightbulb, Trophy, Clock, MessageCircle, Languages } from 'lucide-react';
+import { callGroq } from '../shared/groqService';
 
-  // State for results
-  const [syntaxData, setSyntaxData] = useState<SyntaxNode | null>(null);
-  const [phoneticsData, setPhoneticsData] = useState<PhoneticsAnalysis | null>(null);
-  const [semanticsData, setSemanticsData] = useState<SemanticGraph | null>(null);
-  const [translationData, setTranslationData] = useState<TranslationResult | null>(null);
+interface LinguaLabProps {
+  challenge: Challenge;
+  onComplete?: (success: boolean) => void;
+}
 
-  const handleRunAnalysis = useCallback(async () => {
-    if (!inputText.trim()) return;
-    setLoading(true);
+interface LinguaLabState {
+  userResponse: string;
+  isSubmitting: boolean;
+  feedback: string;
+  isComplete: boolean;
+  isSuccess: boolean;
+  showHint: boolean;
+  currentHintIndex: number;
+  exerciseType: 'translation' | 'conversation' | 'grammar' | 'vocabulary';
+  score: number;
+}
 
+export default function LinguaLab({ challenge, onComplete }: LinguaLabProps) {
+  const [state, setState] = useState<LinguaLabState>({
+    userResponse: '',
+    isSubmitting: false,
+    feedback: '',
+    isComplete: false,
+    isSuccess: false,
+    showHint: false,
+    currentHintIndex: 0,
+    exerciseType: 'conversation',
+    score: 0,
+  });
+
+  const handleResponseChange = (newResponse: string) => {
+    setState(prev => ({ ...prev, userResponse: newResponse }));
+  };
+
+  const handleSubmit = async () => {
+    setState(prev => ({ ...prev, isSubmitting: true, feedback: '' }));
+    
     try {
-      switch (activeModule) {
-        case ModuleType.SYNTAX:
-          const sData = await analyzeSyntax(inputText);
-          setSyntaxData(sData);
-          break;
-        case ModuleType.PHONETICS:
-          const pData = await analyzePhonetics(inputText);
-          setPhoneticsData(pData);
-          break;
-        case ModuleType.SEMANTICS:
-          const semData = await analyzeSemantics(inputText);
-          setSemanticsData(semData);
-          break;
-        case ModuleType.TRANSLATION:
-          const tData = await translateText(inputText, "Spanish"); // Defaulting to Spanish for demo
-          setTranslationData(tData);
-          break;
-        // Conversation doesn't use this manual run handler
+      const systemPrompt = `You are a language learning evaluation assistant. Evaluate the provided language response against the challenge requirements.
+
+Challenge: ${challenge.title}
+Description: ${challenge.description}
+Validation Criteria: ${JSON.stringify(challenge.validationCriteria)}
+
+Analyze the language response and return a JSON response with:
+{
+  "success": boolean,
+  "feedback": "detailed feedback on grammar, vocabulary, and fluency",
+  "corrections": ["list of corrections if needed"],
+  "strengths": ["what the learner did well"],
+  "score": number (1-10),
+  "nextSteps": "suggestions for improvement"
+}
+
+Focus on constructive feedback that helps language learning progress.`;
+
+      const userPrompt = `Evaluate this language learning response:
+
+Exercise: ${challenge.description}
+
+Student's Response: "${state.userResponse}"
+
+Provide detailed feedback on grammar, vocabulary usage, and overall communication effectiveness.`;
+
+      const response = await callGroq(systemPrompt, userPrompt);
+      
+      try {
+        const result = JSON.parse(response);
+        
+        setState(prev => ({
+          ...prev,
+          isSubmitting: false,
+          feedback: result.feedback || response,
+          score: result.score || 0,
+          isComplete: true,
+          isSuccess: result.success || (result.score >= 7),
+        }));
+        
+        if (onComplete) {
+          onComplete(result.success || (result.score >= 7));
+        }
+      } catch (parseError) {
+        const success = response.toLowerCase().includes('good') || response.toLowerCase().includes('correct');
+        setState(prev => ({
+          ...prev,
+          isSubmitting: false,
+          feedback: response,
+          isComplete: true,
+          isSuccess: success,
+        }));
+        
+        if (onComplete) {
+          onComplete(success);
+        }
       }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        isSubmitting: false,
+        feedback: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        isComplete: true,
+        isSuccess: false,
+      }));
     }
-  }, [inputText, activeModule]);
+  };
 
-  const renderModuleContent = () => {
-    if (loading) {
-      return (
-        <div className="flex flex-col items-center justify-center h-full text-gray-400 animate-pulse">
-          <Activity className="w-12 h-12 mb-4 animate-spin" />
-          <p className="font-mono text-sm">ANALYZING INPUT STREAM...</p>
-        </div>
-      );
+  const showNextHint = () => {
+    if (state.currentHintIndex < challenge.hints.length - 1) {
+      setState(prev => ({
+        ...prev,
+        showHint: true,
+        currentHintIndex: prev.currentHintIndex + 1,
+      }));
     }
+  };
 
-    switch (activeModule) {
-      case ModuleType.PHONETICS:
-        return (
-          <div className="h-full flex flex-col gap-4">
-            <div className="bg-[#25252b] p-4 md:p-6 rounded-lg border border-gray-700 shadow-lg flex-shrink-0">
-              <h3 className="text-gray-400 font-mono text-xs mb-2 uppercase">IPA Transcription</h3>
-              <div className="text-3xl md:text-4xl font-serif text-emerald-400 tracking-wider mb-4 break-words">
-                {phoneticsData ? `/${phoneticsData.ipa}/` : <span className="text-gray-600 text-xl italic">Run analysis to see IPA</span>}
-              </div>
-              {phoneticsData && (
-                <div className="text-sm text-gray-400 font-mono">
-                  Stress Pattern: <span className="text-gray-200">{phoneticsData.stressPattern}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex-1 bg-[#25252b] rounded-lg border border-gray-700 p-4 overflow-y-auto">
-              <h3 className="text-gray-400 font-mono text-xs mb-4 uppercase">Segment Analysis</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {phoneticsData?.segments.map((seg, idx) => (
-                  <div key={idx} className="bg-[#1e1e23] p-3 rounded border border-gray-800 hover:border-emerald-500/50 transition-colors group">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-2xl font-serif text-emerald-300">{seg.symbol}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase ${seg.type === 'vowel' ? 'bg-blue-900/30 text-blue-400' : 'bg-orange-900/30 text-orange-400'}`}>
-                        {seg.type}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 group-hover:text-gray-300">{seg.description}</p>
-                    <div className="mt-2 h-1 w-full bg-gray-800 rounded overflow-hidden">
-                      <div className="h-full bg-emerald-500/40" style={{ width: `${Math.min(100, (seg.duration || 50) / 2)}%` }}></div>
-                    </div>
-                  </div>
-                ))}
-                {!phoneticsData && <p className="text-gray-600 text-sm col-span-full text-center py-10">No segments to display.</p>}
-              </div>
-            </div>
-          </div>
-        );
-
-      case ModuleType.SYNTAX:
-        return <SyntaxTree data={syntaxData} />;
-
-      case ModuleType.SEMANTICS:
-        return <SemanticNetwork data={semanticsData} />;
-
-      case ModuleType.CONVERSATION:
-        return <ConversationPractice />;
-
-      case ModuleType.TRANSLATION:
-        return (
-          <div className="h-full flex flex-col gap-6 overflow-y-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-shrink-0">
-              <div className="bg-[#25252b] p-6 rounded-lg border border-gray-700">
-                <h3 className="text-gray-400 font-mono text-xs mb-4 uppercase">Source Text</h3>
-                <p className="text-xl text-gray-200 leading-relaxed">{translationData?.original || inputText}</p>
-              </div>
-              <div className="bg-[#25252b] p-6 rounded-lg border border-gray-700">
-                <h3 className="text-gray-400 font-mono text-xs mb-4 uppercase">Target (Spanish)</h3>
-                <p className="text-xl text-blue-300 leading-relaxed">{translationData?.translated || "..."}</p>
-              </div>
-            </div>
-
-            <div className="flex-1 bg-[#25252b] p-6 rounded-lg border border-gray-700 overflow-x-auto min-h-[200px]">
-              <h3 className="text-gray-400 font-mono text-xs mb-4 uppercase">Alignment Confidence</h3>
-              <div className="flex gap-4 min-w-max pb-2">
-                {translationData?.alignment.map((align, idx) => (
-                  <div key={idx} className="flex flex-col items-center gap-2 group">
-                    <div className="px-3 py-1 bg-gray-800 rounded text-sm text-gray-300">{align.originalWord}</div>
-                    <div className="w-px h-8 bg-gradient-to-b from-gray-700 to-blue-500/50"></div>
-                    <div className="px-3 py-1 bg-blue-900/20 border border-blue-900/50 rounded text-sm text-blue-300">{align.translatedWord}</div>
-                    <div className="text-[10px] text-gray-600 mt-1 font-mono opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                      {(align.confidence * 100).toFixed(0)}% match
-                    </div>
-                  </div>
-                ))}
-                {!translationData && <p className="text-gray-600 text-sm italic">Run translation to see word alignment.</p>}
-              </div>
-            </div>
-          </div>
-        );
+  const speakText = (text: string) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.8;
+      utterance.pitch = 1;
+      speechSynthesis.speak(utterance);
     }
   };
 
   return (
-    <div className="flex flex-col h-full w-full text-gray-100 selection:bg-emerald-500/30 overflow-hidden bg-[#1e1e23] rounded-xl">
+    <div className="h-full bg-gray-900 text-white flex flex-col">
+      {/* Header */}
+      <div className="bg-gray-800 border-b border-gray-700 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+              <Languages className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">{challenge.title}</h2>
+              <p className="text-gray-400 text-sm">{challenge.description}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-1 text-blue-400">
+              <Clock className="w-4 h-4" />
+              <span>{challenge.estimatedMinutes}m</span>
+            </div>
+            <div className="flex items-center gap-1 text-yellow-400">
+              <Trophy className="w-4 h-4" />
+              <span>{challenge.xpReward} XP</span>
+            </div>
+            <div className="px-2 py-1 bg-gray-700 rounded text-xs">
+              {challenge.difficulty}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-        {/* Unified Top Toolbar */}
-        <header className="h-16 border-b border-gray-800 bg-[#1e1e23] flex items-center px-4 md:px-6 justify-between shrink-0 gap-4 overflow-x-auto">
-
-          <nav className="flex items-center gap-2">
-            <NavButton
-              active={activeModule === ModuleType.CONVERSATION}
-              onClick={() => setActiveModule(ModuleType.CONVERSATION)}
-              icon={<MessageCircle size={20} />}
-              label="Conversation"
-            />
-            <NavButton
-              active={activeModule === ModuleType.PHONETICS}
-              onClick={() => setActiveModule(ModuleType.PHONETICS)}
-              icon={<Mic size={20} />}
-              label="Phonetics"
-            />
-            <NavButton
-              active={activeModule === ModuleType.SYNTAX}
-              onClick={() => setActiveModule(ModuleType.SYNTAX)}
-              icon={<GitBranch size={20} />}
-              label="Syntax"
-            />
-            <NavButton
-              active={activeModule === ModuleType.SEMANTICS}
-              onClick={() => setActiveModule(ModuleType.SEMANTICS)}
-              icon={<Network size={20} />}
-              label="Semantics"
-            />
-            <NavButton
-              active={activeModule === ModuleType.TRANSLATION}
-              onClick={() => setActiveModule(ModuleType.TRANSLATION)}
-              icon={<Languages size={20} />}
-              label="Translate"
-            />
-          </nav>
-
-          <div className="flex items-center gap-4 min-w-max">
-            <div className="flex items-center gap-2 px-3 py-1 bg-gray-900 rounded border border-gray-800">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-[10px] md:text-xs text-gray-400 font-mono hidden sm:inline">SYSTEM ONLINE</span>
+      <div className="flex-1 flex">
+        {/* Left Panel - Exercise & Hints */}
+        <div className="w-1/3 p-4 border-r border-gray-700 overflow-y-auto">
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Language Exercise</h3>
+              <div className="bg-gray-800 rounded-lg p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <p className="text-gray-300 whitespace-pre-wrap flex-1">{challenge.description}</p>
+                  <button
+                    onClick={() => speakText(challenge.description)}
+                    className="ml-2 p-2 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20 rounded transition-colors"
+                    title="Listen to pronunciation"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
-            <button className="p-2 text-gray-500 hover:text-gray-300 transition-colors">
-              <Settings size={20} />
-            </button>
+
+            {/* Requirements */}
+            {challenge.validationCriteria.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Focus Areas</h3>
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <ul className="space-y-2">
+                    {challenge.validationCriteria.map((criteria, index) => (
+                      <li key={index} className="flex items-start gap-2 text-sm">
+                        <span className="text-indigo-400 mt-1">•</span>
+                        <span className="text-gray-300">{criteria.type}: {criteria.expected || criteria.rubric}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* Hints */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-semibold">Language Tips</h3>
+                {challenge.hints.length > 0 && (
+                  <button
+                    onClick={showNextHint}
+                    disabled={state.currentHintIndex >= challenge.hints.length - 1}
+                    className="flex items-center gap-1 px-3 py-1 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-sm transition-colors"
+                  >
+                    <Lightbulb className="w-4 h-4" />
+                    Show Tip ({state.currentHintIndex + 1}/{challenge.hints.length})
+                  </button>
+                )}
+              </div>
+              
+              {state.showHint && challenge.hints.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3"
+                >
+                  <p className="text-yellow-200 text-sm">
+                    💡 {challenge.hints[state.currentHintIndex]}
+                  </p>
+                </motion.div>
+              )}
+            </div>
           </div>
-        </header>
-
-        {/* Workspace */}
-        <div className="flex-1 flex flex-col p-4 md:p-6 gap-4 md:gap-6 overflow-hidden relative">
-
-          {/* Input Section - Only show for non-conversation modules */}
-          {activeModule !== ModuleType.CONVERSATION && (
-            <section className="flex-shrink-0 bg-[#25252b] rounded-xl border border-gray-700 p-1 flex gap-2 shadow-lg">
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                className="flex-1 bg-transparent border-none outline-none px-3 md:px-4 py-2 md:py-3 text-sm md:text-base text-gray-200 placeholder-gray-600 font-medium"
-                placeholder="Enter text for analysis..."
-              />
-              <button
-                onClick={handleRunAnalysis}
-                disabled={loading}
-                className={`px-4 md:px-6 rounded-lg font-semibold flex items-center gap-2 transition-all text-sm md:text-base
-                  ${loading
-                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]'
-                  }`}
-              >
-                {loading ? <Activity className="animate-spin" size={18} /> : <Play size={18} fill="currentColor" />}
-                <span className="hidden sm:inline">RUN</span>
-              </button>
-            </section>
-          )}
-
-          {/* Visualization Canvas */}
-          <section className="flex-1 min-h-0 relative">
-            {renderModuleContent()}
-          </section>
-
         </div>
 
-        {/* Desktop Footer */}
-        <footer className="hidden md:flex h-8 border-t border-gray-800 bg-[#18181c] items-center px-4 text-xs font-mono text-gray-500 justify-between shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1 hover:text-gray-300 cursor-pointer">
-              <Terminal size={12} />
-              <span>CONSOLE</span>
+        {/* Middle Panel - Response Area */}
+        <div className="w-1/2 p-4 flex flex-col">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold">Your Response</h3>
+            <div className="flex items-center gap-2">
+              <button
+                className="p-2 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20 rounded transition-colors"
+                title="Voice input (coming soon)"
+                disabled
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={state.isSubmitting || state.userResponse.trim().length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                {state.isSubmitting ? 'Evaluating...' : 'Submit Response'}
+              </button>
             </div>
-            <div className="w-px h-3 bg-gray-700"></div>
-            <span>MODULE: {activeModule}</span>
           </div>
-          <div>
-            PLATFORM: WEBGL2
+          
+          <div className="flex-1 bg-gray-800 rounded-lg overflow-hidden">
+            <textarea
+              value={state.userResponse}
+              onChange={(e) => handleResponseChange(e.target.value)}
+              className="w-full h-full bg-transparent text-white text-lg p-4 resize-none focus:outline-none leading-relaxed"
+              placeholder="Type your response here..."
+              spellCheck={true}
+            />
           </div>
-        </footer>
+        </div>
 
-        {/* Mobile Bottom Navigation */}
-        <nav className="md:hidden h-16 bg-[#18181c] border-t border-gray-800 flex justify-around items-center shrink-0 px-2 z-30">
-          <MobileNavButton
-            active={activeModule === ModuleType.CONVERSATION}
-            onClick={() => setActiveModule(ModuleType.CONVERSATION)}
-            icon={<MessageCircle size={20} />}
-            label="Chat"
-          />
-          <MobileNavButton
-            active={activeModule === ModuleType.PHONETICS}
-            onClick={() => setActiveModule(ModuleType.PHONETICS)}
-            icon={<Mic size={20} />}
-            label="Phonetics"
-          />
-          <MobileNavButton
-            active={activeModule === ModuleType.SYNTAX}
-            onClick={() => setActiveModule(ModuleType.SYNTAX)}
-            icon={<GitBranch size={20} />}
-            label="Syntax"
-          />
-          <MobileNavButton
-            active={activeModule === ModuleType.SEMANTICS}
-            onClick={() => setActiveModule(ModuleType.SEMANTICS)}
-            icon={<Network size={20} />}
-            label="Graph"
-          />
-          <MobileNavButton
-            active={activeModule === ModuleType.TRANSLATION}
-            onClick={() => setActiveModule(ModuleType.TRANSLATION)}
-            icon={<Languages size={20} />}
-            label="Translate"
-          />
-        </nav>
-      </main>
+        {/* Right Panel - Feedback */}
+        <div className="w-1/3 p-4 border-l border-gray-700 flex flex-col">
+          <div className="flex-1 space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Feedback</h3>
+              <div className="bg-gray-800 rounded-lg p-4 h-64 overflow-y-auto">
+                {state.feedback && (
+                  <div className="text-sm text-gray-300 whitespace-pre-wrap">{state.feedback}</div>
+                )}
+                {!state.feedback && (
+                  <p className="text-gray-500 text-sm">Submit your response to receive detailed language feedback...</p>
+                )}
+              </div>
+            </div>
+
+            {/* Score Display */}
+            {state.isComplete && state.score > 0 && (
+              <div className="bg-gray-800 rounded-lg p-4">
+                <h4 className="text-sm font-semibold mb-2">Language Score</h4>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-gray-700 rounded-full h-2">
+                    <motion.div
+                      className="bg-indigo-500 h-2 rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${state.score * 10}%` }}
+                      transition={{ duration: 1 }}
+                    />
+                  </div>
+                  <span className="text-sm font-bold">{state.score}/10</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Success State */}
+          {state.isComplete && state.isSuccess && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mt-4 bg-green-900/20 border border-green-600/30 rounded-lg p-4"
+            >
+              <div className="flex items-center gap-2 text-green-400 mb-2">
+                <Trophy className="w-5 h-5" />
+                <span className="font-semibold">Exercise Completed!</span>
+              </div>
+              <p className="text-green-200 text-sm mb-3">{challenge.explanation}</p>
+              <div className="text-sm text-green-300">
+                🎉 You earned {challenge.xpReward} XP!
+              </div>
+            </motion.div>
+          )}
+        </div>
+      </div>
     </div>
   );
-};
-
-// Helper component for desktop nav items
-const NavButton: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string }> = ({ active, onClick, icon, label }) => (
-  <button
-    onClick={onClick}
-    className={`relative group p-3 rounded-xl transition-all duration-200 flex items-center justify-center w-12 h-12
-      ${active ? 'bg-emerald-500/10 text-emerald-400' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-300'}`}
-    title={label}
-  >
-    {icon}
-    {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-emerald-500 rounded-r-full -ml-2"></div>}
-  </button>
-);
-
-// Helper component for mobile nav items
-const MobileNavButton: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string }> = ({ active, onClick, icon, label }) => (
-  <button
-    onClick={onClick}
-    className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-all w-16
-      ${active ? 'text-emerald-400' : 'text-gray-500'}`}
-  >
-    <div className={`${active ? 'bg-emerald-500/10' : ''} p-1 rounded-full`}>
-      {icon}
-    </div>
-    <span className="text-[10px] font-medium">{label}</span>
-  </button>
-);
-
-export default App;
+}

@@ -68,20 +68,24 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
   const renderEngine = () => {
     if (!currentChallenge) return null;
     console.log('Current challenge engine:', currentChallenge.engine);
-    switch (currentChallenge.engine) {
-      case EngineType.CodeStudio:
+    
+    // Convert engine to string for comparison since it comes from the database as a string
+    const engineStr = String(currentChallenge.engine).toLowerCase();
+    
+    switch (engineStr) {
+      case 'codestudio':
         return <CodeStudio challenge={currentChallenge} />;
-      case EngineType.WritingStudio:
+      case 'writingstudio':
         return <WriteLab challenge={currentChallenge} />;
-      case EngineType.MathLab:
+      case 'mathlab':
         return <MathLab challenge={currentChallenge} />;
-      case EngineType.LinguaLab:
+      case 'lingualab':
         return <LinguaLab challenge={currentChallenge} />;
-      case EngineType.FinLab:
+      case 'finlab':
         return <WriteLab challenge={currentChallenge} />; // Default fallback
       default:
-        console.log('No matching engine for:', currentChallenge.engine);
-        return <div className="text-white">Engine not available for: {currentChallenge.engine}</div>;
+        console.log('No matching engine for:', engineStr);
+        return <div className="text-white">Engine not available for: {engineStr}</div>;
     }
   };
 

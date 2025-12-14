@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { SkillGraphView } from '@/components/SkillGraphView';
-import { SkillGraph, SkillNode, EngineType, CourseCategory, Challenge } from '@/lib/courseCreation/types';
+import { SkillGraph, SkillNode, CourseCategory, Challenge } from '@/lib/courseCreation/types';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { X, Sparkles, Trophy, Clock, Target, Zap } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -22,7 +22,7 @@ const DEMO_SKILL_GRAPH: SkillGraph = {
             title: 'Understand API Basics',
             description: 'Learn how to make HTTP requests and handle responses',
             category: CourseCategory.Technology,
-            engine: EngineType.Coding,
+            engine: 'codestudio',
             level: 'Beginner',
             estimatedMinutes: 15,
             prerequisites: [],
@@ -34,7 +34,7 @@ const DEMO_SKILL_GRAPH: SkillGraph = {
             title: 'Write Your First Function',
             description: 'Create reusable code with functions',
             category: CourseCategory.Technology,
-            engine: EngineType.Coding,
+            engine: 'codestudio',
             level: 'Beginner',
             estimatedMinutes: 20,
             prerequisites: ['skill_1'],
@@ -46,7 +46,7 @@ const DEMO_SKILL_GRAPH: SkillGraph = {
             title: 'Connect to Gemini API',
             description: 'Integrate Google Gemini for AI responses',
             category: CourseCategory.Technology,
-            engine: EngineType.Coding,
+            engine: 'codestudio',
             level: 'Intermediate',
             estimatedMinutes: 25,
             prerequisites: ['skill_2'],
@@ -58,7 +58,7 @@ const DEMO_SKILL_GRAPH: SkillGraph = {
             title: 'Build Conversation Logic',
             description: 'Manage chat history and context',
             category: CourseCategory.Technology,
-            engine: EngineType.Coding,
+            engine: 'codestudio',
             level: 'Intermediate',
             estimatedMinutes: 30,
             prerequisites: ['skill_3'],
@@ -70,7 +70,7 @@ const DEMO_SKILL_GRAPH: SkillGraph = {
             title: 'Design Chat UI',
             description: 'Create an interactive chat interface',
             category: CourseCategory.Technology,
-            engine: EngineType.Coding,
+            engine: 'codestudio',
             level: 'Advanced',
             estimatedMinutes: 35,
             prerequisites: ['skill_4'],
@@ -94,7 +94,7 @@ const DEMO_CHALLENGES: Record<string, Challenge> = {
         skillId: 'skill_1',
         title: 'Fetch User Data from API',
         description: 'Create a function that fetches user data from a REST API endpoint',
-        engine: EngineType.Coding,
+        engine: 'codestudio',
         difficulty: 'Easy',
         starterCode: `// Fetch user data from the API\nasync function fetchUser(userId) {\n  // Your code here\n  \n}\n\n// Test your function\nfetchUser(1).then(user => console.log(user));`,
         validationCriteria: [{ type: 'ai_eval', rubric: 'Did they correctly use the fetch API?' }],
@@ -131,14 +131,15 @@ export default function DemoCourse() {
 
     const renderEngine = () => {
         if (!currentChallenge) return null;
-        switch (currentChallenge.engine) {
-            case EngineType.Coding:
+        const engineStr = String(currentChallenge.engine).toLowerCase();
+        switch (engineStr) {
+            case 'codestudio':
                 return <CodeStudio challenge={currentChallenge} />;
-            case EngineType.Default:
+            case 'writingstudio':
                 return <WriteLab challenge={currentChallenge} />;
-            case EngineType.Math:
+            case 'mathlab':
                 return <MathLab challenge={currentChallenge} />;
-            case EngineType.Language:
+            case 'lingualab':
                 return <LinguaLab challenge={currentChallenge} />;
             default:
                 return <div className="text-white">Engine not available for this skill.</div>;

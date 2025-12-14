@@ -1,412 +1,309 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import { CodeEditor } from './components/CodeEditor';
-import { Visualizer } from './components/Visualizer';
-import { Console } from './components/Console';
-import { SCENES } from './constants';
-import { Language, LogEntry, VisualizationMode, ChartDataPoint } from './types';
-import { generateCodeAnalysis, simulateExecution, optimizeCode, instrumentCode } from './services/geminiService';
-import { Challenge } from '../../types';
+'use client';
 
-export default function App({ challenge }: { challenge?: Challenge | null }) {
-  // -- State --
-  const [activeSceneId, setActiveSceneId] = useState(SCENES[0].id);
-  const [code, setCode] = useState(challenge?.starterCode || SCENES[0].code);
-  const [language, setLanguage] = useState<Language>(SCENES[0].language);
+import React, { useState } from 'react';
+import { Challenge } from '@/lib/courseCreation/types';
+import { motion } from 'framer-motion';
+import { Play, CheckCircle, XCircle, Lightbulb, Trophy, Clock, Code, Terminal } from 'lucide-react';
+import { callGroq } from '../shared/groqService';
 
-  useEffect(() => {
-    if (challenge && challenge.starterCode) {
-      setCode(challenge.starterCode);
-      // Logic to detect language from engine/context could go here
-      // setLanguage(challenge.engine === 'Coding' ? Language.JavaScript : Language.Python); 
-    }
-  }, [challenge]);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [vizData, setVizData] = useState<ChartDataPoint[]>([]);
-  const [vizMode, setVizMode] = useState<VisualizationMode>(SCENES[0].defaultViz);
-  const [analysis, setAnalysis] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'console' | 'visualizer' | 'analysis'>('console');
+interface CodeStudioProps {
+  challenge: Challenge;
+  onComplete?: (success: boolean) => void;
+}
 
-  // Debugging State
-  const [isDebugMode, setIsDebugMode] = useState(false);
-  const [currentLine, setCurrentLine] = useState<number | null>(null);
-  const [isWaitingForStep, setIsWaitingForStep] = useState(false);
-  const stepResolverRef = useRef<((value: void) => void) | null>(null);
+interface CodeStudioState {
+  code: string;
+  isRunning: boolean;
+  output: string;
+  isComplete: boolean;
+  isSuccess: boolean;
+  showHint: boolean;
+  currentHintIndex: number;
+  testResults: Array<{ test: string; passed: boolean; message: string }>;
+}
 
-  // -- Helpers --
-  const addLog = (type: LogEntry['type'], content: string) => {
-    setLogs(prev => [...prev, { id: crypto.randomUUID(), timestamp: new Date(), type, content }]);
-  };
+export default function CodeStudio({ challenge, onComplete }: CodeStudioProps) {
+  const [state, setState] = useState<CodeStudioState>({
+    code: challenge.starterCode || '// Write your code here\nfunction solution() {\n  // Your implementation\n}\n',
+    isRunning: false,
+    output: '',
+    isComplete: false,
+    isSuccess: false,
+    showHint: false,
+    currentHintIndex: 0,
+    testResults: [],
+  });
 
-  const handleSceneChange = (id: string) => {
-    const scene = SCENES.find(s => s.id === id);
-    if (scene) {
-      setActiveSceneId(id);
-      setCode(scene.code);
-      setLanguage(scene.language);
-      setVizMode(scene.defaultViz);
-      setLogs([]);
-      setVizData([]);
-      setAnalysis(null);
-      setIsDebugMode(false);
-      setCurrentLine(null);
-
-      // Auto-switch tabs based on scene type
-      if (scene.defaultViz !== VisualizationMode.None) {
-        setActiveTab('visualizer');
-      } else {
-        setActiveTab('console');
-      }
-    }
-  };
-
-  // -- Execution Logic --
-
-  const runJavaScript = async (codeToRun: string, debug = false) => {
-    setLogs([]);
-    setVizData([]); // Reset viz
-
-    // If not debugging, switch to console or visualizer
-    if (!debug) {
-      if (vizMode !== VisualizationMode.None) setActiveTab('visualizer');
-      else setActiveTab('console');
-    }
-
-    try {
-      // Define Environment Helpers
-      const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-      const visualize = (type: string, data: any) => {
-        // This function runs in the user's code scope
-        if (type === 'chart') {
-          setVizData(data);
-        }
-        // Additional viz types can be handled here
-      };
-
-      // Debug stepper
-      const step = async (line: number) => {
-        setCurrentLine(line);
-        setIsWaitingForStep(true);
-        await new Promise<void>(resolve => {
-          stepResolverRef.current = resolve;
-        });
-        setIsWaitingForStep(false);
-      };
-
-      // Create a custom console to intercept logs
-      // This ensures "hello world" works even if they use console.log instead of our helper
-      const customConsole = {
-        log: (...args: any[]) => {
-          const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ');
-          addLog('info', msg);
-          console.log('[User Code]', ...args); // also log to real console for dev debugging
-        },
-        error: (...args: any[]) => {
-          const msg = args.join(' ');
-          addLog('error', msg);
-        },
-        warn: (...args: any[]) => {
-          const msg = args.join(' ');
-          addLog('warn', msg);
-        },
-        info: (...args: any[]) => {
-          const msg = args.join(' ');
-          addLog('info', msg);
-        }
-      };
-
-      // Legacy 'log' helper for backward compatibility with scenes
-      const legacyLog = (...args: any[]) => customConsole.log(...args);
-
-      // Construct the function body
-      // We wrap it in an async IIFE to allow top-level await
-      const wrappedCode = `
-        return (async () => {
-          try {
-            ${codeToRun}
-          } catch (e) {
-            console.error("Runtime Error: " + e.message);
-            throw e;
-          }
-        })();
-      `;
-
-      // Create the function with injected dependencies
-      const func = new Function(
-        'log',
-        'sleep',
-        'visualize',
-        'step',
-        'console', // Inject our custom console
-        wrappedCode
-      );
-
-      await func(legacyLog, sleep, visualize, step, customConsole);
-
-      addLog('system', 'Execution finished.');
-      if (debug) {
-        setIsDebugMode(false);
-        setCurrentLine(null);
-      }
-
-    } catch (err: any) {
-      addLog('error', err.message || String(err));
-      setIsDebugMode(false);
-    }
+  const handleCodeChange = (newCode: string) => {
+    setState(prev => ({ ...prev, code: newCode }));
   };
 
   const handleRun = async () => {
-    if (language === Language.JavaScript) {
-      await runJavaScript(code, false);
-    } else {
-      // Simulate execution for non-browser languages via Gemini
-      addLog('system', `Running ${language} simulation...`);
-      setActiveTab('console');
-      const result = await simulateExecution(code, language);
-      addLog('info', result);
-      addLog('system', 'Simulation complete.');
-    }
-  };
-
-  const handleDebug = async () => {
-    if (language !== Language.JavaScript) {
-      addLog('warn', 'Interactive debugging is currently only available for JavaScript.');
-      return;
-    }
-
-    setIsDebugMode(true);
-    addLog('system', 'Preparing debugger...');
-
+    setState(prev => ({ ...prev, isRunning: true, output: '', testResults: [] }));
+    
     try {
-      // Instrument code via Gemini
-      const instrumented = await instrumentCode(code);
-      addLog('system', 'Debugger ready. Running...');
-      // Run the instrumented code
-      await runJavaScript(instrumented, true);
-    } catch (e) {
-      addLog('error', 'Failed to start debugger.');
-      setIsDebugMode(false);
+      // Use Groq to evaluate the code
+      const systemPrompt = `You are a code evaluation assistant. Evaluate the provided code against the challenge requirements.
+
+Challenge: ${challenge.title}
+Description: ${challenge.description}
+Validation Criteria: ${JSON.stringify(challenge.validationCriteria)}
+
+Analyze the code and return a JSON response with:
+{
+  "success": boolean,
+  "output": "execution output or error message",
+  "testResults": [
+    {"test": "test description", "passed": boolean, "message": "result message"}
+  ],
+  "feedback": "constructive feedback"
+}
+
+Be thorough in your evaluation and provide helpful feedback.`;
+
+      const userPrompt = `Evaluate this code:
+
+\`\`\`javascript
+${state.code}
+\`\`\`
+
+Check if it meets the challenge requirements and provide detailed feedback.`;
+
+      const response = await callGroq(systemPrompt, userPrompt);
+      
+      try {
+        const result = JSON.parse(response);
+        
+        setState(prev => ({
+          ...prev,
+          isRunning: false,
+          output: result.output || 'Code executed successfully',
+          testResults: result.testResults || [],
+          isComplete: true,
+          isSuccess: result.success || false,
+        }));
+        
+        if (onComplete) {
+          onComplete(result.success || false);
+        }
+      } catch (parseError) {
+        // Fallback if JSON parsing fails
+        const success = response.toLowerCase().includes('success') || response.toLowerCase().includes('correct');
+        setState(prev => ({
+          ...prev,
+          isRunning: false,
+          output: response,
+          isComplete: true,
+          isSuccess: success,
+        }));
+        
+        if (onComplete) {
+          onComplete(success);
+        }
+      }
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        isRunning: false,
+        output: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        isComplete: true,
+        isSuccess: false,
+      }));
     }
   };
 
-  const handleNextStep = () => {
-    if (stepResolverRef.current) {
-      stepResolverRef.current();
-      stepResolverRef.current = null;
-    }
-  };
-
-  const handleAnalysis = async () => {
-    setIsAnalyzing(true);
-    setActiveTab('analysis');
-    const result = await generateCodeAnalysis(code, language);
-    setAnalysis(result);
-    setIsAnalyzing(false);
-  };
-
-  const handleOptimize = async () => {
-    const original = code;
-    setCode("// Optimizing...");
-    try {
-      const optimized = await optimizeCode(original, language);
-      setCode(optimized);
-      addLog('system', 'Code optimized by AI.');
-    } catch (e) {
-      setCode(original);
-      addLog('error', 'Optimization failed.');
+  const showNextHint = () => {
+    if (state.currentHintIndex < challenge.hints.length - 1) {
+      setState(prev => ({
+        ...prev,
+        showHint: true,
+        currentHintIndex: prev.currentHintIndex + 1,
+      }));
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30 rounded-xl overflow-hidden">
-
-      {/* -- HEADER -- */}
-      <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center px-4 justify-between shrink-0 overflow-x-auto gap-4 rounded-t-xl">
-        <div className="flex items-center gap-3 min-w-max">
-          {/* Space reserved for future toolbar items or just empty if branding removed */}
-        </div>
-
-        <div className="flex items-center gap-2 bg-slate-950/50 p-1 rounded-lg border border-slate-800 min-w-max">
-          {SCENES.map(scene => (
-            <button
-              key={scene.id}
-              onClick={() => handleSceneChange(scene.id)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${activeSceneId === scene.id
-                ? 'bg-slate-800 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
-            >
-              {scene.name}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2 min-w-max">
-          {/* Run Button */}
-          <button
-            onClick={handleRun}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded shadow-lg shadow-emerald-900/20 transition-all active:scale-95"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            RUN
-          </button>
-
-          {language === Language.JavaScript && (
-            <button
-              onClick={isDebugMode ? undefined : handleDebug}
-              disabled={isDebugMode}
-              className={`flex items-center gap-2 px-4 py-2 border border-slate-700 rounded text-xs font-bold transition-all ${isDebugMode
-                ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/50'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-                }`}
-            >
-              {isDebugMode ? (
-                <>
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
-                  </span>
-                  DEBUGGING...
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  DEBUG
-                </>
-              )}
-            </button>
-          )}
-
-          {isDebugMode && (
-            <button
-              onClick={handleNextStep}
-              disabled={!isWaitingForStep}
-              className={`px-4 py-2 rounded text-xs font-bold transition-all ${isWaitingForStep
-                ? 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.3)]'
-                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                }`}
-            >
-              NEXT STEP →
-            </button>
-          )}
-
-          <div className="h-6 w-px bg-slate-800 mx-1" />
-
-          <button
-            onClick={handleOptimize}
-            className="p-2 text-slate-400 hover:text-purple-400 hover:bg-purple-900/20 rounded transition-colors"
-            title="AI Optimize"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </button>
-          <button
-            onClick={handleAnalysis}
-            className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-900/20 rounded transition-colors"
-            title="AI Analysis"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-          </button>
-        </div>
-      </header>
-
-      {/* -- MAIN VERTICAL SPLIT -- */}
-      <div className="flex-1 flex flex-col min-h-0">
-
-        {/* TOP: Code Editor */}
-        <div className="h-[55%] min-h-[200px] border-b border-slate-800 relative">
-          <CodeEditor
-            code={code}
-            language={language}
-            onChange={setCode}
-            highlightedLine={currentLine}
-          />
-          {/* Debug overlay indicator */}
-          {isDebugMode && isWaitingForStep && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-yellow-500/90 text-black px-3 py-1 rounded-full text-xs font-bold shadow-lg animate-bounce z-30 pointer-events-none">
-              Paused on Line {currentLine}
+    <div className="h-full bg-gray-900 text-white flex flex-col">
+      {/* Header */}
+      <div className="bg-gray-800 border-b border-gray-700 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Code className="w-5 h-5" />
             </div>
-          )}
+            <div>
+              <h2 className="text-xl font-bold">{challenge.title}</h2>
+              <p className="text-gray-400 text-sm">{challenge.description}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-1 text-blue-400">
+              <Clock className="w-4 h-4" />
+              <span>{challenge.estimatedMinutes}m</span>
+            </div>
+            <div className="flex items-center gap-1 text-yellow-400">
+              <Trophy className="w-4 h-4" />
+              <span>{challenge.xpReward} XP</span>
+            </div>
+            <div className="px-2 py-1 bg-gray-700 rounded text-xs">
+              {challenge.difficulty}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex">
+        {/* Left Panel - Challenge & Hints */}
+        <div className="w-1/3 p-4 border-r border-gray-700 overflow-y-auto">
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Challenge</h3>
+              <div className="bg-gray-800 rounded-lg p-4">
+                <p className="text-gray-300 whitespace-pre-wrap">{challenge.description}</p>
+              </div>
+            </div>
+
+            {/* Validation Criteria */}
+            {challenge.validationCriteria.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Requirements</h3>
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <ul className="space-y-2">
+                    {challenge.validationCriteria.map((criteria, index) => (
+                      <li key={index} className="flex items-start gap-2 text-sm">
+                        <span className="text-blue-400 mt-1">•</span>
+                        <span className="text-gray-300">{criteria.type}: {criteria.expected || criteria.rubric}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* Hints */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-semibold">Hints</h3>
+                {challenge.hints.length > 0 && (
+                  <button
+                    onClick={showNextHint}
+                    disabled={state.currentHintIndex >= challenge.hints.length - 1}
+                    className="flex items-center gap-1 px-3 py-1 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-sm transition-colors"
+                  >
+                    <Lightbulb className="w-4 h-4" />
+                    Show Hint ({state.currentHintIndex + 1}/{challenge.hints.length})
+                  </button>
+                )}
+              </div>
+              
+              {state.showHint && challenge.hints.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3"
+                >
+                  <p className="text-yellow-200 text-sm">
+                    💡 {challenge.hints[state.currentHintIndex]}
+                  </p>
+                </motion.div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* BOTTOM: Output Panel */}
-        <div className="flex-1 flex flex-col min-h-0 bg-slate-950">
-          {/* Tabs */}
-          <div className="flex border-b border-slate-800 bg-slate-900/50">
+        {/* Middle Panel - Code Editor */}
+        <div className="w-1/2 p-4 flex flex-col">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold">Code Editor</h3>
             <button
-              onClick={() => setActiveTab('console')}
-              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'console'
-                ? 'border-blue-500 text-blue-400 bg-slate-800/50'
-                : 'border-transparent text-slate-500 hover:text-slate-300'
-                }`}
+              onClick={handleRun}
+              disabled={state.isRunning}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded transition-colors"
             >
-              Console
-            </button>
-            <button
-              onClick={() => setActiveTab('visualizer')}
-              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'visualizer'
-                ? 'border-blue-500 text-blue-400 bg-slate-800/50'
-                : 'border-transparent text-slate-500 hover:text-slate-300'
-                }`}
-            >
-              Visualizer
-            </button>
-            <button
-              onClick={() => setActiveTab('analysis')}
-              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${activeTab === 'analysis'
-                ? 'border-blue-500 text-blue-400 bg-slate-800/50'
-                : 'border-transparent text-slate-500 hover:text-slate-300'
-                }`}
-            >
-              AI Analysis
+              <Play className="w-4 h-4" />
+              {state.isRunning ? 'Running...' : 'Run Code'}
             </button>
           </div>
+          
+          <div className="flex-1 bg-gray-800 rounded-lg overflow-hidden">
+            <textarea
+              value={state.code}
+              onChange={(e) => handleCodeChange(e.target.value)}
+              className="w-full h-full bg-transparent text-white font-mono text-sm p-4 resize-none focus:outline-none"
+              placeholder="// Write your code here..."
+              spellCheck={false}
+            />
+          </div>
+        </div>
 
-          {/* Panel Content */}
-          <div className="flex-1 overflow-hidden relative">
-            {activeTab === 'console' && (
-              <Console logs={logs} onClear={() => setLogs([])} />
-            )}
-
-            {activeTab === 'visualizer' && (
-              <Visualizer
-                mode={vizMode}
-                data={vizData}
-                htmlContent={language === Language.HTML ? code : undefined}
-              />
-            )}
-
-            {activeTab === 'analysis' && (
-              <div className="h-full overflow-y-auto p-6 bg-slate-900">
-                {isAnalyzing ? (
-                  <div className="flex items-center gap-3 text-slate-400 animate-pulse">
-                    <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-                    Analyzing code structure...
-                  </div>
-                ) : analysis ? (
-                  <div className="prose prose-invert prose-sm max-w-none">
-                    <ReactMarkdown>{analysis}</ReactMarkdown>
-                  </div>
-                ) : (
-                  <div className="text-slate-500 text-center mt-10">
-                    <p>Click the magic wand icon in the header to generate an AI analysis.</p>
-                  </div>
+        {/* Right Panel - Output & Results */}
+        <div className="w-1/3 p-4 border-l border-gray-700 flex flex-col">
+          <div className="flex-1 space-y-4">
+            {/* Output */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Terminal className="w-5 h-5" />
+                <h3 className="text-lg font-semibold">Output</h3>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-4 h-32 overflow-y-auto">
+                {state.output && (
+                  <pre className="text-sm text-gray-300 whitespace-pre-wrap">{state.output}</pre>
                 )}
+                {!state.output && (
+                  <p className="text-gray-500 text-sm">Output will appear here...</p>
+                )}
+              </div>
+            </div>
+
+            {/* Test Results */}
+            {state.testResults.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Test Results</h3>
+                <div className="space-y-2">
+                  {state.testResults.map((result, index) => (
+                    <div
+                      key={index}
+                      className={`flex items-start gap-2 p-3 rounded-lg ${
+                        result.passed ? 'bg-green-900/20 border border-green-600/30' : 'bg-red-900/20 border border-red-600/30'
+                      }`}
+                    >
+                      {result.passed ? (
+                        <CheckCircle className="w-5 h-5 text-green-400 mt-0.5" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-red-400 mt-0.5" />
+                      )}
+                      <div>
+                        <p className={`text-sm font-medium ${result.passed ? 'text-green-400' : 'text-red-400'}`}>
+                          {result.test}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">{result.message}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
-        </div>
 
+          {/* Success State */}
+          {state.isComplete && state.isSuccess && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mt-4 bg-green-900/20 border border-green-600/30 rounded-lg p-4"
+            >
+              <div className="flex items-center gap-2 text-green-400 mb-2">
+                <Trophy className="w-5 h-5" />
+                <span className="font-semibold">Challenge Completed!</span>
+              </div>
+              <p className="text-green-200 text-sm mb-3">{challenge.explanation}</p>
+              <div className="text-sm text-green-300">
+                🎉 You earned {challenge.xpReward} XP!
+              </div>
+            </motion.div>
+          )}
+        </div>
       </div>
     </div>
   );

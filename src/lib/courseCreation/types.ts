@@ -157,7 +157,7 @@ export interface SkillNode {
   title: string;
   description: string;
   category: CourseCategory;
-  engine: EngineType;
+  engine: string; // Using string to match database storage
   level: string; // 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert';
   estimatedMinutes: number;
   prerequisites: string[]; // IDs of other SkillNodes
@@ -184,7 +184,7 @@ export interface Challenge {
   skillId: string;
   title: string;
   description: string;
-  engine: EngineType;
+  engine: string; // Using string to match database storage
   difficulty: 'Easy' | 'Medium' | 'Hard';
 
   // Context for the AI to generate the challenge

@@ -163,17 +163,59 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
                         disabled={answered}
-                    placeholder="Your answer..."
-                    className={`w-full bg-white/10 text-white text-center text-base sm:text-lg p-3 sm:p-4 rounded-xl border-2 transition-colors duration-300 outline-none ${getBorderColor()}`}
-                />
-            </form>
-
-            {answered && (
-                <div className="mt-6">
-                    <p className="text-lg">The answer was: <span className="font-bold text-green-300">{item.answer}</span></p>
-                    <p className="mt-2 text-gray-300 text-sm animate-pulse">Next card coming up...</p>
+                        placeholder="Type your answer..."
+                        className={`w-full p-4 bg-black/40 backdrop-blur-sm border-2 rounded-xl text-white placeholder-gray-400 focus:outline-none transition-all duration-200 ${getBorderColor()}`}
+                    />
+                    <motion.button
+                        type="submit"
+                        disabled={answered || !inputValue.trim()}
+                        whileHover={{ scale: answered ? 1 : 1.05 }}
+                        whileTap={{ scale: answered ? 1 : 0.95 }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 disabled:from-gray-600 disabled:to-gray-600 rounded-lg transition-all duration-200 disabled:cursor-not-allowed"
+                    >
+                        <Send className="w-4 h-4 text-white" />
+                    </motion.button>
                 </div>
-            )}
+            </motion.form>
+
+            {/* XP Reward */}
+            <motion.div 
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.8 }}
+                className="mt-4 flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-full border border-yellow-400/30"
+            >
+                <Trophy className="w-4 h-4 text-yellow-400" />
+                <span className="text-yellow-400 font-bold text-sm">{item.xp_reward} XP</span>
+            </motion.div>
+
+            {/* Result Display */}
+            <AnimatePresence>
+                {answered && (
+                    <motion.div
+                        initial={{ y: 50, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: -50, opacity: 0 }}
+                        className="mt-6 text-center"
+                    >
+                        <div className={`text-lg font-bold mb-2 ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
+                            {isCorrect ? '🎯 Correct!' : '❌ Time\'s up!'}
+                        </div>
+                        
+                        {!isCorrect && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="text-sm text-gray-300 bg-black/30 p-3 rounded-lg"
+                            >
+                                The answer was: <span className="text-green-400 font-bold">{item.answer}</span>
+                            </motion.div>
+                        )}
+                        
+                        <p className="mt-3 text-gray-400 text-xs animate-pulse">Next challenge coming up...</p>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

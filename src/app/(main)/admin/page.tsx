@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
   Users, Activity, FileText, MessageSquare, TrendingUp, TrendingDown,
-  Shield, Eye, UserCog, BarChart3, Sparkles, Clock, AlertCircle
+  Shield, Eye, UserCog, BarChart3, Sparkles, Clock, AlertCircle, Settings, Cog
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { SkillConfigurationAdmin } from '@/components/admin/SkillConfigurationAdmin';
+import type { SkillGraph } from '@/lib/services/skill-progression-manager';
 
 interface Stats {
   users: {
@@ -60,11 +62,16 @@ export default function AdminDashboard() {
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'skill-config'>('dashboard');
+  const [skillGraph, setSkillGraph] = useState<SkillGraph | null>(null);
 
   useEffect(() => {
     fetchStats();
     fetchUsers(currentPage);
-  }, [currentPage]);
+    if (activeTab === 'skill-config') {
+      fetchSkillGraph();
+    }
+  }, [currentPage, activeTab]);
 
   const fetchStats = async () => {
     try {
@@ -138,6 +145,48 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchSkillGraph = async () => {
+    try {
+      // This would typically fetch from your skill graph API
+      // For now, using a mock skill graph
+      const mockSkillGraph: SkillGraph = {
+        nodes: [
+          {
+            id: 'javascript-basics',
+            title: 'JavaScript Basics',
+            description: 'Learn fundamental JavaScript concepts',
+            prerequisites: [],
+            engine: 'codestudio',
+            difficulty: 'Easy'
+          },
+          {
+            id: 'dom-manipulation',
+            title: 'DOM Manipulation',
+            description: 'Learn to interact with the DOM',
+            prerequisites: ['javascript-basics'],
+            engine: 'codestudio',
+            difficulty: 'Medium'
+          },
+          {
+            id: 'async-programming',
+            title: 'Async Programming',
+            description: 'Master promises and async/await',
+            prerequisites: ['javascript-basics'],
+            engine: 'codestudio',
+            difficulty: 'Hard'
+          }
+        ],
+        edges: [
+          { from: 'javascript-basics', to: 'dom-manipulation' },
+          { from: 'javascript-basics', to: 'async-programming' }
+        ]
+      };
+      setSkillGraph(mockSkillGraph);
+    } catch (err: any) {
+      console.error('Failed to fetch skill graph:', err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-blue-900/20 to-gray-900">
@@ -185,18 +234,51 @@ export default function AdminDashboard() {
             <p className="text-gray-400 mt-2">Monitor platform health and user engagement</p>
           </div>
           
-          <button
-            onClick={generateAnalysis}
-            disabled={loadingAnalysis}
-            className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-50"
-          >
-            <Sparkles className="w-5 h-5" />
-            {loadingAnalysis ? 'Generating...' : 'AI Analysis'}
-          </button>
+          <div className="flex items-center gap-4">
+            {/* Tab Navigation */}
+            <div className="flex bg-gray-800/50 rounded-xl p-1">
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                  activeTab === 'dashboard' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                Dashboard
+              </button>
+              <button
+                onClick={() => setActiveTab('skill-config')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                  activeTab === 'skill-config' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Settings className="w-4 h-4" />
+                Skill Config
+              </button>
+            </div>
+
+            {activeTab === 'dashboard' && (
+              <button
+                onClick={generateAnalysis}
+                disabled={loadingAnalysis}
+                className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-50"
+              >
+                <Sparkles className="w-5 h-5" />
+                {loadingAnalysis ? 'Generating...' : 'AI Analysis'}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Content based on active tab */}
+        {activeTab === 'dashboard' && (
+          <>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Total Users */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -377,6 +459,31 @@ export default function AdminDashboard() {
             </button>
           </div>
         </motion.div>
+          </>
+        )}
+
+        {/* Skill Configuration Tab */}
+        {activeTab === 'skill-config' && skillGraph && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-700"
+          >
+            <SkillConfigurationAdmin 
+              skillGraph={skillGraph}
+              onConfigurationUpdate={(skillId, config) => {
+                console.log(`Configuration updated for skill ${skillId}:`, config);
+              }}
+            />
+          </motion.div>
+        )}
+
+        {activeTab === 'skill-config' && !skillGraph && (
+          <div className="text-center py-12">
+            <Cog className="w-16 h-16 text-gray-500 mx-auto mb-4 animate-spin" />
+            <p className="text-gray-400">Loading skill configuration...</p>
+          </div>
+        )}
       </div>
     </div>
   );

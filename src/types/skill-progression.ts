@@ -74,6 +74,7 @@ export type SkillState = 'locked' | 'unlocked' | 'mastered';
  */
 export interface ChallengeGenerationRequest {
   skillId: string;
+  userId?: string;
   difficultyLevel: DifficultyLevel;
   challengeType?: string;
   userHistory?: ChallengeAttempt[];

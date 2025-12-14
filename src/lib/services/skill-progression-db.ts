@@ -316,6 +316,76 @@ export class SkillProgressionDatabase {
   }
 
   /**
+   * Get recent challenge attempts for a user and skill (for adaptive difficulty)
+   */
+  async getRecentChallengeAttempts(
+    userId: string,
+    skillId: string,
+    limit: number = 10
+  ): Promise<ChallengeAttempt[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('challenge_attempts')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('skill_id', skillId)
+        .order('timestamp', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        throw new ProgressTrackingError(
+          `Failed to get recent challenge attempts: ${error.message}`,
+          skillId,
+          userId
+        );
+      }
+
+      return data.map(this.mapChallengeAttempt);
+    } catch (error) {
+      if (error instanceof ProgressTrackingError) {
+        throw error;
+      }
+      throw new ProgressTrackingError(
+        `Database error getting recent challenge attempts: ${error}`,
+        skillId,
+        userId
+      );
+    }
+  }
+
+  /**
+   * Get all user progress records for adaptive difficulty analysis
+   */
+  async getAllUserProgress(userId: string): Promise<UserSkillProgress[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('user_skill_progress')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        throw new ProgressTrackingError(
+          `Failed to get all user progress: ${error.message}`,
+          'all',
+          userId
+        );
+      }
+
+      return data.map(this.mapUserSkillProgress);
+    } catch (error) {
+      if (error instanceof ProgressTrackingError) {
+        throw error;
+      }
+      throw new ProgressTrackingError(
+        `Database error getting all user progress: ${error}`,
+        'all',
+        userId
+      );
+    }
+  }
+
+  /**
    * Map database row to UserSkillProgress interface
    */
   private mapUserSkillProgress(row: Record<string, any>): UserSkillProgress {

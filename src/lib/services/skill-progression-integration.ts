@@ -5,12 +5,14 @@
 
 import { challengeGenerator } from './challenge-generator';
 import { skillProgressionManager } from './skill-progression-manager';
+import { progressTracker } from './progress-tracker';
 import type {
   GeneratedChallenge,
   ChallengeGenerationRequest,
   DifficultyLevel,
   SkillState,
-  ChallengeAttempt
+  ChallengeAttempt,
+  ChallengeResult
 } from '@/types/skill-progression';
 import type { SkillGraph } from './skill-progression-manager';
 
@@ -111,6 +113,53 @@ export class SkillProgressionIntegration {
   }
 
   /**
+   * Record a challenge attempt and handle all progression logic
+   */
+  async recordChallengeAttempt(
+    userId: string,
+    skillId: string,
+    challengeId: string,
+    success: boolean,
+    skillGraph: SkillGraph,
+    options: {
+      timeSpent?: number;
+      hintsUsed?: number;
+      submissionCode?: string;
+      feedback?: string;
+      difficultyLevel?: DifficultyLevel;
+    } = {}
+  ): Promise<{
+    result: ChallengeResult;
+    unlockedSkills: string[];
+  }> {
+    try {
+      // Record the attempt using ProgressTracker
+      const result = await progressTracker.recordChallengeAttempt(
+        userId,
+        skillId,
+        challengeId,
+        success,
+        options
+      );
+
+      let unlockedSkills: string[] = [];
+
+      // If mastery was achieved, handle skill unlocking
+      if (result.masteryAchieved) {
+        unlockedSkills = await this.onSkillMastered(userId, skillId, skillGraph);
+      }
+
+      return {
+        result,
+        unlockedSkills
+      };
+    } catch (error) {
+      console.error(`Failed to record challenge attempt for user ${userId}, skill ${skillId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Handle skill mastery achievement
    */
   async onSkillMastered(
@@ -158,6 +207,42 @@ export class SkillProgressionIntegration {
       return 'Medium'; // User is performing adequately
     } else {
       return 'Easy'; // User is struggling
+    }
+  }
+
+  /**
+   * Get progress display data for skills in the skill graph
+   */
+  async getSkillProgressData(
+    userId: string,
+    skillGraph: SkillGraph
+  ): Promise<Array<{
+    skillId: string;
+    title: string;
+    progressData: any; // ProgressDisplayData from progress-tracker
+  }>> {
+    try {
+      const skillTitles = new Map<string, string>();
+      skillGraph.nodes.forEach(node => {
+        skillTitles.set(node.id, node.title);
+      });
+
+      const skillIds = skillGraph.nodes.map(node => node.id);
+      const progressDataArray = await progressTracker.getMultipleProgressDisplayData(
+        userId,
+        skillIds,
+        skillTitles,
+        skillGraph
+      );
+
+      return progressDataArray.map(data => ({
+        skillId: data.skillId,
+        title: data.title,
+        progressData: data
+      }));
+    } catch (error) {
+      console.error(`Failed to get skill progress data for user ${userId}:`, error);
+      return [];
     }
   }
 

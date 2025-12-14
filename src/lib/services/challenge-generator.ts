@@ -9,7 +9,8 @@ import type {
   ChallengePool,
   DifficultyLevel,
   ChallengeAttempt,
-  SkillConfiguration
+  SkillConfiguration,
+  DifficultyAdjustment
 } from '@/types/skill-progression';
 import {
   ChallengeGenerationError,
@@ -17,6 +18,7 @@ import {
 } from '@/types/skill-progression';
 import { callGroq } from '@/lib/courseCreation/engines/shared/groqService';
 import { skillProgressionDb } from './skill-progression-db';
+import { adaptiveDifficultyService } from './adaptive-difficulty';
 
 /**
  * Challenge template for fallback scenarios
@@ -70,15 +72,21 @@ export class ChallengeGenerator {
   }
 
   /**
-   * Generate a new challenge for a skill
+   * Generate a new challenge for a skill with adaptive difficulty
    */
   async generateChallenge(request: ChallengeGenerationRequest): Promise<GeneratedChallenge> {
     try {
+      // Apply adaptive difficulty if user ID is provided
+      let adjustedRequest = request;
+      if (request.userId) {
+        adjustedRequest = await this.applyAdaptiveDifficulty(request);
+      }
+
       // Try AI generation first
-      const challenge = await this.generateWithAI(request);
+      const challenge = await this.generateWithAI(adjustedRequest);
       
       // Add to pool if successful
-      await this.addToPool(request.skillId, challenge);
+      await this.addToPool(adjustedRequest.skillId, challenge);
       
       return challenge;
     } catch (error) {
@@ -98,6 +106,50 @@ export class ChallengeGenerator {
   }
 
   /**
+   * Generate challenge with adaptive difficulty adjustment
+   */
+  async generateAdaptiveChallenge(
+    userId: string,
+    skillId: string,
+    challengeType?: string
+  ): Promise<{ challenge: GeneratedChallenge; difficultyAdjustment: DifficultyAdjustment }> {
+    try {
+      // Get skill configuration for starting difficulty
+      const skillConfig = await this.db.getSkillConfiguration(skillId);
+      const startingDifficulty = skillConfig?.difficultyProgression.startingDifficulty || 'Medium';
+
+      // Analyze and adjust difficulty
+      const difficultyAdjustment = await adaptiveDifficultyService.analyzeDifficultyAdjustment(
+        userId,
+        skillId,
+        startingDifficulty
+      );
+
+      // Generate challenge with adjusted difficulty
+      const request: ChallengeGenerationRequest = {
+        skillId,
+        userId,
+        difficultyLevel: difficultyAdjustment.suggestedDifficulty,
+        challengeType,
+        userHistory: await this.db.getRecentChallengeAttempts(userId, skillId, 5)
+      };
+
+      const challenge = await this.generateChallenge(request);
+
+      return {
+        challenge,
+        difficultyAdjustment
+      };
+    } catch (error) {
+      throw new ChallengeGenerationError(
+        `Failed to generate adaptive challenge: ${error}`,
+        skillId,
+        true
+      );
+    }
+  }
+
+  /**
    * Get challenges from pool for a skill
    */
   async getChallengePool(skillId: string): Promise<GeneratedChallenge[]> {
@@ -110,9 +162,13 @@ export class ChallengeGenerator {
   }
 
   /**
-   * Ensure minimum pool size for a skill
+   * Ensure minimum pool size for a skill with adaptive difficulty for a specific user
    */
-  async ensurePoolSize(skillId: string, targetSize: number = this.config.poolSize.min): Promise<void> {
+  async ensurePoolSize(
+    skillId: string, 
+    userId?: string,
+    targetSize: number = this.config.poolSize.min
+  ): Promise<void> {
     const currentPool = await this.getChallengePool(skillId);
     const needed = Math.max(0, targetSize - currentPool.length);
     
@@ -130,13 +186,20 @@ export class ChallengeGenerator {
       );
     }
 
+    // Determine starting difficulty based on user or default
+    let startingDifficulty = skillConfig.difficultyProgression.startingDifficulty;
+    if (userId && skillConfig.difficultyProgression.adaptiveScaling) {
+      startingDifficulty = await adaptiveDifficultyService.getDefaultDifficultyForNewUser(userId);
+    }
+
     // Generate needed challenges
     const generationPromises: Promise<GeneratedChallenge>[] = [];
     
     for (let i = 0; i < needed; i++) {
       const request: ChallengeGenerationRequest = {
         skillId,
-        difficultyLevel: skillConfig.difficultyProgression.startingDifficulty,
+        userId,
+        difficultyLevel: startingDifficulty,
         challengeType: skillConfig.challengeTypes[i % skillConfig.challengeTypes.length]
       };
       
@@ -152,12 +215,13 @@ export class ChallengeGenerator {
   }
 
   /**
-   * Generate challenge variety for the same skill
+   * Generate challenge variety for the same skill with adaptive difficulty
    */
   async generateVariedChallenges(
     skillId: string, 
     count: number, 
-    difficultyLevel: DifficultyLevel
+    difficultyLevel: DifficultyLevel,
+    userId?: string
   ): Promise<GeneratedChallenge[]> {
     const challenges: GeneratedChallenge[] = [];
     const usedScenarios = new Set<string>();
@@ -172,14 +236,32 @@ export class ChallengeGenerator {
       );
     }
 
+    // Adjust difficulty if user provided and adaptive scaling enabled
+    let adjustedDifficulty = difficultyLevel;
+    if (userId && skillConfig.difficultyProgression.adaptiveScaling) {
+      try {
+        const adjustment = await adaptiveDifficultyService.analyzeDifficultyAdjustment(
+          userId,
+          skillId,
+          difficultyLevel
+        );
+        if (adjustment.confidenceScore >= 0.6) {
+          adjustedDifficulty = adjustment.suggestedDifficulty;
+        }
+      } catch (error) {
+        console.warn('Failed to apply adaptive difficulty for varied challenges:', error);
+      }
+    }
+
     for (let i = 0; i < count; i++) {
       const challengeType = skillConfig.challengeTypes[i % skillConfig.challengeTypes.length];
       
       const request: ChallengeGenerationRequest = {
         skillId,
-        difficultyLevel,
+        userId,
+        difficultyLevel: adjustedDifficulty,
         challengeType,
-        userHistory: [] // Could be populated with user's attempt history
+        userHistory: userId ? await this.db.getRecentChallengeAttempts(userId, skillId, 3) : []
       };
 
       try {
@@ -474,6 +556,36 @@ Return ONLY valid JSON matching this exact structure:
       .join(' ');
     
     return `${titleWords}_${descWords}`;
+  }
+
+  /**
+   * Apply adaptive difficulty to a challenge generation request
+   */
+  private async applyAdaptiveDifficulty(request: ChallengeGenerationRequest): Promise<ChallengeGenerationRequest> {
+    if (!request.userId) {
+      return request;
+    }
+
+    try {
+      const difficultyAdjustment = await adaptiveDifficultyService.analyzeDifficultyAdjustment(
+        request.userId,
+        request.skillId,
+        request.difficultyLevel
+      );
+
+      // Only apply adjustment if confidence is high enough
+      if (difficultyAdjustment.confidenceScore >= 0.6) {
+        return {
+          ...request,
+          difficultyLevel: difficultyAdjustment.suggestedDifficulty
+        };
+      }
+
+      return request;
+    } catch (error) {
+      console.warn('Failed to apply adaptive difficulty, using original request:', error);
+      return request;
+    }
   }
 
   /**

@@ -175,6 +175,12 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
+  // Handle closing the engine modal
+  const handleCloseEngine = () => {
+    setSelectedSkill(null);
+    setCurrentChallenge(null);
+  };
+
   // Track previous progress data to detect state changes
   const [previousProgressData, setPreviousProgressData] = useState<typeof progressData>([]);
 

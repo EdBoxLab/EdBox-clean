@@ -92,10 +92,9 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     if (initial) setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: undefined } }));
       if (!user) {
-        console.error("No user found");
-        return;
+        console.info('No user found; generating anonymous feed');
       }
 
       // For new batches, exclude previously viewed content types
@@ -187,8 +186,9 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      await trackInteraction(user.id, id, feedback);
-    }
+      const ok = await trackInteraction(user.id, id, feedback);
+      if (!ok) console.warn('trackInteraction failed for', id, feedback);
+      }
 
     const item = items.find(i => i.id === id);
     if (item && feedback === 'like') {
@@ -199,7 +199,8 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
   const handleSwipe = async (id: string, action: 'skip' | 'got_it' | 'answered', xp?: number) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      await trackInteraction(user.id, id, action);
+      const ok = await trackInteraction(user.id, id, action);
+      if (!ok) console.warn('trackInteraction failed for', id, action);
 
       if ((action === 'got_it' || action === 'answered') && xp) {
         try {

@@ -517,9 +517,10 @@ const CircleChat = ({ circle, onBack, session }: {
 };
 
 // Create Circle Modal
-const CreateCircleModal = ({ onClose, onCircleCreated }: {
+const CreateCircleModal = ({ onClose, onCircleCreated, session }: {
   onClose: () => void;
   onCircleCreated: (circle: any) => void;
+  session: any;
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -530,6 +531,13 @@ const CreateCircleModal = ({ onClose, onCircleCreated }: {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+
+    // Prevent unauthenticated users from attempting to create a circle
+    if (!session || !session.user || !session.user.id) {
+      setError('You must be signed in to create a circle.');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch('/api/study-circles', {
@@ -590,7 +598,7 @@ const CreateCircleModal = ({ onClose, onCircleCreated }: {
             </button>
             <button 
               type="submit" 
-              disabled={isLoading} 
+              disabled={isLoading || !session || !session.user || !session.user.id} 
               className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 font-bold disabled:opacity-50 transition-all shadow-lg shadow-purple-500/30">
               {isLoading ? 'Creating...' : 'Create Circle'}
             </button>
@@ -694,6 +702,7 @@ function StudyCirclesContent() {
         <CreateCircleModal 
           onClose={() => setIsModalOpen(false)} 
           onCircleCreated={handleCircleCreated} 
+          session={session}
         />
       )}
     </>

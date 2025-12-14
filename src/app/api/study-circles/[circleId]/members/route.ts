@@ -43,6 +43,7 @@ export async function POST(
       .insert({
         circle_id: numericCircleId,
         user_id: user.id,
+        joined_at: new Date().toISOString(),
       });
 
     if (insertError) {

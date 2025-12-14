@@ -51,3 +51,21 @@ describe('persistFeedItems', () => {
     expect(stored[0].type).toBe('story');
   });
 });
+
+describe('trackInteraction', () => {
+  it('returns false and logs when supabase insert returns an error object', async () => {
+    const mockError = { code: '123', message: 'boom' };
+    const mockedSupabase = require('@/lib/supabase/client').supabase;
+    mockedSupabase.from = jest.fn().mockReturnValue({ insert: jest.fn().mockResolvedValue({ error: mockError }) });
+
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const { trackInteraction } = require('../feedService');
+    const ok = await trackInteraction('u1', 'item1', 'like');
+
+    expect(ok).toBe(false);
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to track interaction:', mockError, expect.any(Object));
+
+    consoleErrorSpy.mockRestore();
+  });
+});

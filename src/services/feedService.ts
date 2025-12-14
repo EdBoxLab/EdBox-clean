@@ -136,11 +136,23 @@ export const persistFeedItems = async (items: FeedItem[], userId?: string) => {
   }
 };
 
-export const trackInteraction = async (userId: string, itemId: string, type: 'like' | 'dislike' | 'save' | 'skip' | 'got_it' | 'answered') => {
-  const { error } = await supabase.from('user_feed_interactions').insert({
-    user_id: userId,
-    feed_item_id: itemId,
-    interaction_type: type
-  });
-  if (error) console.error('Failed to track interaction:', error);
+export const trackInteraction = async (userId: string, itemId: string, type: 'like' | 'dislike' | 'save' | 'skip' | 'got_it' | 'answered') : Promise<boolean> => {
+  try {
+    const result = await supabase.from('user_feed_interactions').insert({
+      user_id: userId,
+      feed_item_id: itemId,
+      interaction_type: type
+    });
+
+    // Supabase may return an object with an `error` property or throw; be defensive
+    if ((result as any).error) {
+      console.error('Failed to track interaction:', (result as any).error, { userId, itemId, type });
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Failed to track interaction (exception):', err, { userId, itemId, type });
+    return false;
+  }
 };

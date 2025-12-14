@@ -7,7 +7,17 @@ export async function GET(request: NextRequest) {
     const supabase = await createSupabaseServerClient();
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
+    if (userError || !user || !user.id) {
+      // Capture cookie names to help debug missing session state (do NOT log cookie values)
+      try {
+        const { cookies } = await import('next/headers');
+        const cookieNames = cookies().getAll().map(c => c.name);
+        const supabaseCookiePresent = cookieNames.some(n => /supabase|sb/i.test(n));
+        console.warn('Unauthorized request - missing user id', { user, userError, cookieNames, supabaseCookiePresent });
+      } catch (cookieErr) {
+        console.warn('Unauthorized request - missing user id', { user, userError });
+      }
+
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -75,7 +85,17 @@ export async function POST(request: NextRequest) {
     const supabase = await createSupabaseServerClient();
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
+    if (userError || !user || !user.id) {
+      // Capture cookie names to help debug missing session state (do NOT log cookie values)
+      try {
+        const { cookies } = await import('next/headers');
+        const cookieNames = cookies().getAll().map(c => c.name);
+        const supabaseCookiePresent = cookieNames.some(n => /supabase|sb/i.test(n));
+        console.warn('Unauthorized request - missing user id', { user, userError, cookieNames, supabaseCookiePresent });
+      } catch (cookieErr) {
+        console.warn('Unauthorized request - missing user id', { user, userError });
+      }
+
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -107,12 +127,35 @@ export async function POST(request: NextRequest) {
     }
 
     // Add creator as admin member
-    const { error: memberError } = await supabase
-      .from('circle_members')
-      .insert([{ circle_id: newCircle.id, user_id: user.id, is_admin: true }]);
+    const memberPayload = { circle_id: newCircle.id, user_id: user.id, is_admin: true, joined_at: new Date().toISOString() };
+    try {
+      const { error: memberError } = await supabase.from('circle_members').insert([memberPayload]);
+      if (memberError) {
+        console.error('Add creator as admin error:', memberError, { payload: memberPayload });
 
-    if (memberError) {
-      console.error('Add creator as admin error:', memberError);
+        // Attempt to roll back the created circle to avoid orphaned circles when member insert fails
+        try {
+          await supabase.from('study_circles').delete().eq('id', newCircle.id);
+          console.warn('Rolled back circle creation due to member insert failure', { circleId: newCircle.id });
+        } catch (rollbackErr) {
+          console.error('Failed to roll back circle after member insert failure', rollbackErr);
+        }
+
+        // If user_id null error, provide more actionable message
+        if (memberError.code === '23502' || /null value in column "user_id"/.test(memberError.message || '')) {
+          return NextResponse.json({ error: 'Creator user id is missing; cannot add member' }, { status: 500 });
+        }
+
+        return NextResponse.json({ error: 'Failed to add creator as admin' }, { status: 500 });
+      }
+    } catch (err) {
+      console.error('Unexpected error adding creator as admin:', err, { payload: memberPayload });
+      try {
+        await supabase.from('study_circles').delete().eq('id', newCircle.id);
+        console.warn('Rolled back circle creation due to unexpected member insert exception', { circleId: newCircle.id });
+      } catch (rollbackErr) {
+        console.error('Failed to roll back circle after unexpected member insert exception', rollbackErr);
+      }
       return NextResponse.json({ error: 'Failed to add creator as admin' }, { status: 500 });
     }
 

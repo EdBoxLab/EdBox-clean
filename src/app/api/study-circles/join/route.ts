@@ -57,7 +57,8 @@ export async function POST(request: NextRequest) {
       .insert({
         circle_id: circle.id,
         user_id: user.id,
-        is_admin: false
+        is_admin: false,
+        joined_at: new Date().toISOString()
       });
 
     if (insertError) {

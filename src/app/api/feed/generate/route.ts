@@ -39,17 +39,30 @@ async function searchYouTubeVideos(query: string, limit = 4): Promise<any[]> {
 
         if (!data.items) return [];
 
-        return data.items.map((item: any) => ({
-            id: item.id.videoId,
-            title: item.snippet.title,
-            description: item.snippet.description,
-            thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url
-        }));
+        // Normalize various shapes of YouTube API responses
+        const results: any[] = [];
+        for (const item of data.items) {
+            // Typical shape: { id: { videoId: 'abc' }, snippet: {...} }
+            const videoId = item?.id?.videoId || (typeof item.id === 'string' ? item.id : undefined) || item?.snippet?.resourceId?.videoId;
+            if (!videoId) continue; // skip non-video results
+
+            results.push({
+                id: videoId,
+                title: item.snippet?.title || `YouTube short ${videoId}`,
+                description: item.snippet?.description || '',
+                thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || ''
+            });
+        }
+
+        console.log(`YouTube search returned ${results.length} shorts for query: ${query}`);
+        return results;
     } catch (error) {
         console.error("YouTube Search Error:", error);
         return [];
     }
 }
+
+export { searchYouTubeVideos };
 
 // ============= GROQ GENERATION =============
 
@@ -293,6 +306,8 @@ export const POST = async (request: NextRequest) => {
                 } as any);
             });
         }
+
+        console.log(`Added ${videoItems.length} video items to feed for interests: ${interests.slice(0,1).join(',')}`);
 
         // 3. Combine to make exactly 10 items and shuffle for variety
         let finalFeed = [...textItems, ...videoItems].slice(0, 10).sort(() => Math.random() - 0.5);

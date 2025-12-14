@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { SkillGraph, SkillNode, EngineType, Challenge } from '@/lib/courseCreation/types';
+import { SkillGraph, SkillNode, Challenge } from '@/lib/courseCreation/types';
+import { EngineType } from '@/app/api/learning-path/generate/types/enums';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { X, Sparkles, Trophy, Clock, Target, Zap } from 'lucide-react';
@@ -66,17 +67,21 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
   // Render engine based on type
   const renderEngine = () => {
     if (!currentChallenge) return null;
+    console.log('Current challenge engine:', currentChallenge.engine);
     switch (currentChallenge.engine) {
-      case EngineType.Coding:
+      case EngineType.CodeStudio:
         return <CodeStudio challenge={currentChallenge} />;
-      case EngineType.Default:
+      case EngineType.WritingStudio:
         return <WriteLab challenge={currentChallenge} />;
-      case EngineType.Math:
+      case EngineType.MathLab:
         return <MathLab challenge={currentChallenge} />;
-      case EngineType.Language:
+      case EngineType.LinguaLab:
         return <LinguaLab challenge={currentChallenge} />;
+      case EngineType.FinLab:
+        return <WriteLab challenge={currentChallenge} />; // Default fallback
       default:
-        return <div className="text-white">Engine not available</div>;
+        console.log('No matching engine for:', currentChallenge.engine);
+        return <div className="text-white">Engine not available for: {currentChallenge.engine}</div>;
     }
   };
 

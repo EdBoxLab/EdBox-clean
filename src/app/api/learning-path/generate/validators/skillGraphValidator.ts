@@ -27,10 +27,8 @@ export function validateSkillGraphResult(data: any): boolean {
   }
 
   const validEngines = Object.values(EngineType).map(String);
-  console.log("DEBUG: validEngines array:", validEngines);
 
   const validateNode = (n: any, idx: number) => {
-    console.log(`DEBUG: Validating Node[${idx}]:`, JSON.stringify(n, null, 2));
     
     if (!validEngines.includes(String(n.engine))) {
       console.error(`Node[${idx}] validation failed: engine is invalid`, n.engine, "Valid engines:", validEngines);
@@ -64,12 +62,10 @@ export function validateSkillGraphResult(data: any): boolean {
       console.error(`Node[${idx}] validation failed: xpReward is not a number`, n.xpReward, "type:", typeof n.xpReward);
       return false;
     }
-    console.log(`DEBUG: Node[${idx}] validation passed`);
     return true;
   };
 
   const validateProject = (p: any, idx: number, type: string) => {
-    console.log(`DEBUG: Validating ${type}[${idx}]:`, JSON.stringify(p, null, 2));
     
     if (!validEngines.includes(String(p.engine))) {
       console.error(`${type}[${idx}] validation failed: engine is invalid`, p.engine, "Valid engines:", validEngines);
@@ -103,25 +99,12 @@ export function validateSkillGraphResult(data: any): boolean {
       console.error(`${type}[${idx}] validation failed: xpReward is not a number`, p.xpReward, "type:", typeof p.xpReward);
       return false;
     }
-    console.log(`DEBUG: ${type}[${idx}] validation passed`);
     return true;
   };
 
-  console.log("DEBUG: Starting skillPaths validation...");
-  const nodeValidationResult = data.skillPaths.every((n: any, i: number) => validateNode(n, i));
-  console.log("DEBUG: SkillPaths validation result:", nodeValidationResult);
-  if (!nodeValidationResult) return false;
+  if (!data.skillPaths.every((n: any, i: number) => validateNode(n, i))) return false;
+  if (!data.miniProjects.every((p: any, i: number) => validateProject(p, i, "miniProject"))) return false;
+  if (!validateProject(data.capstoneProject, 0, "capstoneProject")) return false;
 
-  console.log("DEBUG: Starting miniProject validation...");
-  const miniProjectValidationResult = data.miniProjects.every((p: any, i: number) => validateProject(p, i, "miniProject"));
-  console.log("DEBUG: MiniProject validation result:", miniProjectValidationResult);
-  if (!miniProjectValidationResult) return false;
-
-  console.log("DEBUG: Starting capstoneProject validation...");
-  const capstoneValidationResult = validateProject(data.capstoneProject, 0, "capstoneProject");
-  console.log("DEBUG: CapstoneProject validation result:", capstoneValidationResult);
-  if (!capstoneValidationResult) return false;
-
-  console.log("DEBUG: All validations passed!");
   return true;
 }

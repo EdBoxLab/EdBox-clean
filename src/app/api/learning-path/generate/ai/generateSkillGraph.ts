@@ -297,14 +297,7 @@ if (parsed.capstone) {
   // Remove the original capstone field
   delete parsed.capstone;
 }
-console.dir(parsed, { depth: null });
-parsed.skillPaths?.forEach((n: any, i: number) => {
-  console.log(`Node[${i}] engine:`, n.engine, typeof n.engine);
-});
-parsed.miniProjects?.forEach((p: any, i: number) => {
-  console.log(`Project[${i}] engine:`, p.engine, typeof p.engine);
-});
-console.log("Capstone engine:", parsed.capstoneProject?.engine, typeof parsed.capstoneProject?.engine);
+
 
     // --- final validation ---
     if (!validateSkillGraphResult(parsed)) {

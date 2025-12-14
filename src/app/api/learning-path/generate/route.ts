@@ -192,9 +192,30 @@ export async function POST(req: Request) {
 
     // Build nodes
     const nodes: any[] = [
-      ...skillGraphData.skillPaths.map((s) => ({ id: s.id, name: s.name, type: 'skill' })),
-      ...skillGraphData.miniProjects.map((p) => ({ id: p.id, name: p.name, type: 'miniProject' })),
-      { id: skillGraphData.capstoneProject.id, name: skillGraphData.capstoneProject.name, type: 'capstone' },
+      ...skillGraphData.skillPaths.map((s) => ({ 
+        id: s.id, 
+        name: s.name, 
+        type: 'skill',
+        estimatedMinutes: s.estimatedMinutes || 0,
+        xpReward: s.xpReward || 0,
+        engine: s.engine
+      })),
+      ...skillGraphData.miniProjects.map((p) => ({ 
+        id: p.id, 
+        name: p.name, 
+        type: 'miniProject',
+        estimatedMinutes: p.estimatedMinutes || 0,
+        xpReward: p.xpReward || 0,
+        engine: p.engine
+      })),
+      { 
+        id: skillGraphData.capstoneProject.id, 
+        name: skillGraphData.capstoneProject.name, 
+        type: 'capstone',
+        estimatedMinutes: skillGraphData.capstoneProject.estimatedMinutes || 0,
+        xpReward: skillGraphData.capstoneProject.xpReward || 0,
+        engine: skillGraphData.capstoneProject.engine
+      },
     ];
 
     // Build edges

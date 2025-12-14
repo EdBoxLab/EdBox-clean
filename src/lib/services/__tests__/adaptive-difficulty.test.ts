@@ -55,7 +55,7 @@ describe('AdaptiveDifficultyService Property Tests', () => {
     skillId: skillIdArb,
     challengesCompleted: fc.integer({ min: 0, max: 20 }),
     challengesRequired: fc.integer({ min: 1, max: 10 }),
-    successRate: fc.float({ min: 0, max: 1 }),
+    successRate: fc.float({ min: Math.fround(0), max: Math.fround(1) }),
     masteryAchieved: fc.boolean(),
     lastAttempt: fc.option(fc.date()),
     totalAttempts: fc.integer({ min: 0, max: 50 }),
@@ -83,7 +83,9 @@ describe('AdaptiveDifficultyService Property Tests', () => {
               ...attempt,
               userId,
               skillId,
-              timeSpent: attempt.timeSpent || undefined
+              timeSpent: attempt.timeSpent ?? undefined,
+              submissionCode: attempt.submissionCode ?? undefined,
+              feedback: attempt.feedback ?? undefined
             }));
 
             const filteredProgress = allProgress.map(progress => ({
@@ -217,7 +219,9 @@ describe('AdaptiveDifficultyService Property Tests', () => {
               ...attempt,
               userId,
               skillId,
-              timeSpent: attempt.timeSpent || undefined,
+              timeSpent: attempt.timeSpent ?? undefined,
+              submissionCode: attempt.submissionCode ?? undefined,
+              feedback: attempt.feedback ?? undefined,
               // Ensure timestamps are in descending order (most recent first)
               timestamp: new Date(Date.now() - attempts.indexOf(attempt) * 60000)
             }));

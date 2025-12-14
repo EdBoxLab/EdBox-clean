@@ -68,14 +68,14 @@ describe('ChallengeGenerator Property Tests', () => {
       skillId: skillIdArb,
       challengeId: fc.string(),
       success: fc.boolean(),
-      timeSpent: fc.option(fc.integer({ min: 1, max: 3600 })),
+      timeSpent: fc.option(fc.integer({ min: 1, max: 3600 }), { nil: undefined }),
       hintsUsed: fc.integer({ min: 0, max: 10 }),
-      submissionCode: fc.option(fc.string()),
-      feedback: fc.option(fc.string()),
+      submissionCode: fc.option(fc.string(), { nil: undefined }),
+      feedback: fc.option(fc.string(), { nil: undefined }),
       difficultyLevel: difficultyArb,
       timestamp: fc.date(),
       createdAt: fc.date()
-    }), { maxLength: 10 }))
+    }), { maxLength: 10 }), { nil: undefined })
   });
 
   const validAIResponseArb = fc.record({

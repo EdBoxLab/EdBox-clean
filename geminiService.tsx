@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import type { CitationStyle, ResearchPackage, Source } from './src/types';
+import type { CitationStyle, ResearchPackage, Source } from './src/app/types';
 
 if (!process.env.API_KEY) {
     console.warn("API_KEY environment variable not set. Using a placeholder.");

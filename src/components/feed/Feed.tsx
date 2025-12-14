@@ -11,7 +11,7 @@ import { ChallengeCard } from './ChallengeCard';
 import { FactCard } from './FactCard';
 import { StoryCard } from './StoryCard';
 import { SkeletonCard } from './SkeletonCard';
-import { GenieResponseView } from './GenieResponseView';
+// Removed GenieResponseView import
 import { ArticleView } from './ArticleView';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { XPStreakDisplay } from '@/components/XPStreakDisplay';
@@ -52,12 +52,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [likedTopics, setLikedTopics] = useState<string[]>([]);
 
-  // Genie State
-  const [isGenieActive, setIsGenieActive] = useState(false);
-  const [genieExplanation, setGenieExplanation] = useState('');
-  const [isGenieThinking, setIsGenieThinking] = useState(false);
-  const [showGenieModal, setShowGenieModal] = useState(false);
-  const [currentGenieItem, setCurrentGenieItem] = useState<FeedItem | null>(null);
+  // Removed genie functionality
 
   // Audio State for Articles
   const [summaryAudio, setSummaryAudio] = useState<Record<string, { state: AudioGenerationState, buffer?: AudioBuffer }>>({});
@@ -243,18 +238,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     console.log("Incorrect");
   };
 
-  const handleAskGenie = (item: FeedItem) => {
-    setCurrentGenieItem(item);
-    setShowGenieModal(true);
-    setIsGenieThinking(true);
-    setGenieExplanation('');
-
-    setTimeout(async () => {
-      const explanation = `Here is a deeper look at "${item.title}". \n\nThe core concept here is ${item.topic}. It is important because it connects to... [Genie AI explanation would go here]`;
-      setGenieExplanation(explanation);
-      setIsGenieThinking(false);
-    }, 1500);
-  };
+  // Removed genie functionality
 
   const handleGenerateSummaryAudio = (item: ArticleFeedItem) => {
     // Placeholder for audio generation
@@ -287,61 +271,63 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
 
   if (loading && items.length === 0) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-gray-950 text-white">
-        <Loader2 className="w-12 h-12 animate-spin text-purple-500 mb-4" />
-        <h2 className="text-xl font-light tracking-widest uppercase text-gray-400">Curating your feed...</h2>
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#09090b] text-white">
+        <Loader2 className="w-12 h-12 animate-spin text-indigo-500 mb-4" />
+        <h2 className="text-xl font-light text-gray-400">Curating your feed...</h2>
       </div>
     );
   }
 
   return (
-    <>
+    <div className="min-h-screen bg-[#09090b]">
       <FeedAnimations />
 
       <div className="fixed top-4 left-1/2 -translate-x-1/2 z-40">
         <XPStreakDisplay showCompact={true} />
       </div>
 
-      <div
-        ref={feedRef}
-        className="h-full w-full overflow-y-auto snap-y snap-mandatory scroll-smooth bg-gray-950 no-scrollbar"
-      >
-        {items.map((item, index) => (
-          <div
-            key={item.id}
-            id={item.id}
-            className="feed-card h-full w-full snap-start flex-shrink-0 opacity-0 animate-card-enter p-1 sm:p-2"
-            style={{ animationDelay: `${(index % 5) * 100}ms` }}
-          >
-            <CardWrapper
-              item={item}
-              isActive={activeCardId === item.id}
-              onSwipe={handleSwipe}
-              onFeedback={handleFeedback}
-              onAskGenie={handleAskGenie}
-              isGenieActive={isGenieActive}
+      {/* Header matching homepage style */}
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8 pt-20">
+        <div className="mb-8">
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4">
+            Your Learning Feed
+          </h1>
+          <p className="text-lg text-gray-400">
+            Personalized content to accelerate your learning journey.
+          </p>
+        </div>
+
+        {/* Feed Grid - consistent with homepage */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          {items.map((item, index) => (
+            <div
+              key={item.id}
+              id={item.id}
+              className="feed-card opacity-0 animate-card-enter"
+              style={{ animationDelay: `${(index % 5) * 100}ms` }}
             >
-              {renderCardContent(item)}
-            </CardWrapper>
-          </div>
-        ))}
+              <CardWrapper
+                item={item}
+                isActive={activeCardId === item.id}
+                onSwipe={handleSwipe}
+                onFeedback={handleFeedback}
+              >
+                <div className="min-h-[400px] flex flex-col justify-center">
+                  {renderCardContent(item)}
+                </div>
+              </CardWrapper>
+            </div>
+          ))}
 
-        {(loading || items.length === 0) && (
-          <>
-            <SkeletonCard />
-            <SkeletonCard />
-          </>
-        )}
+          {(loading || items.length === 0) && (
+            <>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </>
+          )}
+        </div>
       </div>
-
-      {showGenieModal && currentGenieItem && (
-        <GenieResponseView
-          item={currentGenieItem}
-          explanation={genieExplanation}
-          isLoading={isGenieThinking}
-          onClose={() => setShowGenieModal(false)}
-        />
-      )}
 
       {readingArticle && (
         <div className="fixed inset-0 z-50">
@@ -352,7 +338,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
           />
         </div>
       )}
-    </>
+    </div>
   );
 };
 

@@ -4,10 +4,11 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 // GET a single study set with its terms
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createSupabaseServerClient(); // ✅ await here
-  const setId = parseInt(params.id, 10);
+  const { id } = await params;
+  const setId = parseInt(id, 10);
 
   if (isNaN(setId)) return NextResponse.json({ error: 'Invalid study set ID' }, { status: 400 });
 
@@ -42,10 +43,11 @@ export async function GET(
 // PUT (update) a study set
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createSupabaseServerClient(); // ✅ await here
-  const setId = parseInt(params.id, 10);
+  const { id } = await params;
+  const setId = parseInt(id, 10);
 
   if (isNaN(setId)) return NextResponse.json({ error: 'Invalid study set ID' }, { status: 400 });
 
@@ -96,10 +98,11 @@ export async function PUT(
 // DELETE a study set
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createSupabaseServerClient(); // ✅ await here
-  const setId = parseInt(params.id, 10);
+  const { id } = await params;
+  const setId = parseInt(id, 10);
 
   if (isNaN(setId)) return NextResponse.json({ error: 'Invalid study set ID' }, { status: 400 });
 

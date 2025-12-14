@@ -7,11 +7,10 @@ import { motion } from 'framer-motion';
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
-  visible: (i: number) => ({
+  visible: {
     opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.15, duration: 0.5, ease: "easeOut" }
-  })
+    y: 0
+  }
 };
 
 const FeatureCard = ({ 
@@ -36,9 +35,8 @@ const FeatureCard = ({
         variants={cardVariants}
         initial="hidden"
         animate="visible"
-        custom={index}
+        transition={{ delay: index * 0.15, duration: 0.5 }}
         whileHover={{ scale: 1.02 }}
-        transition={{ duration: 0.2 }}
       >
         <div>
           <Icon className="w-12 h-12 text-white opacity-80 mb-4" />
@@ -78,7 +76,7 @@ export default function SocialPage() {
         className="mb-12"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
+        transition={{ duration: 0.6 }}
       >
         <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4">
           Connect & Learn Together

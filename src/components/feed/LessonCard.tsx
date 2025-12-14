@@ -212,7 +212,7 @@ const LessonCard: React.FC<LessonCardProps> = ({
           
           {lesson.type === 'video' && lesson.audioBuffer && (
             <Button
-              size="icon-sm"
+              size="icon"
               variant="ghost"
               onClick={toggleMute}
               className="bg-background/50 backdrop-blur-sm hover:bg-background/70"

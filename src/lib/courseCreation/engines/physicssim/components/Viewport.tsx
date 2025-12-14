@@ -12,7 +12,7 @@ interface ViewportProps {
 export const Viewport: React.FC<ViewportProps> = ({ status, config, speedMultiplier, onTick }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number>(0);
   const timeRef = useRef<number>(0);
   const previousTimeRef = useRef<number>(0);
 

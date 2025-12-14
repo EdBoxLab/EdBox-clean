@@ -10,6 +10,18 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <App challenge={{
+      id: 'demo-challenge',
+      skillId: 'writing-basics',
+      title: 'Writing Fundamentals',
+      description: 'Learn basic writing skills',
+      engine: 'writingstudio',
+      difficulty: 'Easy',
+      estimatedMinutes: 30,
+      xpReward: 100,
+      validationCriteria: [],
+      hints: ['Start with a clear topic'],
+      explanation: 'This is a demo challenge'
+    }} />
   </React.StrictMode>
 );

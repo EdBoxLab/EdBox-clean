@@ -36,7 +36,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ code, language, onChange
             return (
               <div 
                 key={i} 
-                ref={el => lineRefs.current[lineNum] = el}
+                ref={el => { lineRefs.current[lineNum] = el; }}
                 className={`h-6 leading-6 text-xs transition-colors duration-200 flex items-center justify-end ${isHighlighted ? 'text-yellow-400 font-bold' : ''}`}
               >
                 {lineNum}

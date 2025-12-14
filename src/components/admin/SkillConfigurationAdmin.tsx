@@ -228,10 +228,13 @@ export function SkillConfigurationAdmin({
     try {
       setLoading(true);
       const allConfigs = Array.from(configurations.values()).map(config => ({
+        id: config.id || '',
         skillId: config.skillId,
         masteryThreshold: config.masteryThreshold,
         difficultyProgression: config.difficultyProgression,
-        challengeTypes: config.challengeTypes
+        challengeTypes: config.challengeTypes,
+        createdAt: config.createdAt || new Date(),
+        updatedAt: config.updatedAt || new Date()
       }));
 
       const dependencyCheck = await skillConfigurationManager.checkDependencyConsistency(skillGraph, allConfigs);

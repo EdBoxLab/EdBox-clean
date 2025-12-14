@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import type { FeedItem, Feedback } from '@/types/feed';
-import { GenieAvatar } from './GenieAvatar';
-import { ThumbsUpIcon, ThumbsDownIcon, GenieMagicIcon, BookmarkIcon, ShareIcon } from './MediaIcons';
+import { ThumbsUpIcon, ThumbsDownIcon, BookmarkIcon, ShareIcon } from './MediaIcons';
 import { useSounds } from './useSounds';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
@@ -11,19 +10,12 @@ interface CardWrapperProps {
     onSwipe: (id: string, action: 'skip' | 'got_it' | 'answered', xp?: number) => void;
     children: React.ReactNode;
     onFeedback: (id: string, feedback: Feedback) => void;
-    onAskGenie: (item: FeedItem) => void;
-    isGenieActive: boolean;
 }
 
-const themeClasses: { [key: string]: string } = {
-    'purple-gradient': 'from-purple-800 to-indigo-900',
-    'blue-gradient': 'from-blue-800 to-cyan-900',
-    'green-gradient': 'from-emerald-800 to-teal-900',
-    'orange-gradient': 'from-orange-800 to-amber-900',
-    'red-gradient': 'from-red-800 to-rose-900',
-};
+// Using consistent homepage styling - zinc/gray theme
+const cardBaseClass = 'bg-zinc-900/50 border border-zinc-800 hover:border-zinc-600';
 
-export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwipe, children, onFeedback, onAskGenie, isGenieActive }) => {
+export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwipe, children, onFeedback }) => {
     const [translateX, setTranslateX] = useState(0);
     const [opacity, setOpacity] = useState(1);
     const [isSwiping, setIsSwiping] = useState(false);
@@ -123,8 +115,6 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
     const handleTouchMove = (e: React.TouchEvent) => handleSwipeMove(e.touches[0].clientX);
     const handleTouchEnd = () => handleSwipeEnd();
 
-    const themeClass = themeClasses[item.theme] || 'from-gray-800 to-gray-900';
-
     const getFeedbackButtonClass = (type: Feedback) => {
         if (item.feedback) {
             if (item.feedback === type) {
@@ -132,18 +122,18 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
             }
             return 'text-gray-600 cursor-not-allowed';
         }
-        return 'text-white hover:bg-white/10';
+        return 'text-white hover:bg-zinc-700/50';
     };
 
-    const scale = isActive ? 1.01 : 1;
+    const scale = isActive ? 1.02 : 1;
 
     return (
         <div
-            className={`relative h-full w-full flex flex-col justify-between p-3 sm:p-4 md:p-6 text-white bg-gradient-to-br ${themeClass} overflow-hidden rounded-2xl ${isActive ? 'active-card-indicator' : ''}`}
+            className={`relative h-full w-full flex flex-col justify-between p-6 text-white ${cardBaseClass} overflow-hidden rounded-xl transition-all duration-300 ${isActive ? 'border-zinc-600 shadow-lg' : ''}`}
             style={{
                 transform: `translateX(${translateX}px) scale(${scale})`,
                 opacity: opacity,
-                transition: isSwiping ? 'none' : 'transform 0.3s ease-out, opacity 0.3s ease-out, box-shadow 0.3s ease-out',
+                transition: isSwiping ? 'none' : 'transform 0.3s ease-out, opacity 0.3s ease-out, border-color 0.3s ease-out',
             }}
             onMouseDown={swipeFeedback ? undefined : handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -170,25 +160,22 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
                 {children}
             </div>
 
-            {/* Bottom UI */}
-            <div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-4 md:bottom-6 md:left-6 md:right-6 flex justify-between items-end gap-2 z-20 pointer-events-none">
-                <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="scale-75 sm:scale-100">
-                        <GenieAvatar reaction={item.genie_reaction} isActive={isActive} />
-                    </div>
-                    <div className="hidden xs:block">
-                        <p className="font-bold text-sm sm:text-base md:text-lg">EdBox Feed</p>
-                        <p className="text-xs sm:text-sm text-gray-300">Personalized for you</p>
+            {/* Bottom UI - Consistent with homepage styling */}
+            <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end gap-3 z-20 pointer-events-none">
+                <div className="flex items-center gap-3">
+                    <div className="hidden sm:block">
+                        <p className="font-bold text-base text-white">EdBox Feed</p>
+                        <p className="text-sm text-gray-400">Personalized learning</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-1 sm:gap-2 pointer-events-auto">
+                <div className="flex items-center gap-2 pointer-events-auto">
                     <button
                         onClick={handleSave}
                         onMouseDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
                         disabled={isSaved}
                         aria-label="Save for later"
-                        className={`p-2 rounded-full transition-colors duration-200 ${isSaved ? 'text-yellow-400' : 'text-white hover:bg-white/10'}`}
+                        className={`p-2 rounded-lg transition-colors duration-200 ${isSaved ? 'text-yellow-400 bg-zinc-800' : 'text-white hover:bg-zinc-700/50'}`}
                     >
                         <BookmarkIcon filled={isSaved} />
                     </button>
@@ -197,9 +184,9 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
                         onMouseDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
                         aria-label="Share content"
-                        className="p-2 rounded-full transition-colors duration-200 text-white hover:bg-white/10"
+                        className="p-2 rounded-lg transition-colors duration-200 text-white hover:bg-zinc-700/50"
                     >
-                        <ShareIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+                        <ShareIcon className="h-5 w-5" />
                     </button>
                     <button
                         onClick={() => onFeedback(item.id, 'like')}
@@ -207,9 +194,9 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
                         onTouchStart={(e) => e.stopPropagation()}
                         disabled={!!item.feedback}
                         aria-label="Like this content"
-                        className={`p-2 rounded-full transition-colors duration-200 ${getFeedbackButtonClass('like')}`}
+                        className={`p-2 rounded-lg transition-colors duration-200 ${getFeedbackButtonClass('like')}`}
                     >
-                        <ThumbsUpIcon filled={item.feedback === 'like'} className="h-5 w-5 sm:h-6 sm:w-6" />
+                        <ThumbsUpIcon filled={item.feedback === 'like'} className="h-5 w-5" />
                     </button>
                     <button
                         onClick={() => onFeedback(item.id, 'dislike')}
@@ -217,22 +204,11 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
                         onTouchStart={(e) => e.stopPropagation()}
                         disabled={!!item.feedback}
                         aria-label="Dislike this content"
-                        className={`p-2 rounded-full transition-colors duration-200 ${getFeedbackButtonClass('dislike')}`}
+                        className={`p-2 rounded-lg transition-colors duration-200 ${getFeedbackButtonClass('dislike')}`}
                     >
-                        <ThumbsDownIcon filled={item.feedback === 'dislike'} className="h-5 w-5 sm:h-6 sm:w-6" />
+                        <ThumbsDownIcon filled={item.feedback === 'dislike'} className="h-5 w-5" />
                     </button>
-                    <button
-                        onClick={() => onAskGenie(item)}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        disabled={!isActive || isGenieActive}
-                        aria-label="Ask Genie for details"
-                        className={`p-2 rounded-full transition-colors duration-200 ${isActive && !isGenieActive ? 'text-purple-300 hover:bg-white/10' : 'text-gray-600 cursor-not-allowed'
-                            }`}
-                    >
-                        <GenieMagicIcon className="h-5 w-5 sm:h-6 sm:w-6" />
-                    </button>
-                    <div className="bg-yellow-400 text-yellow-900 font-bold px-2 py-0.5 text-[10px] sm:px-3 sm:py-1 sm:text-xs md:text-sm rounded-full whitespace-nowrap">
+                    <div className="bg-indigo-600 text-white font-bold px-3 py-1 text-sm rounded-lg whitespace-nowrap">
                         +{item.xp_reward} XP
                     </div>
                 </div>

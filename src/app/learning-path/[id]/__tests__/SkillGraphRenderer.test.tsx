@@ -29,7 +29,7 @@ jest.mock('next/dynamic', () => () => {
 });
 
 describe('SkillGraphRenderer', () => {
-  const mockGraph: SkillGraph = {
+  const mockGraph: any = {
     goal: 'Test Learning Path',
     nodes: [
       {

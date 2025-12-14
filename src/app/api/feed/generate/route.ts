@@ -9,11 +9,11 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 // Simple Key Pool for Groq if multiple keys exist (reusing your existing pattern simply)
 const GROQ_KEYS = [
-    process.env.GROQ_API_KEY,
-    process.env.GROQ_API_KEY_2,
-    process.env.GROQ_API_KEY_3,
+    process.env.GROQ_API_KEY_8,
+    process.env.GROQ_API_KEY_5,
+    process.env.GROQ_API_KEY_7,
 ].filter(Boolean) as string[];
-
+console.log(GROQ_KEYS);
 const getRandomGroqKey = () => GROQ_KEYS[Math.floor(Math.random() * GROQ_KEYS.length)];
 
 // ============= YOUTUBE SEARCH =============
@@ -25,7 +25,9 @@ async function searchYouTubeVideos(query: string, limit = 2): Promise<any[]> {
     }
 
     try {
-        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=${limit}&key=${YOUTUBE_API_KEY}`;
+        // Search for shorts specifically by adding duration filter and shorts-related terms
+        const shortsQuery = `${query} #shorts short video under 60 seconds`;
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(shortsQuery)}&type=video&maxResults=${limit}&videoDuration=short&key=${YOUTUBE_API_KEY}`;
         const response = await fetch(url);
         const data = await response.json();
 
@@ -45,7 +47,7 @@ async function searchYouTubeVideos(query: string, limit = 2): Promise<any[]> {
 
 // ============= GROQ GENERATION =============
 
-async function generateFeedWithGroq(interests: string[], likedTopics: string[]): Promise<FeedItem[]> {
+async function generateFeedWithGroq(interests: string[], likedTopics: string[], excludeTypes: string[] = []): Promise<FeedItem[]> {
     const apiKey = getRandomGroqKey();
     if (!apiKey) throw new Error("No Groq API Keys available");
 
@@ -53,18 +55,29 @@ async function generateFeedWithGroq(interests: string[], likedTopics: string[]):
 
     // Mix interests and liked topics, prioritizing liked ones slightly
     const focusTopics = [...interests, ...likedTopics].slice(0, 5);
+    
+    // Define available content types
+    const allTypes = ['quiz', 'article', 'fact', 'challenge', 'story'];
+    const availableTypes = allTypes.filter(type => !excludeTypes.includes(type));
+    
+    // Generate 8 diverse types, ensuring no duplicates within this batch
+    const selectedTypes = [];
+    while (selectedTypes.length < 8 && availableTypes.length > 0) {
+        // First pass: add each type once
+        if (selectedTypes.length < availableTypes.length) {
+            selectedTypes.push(availableTypes[selectedTypes.length]);
+        } else {
+            // Second pass: add remaining types randomly
+            const randomType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+            selectedTypes.push(randomType);
+        }
+    }
+
     const prompt = `
     Generate 8 diverse educational feed items for a user interested in: ${focusTopics.join(', ')}.
     
-    You must generate exactly these types (one of each):
-    1. One 'quiz' item - Interactive multiple choice question
-    2. One 'article' item - Educational article with summary
-    3. One 'fact' item - Interesting fact with explanation
-    4. One 'challenge' item - Quick brain teaser or problem
-    5. One 'story' item - Short educational narrative
-    6. One additional 'quiz' item (different topic)
-    7. One additional 'fact' item (different topic)  
-    8. One additional 'article' item (different topic)
+    You must generate exactly these types in order:
+    ${selectedTypes.map((type, i) => `${i + 1}. One '${type}' item`).join('\n    ')}
 
     Return a JSON array with exactly 8 objects. Each object must have these base fields:
     - id: unique string like "quiz_001", "fact_002", etc.
@@ -139,51 +152,24 @@ async function generateFeedWithGroq(interests: string[], likedTopics: string[]):
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { interests = [], likedTopics = [] } = body;
+        const { interests = [], likedTopics = [], excludeTypes = [] } = body;
 
-        console.log('Generating feed for:', interests.length, 'interests');
+        console.log('Generating feed for:', interests.length, 'interests', 'excluding:', excludeTypes);
 
         // 1. Generate text content via Groq
-        const textItems = await generateFeedWithGroq(interests, likedTopics);
+        const textItems = await generateFeedWithGroq(interests, likedTopics, excludeTypes);
 
-        // 2. Fetch relevant videos from YouTube (limit to 1-2 to balance content)
+        // 2. Add YouTube Shorts only (no regular videos)
         const videoItems: FeedItem[] = [];
         if (interests.length > 0) {
-            const query = `${interests[0]} tutorial educational short`;
-            const videos = await searchYouTubeVideos(query, 1); // Reduced to 1 video
-
-            videos.forEach(v => {
-                videoItems.push({
-                    id: `vid_${v.id}`,
-                    type: 'video',
-                    topic: interests[0],
-                    title: v.title.length > 60 ? v.title.substring(0, 57) + '...' : v.title,
-                    xp_reward: 150,
-                    genie_reaction: 'hype',
-                    theme: 'red-gradient',
-                    likedByUser: false,
-                    likes: Math.floor(Math.random() * 100),
-                    shares: Math.floor(Math.random() * 30),
-                    comments: [],
-                    // Video specific
-                    script: v.description.substring(0, 200) + '...',
-                    visualPrompt: 'educational_video_content',
-                    imageUrl: v.thumbnail,
-                    video_url: `https://www.youtube.com/embed/${v.id}`
-                } as any);
-            });
-        }
-
-        // 3. Add YouTube Shorts (simulated as short videos)
-        if (interests.length > 1) {
-            const shortsQuery = `${interests[1]} quick facts shorts`;
-            const shorts = await searchYouTubeVideos(shortsQuery, 1);
+            const shortsQuery = `${interests[0]} shorts quick facts tutorial`;
+            const shorts = await searchYouTubeVideos(shortsQuery, 2); // Get 2 shorts to fill the 10-item batch
             
-            shorts.forEach(s => {
+            shorts.forEach((s, index) => {
                 videoItems.push({
                     id: `short_${s.id}`,
                     type: 'video',
-                    topic: interests[1],
+                    topic: interests[index % interests.length],
                     title: `🔥 ${s.title.length > 50 ? s.title.substring(0, 47) + '...' : s.title}`,
                     xp_reward: 75,
                     genie_reaction: 'cheer',
@@ -200,8 +186,8 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // 4. Combine and Shuffle for variety
-        const finalFeed = [...textItems, ...videoItems].sort(() => Math.random() - 0.5);
+        // 3. Combine to make exactly 10 items and shuffle for variety
+        const finalFeed = [...textItems, ...videoItems].slice(0, 10).sort(() => Math.random() - 0.5);
 
         return NextResponse.json(finalFeed);
 

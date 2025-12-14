@@ -58,7 +58,8 @@ async function retryOperation<T>(operation: () => Promise<T>, retries = 3, delay
 
 export const generateFeedBatch = async (
   interests: string[],
-  likedTopics: string[] = []
+  likedTopics: string[] = [],
+  excludeTypes: string[] = []
 ): Promise<(FeedItem)[]> => {
   return retryOperation(async () => {
     const response = await fetch('/api/feed/generate', {
@@ -66,7 +67,7 @@ export const generateFeedBatch = async (
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ interests, likedTopics }),
+      body: JSON.stringify({ interests, likedTopics, excludeTypes }),
     });
 
     if (!response.ok) {

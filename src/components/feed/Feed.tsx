@@ -52,6 +52,8 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [likedTopics, setLikedTopics] = useState<string[]>([]);
+  const [viewedTypes, setViewedTypes] = useState<Set<string>>(new Set());
+  const [currentBatch, setCurrentBatch] = useState(0);
 
   // Removed genie functionality
 
@@ -90,7 +92,18 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
         return;
       }
 
-      const itemBatch = await generateFeedBatch(preferences.interests, likedTopics);
+      // For new batches, exclude previously viewed content types
+      // Reset if all content types have been viewed (5 main types: quiz, article, fact, challenge, story)
+      const allContentTypes = ['quiz', 'article', 'fact', 'challenge', 'story'];
+      const shouldReset = viewedTypes.size >= allContentTypes.length;
+      const excludeTypes = initial || shouldReset ? [] : Array.from(viewedTypes);
+      
+      if (shouldReset) {
+        console.log('🔄 Resetting content types - all types have been viewed');
+        setViewedTypes(new Set());
+      }
+      
+      const itemBatch = await generateFeedBatch(preferences.interests, likedTopics, excludeTypes);
 
       // Persist generated items
       await persistFeedItems(itemBatch, user.id);
@@ -98,16 +111,26 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       // Process items (removed client-side image gen)
       const processedItems = itemBatch.filter(item => item.type !== 'meme');
 
+      // Track content types in this batch
+      const newTypes = new Set(processedItems.map(item => item.type));
+      setViewedTypes(prev => shouldReset ? newTypes : new Set([...prev, ...newTypes]));
 
       const newItems = processedItems;
-      setItems(prev => [...prev, ...newItems]);
+      
+      if (initial) {
+        setItems(newItems);
+        setCurrentBatch(1);
+      } else {
+        setItems(prev => [...prev, ...newItems]);
+        setCurrentBatch(prev => prev + 1);
+      }
     } catch (err) {
       console.error("Failed to load feed items", err);
     } finally {
       processingRef.current = false;
       setLoading(false);
     }
-  }, [preferences.interests, likedTopics, supabase]);
+  }, [preferences.interests, likedTopics, supabase, viewedTypes]);
 
   // Initial Load
   useEffect(() => {
@@ -128,8 +151,8 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
               const index = items.findIndex(item => item.id === newActiveId);
               setActiveIndex(index);
 
-              // Load more when close to end
-              if (index !== -1 && index >= items.length - 3 && !loading && !processingRef.current) {
+              // Load more when user has viewed all 10 items in current batch
+              if (index !== -1 && index >= (currentBatch * 10) - 1 && !loading && !processingRef.current) {
                 loadMoreItems();
               }
               return newActiveId;
@@ -274,6 +297,19 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
           <p className="text-lg text-gray-400">
             Personalized content to accelerate your learning journey.
           </p>
+          {items.length > 0 && (
+            <div className="mt-4 flex items-center gap-4 text-sm text-gray-500">
+              <span>Batch {currentBatch}</span>
+              <span>•</span>
+              <span>{activeIndex + 1} of {Math.min(currentBatch * 10, items.length)} items</span>
+              <span>•</span>
+              <span className="text-cyan-400">
+                {viewedTypes.size === 0 ? 'Fresh content types' : `${viewedTypes.size}/5 types viewed`}
+              </span>
+              <span>•</span>
+              <span className="text-orange-400">Shorts only 🔥</span>
+            </div>
+          )}
         </div>
 
         {/* Feed Grid - consistent with homepage */}
@@ -304,6 +340,16 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
               <SkeletonCard />
               <SkeletonCard />
             </>
+          )}
+
+          {/* Loading indicator for new batches */}
+          {loading && items.length > 0 && (
+            <div className="col-span-full flex items-center justify-center py-8">
+              <div className="flex items-center gap-3 text-gray-400">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Loading fresh content...</span>
+              </div>
+            </div>
           )}
         </div>
       </div>

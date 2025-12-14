@@ -16,6 +16,9 @@ import NotificationSystem from './components/NotificationSystem';
 import PrerequisitesModal from './components/PrerequisitesModal';
 import EngineModal from './components/EngineModal';
 
+// Import source map utilities
+import { performSourceMapHealthCheck, enhanceConsoleLogging, logComponentError } from './utils/sourceMapUtils';
+
 // Props for renderer
 interface SkillGraphRendererProps {
   graph: SkillGraph;
@@ -72,6 +75,16 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
 
   // Use progress tracker for the specific selected skill
   const { recordChallengeAttempt } = useProgressTracker(selectedSkill?.id, selectedSkill?.title);
+
+  // Initialize source map utilities and health check
+  useEffect(() => {
+    try {
+      enhanceConsoleLogging();
+      performSourceMapHealthCheck();
+    } catch (error) {
+      logComponentError('SkillGraphRenderer', error as Error, { phase: 'initialization' });
+    }
+  }, []);
 
   // Track mouse for background animations
   useEffect(() => {

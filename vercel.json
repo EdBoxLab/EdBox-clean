@@ -1,5 +1,3 @@
 {
-  "build": {
-    "outputDirectory": ".next"
-  }
+  "outputDirectory": ".next"
 }

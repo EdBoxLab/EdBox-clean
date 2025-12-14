@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Challenge } from '@/lib/courseCreation/types';
+import { Challenge } from '../../types';
 import { motion } from 'framer-motion';
 import { Mic, Volume2, CheckCircle, XCircle, Lightbulb, Trophy, Clock, MessageCircle, Languages } from 'lucide-react';
 import { callGroq } from '../shared/groqService';
+import { evaluateChallenge } from '../../../../app/actions/evaluate-challenge';
 
 interface LinguaLabProps {
   challenge: Challenge;
@@ -42,64 +43,27 @@ export default function LinguaLab({ challenge, onComplete }: LinguaLabProps) {
 
   const handleSubmit = async () => {
     setState(prev => ({ ...prev, isSubmitting: true, feedback: '' }));
-    
+
     try {
-      const systemPrompt = `You are a language learning evaluation assistant. Evaluate the provided language response against the challenge requirements.
+      const result = await evaluateChallenge(
+        state.userResponse,
+        challenge.title,
+        challenge.description,
+        challenge.validationCriteria,
+        'language'
+      );
 
-Challenge: ${challenge.title}
-Description: ${challenge.description}
-Validation Criteria: ${JSON.stringify(challenge.validationCriteria)}
+      setState(prev => ({
+        ...prev,
+        isSubmitting: false,
+        feedback: result.feedback || '',
+        score: result.score || 0,
+        isComplete: true,
+        isSuccess: result.isSuccess,
+      }));
 
-Analyze the language response and return a JSON response with:
-{
-  "success": boolean,
-  "feedback": "detailed feedback on grammar, vocabulary, and fluency",
-  "corrections": ["list of corrections if needed"],
-  "strengths": ["what the learner did well"],
-  "score": number (1-10),
-  "nextSteps": "suggestions for improvement"
-}
-
-Focus on constructive feedback that helps language learning progress.`;
-
-      const userPrompt = `Evaluate this language learning response:
-
-Exercise: ${challenge.description}
-
-Student's Response: "${state.userResponse}"
-
-Provide detailed feedback on grammar, vocabulary usage, and overall communication effectiveness.`;
-
-      const response = await callGroq(systemPrompt, userPrompt);
-      
-      try {
-        const result = JSON.parse(response);
-        
-        setState(prev => ({
-          ...prev,
-          isSubmitting: false,
-          feedback: result.feedback || response,
-          score: result.score || 0,
-          isComplete: true,
-          isSuccess: result.success || (result.score >= 7),
-        }));
-        
-        if (onComplete) {
-          onComplete(result.success || (result.score >= 7));
-        }
-      } catch (parseError) {
-        const success = response.toLowerCase().includes('good') || response.toLowerCase().includes('correct');
-        setState(prev => ({
-          ...prev,
-          isSubmitting: false,
-          feedback: response,
-          isComplete: true,
-          isSuccess: success,
-        }));
-        
-        if (onComplete) {
-          onComplete(success);
-        }
+      if (onComplete) {
+        onComplete(result.isSuccess);
       }
     } catch (error) {
       setState(prev => ({
@@ -214,7 +178,7 @@ Provide detailed feedback on grammar, vocabulary usage, and overall communicatio
                   </button>
                 )}
               </div>
-              
+
               {state.showHint && challenge.hints.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
@@ -252,7 +216,7 @@ Provide detailed feedback on grammar, vocabulary usage, and overall communicatio
               </button>
             </div>
           </div>
-          
+
           <div className="flex-1 bg-gray-800 rounded-lg overflow-hidden">
             <textarea
               value={state.userResponse}

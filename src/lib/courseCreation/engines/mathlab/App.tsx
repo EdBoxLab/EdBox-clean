@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Challenge } from '@/lib/courseCreation/types';
+import { Challenge } from '../../types';
 import { motion } from 'framer-motion';
 import { Calculator, CheckCircle, XCircle, Lightbulb, Trophy, Clock, Hash, Target } from 'lucide-react';
 import { callGroq } from '../shared/groqService';
+import { evaluateChallenge } from '../../../../app/actions/evaluate-challenge';
 
 interface MathLabProps {
   challenge: Challenge;
@@ -46,68 +47,29 @@ export default function MathLab({ challenge, onComplete }: MathLabProps) {
 
   const handleSubmit = async () => {
     setState(prev => ({ ...prev, isSubmitting: true, feedback: '', steps: [] }));
-    
+
     try {
-      const systemPrompt = `You are a mathematics evaluation assistant. Evaluate the provided mathematical solution against the challenge requirements.
+      const input = `Answer: ${state.answer}\n\nWork Shown:\n${state.workShown}`;
 
-Challenge: ${challenge.title}
-Description: ${challenge.description}
-Validation Criteria: ${JSON.stringify(challenge.validationCriteria)}
+      const result = await evaluateChallenge(
+        input,
+        challenge.title,
+        challenge.description,
+        challenge.validationCriteria,
+        'math'
+      );
 
-Analyze the mathematical work and return a JSON response with:
-{
-  "success": boolean,
-  "feedback": "detailed feedback on the mathematical solution",
-  "correctAnswer": "the correct answer if different",
-  "steps": [
-    {"step": "step description", "explanation": "why this step is correct/incorrect", "correct": boolean}
-  ],
-  "score": number (1-10)
-}
+      setState(prev => ({
+        ...prev,
+        isSubmitting: false,
+        feedback: result.feedback || '',
+        steps: result.steps || [],
+        isComplete: true,
+        isSuccess: result.isSuccess,
+      }));
 
-Focus on mathematical accuracy, proper methodology, and clear reasoning.`;
-
-      const userPrompt = `Evaluate this mathematical solution:
-
-Problem: ${challenge.description}
-
-Student's Answer: ${state.answer}
-
-Student's Work:
-${state.workShown}
-
-Check if the solution is mathematically correct and provide detailed feedback.`;
-
-      const response = await callGroq(systemPrompt, userPrompt);
-      
-      try {
-        const result = JSON.parse(response);
-        
-        setState(prev => ({
-          ...prev,
-          isSubmitting: false,
-          feedback: result.feedback || response,
-          steps: result.steps || [],
-          isComplete: true,
-          isSuccess: result.success || (result.score >= 7),
-        }));
-        
-        if (onComplete) {
-          onComplete(result.success || (result.score >= 7));
-        }
-      } catch (parseError) {
-        const success = response.toLowerCase().includes('correct') || response.toLowerCase().includes('right');
-        setState(prev => ({
-          ...prev,
-          isSubmitting: false,
-          feedback: response,
-          isComplete: true,
-          isSuccess: success,
-        }));
-        
-        if (onComplete) {
-          onComplete(success);
-        }
+      if (onComplete) {
+        onComplete(result.isSuccess);
       }
     } catch (error) {
       setState(prev => ({
@@ -204,7 +166,7 @@ Check if the solution is mathematically correct and provide detailed feedback.`;
                   </button>
                 )}
               </div>
-              
+
               {state.showHint && challenge.hints.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
@@ -288,9 +250,8 @@ Check if the solution is mathematically correct and provide detailed feedback.`;
                   {state.steps.map((step, index) => (
                     <div
                       key={index}
-                      className={`flex items-start gap-2 p-3 rounded-lg ${
-                        step.correct ? 'bg-green-900/20 border border-green-600/30' : 'bg-red-900/20 border border-red-600/30'
-                      }`}
+                      className={`flex items-start gap-2 p-3 rounded-lg ${step.correct ? 'bg-green-900/20 border border-green-600/30' : 'bg-red-900/20 border border-red-600/30'
+                        }`}
                     >
                       {step.correct ? (
                         <CheckCircle className="w-5 h-5 text-green-400 mt-0.5" />

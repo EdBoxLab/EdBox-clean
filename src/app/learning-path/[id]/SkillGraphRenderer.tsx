@@ -6,7 +6,7 @@ import { EngineType } from '@/app/api/learning-path/generate/types/enums';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { X, Sparkles, Trophy, Clock, Target, Zap, Lock, CheckCircle, AlertCircle, Info } from 'lucide-react';
-import { useMultipleSkillsProgress } from '@/lib/hooks/useProgressTracker';
+import { useMultipleSkillsProgress, useProgressTracker } from '@/lib/hooks/useProgressTracker';
 import { usePerformanceMonitoring } from '@/lib/hooks/usePerformanceMonitoring';
 import { skillGraphOptimizer } from '@/lib/services/skill-graph-optimizer';
 import type { SkillState, DifficultyLevel } from '@/types/skill-progression';
@@ -75,7 +75,10 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
   const progressionGraph = convertToProgressionGraph(graph);
 
   // Use the progress tracker hook for multiple skills
-  const { progressData, loading: progressLoading, error: progressError } = useMultipleSkillsProgress(progressionGraph);
+  const { progressData, loading: progressLoading, error: progressError, refreshProgress: refreshGraphProgress } = useMultipleSkillsProgress(progressionGraph);
+
+  // Use progress tracker for the specific selected skill
+  const { recordChallengeAttempt } = useProgressTracker(selectedSkill?.id, selectedSkill?.title);
 
   // Optimize graph for rendering when progress data changes
   useEffect(() => {
@@ -267,6 +270,23 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
     setCurrentChallenge(null);
   };
 
+  const handleChallengeComplete = async (success: boolean) => {
+    if (!selectedSkill || !currentChallenge) return;
+
+    // Record the attempt
+    await recordChallengeAttempt(
+      currentChallenge.id || `challenge-${selectedSkill.id}-${Date.now()}`,
+      success,
+      progressionGraph,
+      {
+        difficultyLevel: (selectedSkill.level as DifficultyLevel) || 'Medium'
+      }
+    );
+
+    // Refresh the main graph progress to show updates (e.g. unlock next skill)
+    await refreshGraphProgress();
+  };
+
   // Render engine based on type
   const renderEngine = () => {
     if (!currentChallenge) return null;
@@ -275,17 +295,22 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
     // Convert engine to string for comparison since it comes from the database as a string
     const engineStr = String(currentChallenge.engine).toLowerCase();
 
+    const commonProps = {
+      challenge: currentChallenge,
+      onComplete: handleChallengeComplete
+    };
+
     switch (engineStr) {
       case 'codestudio':
-        return <CodeStudio challenge={currentChallenge} />;
+        return <CodeStudio {...commonProps} />;
       case 'writingstudio':
-        return <WriteLab challenge={currentChallenge} />;
+        return <WriteLab {...commonProps} />;
       case 'mathlab':
-        return <MathLab challenge={currentChallenge} />;
+        return <MathLab {...commonProps} />;
       case 'lingualab':
-        return <LinguaLab challenge={currentChallenge} />;
+        return <LinguaLab {...commonProps} />;
       case 'finlab':
-        return <WriteLab challenge={currentChallenge} />; // Default fallback
+        return <WriteLab {...commonProps} />; // Default fallback
       default:
         console.log('No matching engine for:', engineStr);
         return <div className="text-white">Engine not available for: {engineStr}</div>;
@@ -719,7 +744,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                         {progress.recentPerformance && (
                           <div className="flex items-center gap-1 mt-1">
                             <div className={`w-2 h-2 rounded-full ${progress.recentPerformance.trend === 'improving' ? 'bg-green-400' :
-                                progress.recentPerformance.trend === 'declining' ? 'bg-red-400' : 'bg-yellow-400'
+                              progress.recentPerformance.trend === 'declining' ? 'bg-red-400' : 'bg-yellow-400'
                               }`} />
                             <span className="text-xs text-gray-400">
                               {progress.recentPerformance.trend === 'improving' ? 'Improving' :
@@ -807,8 +832,8 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               style={{ zIndex: 1000 - index }}
               className={`bg-gray-800 border rounded-lg p-4 shadow-2xl max-w-sm backdrop-blur-sm ${notification.type === 'unlock' ? 'border-indigo-500 bg-indigo-500/10' :
-                  notification.type === 'mastery' ? 'border-green-500 bg-green-500/10' :
-                    'border-yellow-500 bg-yellow-500/10'
+                notification.type === 'mastery' ? 'border-green-500 bg-green-500/10' :
+                  'border-yellow-500 bg-yellow-500/10'
                 }`}
             >
               <div className="flex items-start gap-3">
@@ -817,7 +842,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.2, type: "spring", stiffness: 400 }}
                   className={`w-8 h-8 rounded-full flex items-center justify-center ${notification.type === 'unlock' ? 'bg-indigo-500' :
-                      notification.type === 'mastery' ? 'bg-green-500' : 'bg-yellow-500'
+                    notification.type === 'mastery' ? 'bg-green-500' : 'bg-yellow-500'
                     }`}
                 >
                   {notification.type === 'unlock' && <Target className="w-4 h-4 text-white" />}
@@ -861,7 +886,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
               >
                 <motion.div
                   className={`h-full ${notification.type === 'unlock' ? 'bg-indigo-500' :
-                      notification.type === 'mastery' ? 'bg-green-500' : 'bg-yellow-500'
+                    notification.type === 'mastery' ? 'bg-green-500' : 'bg-yellow-500'
                     }`}
                   initial={{ width: '100%' }}
                   animate={{ width: '0%' }}
@@ -934,7 +959,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                             }}
                           >
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all group-hover:scale-110 ${prereqState === 'mastered' ? 'bg-green-500' :
-                                prereqState === 'unlocked' ? 'bg-indigo-500' : 'bg-gray-600'
+                              prereqState === 'unlocked' ? 'bg-indigo-500' : 'bg-gray-600'
                               }`}>
                               {prereqState === 'mastered' ? (
                                 <CheckCircle className="w-4 h-4 text-white" />

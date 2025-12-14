@@ -10,16 +10,29 @@ export interface EvaluationResult {
     isSuccess: boolean;
     feedback?: string;
     error?: string;
+    // Extra fields for other engines
+    score?: number;
+    strengths?: string[];
+    improvements?: string[];
+    corrections?: string[];
+    steps?: Array<{ step: string; explanation: string; correct: boolean }>;
+    nextSteps?: string;
 }
 
 export async function evaluateChallenge(
-    code: string,
+    input: string,
     challengeTitle: string,
     challengeDescription: string,
-    validationCriteria: any[]
+    validationCriteria: any[],
+    type: 'code' | 'writing' | 'math' | 'language' = 'code'
 ): Promise<EvaluationResult> {
     try {
-        const systemPrompt = `You are a code evaluation assistant. Evaluate the provided code against the challenge requirements.
+        let systemPrompt = '';
+        let userPrompt = '';
+
+        switch (type) {
+            case 'code':
+                systemPrompt = `You are a code evaluation assistant. Evaluate the provided code against the challenge requirements.
 
 Challenge: ${challengeTitle}
 Description: ${challengeDescription}
@@ -36,14 +49,72 @@ Analyze the code and return a JSON response with:
 }
 
 Be thorough in your evaluation and provide helpful feedback.`;
+                userPrompt = `Evaluate this code:\n\n\`\`\`javascript\n${input}\n\`\`\`\n\nCheck if it meets the challenge requirements provide detailed feedback.`;
+                break;
 
-        const userPrompt = `Evaluate this code:
+            case 'writing':
+                systemPrompt = `You are a writing evaluation assistant. Evaluate the provided writing against the challenge requirements.
 
-\`\`\`javascript
-${code}
-\`\`\`
+Challenge: ${challengeTitle}
+Description: ${challengeDescription}
+Validation Criteria: ${JSON.stringify(validationCriteria)}
 
-Check if it meets the challenge requirements and provide detailed feedback.`;
+Analyze the writing and return a JSON response with:
+{
+  "success": boolean,
+  "feedback": "detailed constructive feedback on the writing",
+  "strengths": ["list of strengths"],
+  "improvements": ["list of areas for improvement"],
+  "score": number (1-10)
+}
+
+Provide thorough, constructive feedback that helps the writer improve.`;
+                userPrompt = `Evaluate this writing:\n\n"${input}"\n\nCheck if it meets the challenge requirements and provide detailed feedback.`;
+                break;
+
+            case 'math':
+                systemPrompt = `You are a mathematics evaluation assistant. Evaluate the provided mathematical solution against the challenge requirements.
+
+Challenge: ${challengeTitle}
+Description: ${challengeDescription}
+Validation Criteria: ${JSON.stringify(validationCriteria)}
+
+Analyze the mathematical work and return a JSON response with:
+{
+  "success": boolean,
+  "feedback": "detailed feedback on the mathematical solution",
+  "correctAnswer": "the correct answer if different",
+  "steps": [
+    {"step": "step description", "explanation": "why this step is correct/incorrect", "correct": boolean}
+  ],
+  "score": number (1-10)
+}
+
+Focus on mathematical accuracy, proper methodology, and clear reasoning.`;
+                userPrompt = `Evaluate this mathematical solution:\n\n${input}\n\nCheck if the solution is mathematically correct and provide detailed feedback.`;
+                break;
+
+            case 'language':
+                systemPrompt = `You are a language learning evaluation assistant. Evaluate the provided language response against the challenge requirements.
+
+Challenge: ${challengeTitle}
+Description: ${challengeDescription}
+Validation Criteria: ${JSON.stringify(validationCriteria)}
+
+Analyze the language response and return a JSON response with:
+{
+  "success": boolean,
+  "feedback": "detailed feedback on grammar, vocabulary, and fluency",
+  "corrections": ["list of corrections if needed"],
+  "strengths": ["what the learner did well"],
+  "score": number (1-10),
+  "nextSteps": "suggestions for improvement"
+}
+
+Focus on constructive feedback that helps language learning progress.`;
+                userPrompt = `Evaluate this language learning response:\n\n"${input}"\n\nProvide detailed feedback on grammar, vocabulary usage, and overall communication effectiveness.`;
+                break;
+        }
 
         const response = await callGroq(systemPrompt, userPrompt);
 
@@ -57,8 +128,14 @@ Check if it meets the challenge requirements and provide detailed feedback.`;
                 output: result.output || '', // Ensure string
                 testResults: Array.isArray(result.testResults) ? result.testResults : [],
                 isComplete: true,
-                isSuccess: result.success === true,
-                feedback: result.feedback || ''
+                isSuccess: result.success === true || (typeof result.score === 'number' && result.score >= 7),
+                feedback: result.feedback || '',
+                score: result.score,
+                strengths: result.strengths,
+                improvements: result.improvements,
+                corrections: result.corrections,
+                steps: result.steps,
+                nextSteps: result.nextSteps
             };
         } catch (parseError) {
             console.error('JSON Parse Error:', parseError, 'Response:', response);

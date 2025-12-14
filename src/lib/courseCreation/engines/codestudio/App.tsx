@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Challenge } from '@/lib/courseCreation/types';
+import { Challenge } from '../../types';
 import { motion } from 'framer-motion';
 import { Play, CheckCircle, XCircle, Lightbulb, Trophy, Clock, Code, Terminal } from 'lucide-react';
-import { evaluateChallenge } from '@/app/actions/evaluate-challenge';
+import { evaluateChallenge } from '../../../../app/actions/evaluate-challenge';
 
 interface CodeStudioProps {
   challenge: Challenge;

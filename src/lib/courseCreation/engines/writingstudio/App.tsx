@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Challenge } from '@/lib/courseCreation/types';
+import { Challenge } from '../../types';
 import { motion } from 'framer-motion';
 import { Send, CheckCircle, XCircle, Lightbulb, Trophy, Clock, PenTool, FileText } from 'lucide-react';
 import { callGroq } from '../shared/groqService';
+import { evaluateChallenge } from '../../../../app/actions/evaluate-challenge';
 
 interface WritingStudioProps {
   challenge: Challenge;
@@ -41,60 +42,26 @@ export default function WritingStudio({ challenge, onComplete }: WritingStudioPr
 
   const handleSubmit = async () => {
     setState(prev => ({ ...prev, isSubmitting: true, feedback: '' }));
-    
+
     try {
-      const systemPrompt = `You are a writing evaluation assistant. Evaluate the provided writing against the challenge requirements.
+      const result = await evaluateChallenge(
+        state.content,
+        challenge.title,
+        challenge.description,
+        challenge.validationCriteria,
+        'writing'
+      );
 
-Challenge: ${challenge.title}
-Description: ${challenge.description}
-Validation Criteria: ${JSON.stringify(challenge.validationCriteria)}
+      setState(prev => ({
+        ...prev,
+        isSubmitting: false,
+        feedback: result.feedback || '',
+        isComplete: true,
+        isSuccess: result.isSuccess,
+      }));
 
-Analyze the writing and return a JSON response with:
-{
-  "success": boolean,
-  "feedback": "detailed constructive feedback on the writing",
-  "strengths": ["list of strengths"],
-  "improvements": ["list of areas for improvement"],
-  "score": number (1-10)
-}
-
-Provide thorough, constructive feedback that helps the writer improve.`;
-
-      const userPrompt = `Evaluate this writing:
-
-"${state.content}"
-
-Check if it meets the challenge requirements and provide detailed feedback.`;
-
-      const response = await callGroq(systemPrompt, userPrompt);
-      
-      try {
-        const result = JSON.parse(response);
-        
-        setState(prev => ({
-          ...prev,
-          isSubmitting: false,
-          feedback: result.feedback || response,
-          isComplete: true,
-          isSuccess: result.success || (result.score >= 7),
-        }));
-        
-        if (onComplete) {
-          onComplete(result.success || (result.score >= 7));
-        }
-      } catch (parseError) {
-        const success = response.toLowerCase().includes('good') || response.toLowerCase().includes('excellent');
-        setState(prev => ({
-          ...prev,
-          isSubmitting: false,
-          feedback: response,
-          isComplete: true,
-          isSuccess: success,
-        }));
-        
-        if (onComplete) {
-          onComplete(success);
-        }
+      if (onComplete) {
+        onComplete(result.isSuccess);
       }
     } catch (error) {
       setState(prev => ({
@@ -191,7 +158,7 @@ Check if it meets the challenge requirements and provide detailed feedback.`;
                   </button>
                 )}
               </div>
-              
+
               {state.showHint && challenge.hints.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
@@ -225,7 +192,7 @@ Check if it meets the challenge requirements and provide detailed feedback.`;
               </button>
             </div>
           </div>
-          
+
           <div className="flex-1 bg-gray-800 rounded-lg overflow-hidden">
             <textarea
               value={state.content}

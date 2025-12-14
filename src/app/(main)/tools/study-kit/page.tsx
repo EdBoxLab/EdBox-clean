@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Upload, FileText, Brain, Zap, Map, CheckCircle2, Loader2, X, ChevronRight, Copy, Check, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams } from 'next/navigation';
@@ -12,10 +12,10 @@ const contentTypes = [
     { id: 'mindmaps', label: 'Mind Maps', icon: Map, description: 'Visual concept connections' },
 ];
 
-export default function StudyKitPage() {
+function StudyKitContent() {
     const searchParams = useSearchParams();
     const id = searchParams.get('id');
-    
+
     const [prompt, setPrompt] = useState('');
     const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -38,7 +38,7 @@ export default function StudyKitPage() {
 
     const normalizeContent = (content: any) => {
         console.log('🔍 Starting normalization with:', JSON.stringify(content, null, 2));
-        
+
         const parseIfString = (data: any) => {
             if (typeof data === 'string') {
                 try {
@@ -56,7 +56,7 @@ export default function StudyKitPage() {
         if (content.quizzes) {
             const parsed = parseIfString(content.quizzes);
             console.log('📝 Quizzes parsed:', parsed);
-            
+
             if (Array.isArray(parsed)) {
                 normalized.quizzes = parsed;
             } else if (parsed.questions && Array.isArray(parsed.questions)) {
@@ -71,7 +71,7 @@ export default function StudyKitPage() {
         if (content.flashcards) {
             const parsed = parseIfString(content.flashcards);
             console.log('🎴 Flashcards parsed:', parsed);
-            
+
             let cards = [];
             if (Array.isArray(parsed)) {
                 cards = parsed;
@@ -80,7 +80,7 @@ export default function StudyKitPage() {
             } else if (parsed.cards && Array.isArray(parsed.cards)) {
                 cards = parsed.cards;
             }
-            
+
             // Convert question/answer to front/back if needed
             normalized.flashcards = cards.map((card: any) => ({
                 front: card.front || card.question || 'No content',
@@ -92,7 +92,7 @@ export default function StudyKitPage() {
         if (content.notes) {
             const parsed = parseIfString(content.notes);
             console.log('📄 Notes parsed:', parsed);
-            
+
             if (typeof parsed === 'string') {
                 normalized.notes = parsed;
             } else if (parsed.notes && Array.isArray(parsed.notes)) {
@@ -134,7 +134,7 @@ export default function StudyKitPage() {
         if (content.mindmaps) {
             const parsed = parseIfString(content.mindmaps);
             console.log('🗺️ Mindmaps parsed:', parsed);
-            
+
             // Convert various structures to central/branches format
             if (parsed.title && (parsed.children || parsed.nodes)) {
                 const branches = parsed.children || parsed.nodes;
@@ -162,7 +162,7 @@ export default function StudyKitPage() {
         try {
             const response = await fetch('/api/study-kit/list');
             const data = await response.json();
-            
+
             if (data.studyKits) {
                 const kit = data.studyKits.find((k: any) => k.id === kitId);
                 if (kit) {
@@ -245,7 +245,7 @@ export default function StudyKitPage() {
                 console.log('Raw API response:', data.content);
                 const normalized = normalizeContent(data.content);
                 console.log('After normalization in handleGenerate:', normalized);
-                
+
                 // Use setTimeout to ensure state update happens after current render cycle
                 setTimeout(() => {
                     setGeneratedContent(normalized);
@@ -478,16 +478,16 @@ export default function StudyKitPage() {
                             const hasValidData = selectedTypes.every(typeId => {
                                 const data = generatedContent[typeId];
                                 if (!data) return false;
-                                
+
                                 // For arrays, check they're actually arrays
                                 if (typeId === 'quizzes' || typeId === 'flashcards') {
                                     return Array.isArray(data);
                                 }
-                                
+
                                 // For notes and mindmaps, any truthy value is ok
                                 return true;
                             });
-                            
+
                             if (!hasValidData) {
                                 console.error('Invalid data detected:', generatedContent);
                                 return (
@@ -502,10 +502,10 @@ export default function StudyKitPage() {
                                     </div>
                                 );
                             }
-                            
+
                             return null; // Data is valid, continue rendering
                         })()}
-                        
+
                         {/* Tabs */}
                         <div className="flex overflow-x-auto pb-2 gap-2 border-b border-zinc-800">
                             {selectedTypes.map(typeId => {
@@ -516,8 +516,8 @@ export default function StudyKitPage() {
                                         key={typeId}
                                         onClick={() => setActiveTab(typeId)}
                                         className={`px-4 py-2 rounded-t-lg flex items-center gap-2 border-b-2 transition ${activeTab === typeId
-                                                ? 'border-indigo-500 text-indigo-400 bg-indigo-500/10'
-                                                : 'border-transparent text-zinc-400 hover:text-white hover:bg-zinc-800'
+                                            ? 'border-indigo-500 text-indigo-400 bg-indigo-500/10'
+                                            : 'border-transparent text-zinc-400 hover:text-white hover:bg-zinc-800'
                                             }`}
                                     >
                                         <Icon className="w-4 h-4" />
@@ -549,15 +549,15 @@ export default function StudyKitPage() {
                                         <div className="grid gap-6">
                                             {(() => {
                                                 console.log('Quiz data structure:', generatedContent.quizzes);
-                                                
+
                                                 // Handle different data structures
                                                 let quizData = generatedContent.quizzes;
-                                                
+
                                                 // If it's an object with questions property, extract it
                                                 if (!Array.isArray(quizData) && quizData.questions) {
                                                     quizData = quizData.questions;
                                                 }
-                                                
+
                                                 // Ensure it's an array
                                                 if (!Array.isArray(quizData)) {
                                                     return (
@@ -569,7 +569,7 @@ export default function StudyKitPage() {
                                                         </div>
                                                     );
                                                 }
-                                                
+
                                                 if (quizData.length === 0) {
                                                     return (
                                                         <div className="p-6 bg-zinc-900 rounded-xl text-center text-zinc-400">
@@ -577,7 +577,7 @@ export default function StudyKitPage() {
                                                         </div>
                                                     );
                                                 }
-                                                
+
                                                 return quizData.map((quiz: any, i: number) => (
                                                     <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                                                         <h3 className="font-bold text-lg mb-4 flex gap-3">
@@ -591,8 +591,8 @@ export default function StudyKitPage() {
                                                                 <div
                                                                     key={optIndex}
                                                                     className={`p-3 rounded-lg border ${optIndex === quiz.correctAnswer
-                                                                            ? 'border-green-500/50 bg-green-500/10 text-green-200'
-                                                                            : 'border-zinc-800 bg-zinc-950/50'
+                                                                        ? 'border-green-500/50 bg-green-500/10 text-green-200'
+                                                                        : 'border-zinc-800 bg-zinc-950/50'
                                                                         }`}
                                                                 >
                                                                     {opt}
@@ -609,9 +609,9 @@ export default function StudyKitPage() {
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                             {(() => {
                                                 console.log('Flashcard data structure:', generatedContent.flashcards);
-                                                
+
                                                 let flashcardData = generatedContent.flashcards;
-                                                
+
                                                 // If it's an object with flashcards or cards property, extract it
                                                 if (!Array.isArray(flashcardData)) {
                                                     if (flashcardData.flashcards) {
@@ -620,7 +620,7 @@ export default function StudyKitPage() {
                                                         flashcardData = flashcardData.cards;
                                                     }
                                                 }
-                                                
+
                                                 // Ensure it's an array
                                                 if (!Array.isArray(flashcardData)) {
                                                     return (
@@ -632,7 +632,7 @@ export default function StudyKitPage() {
                                                         </div>
                                                     );
                                                 }
-                                                
+
                                                 if (flashcardData.length === 0) {
                                                     return (
                                                         <div className="col-span-full p-6 bg-zinc-900 rounded-xl text-center text-zinc-400">
@@ -640,7 +640,7 @@ export default function StudyKitPage() {
                                                         </div>
                                                     );
                                                 }
-                                                
+
                                                 return flashcardData.map((card: any, i: number) => (
                                                     <div key={i} className="group relative h-64 perspective-1000">
                                                         <div className="relative w-full h-full transition-all duration-500 bg-zinc-900 border border-zinc-700 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-500/50">
@@ -662,13 +662,13 @@ export default function StudyKitPage() {
                                         <div className="prose prose-invert max-w-none bg-zinc-900 border border-zinc-800 rounded-xl p-8">
                                             {(() => {
                                                 console.log('Notes data structure:', generatedContent.notes);
-                                                
+
                                                 let notesContent = generatedContent.notes;
-                                                
+
                                                 // If it's an object with notes property, extract it
                                                 if (typeof notesContent === 'object' && !Array.isArray(notesContent)) {
                                                     if (notesContent.notes) {
-                                                        notesContent = Array.isArray(notesContent.notes) 
+                                                        notesContent = Array.isArray(notesContent.notes)
                                                             ? notesContent.notes.join('\n\n')
                                                             : notesContent.notes;
                                                     } else {
@@ -684,7 +684,7 @@ export default function StudyKitPage() {
                                                 } else if (Array.isArray(notesContent)) {
                                                     notesContent = notesContent.join('\n\n');
                                                 }
-                                                
+
                                                 // Now notesContent should be a string
                                                 if (typeof notesContent !== 'string') {
                                                     return (
@@ -693,17 +693,17 @@ export default function StudyKitPage() {
                                                         </div>
                                                     );
                                                 }
-                                                
+
                                                 return (
-                                                    <div 
+                                                    <div
                                                         className="whitespace-pre-wrap"
-                                                        dangerouslySetInnerHTML={{ 
+                                                        dangerouslySetInnerHTML={{
                                                             __html: notesContent
                                                                 .replace(/\n/g, '<br/>')
                                                                 .replace(/#{3,} /g, '<h3 class="text-xl font-bold mt-6 mb-3 text-white">')
                                                                 .replace(/## /g, '<h2 class="text-2xl font-bold mt-8 mb-4 text-white">')
                                                                 .replace(/# /g, '<h1 class="text-3xl font-bold mt-8 mb-4 text-white">')
-                                                        }} 
+                                                        }}
                                                     />
                                                 );
                                             })()}
@@ -724,11 +724,11 @@ export default function StudyKitPage() {
                                                             const angle = (i / arr.length) * 2 * Math.PI;
                                                             const x = Math.cos(angle) * 200;
                                                             const y = Math.sin(angle) * 150;
-                                                            
+
                                                             // Handle different branch structures
                                                             const branchTopic = typeof branch === 'string' ? branch : branch.topic || branch.name;
                                                             const branchSubtopics = branch.subtopics || [];
-                                                            
+
                                                             return (
                                                                 <div
                                                                     key={i}
@@ -762,5 +762,20 @@ export default function StudyKitPage() {
                 ) : null}
             </div>
         </div>
+    );
+}
+
+export default function StudyKitPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-[#09090b] text-white flex items-center justify-center">
+                <div className="text-center">
+                    <Loader2 className="w-12 h-12 animate-spin text-indigo-400 mx-auto mb-4" />
+                    <p className="text-zinc-400">Loading...</p>
+                </div>
+            </div>
+        }>
+            <StudyKitContent />
+        </Suspense>
     );
 }

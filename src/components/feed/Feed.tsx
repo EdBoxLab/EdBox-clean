@@ -79,7 +79,13 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     return audioContextRef.current;
   };
 
+  const lastLoadRef = useRef<number>(0);
+
   const loadMoreItems = useCallback(async (initial = false) => {
+    // Prevent rapid repeated calls
+    if (Date.now() - lastLoadRef.current < 5000) return;
+    lastLoadRef.current = Date.now();
+
     if (processingRef.current) return;
 
     processingRef.current = true;
@@ -300,13 +306,13 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
           {/* Status header removed per product request - no batch/type/shorthand info shown to users */}
         </div>
 
-        {/* Feed Grid - consistent with homepage */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        {/* Feed Grid - fullscreen single-column deck */}
+        <div className="grid grid-cols-1 gap-0">
           {items.map((item, index) => (
             <div
               key={item.id}
               id={item.id}
-              className="feed-card opacity-0 animate-card-enter"
+              className="feed-card opacity-0 animate-card-enter min-h-screen flex items-stretch"
               style={{ animationDelay: `${(index % 5) * 100}ms` }}
             >
               <CardWrapper
@@ -315,7 +321,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
                 onSwipe={handleSwipe}
                 onFeedback={handleFeedback}
               >
-                <div className="min-h-[400px] flex flex-col justify-center">
+                <div className="min-h-screen flex flex-col justify-center w-full">
                   {renderCardContent(item)}
                 </div>
               </CardWrapper>

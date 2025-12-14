@@ -317,7 +317,7 @@ export class ChallengeGenerator {
     for (let attempt = 1; attempt <= this.config.maxRetries; attempt++) {
       try {
         const response = await Promise.race([
-          callGroq(systemPrompt, userPrompt, 'llama-3.1-70b-versatile'),
+          callGroq(systemPrompt, userPrompt, process.env.GROQ_MODEL || 'llama-3.1-8b-instant'),
           new Promise<never>((_, reject) => 
             setTimeout(() => reject(new Error('Generation timeout')), this.config.timeoutMs)
           )

@@ -106,9 +106,9 @@ export default function LearningPathView({ skillGraph, learnerState, userId }: P
     skill => learnerState.skillMastery[skill.id]?.isMastered
   );
   const readySkills = allSkills.filter(skill => 
-    skill.prerequisites.every(prereqId => 
+    (!skill.prerequisites || skill.prerequisites.length === 0 || skill.prerequisites.every(prereqId => 
       learnerState.skillMastery[prereqId]?.isMastered
-    ) && !learnerState.skillMastery[skill.id]?.isMastered
+    )) && !learnerState.skillMastery[skill.id]?.isMastered
   );
 
   // Get next skill to work on

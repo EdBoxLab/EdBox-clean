@@ -118,6 +118,9 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
 
   // Helper function to get unmet prerequisites
   const getUnmetPrerequisites = (skill: SkillNode): SkillNode[] => {
+    if (!skill.prerequisites || !Array.isArray(skill.prerequisites)) {
+      return [];
+    }
     return skill.prerequisites
       .map(prereqId => graph.nodes.find(node => node.id === prereqId))
       .filter((prereq): prereq is SkillNode => {
@@ -914,7 +917,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
                       </p>
                       <div className="flex items-center gap-2 text-xs text-gray-400">
                         <Info className="w-3 h-3" />
-                        <span>{unmetPrereqs.length} of {skill?.prerequisites.length || 0} remaining</span>
+                        <span>{unmetPrereqs.length} of {skill?.prerequisites?.length || 0} remaining</span>
                       </div>
                     </div>
 

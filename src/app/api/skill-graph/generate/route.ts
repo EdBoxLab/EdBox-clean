@@ -49,11 +49,11 @@ interface MiniProject {
 // ============= API KEY MANAGEMENT =============
 
 const GROQ_API_KEYS = [
-    process.env.Grok_API_Key_1,
-    process.env.Grok_API_Key_2,
-    process.env.Grok_API_Key_3,
-    process.env.Grok_API_Key_4,
-    process.env.Grok_API_Key_5,
+    process.env.GROQ_API_KEY,
+    process.env.GROQ_API_KEY_2,
+    process.env.GROQ_API_KEY_3,
+    process.env.GROQ_API_KEY_4,
+    process.env.GROQ_API_KEY_5,
 ].filter(Boolean) as string[];
 
 let currentKeyIndex = 0;

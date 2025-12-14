@@ -48,7 +48,7 @@ export default function MobileFeedView({ skillPaths, learnerState, onStartSkill 
     
     if (mastery?.isMastered) return 'mastered';
     
-    const prerequisitesMet = skill.prerequisites.every(
+    const prerequisitesMet = !skill.prerequisites || skill.prerequisites.length === 0 || skill.prerequisites.every(
       prereqId => learnerState.skillMastery[prereqId]?.isMastered
     );
     

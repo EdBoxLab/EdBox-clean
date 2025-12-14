@@ -59,11 +59,12 @@ export const SkillGraphView: React.FC<SkillGraphViewProps> = ({
 
     const getTier = (nodeId: string): number => {
         const node = graph.nodes.find(n => n.id === nodeId);
-        if (!node || node.prerequisites.length === 0) return 0;
+        if (!node || !node.prerequisites || node.prerequisites.length === 0) return 0;
         return Math.max(...node.prerequisites.map(prereqId => getTier(prereqId) + 1));
     };
 
     const isUnlocked = (node: SkillNode): boolean => {
+        if (!node.prerequisites || node.prerequisites.length === 0) return true;
         return node.prerequisites.every(prereqId => (userProgress[prereqId] || 0) >= 0.8);
     };
 

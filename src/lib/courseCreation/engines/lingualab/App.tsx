@@ -37,7 +37,7 @@ export default function LinguaLab({ challenge, onComplete }: LinguaLabProps) {
     exerciseType: 'conversation',
     score: 0,
     isRecording: false,
-    micSupported: typeof window !== 'undefined' && 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window,
+    micSupported: typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window),
   });
 
   const handleResponseChange = (newResponse: string) => {

@@ -1,11 +1,10 @@
-// lib/supabase/server.ts
 'use server';
 
 import { createServerClient } from '@supabase/ssr';
-import { cookies as getCookies } from 'next/headers';
+import { cookies } from 'next/headers';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Async server client for direct service-role operations
+// Service-role client (admin tasks, bypasses RLS)
 export const createServerSupabaseClient = async (): Promise<SupabaseClient> => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -14,25 +13,29 @@ export const createServerSupabaseClient = async (): Promise<SupabaseClient> => {
     throw new Error('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set');
   }
 
-  return createClient(url, key);
+  const cookieStore = await cookies();
+
+  // Attach cookies to client for server-side operations
+  return createClient(url, key, {
+    global: { fetch },
+    auth: { persistSession: false }
+  });
 };
 
-// Client SSR supabase with cookies for normal user operations
+// SSR client with cookies (normal user operations)
 export const createSupabaseServerClient = async () => {
-  const cookieStore = await getCookies(); // <-- await here!
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return cookieStore.getAll(); // now works
-        },
-        setAll(cookiesToSet) {
+        getAll: () => cookieStore.getAll(),
+        setAll: (cookiesToSet) => {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options) // now works
+              cookieStore.set(name, value, options)
             );
           } catch {
             // Ignore if called from a Server Component
@@ -43,19 +46,17 @@ export const createSupabaseServerClient = async () => {
   );
 };
 
-// Optional: Admin client for service-role operations
-export const createSupabaseAdminClient = async () => {
-  const cookieStore = await getCookies(); // <-- await here too!
+// Admin client (service-role + cookies)
+export const createSupabaseAdminClient = async (): Promise<SupabaseClient> => {
+  const cookieStore = await cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
       cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
+        getAll: () => cookieStore.getAll(),
+        setAll: (cookiesToSet) => {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)

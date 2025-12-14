@@ -125,6 +125,7 @@ export async function POST(request: NextRequest) {
 
     if (createError || !newCircle) {
       console.error('Circle creation error:', createError);
+      console.log('Current user:', user);
       return NextResponse.json({ error: 'Failed to create circle' }, { status: 500 });
     }
 

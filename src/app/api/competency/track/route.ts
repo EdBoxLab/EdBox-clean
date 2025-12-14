@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
         const totalSkills = graph.nodes.length;
         const masteredSkills = competencies.filter(c => c.isMastered).length;
         const overallMastery = competencies.length > 0
-            ? competencies.reduce((sum, c) => sum + c.mastery_level, 0) / competencies.length
+            ? competencies.reduce((sum, c) => sum + c.masteryLevel, 0) / competencies.length
             : 0;
 
         // Check if eligible for certificate

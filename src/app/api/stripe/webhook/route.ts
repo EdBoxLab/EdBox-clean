@@ -45,7 +45,7 @@ export async function POST(req: Request) {
                     plan_id: `pro_${planType}`,
                     status: subscription.status,
                     billing_interval: subscription.items.data[0].plan.interval,
-                    current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+                    current_period_end: new Date((subscription as any).current_period_end * 1000).toISOString(),
                     updated_at: new Date().toISOString(),
                 });
 

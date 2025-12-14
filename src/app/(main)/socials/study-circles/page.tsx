@@ -6,7 +6,12 @@ import { supabase } from '@/lib/supabase/client';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 // Dashboard View Component
-const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }) => {
+const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }: {
+  circles: any[];
+  onSelectCircle: (circle: any) => void;
+  onNewCircle: () => void;
+  session: any;
+}) => {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -14,11 +19,11 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }) => 
   const [joinError, setJoinError] = useState('');
   const [isJoining, setIsJoining] = useState(false);
 
-  const filteredCircles = circles.filter(c => 
+  const filteredCircles = circles.filter((c: any) => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleJoinByCode = async (e) => {
+  const handleJoinByCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsJoining(true);
     setJoinError('');
@@ -39,7 +44,7 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }) => 
       setShowJoinModal(false);
       setInviteCode('');
       window.location.reload();
-    } catch (err) {
+    } catch (err: any) {
       setJoinError(err.message);
     } finally {
       setIsJoining(false);
@@ -105,7 +110,7 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }) => 
               </div>
               <p className="text-white/60 text-xs font-medium text-center">Start Room</p>
             </div>
-            {filteredCircles.slice(0, 5).map(circle => (
+            {filteredCircles.slice(0, 5).map((circle: any) => (
               <div 
                 key={circle.id} 
                 onClick={() => onSelectCircle(circle)}
@@ -143,7 +148,7 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }) => 
               </button>
             </div>
           ) : (
-            filteredCircles.map(circle => (
+            filteredCircles.map((circle: any) => (
               <div key={circle.id} className="relative flex flex-col bg-gradient-to-br from-purple-900/20 to-pink-900/10 rounded-2xl overflow-hidden border border-purple-500/20 shadow-xl hover:border-purple-500/40 transition-all group">
                 {/* Header Banner */}
                 <div className="relative h-32 bg-gradient-to-r from-purple-600/30 to-pink-600/30 backdrop-blur-sm">
@@ -262,8 +267,12 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }) => 
 };
 
 // Chat View Component
-const CircleChat = ({ circle, onBack, session }) => {
-  const [messages, setMessages] = useState([]);
+const CircleChat = ({ circle, onBack, session }: {
+  circle: any;
+  onBack: () => void;
+  session: any;
+}) => {
+  const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -313,7 +322,7 @@ const CircleChat = ({ circle, onBack, session }) => {
     };
   }, [circle?.id]);
 
-  const handleSendMessage = async (e) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
 
@@ -508,13 +517,16 @@ const CircleChat = ({ circle, onBack, session }) => {
 };
 
 // Create Circle Modal
-const CreateCircleModal = ({ onClose, onCircleCreated }) => {
+const CreateCircleModal = ({ onClose, onCircleCreated }: {
+  onClose: () => void;
+  onCircleCreated: (circle: any) => void;
+}) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
@@ -534,7 +546,7 @@ const CreateCircleModal = ({ onClose, onCircleCreated }) => {
       const newCircle = await response.json();
       onCircleCreated(newCircle);
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       setError(err.message);
     } finally {
       setIsLoading(false);
@@ -591,11 +603,11 @@ const CreateCircleModal = ({ onClose, onCircleCreated }) => {
 
 // Main Component with Suspense wrapper for useSearchParams
 function StudyCirclesContent() {
-  const [circles, setCircles] = useState([]);
+  const [circles, setCircles] = useState<any[]>([]);
   const [selectedCircle, setSelectedCircle] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [session, setSession] = useState(null);
+  const [session, setSession] = useState<any>(null);
 
   const searchParams = useSearchParams();
 
@@ -619,7 +631,7 @@ function StudyCirclesContent() {
 
       const inviteId = searchParams.get('id');
       if (inviteId) {
-        const targetCircle = data.find(c => c.id === parseInt(inviteId));
+        const targetCircle = data.find((c: any) => c.id === parseInt(inviteId));
         if (targetCircle) {
           setSelectedCircle(targetCircle);
         }
@@ -644,7 +656,7 @@ function StudyCirclesContent() {
     };
   }, []);
 
-  const handleCircleCreated = (newCircle) => {
+  const handleCircleCreated = (newCircle: any) => {
     const circleWithDetails = { ...newCircle, member_count: 1, is_member: true };
     setCircles(prev => [circleWithDetails, ...prev]);
     setSelectedCircle(circleWithDetails);

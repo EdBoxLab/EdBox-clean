@@ -77,7 +77,7 @@ const extractStringFromPartialJson = (jsonStr: string, key: string): string => {
 const extractStepsFromPartialJson = (jsonStr: string): string[] => {
     const steps: string[] = [];
     // Find the steps array
-    const regex = /"steps"\s*:\s*\[(.*?)\]/s;
+    const regex = /"steps"\s*:\s*\[(.*?)\]/;
     const match = jsonStr.match(regex);
     if (match && match[1]) {
         // Match individual strings inside the array

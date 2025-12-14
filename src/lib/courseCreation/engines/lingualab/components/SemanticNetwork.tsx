@@ -54,7 +54,7 @@ export const SemanticNetwork: React.FC<SemanticNetworkProps> = ({ data }) => {
         .selectAll("text")
         .data(data.links)
         .join("text")
-        .text((d) => d.relation)
+        .text((d: any) => d.relation)
         .attr("font-size", "10px")
         .attr("fill", "#9ca3af")
         .attr("text-anchor", "middle");
@@ -70,13 +70,13 @@ export const SemanticNetwork: React.FC<SemanticNetworkProps> = ({ data }) => {
           .on("end", dragended) as any);
 
     node.append("circle")
-      .attr("r", (d) => 10 + (d.value || 1) * 2)
-      .attr("fill", (d) => d.type === 'entity' ? '#34d399' : d.type === 'concept' ? '#60a5fa' : '#f472b6')
+      .attr("r", (d: any) => 10 + (d.value || 1) * 2)
+      .attr("fill", (d: any) => d.type === 'entity' ? '#34d399' : d.type === 'concept' ? '#60a5fa' : '#f472b6')
       .attr("stroke", "#fff")
       .attr("stroke-width", 1.5);
 
     node.append("text")
-      .text((d) => d.label)
+      .text((d: any) => d.label)
       .attr("x", 15)
       .attr("y", 4)
       .attr("fill", "#e5e7eb")

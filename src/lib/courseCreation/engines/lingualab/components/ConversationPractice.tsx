@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import { GoogleGenAI, Modality } from '@google/genai';
 import { 
   Mic, MicOff, Volume2, Globe,
   Download, FileText, Sparkles, BookOpen, History, 
@@ -360,7 +360,7 @@ export const ConversationPractice: React.FC = () => {
                 if (!sessionRef.current) return;
                 const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
                 const pcmBlob = createBlob(inputData);
-                sessionPromise.then((session) => {
+                sessionPromise.then((session: any) => {
                     session.sendRealtimeInput({ media: pcmBlob });
                 });
             };
@@ -368,7 +368,7 @@ export const ConversationPractice: React.FC = () => {
             source.connect(scriptProcessor);
             scriptProcessor.connect(inputAudioContext.destination);
           },
-          onmessage: async (message: LiveServerMessage) => {
+          onmessage: async (message: any) => {
             // Text
             if (message.serverContent?.outputTranscription) {
                 const text = message.serverContent.outputTranscription.text;
@@ -423,7 +423,7 @@ export const ConversationPractice: React.FC = () => {
             }
           },
           onclose: () => { stopSession(); },
-          onerror: (e) => { stopSession(); }
+          onerror: (e: any) => { stopSession(); }
         },
         config: {
             responseModalities: [Modality.AUDIO],

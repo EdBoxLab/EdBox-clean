@@ -1,7 +1,7 @@
 // app/api/learning-path/generate/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Type } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { generateWithRetry } from '@/lib/ai-providers';
 import { detectCourseCategory, injectTemplateIntoPrompt, type CourseCategory } from './templates';

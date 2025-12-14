@@ -38,11 +38,11 @@ export default function QuizForgePage() {
       {quiz && (
         <Card>
           <CardContent className="p-4">
-            {quiz.questions.map((q) => (
+            {quiz.questions.map((q: any) => (
               <div key={q.id} className="mb-4">
                 <p className="font-semibold">{q.question}</p>
                 <div className="space-y-2 mt-2">
-                  {q.options.map((option) => (
+                  {q.options.map((option: any) => (
                     <Button key={option} variant="outline" className="w-full text-left justify-start">{option}</Button>
                   ))}
                 </div>

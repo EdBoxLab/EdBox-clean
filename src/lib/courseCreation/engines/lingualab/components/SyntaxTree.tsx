@@ -26,7 +26,7 @@ export const SyntaxTree: React.FC<SyntaxTreeProps> = ({ data }) => {
     const root = d3.hierarchy(data);
     
     // Create tree layout
-    const treeLayout = d3.tree<SyntaxNode>().size([innerWidth, innerHeight - 50]);
+    const treeLayout = d3.tree().size([innerWidth, innerHeight - 50]);
     treeLayout(root);
 
     const g = svg.append("g")
@@ -63,7 +63,7 @@ export const SyntaxTree: React.FC<SyntaxTreeProps> = ({ data }) => {
     node.append("text")
       .attr("dy", 5)
       .attr("text-anchor", "middle")
-      .text((d) => d.data.name)
+      .text((d: any) => d.data.name)
       .attr("fill", "#e5e7eb")
       .style("font-size", "12px")
       .style("font-weight", "bold")

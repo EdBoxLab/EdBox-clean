@@ -45,20 +45,20 @@ const LessonCard: React.FC<LessonCardProps> = ({
       stopAudio();
     }
     return () => stopAudio();
-  }, [isActive, lesson.audioBuffer]);
+  }, [isActive, (lesson as any).audioBuffer]);
 
   // Auto-advance slides for story type
   useEffect(() => {
-    if (isActive && lesson.type === 'story' && lesson.slides) {
+    if (isActive && lesson.type === 'story' && (lesson as any).slides) {
       const interval = setInterval(() => {
-        setCurrentSlide((prev) => (prev + 1) % lesson.slides!.length);
+        setCurrentSlide((prev) => (prev + 1) % (lesson as any).slides!.length);
       }, 4000);
       return () => clearInterval(interval);
     }
-  }, [isActive, lesson.type, lesson.slides]);
+  }, [isActive, lesson.type, (lesson as any).slides]);
 
   const playAudio = () => {
-    if (!audioContext || !lesson.audioBuffer) return;
+    if (!audioContext || !(lesson as any).audioBuffer) return;
     
     onInteract(); // Resume audio context
     
@@ -67,7 +67,7 @@ const LessonCard: React.FC<LessonCardProps> = ({
     const source = audioContext.createBufferSource();
     const gainNode = audioContext.createGain();
     
-    source.buffer = lesson.audioBuffer;
+    source.buffer = (lesson as any).audioBuffer;
     source.connect(gainNode);
     gainNode.connect(audioContext.destination);
     gainNode.gain.value = isMuted ? 0 : 1;
@@ -190,9 +190,9 @@ const LessonCard: React.FC<LessonCardProps> = ({
       )}
       {/* Background Image */}
       <div className="absolute inset-0">
-        {lesson.imageUrl ? (
+        {(lesson as any).imageUrl ? (
           <img
-            src={lesson.imageUrl}
+            src={(lesson as any).imageUrl}
             alt={lesson.title}
             className="w-full h-full object-cover"
           />
@@ -273,7 +273,7 @@ const LessonCard: React.FC<LessonCardProps> = ({
               {lesson.title}
             </h2>
             <p className="text-xs sm:text-sm md:text-base text-muted-foreground">
-              {lesson.keyTakeaway}
+              {(lesson as any).keyTakeaway}
             </p>
             <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-muted-foreground">
               <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-accent/50 text-xs">
@@ -342,12 +342,12 @@ const LessonCard: React.FC<LessonCardProps> = ({
             <DialogTitle>Test Your Knowledge</DialogTitle>
           </DialogHeader>
           
-          {lesson.quiz && (
+          {(lesson as any).quiz && (
             <div className="space-y-3 sm:space-y-4">
-              <p className="text-sm sm:text-base font-medium">{lesson.quiz.question}</p>
+              <p className="text-sm sm:text-base font-medium">{(lesson as any).quiz.question}</p>
               
               <div className="space-y-1.5 sm:space-y-2">
-                {lesson.quiz.options.map((option, idx) => (
+                {(lesson as any).quiz.options.map((option: any, idx: number) => (
                   <button
                     key={idx}
                     onClick={() => handleQuizAnswer(idx)}
@@ -356,7 +356,7 @@ const LessonCard: React.FC<LessonCardProps> = ({
                       "w-full p-2 sm:p-3 rounded-lg text-left transition-all border-2",
                       selectedAnswer === idx
                         ? showResult
-                          ? idx === lesson.quiz!.correctIndex
+                          ? idx === (lesson as any).quiz!.correctIndex
                             ? "border-green-500 bg-green-500/10"
                             : "border-red-500 bg-red-500/10"
                           : "border-primary bg-primary/10"
@@ -371,14 +371,14 @@ const LessonCard: React.FC<LessonCardProps> = ({
               {showResult && (
                 <div className={cn(
                   "p-3 sm:p-4 rounded-lg",
-                  selectedAnswer === lesson.quiz.correctIndex
+                  selectedAnswer === (lesson as any).quiz.correctIndex
                     ? "bg-green-500/10 text-green-700 dark:text-green-300"
                     : "bg-red-500/10 text-red-700 dark:text-red-300"
                 )}>
                   <p className="font-medium text-xs sm:text-sm">
-                    {selectedAnswer === lesson.quiz.correctIndex
+                    {selectedAnswer === (lesson as any).quiz.correctIndex
                       ? "🎉 Correct! Great job!"
-                      : `❌ Not quite. The correct answer is: ${lesson.quiz.options[lesson.quiz.correctIndex]}`}
+                      : `❌ Not quite. The correct answer is: ${(lesson as any).quiz.options[(lesson as any).quiz.correctIndex]}`}
                   </p>
                 </div>
               )}

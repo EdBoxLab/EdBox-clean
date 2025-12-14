@@ -20,8 +20,8 @@ export async function logErrorToSupport(errorLog: ErrorLog): Promise<void> {
     console.error('ERROR LOGGED:', errorLog);
     
     // Store in database for review
-    const { createClient } = await import('@/lib/supabase/server');
-    const supabase = await createClient();
+    const { createSupabaseServerClient } = await import('@/lib/supabase/server');
+    const supabase = await createSupabaseServerClient();
     
     await supabase.from('error_logs').insert({
       timestamp: errorLog.timestamp,

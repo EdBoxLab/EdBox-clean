@@ -32,6 +32,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         setTimeout(() => {
             onComplete({
                 interests: selectedInterests,
+                learningStyle: 'visual',
                 onboarded: true
             });
             setIsSubmitting(false);

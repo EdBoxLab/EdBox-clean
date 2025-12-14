@@ -51,7 +51,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({ item, onSwipe }) => {
             <div className="relative w-full max-w-[90%] sm:max-w-[320px] aspect-[9/16] bg-gray-900 rounded-2xl shadow-lg overflow-hidden flex items-center justify-center group">
                 <CardImage
                     generationState={slide.imageGenerationState}
-                    imageUrl={slide.imageUrl}
+                    imageUrl={slide.image_url}
                     altText={`Slide ${currentSlide + 1} for ${item.title}`}
                 />
 

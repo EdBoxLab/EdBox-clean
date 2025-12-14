@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import type { Source } from '../../types';
+import type { Source } from '../types';
 import { FileIcon, PlusIcon, TrashIcon, TextIcon, BookOpenIcon } from './Icons';
 
 interface SourceUploaderProps {

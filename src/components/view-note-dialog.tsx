@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 
-export function ViewNoteDialog({ note }) {
+export function ViewNoteDialog({ note }: { note: any }) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (

@@ -2,7 +2,7 @@ import { GoogleGenAI, Modality } from "@google/genai";
 
 const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
 
-let aiClient: GoogleGenAI | null = null;
+let aiClient: InstanceType<typeof GoogleGenAI> | null = null;
 
 const getClient = () => {
   if (!aiClient) {

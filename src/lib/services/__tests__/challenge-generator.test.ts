@@ -45,7 +45,7 @@ describe('ChallengeGenerator Property Tests', () => {
     id: fc.string(),
     skillId: skillIdArb,
     masteryThreshold: fc.record({
-      minSuccessRate: fc.float({ min: 0.1, max: 1.0 }),
+      minSuccessRate: fc.float({ min: Math.fround(0.1), max: Math.fround(1.0) }),
       challengesRequired: fc.integer({ min: 1, max: 10 }),
       maxChallenges: fc.integer({ min: 5, max: 15 })
     }),

@@ -15,6 +15,9 @@ interface SkillNode {
   id: string;
   name: string;
   prereqs: string[];
+  estimatedMinutes?: number;
+  xpReward?: number;
+  engine?: string;
 }
 
 interface ProjectNode {

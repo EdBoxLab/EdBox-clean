@@ -19,6 +19,11 @@ import {
   ConfigurationUpdateRequest,
   ConfigurationValidationResult
 } from '@/lib/services/skill-configuration-manager';
+import {
+  skillConfigurationExport,
+  ConfigurationExport,
+  ImportExecutionResult
+} from '@/lib/services/skill-configuration-export';
 import { SkillGraph } from '@/lib/services/skill-progression-manager';
 
 interface SkillConfigurationAdminProps {
@@ -55,6 +60,9 @@ export function SkillConfigurationAdmin({
   const [validation, setValidation] = useState<ConfigurationValidationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [challengeTypesInput, setChallengeTypesInput] = useState('');
+  const [showImportExport, setShowImportExport] = useState(false);
+  const [importData, setImportData] = useState<string>('');
+  const [importResult, setImportResult] = useState<ImportExecutionResult | null>(null);
 
   // Load existing configurations
   useEffect(() => {
@@ -251,15 +259,111 @@ export function SkillConfigurationAdmin({
     }
   };
 
+  const handleExportConfigurations = async () => {
+    try {
+      setLoading(true);
+      const skillIds = Array.from(configurations.keys());
+      const exportData = await skillConfigurationExport.exportConfigurations(skillIds, {
+        includeDefaults: true,
+        description: 'Admin export',
+        exportedBy: 'admin'
+      });
+
+      // Download as JSON file
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `skill-configurations-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Export Successful',
+        description: `Exported ${skillIds.length} configurations`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Export Failed',
+        description: error instanceof Error ? error.message : 'Failed to export configurations',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImportConfigurations = async () => {
+    try {
+      setLoading(true);
+      setImportResult(null);
+
+      let parsedData: ConfigurationExport;
+      try {
+        parsedData = JSON.parse(importData);
+      } catch (error) {
+        throw new Error('Invalid JSON format');
+      }
+
+      const result = await skillConfigurationExport.importConfigurations(
+        parsedData,
+        skillGraph,
+        {
+          overwriteExisting: true,
+          skipInvalid: true
+        }
+      );
+
+      setImportResult(result);
+
+      if (result.success) {
+        toast({
+          title: 'Import Successful',
+          description: `Imported ${result.imported} configurations`,
+        });
+        // Reload configurations
+        await loadConfigurations();
+      } else {
+        toast({
+          title: 'Import Completed with Issues',
+          description: `Imported: ${result.imported}, Failed: ${result.failed}`,
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Import Failed',
+        description: error instanceof Error ? error.message : 'Failed to import configurations',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const selectedSkillNode = skillGraph.nodes.find(node => node.id === selectedSkill);
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Skill Configuration Management</h2>
-        <Button onClick={handleBulkValidation} disabled={loading}>
-          Validate All Configurations
-        </Button>
+        <div className="flex items-center gap-4">
+          <Button onClick={handleBulkValidation} disabled={loading}>
+            Validate All Configurations
+          </Button>
+          <Button onClick={handleExportConfigurations} disabled={loading} variant="outline">
+            Export Configurations
+          </Button>
+          <Button 
+            onClick={() => setShowImportExport(!showImportExport)} 
+            disabled={loading} 
+            variant="outline"
+          >
+            Import/Export
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -443,6 +547,82 @@ export function SkillConfigurationAdmin({
           </Card>
         )}
       </div>
+
+      {/* Import/Export Panel */}
+      {showImportExport && (
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Import/Export Configurations</h3>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Import Configuration JSON
+              </label>
+              <textarea
+                className="w-full h-32 p-3 border rounded-lg font-mono text-sm"
+                placeholder="Paste configuration JSON here..."
+                value={importData}
+                onChange={(e) => setImportData(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-4">
+              <Button
+                onClick={handleImportConfigurations}
+                disabled={loading || !importData.trim()}
+              >
+                Import Configurations
+              </Button>
+              <Button
+                onClick={() => {
+                  const template = skillConfigurationExport.generateConfigurationTemplate(
+                    skillGraph.nodes.map(n => n.id),
+                    skillGraph
+                  );
+                  setImportData(JSON.stringify(template, null, 2));
+                }}
+                variant="outline"
+              >
+                Generate Template
+              </Button>
+            </div>
+
+            {/* Import Results */}
+            {importResult && (
+              <div className="mt-4 p-4 border rounded-lg">
+                <h4 className="font-medium mb-2">Import Results</h4>
+                <div className="text-sm space-y-1">
+                  <div>Imported: {importResult.imported}</div>
+                  <div>Skipped: {importResult.skipped}</div>
+                  <div>Failed: {importResult.failed}</div>
+                </div>
+                
+                {importResult.errors.length > 0 && (
+                  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
+                    <h5 className="font-medium text-red-800 mb-1">Errors:</h5>
+                    <ul className="text-sm text-red-700 list-disc list-inside">
+                      {importResult.errors.map((error, index) => (
+                        <li key={index}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {importResult.warnings.length > 0 && (
+                  <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                    <h5 className="font-medium text-yellow-800 mb-1">Warnings:</h5>
+                    <ul className="text-sm text-yellow-700 list-disc list-inside">
+                      {importResult.warnings.map((warning, index) => (
+                        <li key={index}>{warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

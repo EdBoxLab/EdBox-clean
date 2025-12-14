@@ -21,6 +21,8 @@ interface LinguaLabState {
   currentHintIndex: number;
   exerciseType: 'translation' | 'conversation' | 'grammar' | 'vocabulary';
   score: number;
+  isRecording: boolean;
+  micSupported: boolean;
 }
 
 export default function LinguaLab({ challenge, onComplete }: LinguaLabProps) {
@@ -34,6 +36,8 @@ export default function LinguaLab({ challenge, onComplete }: LinguaLabProps) {
     currentHintIndex: 0,
     exerciseType: 'conversation',
     score: 0,
+    isRecording: false,
+    micSupported: typeof window !== 'undefined' && 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window,
   });
 
   const handleResponseChange = (newResponse: string) => {
@@ -94,27 +98,60 @@ export default function LinguaLab({ challenge, onComplete }: LinguaLabProps) {
     }
   };
 
+  const startVoiceRecording = () => {
+    if (!state.micSupported) return;
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'es-ES'; // Default to Spanish, could be dynamic based on challenge
+    
+    setState(prev => ({ ...prev, isRecording: true }));
+    
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setState(prev => ({ 
+        ...prev, 
+        userResponse: prev.userResponse + (prev.userResponse ? ' ' : '') + transcript,
+        isRecording: false 
+      }));
+    };
+    
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      setState(prev => ({ ...prev, isRecording: false }));
+    };
+    
+    recognition.onend = () => {
+      setState(prev => ({ ...prev, isRecording: false }));
+    };
+    
+    recognition.start();
+  };
+
   return (
     <div className="h-full bg-gray-900 text-white flex flex-col">
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-              <Languages className="w-5 h-5" />
+      <div className="bg-gray-800 border-b border-gray-700 p-3 sm:p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
+              <Languages className="w-3 h-3 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <h2 className="text-xl font-bold">{challenge.title}</h2>
-              <p className="text-gray-400 text-sm">{challenge.description}</p>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-xl font-bold truncate">{challenge.title}</h2>
+              <p className="text-gray-400 text-xs sm:text-sm truncate">{challenge.description}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm shrink-0">
             <div className="flex items-center gap-1 text-blue-400">
-              <Clock className="w-4 h-4" />
+              <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
               <span>{challenge.estimatedMinutes}m</span>
             </div>
             <div className="flex items-center gap-1 text-yellow-400">
-              <Trophy className="w-4 h-4" />
+              <Trophy className="w-3 h-3 sm:w-4 sm:h-4" />
               <span>{challenge.xpReward} XP</span>
             </div>
             <div className="px-2 py-1 bg-gray-700 rounded text-xs">
@@ -125,23 +162,48 @@ export default function LinguaLab({ challenge, onComplete }: LinguaLabProps) {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Left Panel - Exercise & Hints */}
-        <div className="w-1/3 p-4 border-r border-gray-700 overflow-y-auto">
+        <div className="w-full lg:w-1/3 p-3 sm:p-4 border-b lg:border-r lg:border-b-0 border-gray-700 overflow-y-auto max-h-48 lg:max-h-none">
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-semibold mb-2">Language Exercise</h3>
-              <div className="bg-gray-800 rounded-lg p-4">
+              <h3 className="text-base sm:text-lg font-semibold mb-2">Language Exercise</h3>
+              <div className="bg-gray-800 rounded-lg p-3 sm:p-4">
                 <div className="flex items-start justify-between mb-2">
-                  <p className="text-gray-300 whitespace-pre-wrap flex-1">{challenge.description}</p>
+                  <p className="text-gray-300 whitespace-pre-wrap flex-1 text-sm sm:text-base">{challenge.description}</p>
                   <button
                     onClick={() => speakText(challenge.description)}
-                    className="ml-2 p-2 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20 rounded transition-colors"
+                    className="ml-2 p-1.5 sm:p-2 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20 rounded transition-colors shrink-0"
                     title="Listen to pronunciation"
                   >
-                    <Volume2 className="w-4 h-4" />
+                    <Volume2 className="w-3 h-3 sm:w-4 sm:h-4" />
                   </button>
                 </div>
+                
+                {/* Spanish Alphabet Helper */}
+                {(challenge.title.toLowerCase().includes('alphabet') || challenge.title.toLowerCase().includes('letters') || challenge.description.toLowerCase().includes('alphabet')) && (
+                  <div className="mt-3 p-3 bg-indigo-900/20 border border-indigo-600/30 rounded-lg">
+                    <h4 className="text-sm font-semibold text-indigo-300 mb-2">Spanish Alphabet Reference</h4>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 text-xs">
+                      {[
+                        'A (ah)', 'B (beh)', 'C (seh)', 'D (deh)', 'E (eh)', 'F (eh-feh)',
+                        'G (heh)', 'H (ah-cheh)', 'I (ee)', 'J (ho-tah)', 'K (kah)', 'L (eh-leh)',
+                        'M (eh-meh)', 'N (eh-neh)', 'Ñ (eh-nyeh)', 'O (oh)', 'P (peh)', 'Q (koo)',
+                        'R (eh-rreh)', 'S (eh-seh)', 'T (teh)', 'U (oo)', 'V (veh)', 'W (do-bleh veh)',
+                        'X (eh-kees)', 'Y (ee gree-eh-gah)', 'Z (seh-tah)'
+                      ].map((letter, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => speakText(letter.split(' ')[0])}
+                          className="p-1 bg-gray-700 hover:bg-indigo-600 rounded text-center transition-colors"
+                          title={`Click to hear pronunciation`}
+                        >
+                          {letter}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -194,14 +256,21 @@ export default function LinguaLab({ challenge, onComplete }: LinguaLabProps) {
         </div>
 
         {/* Middle Panel - Response Area */}
-        <div className="w-1/2 p-4 flex flex-col">
+        <div className="w-full lg:w-1/2 p-3 sm:p-4 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-semibold">Your Response</h3>
             <div className="flex items-center gap-2">
               <button
-                className="p-2 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20 rounded transition-colors"
-                title="Voice input (coming soon)"
-                disabled
+                onClick={startVoiceRecording}
+                disabled={!state.micSupported || state.isRecording}
+                className={`p-2 rounded transition-colors ${
+                  state.isRecording 
+                    ? 'text-red-400 bg-red-900/20 animate-pulse' 
+                    : state.micSupported 
+                      ? 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20' 
+                      : 'text-gray-500 cursor-not-allowed'
+                }`}
+                title={state.micSupported ? (state.isRecording ? 'Recording...' : 'Voice input') : 'Microphone not supported'}
               >
                 <Mic className="w-4 h-4" />
               </button>
@@ -216,19 +285,19 @@ export default function LinguaLab({ challenge, onComplete }: LinguaLabProps) {
             </div>
           </div>
 
-          <div className="flex-1 bg-gray-800 rounded-lg overflow-hidden">
+          <div className="flex-1 bg-gray-800 rounded-lg overflow-hidden min-h-48 lg:min-h-0">
             <textarea
               value={state.userResponse}
               onChange={(e) => handleResponseChange(e.target.value)}
-              className="w-full h-full bg-transparent text-white text-lg p-4 resize-none focus:outline-none leading-relaxed"
-              placeholder="Type your response here..."
+              className="w-full h-full bg-transparent text-white text-sm sm:text-lg p-3 sm:p-4 resize-none focus:outline-none leading-relaxed"
+              placeholder={state.micSupported ? "Type your response here or use the microphone button above..." : "Type your response here..."}
               spellCheck={true}
             />
           </div>
         </div>
 
         {/* Right Panel - Feedback */}
-        <div className="w-1/3 p-4 border-l border-gray-700 flex flex-col">
+        <div className="w-full lg:w-1/3 p-3 sm:p-4 border-t lg:border-l lg:border-t-0 border-gray-700 flex flex-col min-h-0">
           <div className="flex-1 space-y-4">
             <div>
               <h3 className="text-lg font-semibold mb-2">Feedback</h3>

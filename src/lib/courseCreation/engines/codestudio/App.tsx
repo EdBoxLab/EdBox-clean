@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Challenge } from '../../types';
 import { motion } from 'framer-motion';
 import { Play, CheckCircle, XCircle, Lightbulb, Trophy, Clock, Code, Terminal } from 'lucide-react';
-import { evaluateChallenge } from '@/app/actions/evaluate-challenge';
+import { evaluateChallenge } from '../../../../app/actions/evaluate-challenge';
 
 interface CodeStudioProps {
   challenge: Challenge;
@@ -85,24 +85,24 @@ export default function CodeStudio({ challenge, onComplete }: CodeStudioProps) {
   return (
     <div className="h-full bg-gray-900 text-white flex flex-col">
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Code className="w-5 h-5" />
+      <div className="bg-gray-800 border-b border-gray-700 p-3 sm:p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-600 rounded-lg flex items-center justify-center shrink-0">
+              <Code className="w-3 h-3 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <h2 className="text-xl font-bold">{challenge.title}</h2>
-              <p className="text-gray-400 text-sm">{challenge.description}</p>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-xl font-bold truncate">{challenge.title}</h2>
+              <p className="text-gray-400 text-xs sm:text-sm truncate">{challenge.description}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm shrink-0">
             <div className="flex items-center gap-1 text-blue-400">
-              <Clock className="w-4 h-4" />
+              <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
               <span>{challenge.estimatedMinutes || 15}m</span>
             </div>
             <div className="flex items-center gap-1 text-yellow-400">
-              <Trophy className="w-4 h-4" />
+              <Trophy className="w-3 h-3 sm:w-4 sm:h-4" />
               <span>{challenge.xpReward} XP</span>
             </div>
             <div className="px-2 py-1 bg-gray-700 rounded text-xs">
@@ -113,9 +113,9 @@ export default function CodeStudio({ challenge, onComplete }: CodeStudioProps) {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Left Panel - Challenge & Hints */}
-        <div className="w-1/3 p-4 border-r border-gray-700 overflow-y-auto">
+        <div className="w-full lg:w-1/3 p-3 sm:p-4 border-b lg:border-r lg:border-b-0 border-gray-700 overflow-y-auto max-h-48 lg:max-h-none">
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-semibold mb-2">Challenge</h3>
@@ -143,16 +143,16 @@ export default function CodeStudio({ challenge, onComplete }: CodeStudioProps) {
 
             {/* Hints */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-semibold">Hints</h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
+                <h3 className="text-base sm:text-lg font-semibold">Hints</h3>
                 {challenge.hints.length > 0 && (
                   <button
                     onClick={showNextHint}
                     disabled={state.currentHintIndex >= challenge.hints.length - 1}
-                    className="flex items-center gap-1 px-3 py-1 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-sm transition-colors"
+                    className="flex items-center gap-1 px-2 sm:px-3 py-1 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-xs sm:text-sm transition-colors"
                   >
-                    <Lightbulb className="w-4 h-4" />
-                    Show Hint ({state.currentHintIndex + 1}/{challenge.hints.length})
+                    <Lightbulb className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Show Hint</span> ({state.currentHintIndex + 1}/{challenge.hints.length})
                   </button>
                 )}
               </div>
@@ -163,7 +163,7 @@ export default function CodeStudio({ challenge, onComplete }: CodeStudioProps) {
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-3"
                 >
-                  <p className="text-yellow-200 text-sm">
+                  <p className="text-yellow-200 text-xs sm:text-sm">
                     💡 {challenge.hints[state.currentHintIndex]}
                   </p>
                 </motion.div>
@@ -173,24 +173,24 @@ export default function CodeStudio({ challenge, onComplete }: CodeStudioProps) {
         </div>
 
         {/* Middle Panel - Code Editor */}
-        <div className="w-1/2 p-4 flex flex-col">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold">Code Editor</h3>
+        <div className="w-full lg:w-1/2 p-3 sm:p-4 flex flex-col min-h-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
+            <h3 className="text-base sm:text-lg font-semibold">Code Editor</h3>
             <button
               onClick={handleRun}
               disabled={state.isRunning}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded transition-colors"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded transition-colors text-sm sm:text-base"
             >
-              <Play className="w-4 h-4" />
+              <Play className="w-3 h-3 sm:w-4 sm:h-4" />
               {state.isRunning ? 'Running...' : 'Run Code'}
             </button>
           </div>
 
-          <div className="flex-1 bg-gray-800 rounded-lg overflow-hidden">
+          <div className="flex-1 bg-gray-800 rounded-lg overflow-hidden min-h-48 lg:min-h-0">
             <textarea
               value={state.code}
               onChange={(e) => handleCodeChange(e.target.value)}
-              className="w-full h-full bg-transparent text-white font-mono text-sm p-4 resize-none focus:outline-none"
+              className="w-full h-full bg-transparent text-white font-mono text-xs sm:text-sm p-3 sm:p-4 resize-none focus:outline-none"
               placeholder="// Write your code here..."
               spellCheck={false}
             />
@@ -198,15 +198,15 @@ export default function CodeStudio({ challenge, onComplete }: CodeStudioProps) {
         </div>
 
         {/* Right Panel - Output & Results */}
-        <div className="w-1/3 p-4 border-l border-gray-700 flex flex-col">
+        <div className="w-full lg:w-1/3 p-3 sm:p-4 border-t lg:border-l lg:border-t-0 border-gray-700 flex flex-col min-h-0">
           <div className="flex-1 space-y-4">
             {/* Output */}
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <Terminal className="w-5 h-5" />
-                <h3 className="text-lg font-semibold">Output</h3>
+                <Terminal className="w-4 h-4 sm:w-5 sm:h-5" />
+                <h3 className="text-base sm:text-lg font-semibold">Output</h3>
               </div>
-              <div className="bg-gray-800 rounded-lg p-4 h-32 overflow-y-auto">
+              <div className="bg-gray-800 rounded-lg p-3 sm:p-4 h-32 sm:h-40 lg:h-32 overflow-y-auto">
                 {/* Feedback & Output Display */}
                 {state.isComplete ? (
                   <div className="space-y-4">

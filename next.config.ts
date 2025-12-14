@@ -10,28 +10,12 @@ const nextConfig: NextConfig = {
   webpack: (config, { isServer, dev }) => {
     // Configure source maps for webpack
     if (dev) {
-      // Use high-quality source maps in development
-      config.devtool = 'eval-source-map';
+      // Use eval-cheap-module-source-map for better performance and fewer errors
+      config.devtool = 'eval-cheap-module-source-map';
     } else {
-      // Use lighter source maps in production for better performance
-      config.devtool = 'source-map';
+      // Disable source maps in production to avoid parsing errors
+      config.devtool = false;
     }
-
-    // Ensure source map generation is not interfered with by custom rules
-    config.module.rules.push({
-      test: /\.mts$/,
-      use: {
-        loader: 'ts-loader',
-        options: {
-          // Ensure source maps are generated for .mts files
-          compilerOptions: {
-            sourceMap: true,
-            inlineSourceMap: false,
-          },
-        },
-      },
-      exclude: /node_modules/,
-    });
 
     // Add the resolver for path aliases
     config.resolve.alias['@'] = __dirname + '/src';
@@ -41,6 +25,13 @@ const nextConfig: NextConfig = {
       ...config.optimization,
       moduleIds: dev ? 'named' : 'deterministic',
     };
+
+    // Ignore source map warnings from node_modules
+    config.ignoreWarnings = [
+      /Failed to parse source map/,
+      /source map.*node_modules/,
+      /sourceMapURL could not be parsed/,
+    ];
 
     return config;
   },

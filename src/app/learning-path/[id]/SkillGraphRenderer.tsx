@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { SkillGraph, SkillNode, Challenge } from '@/lib/courseCreation/types';
 import { motion } from 'framer-motion';
 import { Target, Sparkles, Trophy, AlertCircle } from 'lucide-react';
@@ -33,6 +33,13 @@ interface Notification {
 }
 
 export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGraphRendererProps) {
+  // Debug render count to detect infinite loops
+  const renderCount = React.useRef(0);
+  renderCount.current += 1;
+  
+  if (renderCount.current > 100) {
+    console.error('SkillGraphRenderer: Excessive renders detected!', renderCount.current);
+  }
   // Core state
   const [selectedSkill, setSelectedSkill] = useState<SkillNode | null>(null);
   const [currentChallenge, setCurrentChallenge] = useState<Challenge | null>(null);
@@ -116,7 +123,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
   };
 
   // Notification management
-  const addNotification = (type: 'unlock' | 'mastery' | 'xp' | 'error' | 'info', message: string, skillId?: string) => {
+  const addNotification = useCallback((type: 'unlock' | 'mastery' | 'xp' | 'error' | 'info', message: string, skillId?: string) => {
     const id = Date.now().toString();
     setNotifications(prev => [...prev, { id, type, message, skillId }]);
 
@@ -147,7 +154,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id));
     }, duration);
-  };
+  }, []);
 
   const removeNotification = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
@@ -161,32 +168,45 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
 
   // Listen for progress updates to show notifications
   useEffect(() => {
-    if (progressData.length === 0 || previousProgressData.length === 0) {
+    // Only process if we have both current and previous data
+    if (progressData.length === 0) {
+      return;
+    }
+
+    // If this is the first load, just store the data without notifications
+    if (previousProgressData.length === 0) {
       setPreviousProgressData(progressData);
       return;
     }
 
+    // Compare progress and show notifications
     progressData.forEach(current => {
       const previous = previousProgressData.find(p => p.skillId === current.skillId);
 
-      if (previous) {
+      if (previous && current.progressData && previous.progressData) {
+        // Check for unlock
         if (previous.progressData.state === 'locked' && current.progressData.state === 'unlocked') {
           addNotification('unlock', `🎉 ${current.title} unlocked!`, current.skillId);
         }
 
+        // Check for mastery
         if (!previous.progressData.masteryAchieved && current.progressData.masteryAchieved) {
           addNotification('mastery', `🏆 ${current.title} mastered!`, current.skillId);
         }
 
-        const xpGain = current.progressData.xpEarned - previous.progressData.xpEarned;
+        // Check for XP gain
+        const previousXP = previous.progressData.xpEarned || 0;
+        const currentXP = current.progressData.xpEarned || 0;
+        const xpGain = currentXP - previousXP;
         if (xpGain > 0) {
           addNotification('xp', `+${xpGain} XP earned!`, current.skillId);
         }
       }
     });
 
+    // Update previous data for next comparison
     setPreviousProgressData(progressData);
-  }, [progressData, previousProgressData]);
+  }, [progressData]); // Remove previousProgressData from dependencies to prevent infinite loop
 
   // Skill interaction handlers
   const handleSkillClick = async (skillId: string) => {
@@ -229,11 +249,30 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
           const batch = await generateChallengeBatch(skill.id, skillTitle, skillEngine);
 
           if (batch.challenges && batch.challenges.length > 0) {
+            console.log('Successfully generated', batch.challenges.length, 'challenges for', skillTitle);
             setSessionChallenges(batch.challenges);
-            setConceptExplanation(batch.explanation);
+            setConceptExplanation(batch.explanation || `Learn about ${skillTitle} through hands-on practice.`);
             setActiveChallengeIndex(-1);
           } else {
-            throw new Error('No challenges generated');
+            console.warn('No challenges generated for', skillTitle);
+            // Create a fallback challenge
+            const fallbackChallenge: Challenge = {
+              id: `fallback_${skill.id}_${Date.now()}`,
+              skillId: skill.id,
+              title: `Practice ${skillTitle}`,
+              description: `Practice your understanding of ${skillTitle} concepts.`,
+              engine: skillEngine,
+              difficulty: 'Medium',
+              estimatedMinutes: 15,
+              xpReward: 100,
+              starterCode: '',
+              validationCriteria: [{ type: 'ai_eval', rubric: 'Demonstrate understanding of the concept.' }],
+              hints: ['Take your time to understand the concept', 'Ask for help if needed'],
+              explanation: `This is a practice exercise for ${skillTitle}.`
+            };
+            setSessionChallenges([fallbackChallenge]);
+            setConceptExplanation(`Learn about ${skillTitle} through hands-on practice.`);
+            setActiveChallengeIndex(-1);
           }
         } catch (e) {
           console.error("Generation failed", e);
@@ -308,6 +347,14 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
 
     if (success) {
       setConsecutiveFailures(0);
+      
+      // Show progress feedback
+      const skillProgress = getSkillProgress(selectedSkill.id);
+      if (skillProgress) {
+        const progressPercent = Math.round((skillProgress.challengesCompleted / skillProgress.challengesRequired) * 100);
+        addNotification('xp', `Progress: ${progressPercent}% complete! +${currentChal.xpReward || 100} XP`, selectedSkill.id);
+      }
+      
       if (activeChallengeIndex < sessionChallenges.length - 1) {
         setTimeout(() => handleChallengeSelect(activeChallengeIndex + 1), 1500);
       } else {

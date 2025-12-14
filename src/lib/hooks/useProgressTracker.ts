@@ -3,7 +3,7 @@
 // Provides easy access to progress tracking functionality in React components
 // ============================================
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type {
   ProgressSummary,
   ChallengeResult,
@@ -336,8 +336,15 @@ export function useMultipleSkillsProgress(skillGraph?: SkillGraph) {
     progressData: []
   });
 
+  // Memoize the skill graph to prevent unnecessary re-renders
+  const memoizedSkillGraph = useMemo(() => skillGraph, [
+    skillGraph?.nodes?.length,
+    skillGraph?.edges?.length,
+    JSON.stringify(skillGraph?.nodes?.map(n => n.id))
+  ]);
+
   const loadProgressData = useCallback(async () => {
-    if (!skillGraph) return;
+    if (!memoizedSkillGraph) return;
 
     setState(prev => ({ ...prev, loading: true, error: null }));
 
@@ -349,7 +356,7 @@ export function useMultipleSkillsProgress(skillGraph?: SkillGraph) {
         },
         body: JSON.stringify({
           action: 'getMultipleProgressData',
-          skillGraph
+          skillGraph: memoizedSkillGraph
         }),
       });
 
@@ -372,13 +379,13 @@ export function useMultipleSkillsProgress(skillGraph?: SkillGraph) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setState(prev => ({ ...prev, loading: false, error: errorMessage }));
     }
-  }, [skillGraph]);
+  }, [memoizedSkillGraph]);
 
   useEffect(() => {
-    if (skillGraph) {
+    if (memoizedSkillGraph) {
       loadProgressData();
     }
-  }, [loadProgressData, skillGraph?.nodes?.length, skillGraph?.edges?.length]);
+  }, [loadProgressData, memoizedSkillGraph]);
 
   return {
     loading: state.loading,

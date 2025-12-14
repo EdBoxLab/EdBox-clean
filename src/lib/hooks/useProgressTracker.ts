@@ -378,7 +378,7 @@ export function useMultipleSkillsProgress(skillGraph?: SkillGraph) {
     if (skillGraph) {
       loadProgressData();
     }
-  }, [skillGraph, loadProgressData]);
+  }, [loadProgressData, skillGraph?.nodes?.length, skillGraph?.edges?.length]);
 
   return {
     loading: state.loading,

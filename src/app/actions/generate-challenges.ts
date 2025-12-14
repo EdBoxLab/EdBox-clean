@@ -16,6 +16,12 @@ export async function generateChallengeBatch(
     count: number = 5,
     difficulty: string = 'Medium'
 ): Promise<ChallengeBatch> {
+    // Validate inputs
+    if (!skillId || !skillTitle || !engine) {
+        console.error('Invalid parameters:', { skillId, skillTitle, engine });
+        throw new Error('Missing required parameters for challenge generation');
+    }
+
     try {
         const systemPrompt = `You are an expert curriculum designer and technical tutor.
     Create a complete learning module for the skill: "${skillTitle}".

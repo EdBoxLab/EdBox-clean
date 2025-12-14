@@ -1,35 +1,61 @@
-import React from 'react';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { SkillGraph, Challenge } from '@/lib/courseCreation/types';
 import SkillGraphWrapper from './SkillGraphWrapper';
 
 interface Props {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default async function LearningPathPage({ params }: Props) {
-  try {
-    const { id } = params;
+  const { id } = await params;
 
-    if (!id) {
-      return <div className="text-white p-8">Invalid skill graph ID.</div>;
+  if (!id) {
+    return <div className="text-white p-8">Invalid skill graph ID.</div>;
+  }
+
+  try {
+    const supabase = await createSupabaseServerClient();
+
+    // Get the current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      return (
+        <div className="text-white p-8">
+          <h1 className="text-2xl font-bold mb-4">Authentication Required</h1>
+          <p className="text-gray-400">Please log in to view your learning paths.</p>
+        </div>
+      );
     }
 
-    const supabase = await createServerSupabaseClient();
-
+    // Fetch skill graph for this specific user
     const { data: graphDataRaw, error: graphError } = await supabase
       .from('skill_graphs')
       .select('*')
       .eq('id', id)
+      .eq('user_id', user.id)
       .single();
 
     if (graphError || !graphDataRaw) {
       console.error('Supabase error:', graphError);
       return (
         <div className="text-white p-8">
-          <h1 className="text-2xl font-bold mb-4">Skill graph not found</h1>
-          <p className="text-gray-400">Error: {graphError?.message || 'Unknown error'}</p>
+          <h1 className="text-2xl font-bold mb-4">Learning Path Not Found</h1>
+          <p className="text-gray-400">
+            {graphError?.code === 'PGRST116' 
+              ? 'This learning path does not exist or you do not have access to it.'
+              : `Error: ${graphError?.message || 'Unknown error'}`
+            }
+          </p>
           <p className="text-gray-500 mt-2">ID: {id}</p>
+          <div className="mt-4">
+            <a 
+              href="/learning-path" 
+              className="inline-block px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
+            >
+              Browse Learning Paths
+            </a>
+          </div>
         </div>
       );
     }
@@ -48,41 +74,13 @@ export default async function LearningPathPage({ params }: Props) {
 
     return <SkillGraphWrapper graph={graphData} challenges={challengesMap} />;
   } catch (error) {
-    // Handle any unexpected errors, including source map issues
-    const isSourceMapError = error instanceof Error && 
-      (error.message.includes('source map') || error.message.includes('sourceMapURL'));
-    
-    if (isSourceMapError) {
-      console.warn('Source map error in server component (non-breaking):', error.message);
-      // Continue with normal rendering despite source map issues
-      const { id } = params;
-      if (!id) {
-        return <div className="text-white p-8">Invalid skill graph ID.</div>;
-      }
-      
-      // Return a simplified version that will still work
-      return (
-        <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-gray-400">Loading learning path...</p>
-            <p className="text-xs text-gray-500 mt-2">Initializing with enhanced compatibility mode</p>
-          </div>
-        </div>
-      );
-    }
-
     console.error('Unexpected error in LearningPathPage:', error);
     return (
       <div className="text-white p-8">
         <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
-        <p className="text-gray-400">We encountered an unexpected error while loading the learning path.</p>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
-        >
-          Reload Page
-        </button>
+        <p className="text-gray-400">
+          We encountered an unexpected error while loading the learning path.
+        </p>
       </div>
     );
   }

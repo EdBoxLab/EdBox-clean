@@ -59,10 +59,21 @@ export function validateSourceMapURL(url: string): SourceMapValidationResult {
  * Provides debugging information when source maps are unavailable
  */
 export function getFallbackDebuggingInfo(componentName: string, error?: Error) {
-  const debugInfo = {
+  const debugInfo: {
+    component: string;
+    timestamp: string;
+    environment: string;
+    sourceMapStatus: string;
+    fallbackMethods: string[];
+    suggestions: string[];
+    error?: {
+      message: string;
+      stack?: string;
+    };
+  } = {
     component: componentName,
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
+    environment: process.env.NODE_ENV || 'unknown',
     sourceMapStatus: 'unavailable',
     fallbackMethods: [
       'Console logging with component names',

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { SkillGraph, SkillNode, Challenge } from '@/lib/courseCreation/types';
 import { motion } from 'framer-motion';
 import { Target, Sparkles, Trophy, AlertCircle } from 'lucide-react';
@@ -54,7 +54,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
   const { timeAsync } = usePerformanceMonitoring('SkillGraphRenderer');
 
   // Convert the graph to the format expected by the progress tracker
-  const convertToProgressionGraph = (graph: SkillGraph): ProgressionSkillGraph => {
+  const progressionGraph = useMemo((): ProgressionSkillGraph => {
     return {
       nodes: graph.nodes.map(node => ({
         id: node.id,
@@ -66,9 +66,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
       })),
       edges: graph.edges || []
     };
-  };
-
-  const progressionGraph = convertToProgressionGraph(graph);
+  }, [graph]);
 
   // Use the progress tracker hook for multiple skills
   const { progressData, loading: progressLoading, error: progressError, refreshProgress: refreshGraphProgress } = useMultipleSkillsProgress(progressionGraph);
@@ -221,14 +219,25 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
         setIsGenerating(true);
         try {
           const { generateChallengeBatch } = await import('@/app/actions/generate-challenges');
-          const batch = await generateChallengeBatch(skill.id, skill.title, skill.engine);
+          
+          // Validate required parameters
+          const skillTitle = skill.title || `Skill ${skill.id}`;
+          const skillEngine = skill.engine || 'default';
+          
+          console.log('Generating challenges for:', { skillId: skill.id, skillTitle, skillEngine });
+          
+          const batch = await generateChallengeBatch(skill.id, skillTitle, skillEngine);
 
-          setSessionChallenges(batch.challenges);
-          setConceptExplanation(batch.explanation);
-          setActiveChallengeIndex(-1);
+          if (batch.challenges && batch.challenges.length > 0) {
+            setSessionChallenges(batch.challenges);
+            setConceptExplanation(batch.explanation);
+            setActiveChallengeIndex(-1);
+          } else {
+            throw new Error('No challenges generated');
+          }
         } catch (e) {
           console.error("Generation failed", e);
-          addNotification('error', 'Failed to generate challenges', skillId);
+          addNotification('error', 'Failed to generate challenges. Please try again.', skillId);
         } finally {
           setIsGenerating(false);
         }

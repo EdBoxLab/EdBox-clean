@@ -4,18 +4,19 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import LearningPathView from './components/LearningPathView';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
   const supabase = await createSupabaseServerClient();
   
   const { data: skillGraph } = await supabase
     .from('skill_graphs')
     .select('goal')
-    .eq('id', params.id)
+    .eq('id', id)
     .single();
 
   return {
@@ -25,6 +26,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function LearningPathPage({ params }: PageProps) {
+  const { id } = await params;
   const supabase = await createSupabaseServerClient();
 
   // Check authentication
@@ -38,7 +40,7 @@ export default async function LearningPathPage({ params }: PageProps) {
   const { data: skillGraph, error: graphError } = await supabase
     .from('skill_graphs')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('user_id', user.id)
     .single();
 
@@ -50,7 +52,7 @@ export default async function LearningPathPage({ params }: PageProps) {
   const { data: learnerState, error: stateError } = await supabase
     .from('learner_states')
     .select('*')
-    .eq('skill_graph_id', params.id)
+    .eq('skill_graph_id', id)
     .eq('user_id', user.id)
     .single();
 

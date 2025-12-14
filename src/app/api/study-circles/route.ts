@@ -10,9 +10,10 @@ export async function GET(request: NextRequest) {
     if (userError || !user || !user.id) {
       // Capture cookie names to help debug missing session state (do NOT log cookie values)
       try {
-        const { cookies } = await import('next/headers');
-        const cookieNames = cookies().getAll().map(c => c.name);
-        const supabaseCookiePresent = cookieNames.some(n => /supabase|sb/i.test(n));
+        const headers = await import('next/headers');
+        const cookieStore = await headers.cookies();
+        const cookieNames = cookieStore.getAll().map((c: any) => c.name);
+        const supabaseCookiePresent = cookieNames.some((n: any) => /supabase|sb/i.test(n));
         console.warn('Unauthorized request - missing user id', { user, userError, cookieNames, supabaseCookiePresent });
       } catch (cookieErr) {
         console.warn('Unauthorized request - missing user id', { user, userError });
@@ -88,9 +89,10 @@ export async function POST(request: NextRequest) {
     if (userError || !user || !user.id) {
       // Capture cookie names to help debug missing session state (do NOT log cookie values)
       try {
-        const { cookies } = await import('next/headers');
-        const cookieNames = cookies().getAll().map(c => c.name);
-        const supabaseCookiePresent = cookieNames.some(n => /supabase|sb/i.test(n));
+        const headers = await import('next/headers');
+        const cookieStore = await headers.cookies();
+        const cookieNames = cookieStore.getAll().map((c: any) => c.name);
+        const supabaseCookiePresent = cookieNames.some((n: any) => /supabase|sb/i.test(n));
         console.warn('Unauthorized request - missing user id', { user, userError, cookieNames, supabaseCookiePresent });
       } catch (cookieErr) {
         console.warn('Unauthorized request - missing user id', { user, userError });

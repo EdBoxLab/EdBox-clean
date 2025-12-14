@@ -111,7 +111,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       const itemBatch = await generateFeedBatch(preferences.interests, likedTopics, excludeTypes);
 
       // Persist generated items
-      await persistFeedItems(itemBatch, user.id);
+      await persistFeedItems(itemBatch, user?.id);
 
       // Process items (removed client-side image gen)
       const processedItems = itemBatch.filter(item => item.type !== 'meme');

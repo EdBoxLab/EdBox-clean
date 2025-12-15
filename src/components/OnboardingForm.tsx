@@ -67,17 +67,21 @@ export default function OnboardingForm() {
 
   const handleEducationSelect = (level: string) => {
     setFormData({ ...formData, education: level });
-    // Auto-advance after a brief delay for visual feedback
     setTimeout(() => {
       setStep(3);
     }, 300);
   };
 
-  const handleGoalSelect = (goal: string) => {
-    setFormData({ ...formData, goal });
-    // Auto-submit after selection
+  // 🔥 FIXED: Pass the goal directly instead of relying on state
+  const handleGoalSelect = async (selectedGoal: string) => {
+    if (isSubmitting) return;
+    
+    // Update UI immediately
+    setFormData(prev => ({ ...prev, goal: selectedGoal }));
+    
+    // Submit with the selected goal
     setTimeout(() => {
-      handleSubmit();
+      handleSubmit(selectedGoal);
     }, 300);
   };
 
@@ -89,35 +93,55 @@ export default function OnboardingForm() {
     if (step > 1) setStep(step - 1);
   };
 
-  // 🔥 THIS IS WHERE DATA GETS SENT TO SUPABASE DATABASE 🔥
-  const handleSubmit = async () => {
+  // 🔥 FIXED: Accept goal as parameter with fallback to state
+  const handleSubmit = async (goalToSubmit?: string) => {
     if (!user || isSubmitting) return;
 
-    // Validate before submitting
-    if (!formData.goal) return;
+    const finalGoal = goalToSubmit || formData.goal;
+    if (!finalGoal) return;
 
     setIsSubmitting(true);
 
     try {
-      // THIS UPDATES THE 'profiles' TABLE IN SUPABASE
-      const { error } = await supabase
-        .from('profiles')              // Table name in your Supabase database
-        .update({                      // SQL UPDATE operation
-          country: formData.country,   // Column: country
-          education: formData.education, // Column: education
-          age: parseInt(formData.age, 10), // Column: age (converted to integer)
-          interests: formData.interests,   // Column: interests (array)
-          goal: formData.goal,            // Column: goal
-          onboarding_completed: true,     // Column: onboarding_completed (boolean flag)
-        })
-        .eq('id', user.id);           // WHERE id = user.id (only update this user's row)
+      // Check if profile exists
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
 
-      if (error) {
-        console.error('Error updating profile:', error);
-        alert('Failed to save profile. Please try again.');
+      const profileData = {
+        country: formData.country,
+        education: formData.education,
+        age: parseInt(formData.age, 10),
+        interests: formData.interests,
+        goal: finalGoal, // Use the passed goal
+        onboarding_completed: true,
+      };
+
+      let result;
+
+      if (existingProfile) {
+        result = await supabase
+          .from('profiles')
+          .update(profileData)
+          .eq('id', user.id)
+          .select();
+      } else {
+        result = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            ...profileData
+          })
+          .select();
+      }
+
+      if (result.error) {
+        console.error('Database error:', result.error);
+        alert(`Failed to save profile: ${result.error.message}`);
         setIsSubmitting(false);
       } else {
-        // Successfully saved - redirect to home page
         router.push('/');
       }
     } catch (err) {
@@ -150,7 +174,6 @@ export default function OnboardingForm() {
         <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
 
-      {/* 🔥 FIXED: Added max-h and overflow-y-auto for scrollability */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -166,7 +189,6 @@ export default function OnboardingForm() {
           />
         </div>
 
-        {/* 🔥 FIXED: Made content area scrollable */}
         <div className="p-8 sm:p-12 overflow-y-auto flex-1">
           {/* Header */}
           <div className="text-center mb-8">

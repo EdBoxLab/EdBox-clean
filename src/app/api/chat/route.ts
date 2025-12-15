@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import Groq from 'groq-sdk';
+import pdf from 'pdf-parse';
 
 type ChatRole = 'system' | 'user' | 'assistant';
 
@@ -9,6 +10,20 @@ interface FileAttachment {
   type: string;
   size: number;
   content: string; // base64
+}
+
+interface ProcessedFile {
+  type: 'text' | 'image' | 'pdf' | 'unsupported';
+  content: string;
+  metadata: {
+    name: string;
+    size: number;
+    mimeType: string;
+  };
+  imageData?: {
+    base64: string;
+    mimeType: string;
+  };
 }
 
 interface ChatMessage {
@@ -29,11 +44,77 @@ interface Conversation {
   created_at: string;
 }
 
-// Process file content with proper encoding
-async function processFileContent(file: FileAttachment): Promise<string> {
+// 🔥 NEW: Enhanced file processing with Vision support
+async function processFileContent(file: FileAttachment): Promise<ProcessedFile> {
   try {
     const buffer = Buffer.from(file.content, 'base64');
     
+    // ===== IMAGE FILES (USE VISION API) =====
+    if (file.type.startsWith('image/')) {
+      return {
+        type: 'image',
+        content: `[Image: ${file.name}]`,
+        metadata: {
+          name: file.name,
+          size: file.size,
+          mimeType: file.type,
+        },
+        imageData: {
+          base64: file.content,
+          mimeType: file.type,
+        },
+      };
+    }
+    
+    // ===== PDF FILES (EXTRACT TEXT) =====
+    if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+      try {
+        const pdfData = await pdf(buffer);
+        const text = pdfData.text.trim();
+        
+        if (text && text.length > 50) {
+          // Successfully extracted meaningful text
+          const maxLength = 15000;
+          const truncatedText = text.length > maxLength 
+            ? text.substring(0, maxLength) + '\n\n[... Content truncated ...]'
+            : text;
+          
+          return {
+            type: 'pdf',
+            content: `📕 PDF: ${file.name}\n${'═'.repeat(60)}\n${truncatedText}\n${'═'.repeat(60)}`,
+            metadata: {
+              name: file.name,
+              size: file.size,
+              mimeType: file.type,
+            },
+          };
+        } else {
+          // PDF has minimal text (likely scanned/image-based)
+          return {
+            type: 'pdf',
+            content: `📕 PDF: ${file.name} (${(file.size / 1024).toFixed(2)} KB)\n\nThis PDF appears to be image-based or has minimal text. Text extraction found limited content. If you need help with this PDF, please describe its contents or take screenshots of specific pages.`,
+            metadata: {
+              name: file.name,
+              size: file.size,
+              mimeType: file.type,
+            },
+          };
+        }
+      } catch (pdfError) {
+        console.error('PDF parsing error:', pdfError);
+        return {
+          type: 'pdf',
+          content: `📕 PDF: ${file.name} - Could not extract text. The file may be password-protected, corrupted, or image-based. Please describe what you need help with.`,
+          metadata: {
+            name: file.name,
+            size: file.size,
+            mimeType: file.type,
+          },
+        };
+      }
+    }
+    
+    // ===== TEXT FILES =====
     const isTextFile = 
       file.type.startsWith('text/') ||
       file.type.includes('json') ||
@@ -41,36 +122,15 @@ async function processFileContent(file: FileAttachment): Promise<string> {
       file.type.includes('typescript') ||
       file.type.includes('xml') ||
       file.type.includes('html') ||
-      file.name.endsWith('.txt') ||
-      file.name.endsWith('.js') ||
-      file.name.endsWith('.jsx') ||
-      file.name.endsWith('.ts') ||
-      file.name.endsWith('.tsx') ||
-      file.name.endsWith('.py') ||
-      file.name.endsWith('.java') ||
-      file.name.endsWith('.cpp') ||
-      file.name.endsWith('.c') ||
-      file.name.endsWith('.h') ||
-      file.name.endsWith('.cs') ||
-      file.name.endsWith('.php') ||
-      file.name.endsWith('.rb') ||
-      file.name.endsWith('.go') ||
-      file.name.endsWith('.rs') ||
-      file.name.endsWith('.swift') ||
-      file.name.endsWith('.kt') ||
-      file.name.endsWith('.md') ||
-      file.name.endsWith('.json') ||
-      file.name.endsWith('.xml') ||
-      file.name.endsWith('.yaml') ||
-      file.name.endsWith('.yml') ||
-      file.name.endsWith('.csv') ||
-      file.name.endsWith('.sql') ||
-      file.name.endsWith('.sh') ||
-      file.name.endsWith('.bat');
+      ['.txt', '.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.c', 
+       '.h', '.cs', '.php', '.rb', '.go', '.rs', '.swift', '.kt', '.md', 
+       '.json', '.xml', '.yaml', '.yml', '.csv', '.sql', '.sh', '.bat']
+        .some(ext => file.name.toLowerCase().endsWith(ext));
 
     if (isTextFile) {
       let content = buffer.toString('utf-8');
       
+      // Check for encoding issues
       const replacementChars = (content.match(/�/g) || []).length;
       if (replacementChars > content.length * 0.05) {
         content = buffer.toString('latin1');
@@ -82,30 +142,47 @@ async function processFileContent(file: FileAttachment): Promise<string> {
         .trim();
       
       const maxLength = 12000;
-      if (content.length > maxLength) {
-        return `📄 FILE: ${file.name}\n${'─'.repeat(60)}\n${content.substring(0, maxLength)}\n\n... [Content truncated - showing first ${maxLength} of ${content.length} characters]\n${'─'.repeat(60)}`;
-      }
+      const truncatedContent = content.length > maxLength
+        ? content.substring(0, maxLength) + '\n\n[... Content truncated ...]'
+        : content;
       
-      return `📄 FILE: ${file.name}\n${'─'.repeat(60)}\n${content}\n${'─'.repeat(60)}`;
+      return {
+        type: 'text',
+        content: `📄 FILE: ${file.name}\n${'─'.repeat(60)}\n${truncatedContent}\n${'─'.repeat(60)}`,
+        metadata: {
+          name: file.name,
+          size: file.size,
+          mimeType: file.type,
+        },
+      };
     }
     
-    if (file.type.startsWith('image/')) {
-      return `🖼️ IMAGE FILE: ${file.name} (${(file.size / 1024).toFixed(2)} KB)\nNote: This is an image file. I cannot view images, but I can help if you describe what's in it or what you need help with.`;
-    }
-    
-    if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-      return `📕 PDF FILE: ${file.name} (${(file.size / 1024).toFixed(2)} KB)\nNote: This is a PDF. I cannot extract text from PDFs yet, but I can help if you describe its content or paste relevant sections.`;
-    }
-    
-    return `📎 BINARY FILE: ${file.name} (Type: ${file.type}, Size: ${(file.size / 1024).toFixed(2)} KB)\nNote: This is a binary file that cannot be read as text. Please describe what you need help with.`;
+    // ===== UNSUPPORTED FILES =====
+    return {
+      type: 'unsupported',
+      content: `📎 FILE: ${file.name} (${file.type}, ${(file.size / 1024).toFixed(2)} KB)\nThis file type is not supported for content analysis. Please describe what you need help with.`,
+      metadata: {
+        name: file.name,
+        size: file.size,
+        mimeType: file.type,
+      },
+    };
     
   } catch (err) {
     console.error('Error processing file:', file.name, err);
-    return `❌ ERROR: Unable to read file "${file.name}". The file may be corrupted.`;
+    return {
+      type: 'unsupported',
+      content: `❌ ERROR: Unable to process file "${file.name}"`,
+      metadata: {
+        name: file.name,
+        size: file.size,
+        mimeType: file.type,
+      },
+    };
   }
 }
 
-// 🔥 NEW: GET endpoint to fetch conversations and messages
+// GET endpoint for fetching conversations and messages
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient();
@@ -121,11 +198,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const conversationId = searchParams.get('conversationId');
 
-    // If conversationId provided, fetch messages for that conversation
     if (conversationId) {
-      console.log('📨 Fetching messages for conversation:', conversationId);
-      
-      // Verify user owns this conversation
       const { data: conversation, error: convError } = await supabase
         .from('chat_conversations')
         .select('*')
@@ -134,14 +207,9 @@ export async function GET(req: NextRequest) {
         .single();
 
       if (convError || !conversation) {
-        console.error('❌ Conversation not found or access denied:', convError);
-        return NextResponse.json(
-          { error: 'Conversation not found' },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
       }
 
-      // Fetch all messages for this conversation
       const { data: messages, error: messagesError } = await supabase
         .from('chat_messages')
         .select('*')
@@ -149,14 +217,8 @@ export async function GET(req: NextRequest) {
         .order('created_at', { ascending: true });
 
       if (messagesError) {
-        console.error('❌ Error fetching messages:', messagesError);
-        return NextResponse.json(
-          { error: 'Failed to fetch messages' },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 });
       }
-
-      console.log('✅ Found messages:', messages?.length || 0);
 
       return NextResponse.json({
         conversation,
@@ -164,9 +226,6 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Otherwise, fetch all conversations for the user
-    console.log('📋 Fetching all conversations for user:', user.id);
-    
     const { data: conversations, error: conversationsError } = await supabase
       .from('chat_conversations')
       .select('*')
@@ -175,16 +234,9 @@ export async function GET(req: NextRequest) {
       .limit(50);
 
     if (conversationsError) {
-      console.error('❌ Error fetching conversations:', conversationsError);
-      return NextResponse.json(
-        { error: 'Failed to fetch conversations' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to fetch conversations' }, { status: 500 });
     }
 
-    console.log('✅ Found conversations:', conversations?.length || 0);
-
-    // Optionally, fetch the last message for each conversation
     const conversationsWithLastMessage = await Promise.all(
       (conversations || []).map(async (conv) => {
         const { data: lastMessage } = await supabase
@@ -203,16 +255,11 @@ export async function GET(req: NextRequest) {
       })
     );
 
-    return NextResponse.json({
-      conversations: conversationsWithLastMessage,
-    });
+    return NextResponse.json({ conversations: conversationsWithLastMessage });
     
   } catch (err: any) {
-    console.error('❌ GET error:', err);
-    return NextResponse.json(
-      { error: err.message || 'Server error' },
-      { status: 500 }
-    );
+    console.error('GET error:', err);
+    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
   }
 }
 
@@ -296,22 +343,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Process attachments
+    // 🔥 Process attachments with new system
+    const processedFiles = await Promise.all(
+      attachments.map(file => processFileContent(file))
+    );
+
+    // Separate images from text content
+    const imageFiles = processedFiles.filter(f => f.type === 'image' && f.imageData);
+    const textContent = processedFiles
+      .filter(f => f.type !== 'image')
+      .map(f => f.content)
+      .join('\n\n');
+
+    // Build enhanced message
     let enhancedMessage = message;
-    if (attachments.length > 0) {
-      const fileContents = await Promise.all(
-        attachments.map(file => processFileContent(file))
-      );
-      
-      enhancedMessage = `${message}
-
-${'═'.repeat(70)}
-📎 ATTACHED FILES (${attachments.length})
-${'═'.repeat(70)}
-
-${fileContents.join('\n\n')}
-
-${'═'.repeat(70)}`;
+    if (textContent) {
+      enhancedMessage += `\n\n${'═'.repeat(70)}\n📎 ATTACHED FILES\n${'═'.repeat(70)}\n\n${textContent}\n\n${'═'.repeat(70)}`;
     }
 
     // Save user message
@@ -350,38 +397,43 @@ ${'═'.repeat(70)}`;
     const conversationHistory: Array<{ role: ChatRole; content: string }> = (
       history || []
     ).map((msg: any) => ({
-      role: msg.role as ChatRole,
-      content: String(msg.content || ''),
-    }));
+        role: msg.role as ChatRole,
+        content: String(msg.content || ''),
+      }));
 
-    const systemPrompt = `You are EdBox AI, an intelligent tutoring assistant.
+    // System prompt
+    const systemPrompt = `You are EdBox AI, an intelligent tutoring assistant with advanced capabilities.
 
-🔥 CRITICAL: When users attach text files (code, documents, etc.), the COMPLETE file content is extracted and provided to you as plain text within the user's message. You CAN and MUST read and analyze these files.
+🎯 YOUR CAPABILITIES:
+- ✅ Read and analyze text files (code, documents, data)
+- ✅ View and analyze images (screenshots, diagrams, charts, handwritten notes)
+- ✅ Extract and analyze text from PDFs
+- ✅ Understand code in multiple programming languages
+- ✅ Provide detailed explanations and debugging help
 
-When you see sections marked "📎 ATTACHED FILES" in the user's message:
-- These are NOT external files you can't access
-- The full text content IS ALREADY in the message
-- You MUST read and analyze the file content thoroughly
-- Reference specific parts of the code/text in your response
-- Provide detailed explanations, debugging help, or improvements
+📸 WHEN IMAGES ARE SHARED:
+- Carefully analyze all visual elements
+- Describe what you see
+- Answer questions about the image content
+- Help with code screenshots, diagrams, or handwritten notes
 
-For text files (.txt, .js, .py, .java, .cpp, .html, .css, .json, etc.):
-✅ YOU CAN READ THEM - the content is right there in the message
-✅ Analyze the code/text in detail
-✅ Point out specific lines, errors, or improvements
-✅ Provide code examples and explanations
+📄 WHEN TEXT FILES ARE SHARED:
+- The complete file content is provided as text
+- Analyze code thoroughly
+- Point out specific issues and improvements
+- Provide detailed explanations
 
-For images/PDFs:
-❌ You genuinely cannot view these - ask the user to describe them
+📕 WHEN PDFs ARE SHARED:
+- Text content has been extracted and provided
+- Analyze the content thoroughly
+- Help with understanding and questions
 
-Your teaching approach:
+🎓 YOUR TEACHING APPROACH:
 - Be clear and educational
 - Break down complex topics
-- Provide examples and explanations
+- Provide examples
 - Encourage understanding
-- Be patient and supportive
-
-NEVER say "I cannot read files" when text file content is clearly provided in the message. You CAN read it because it's text in the prompt.`;
+- Be patient and supportive`;
 
     const groqApiKey =
       process.env.GROQ_API_KEY ||
@@ -393,17 +445,55 @@ NEVER say "I cannot read files" when text file content is clearly provided in th
     }
 
     const groq = new Groq({ apiKey: groqApiKey });
-    const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
     let aiResponse: string;
 
     try {
+      // 🔥 CHOOSE MODEL BASED ON CONTENT TYPE
+      const hasImages = imageFiles.length > 0;
+      const model = hasImages 
+        ? 'llama-3.2-90b-vision-preview'  // Use vision model for images
+        : (process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'); // Use text model otherwise
+
+      // 🔥 BUILD MESSAGES ARRAY WITH VISION SUPPORT
+      const messages: any[] = [
+        { role: 'system', content: systemPrompt },
+        ...conversationHistory,
+      ];
+
+      // Add user message with images if present
+      if (hasImages) {
+        const userContent: any[] = [
+          { type: 'text', text: enhancedMessage }
+        ];
+
+        // Add all images
+        for (const imgFile of imageFiles) {
+          if (imgFile.imageData) {
+            userContent.push({
+              type: 'image_url',
+              image_url: {
+                url: `data:${imgFile.imageData.mimeType};base64,${imgFile.imageData.base64}`
+              }
+            });
+          }
+        }
+
+        messages.push({
+          role: 'user',
+          content: userContent
+        });
+      } else {
+        messages.push({
+          role: 'user',
+          content: enhancedMessage
+        });
+      }
+
+      console.log(`🤖 Using model: ${model} (${hasImages ? 'with vision' : 'text only'})`);
+
       const completion = await groq.chat.completions.create({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...conversationHistory,
-          { role: 'user', content: enhancedMessage },
-        ] as any,
+        messages,
         model,
         temperature: 0.7,
         max_tokens: 3000,
@@ -425,21 +515,16 @@ NEVER say "I cannot read files" when text file content is clearly provided in th
     }
 
     // Save AI response
-    const { data: aiMessageData } = await supabase
-      .from('chat_messages')
-      .insert({
-        conversation_id: conversationId,
-        role: 'assistant' as ChatRole,
-        content: aiResponse,
-      })
-      .select('id')
-      .single();
+    await supabase.from('chat_messages').insert({
+      conversation_id: conversationId,
+      role: 'assistant' as ChatRole,
+      content: aiResponse,
+    });
 
     return NextResponse.json({
       conversationId,
       response: aiResponse,
       messageId: userMessageId,
-      aiMessageId: (aiMessageData as any)?.id,
     });
     
   } catch (err: any) {

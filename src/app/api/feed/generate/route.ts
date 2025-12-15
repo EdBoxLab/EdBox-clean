@@ -1,343 +1,375 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
 import Groq from 'groq-sdk';
 import { FeedItem } from '@/types/feed';
 
 // ============= CONFIGURATION =============
 const YOUTUBE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-// Simple Key Pool for Groq if multiple keys exist (reusing your existing pattern simply)
 const GROQ_KEYS = [
     process.env.GROQ_API_KEY_8,
     process.env.GROQ_API_KEY_5,
     process.env.GROQ_API_KEY_7,
 ].filter(Boolean) as string[];
-console.log(GROQ_KEYS);
+
 const getRandomGroqKey = () => GROQ_KEYS[Math.floor(Math.random() * GROQ_KEYS.length)];
 
 // ============= YOUTUBE SEARCH =============
 
-async function searchYouTubeVideos(query: string, limit = 4): Promise<any[]> {
+async function searchYouTubeVideos(query: string, limit = 3): Promise<any[]> {
+    // Disable YouTube search to conserve API quota
+    // You can re-enable when quota resets (midnight Pacific Time)
+    console.log('⚠️  YouTube search disabled - quota exceeded');
+    return [];
+    
+    /* Uncomment when quota resets:
     if (!YOUTUBE_API_KEY) {
-        console.warn("❌ No YouTube API Key configured; returning mock shorts for UI fallback");
-        // Return mock shorts so UI still has video content when API key is missing
-        return Array.from({ length: limit }).map((_, idx) => ({
-            id: `mock_${idx}`,
-            title: `${query} (sample short)`,
-            description: `Sample short about ${query}`,
-            thumbnail: `https://via.placeholder.com/480x360?text=Short+${idx+1}`
-        }));
+        console.warn("No YouTube API Key configured");
+        return [];
     }
 
     try {
-        // Search for shorts specifically by adding duration filter and shorts-related terms
-        const shortsQuery = `${query} #shorts short video under 60 seconds`;
+        const shortsQuery = `${query} #shorts educational`;
         const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(shortsQuery)}&type=video&maxResults=${limit}&videoDuration=short&key=${YOUTUBE_API_KEY}`;
+        
+        console.log('🔍 Searching YouTube:', shortsQuery);
         const response = await fetch(url);
+        
+        if (!response.ok) {
+            console.error('YouTube API error:', response.status, await response.text());
+            return [];
+        }
+        
         const data = await response.json();
 
-        if (!data.items) return [];
+        if (data.error) {
+            console.error('YouTube API error:', data.error);
+            return [];
+        }
 
-        // Normalize various shapes of YouTube API responses
+        if (!data.items || data.items.length === 0) {
+            console.warn('No YouTube results found');
+            return [];
+        }
+
         const results: any[] = [];
         for (const item of data.items) {
-            // Typical shape: { id: { videoId: 'abc' }, snippet: {...} }
-            const videoId = item?.id?.videoId || (typeof item.id === 'string' ? item.id : undefined) || item?.snippet?.resourceId?.videoId;
-            if (!videoId) continue; // skip non-video results
+            const videoId = item?.id?.videoId;
+            if (!videoId) continue;
 
             results.push({
                 id: videoId,
-                title: item.snippet?.title || `YouTube short ${videoId}`,
+                title: item.snippet?.title || `YouTube short`,
                 description: item.snippet?.description || '',
                 thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || ''
             });
         }
 
-        console.log(`YouTube search returned ${results.length} shorts for query: ${query}`);
+        console.log(`✅ YouTube returned ${results.length} shorts`);
         return results;
     } catch (error) {
         console.error("YouTube Search Error:", error);
         return [];
     }
+    */
 }
-
-export { searchYouTubeVideos };
 
 // ============= GROQ GENERATION =============
 
-async function generateFeedWithGroq(interests: string[], likedTopics: string[], excludeTypes: string[] = []): Promise<FeedItem[]> {
+async function generateFeedWithGroq(interests: string[], likedTopics: string[]): Promise<FeedItem[]> {
     const apiKey = getRandomGroqKey();
-    if (!apiKey) throw new Error("No Groq API Keys available");
+    if (!apiKey) {
+        console.warn("No Groq API Keys available");
+        return createFallbackFeed(interests);
+    }
 
     const groq = new Groq({ apiKey });
-
-    // Mix interests and liked topics, prioritizing liked ones slightly
-    const focusTopics = [...interests, ...likedTopics].slice(0, 5);
+    const focusTopics = [...new Set([...likedTopics, ...interests])].slice(0, 5);
     
-    // Define available content types
-    const allTypes: string[] = ['quiz', 'article', 'fact', 'challenge', 'story'];
-    const availableTypes = allTypes.filter(type => !excludeTypes.includes(type));
-    
-    // Generate 8 diverse types, ensuring no duplicates within this batch
-    const selectedTypes: string[] = [];
-    while (selectedTypes.length < 8 && availableTypes.length > 0) {
-        // First pass: add each type once
-        if (selectedTypes.length < availableTypes.length) {
-            selectedTypes.push(availableTypes[selectedTypes.length]);
-        } else {
-            // Second pass: add remaining types randomly
-            const randomType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
-            selectedTypes.push(randomType);
-        }
+    if (focusTopics.length === 0) {
+        focusTopics.push('science', 'technology', 'history');
     }
 
-    const prompt = `
-    Generate 8 diverse, safe, educational feed items for a user interested in: ${focusTopics.join(', ')}.
+    const prompt = `Create 7 educational feed items about: ${focusTopics.join(', ')}.
 
-    Requirements:
-    - Return a single top-level JSON array of exactly 8 objects (no extra text).
-    - Each object must include: id, type, topic, title, xp_reward, theme, likes, likedByUser, shares, comments (array), genie_reaction
-    - Valid types: 'quiz','article','fact','challenge','story'. Ensure 'type' exactly matches one of these.
+Return a JSON array with these exact structures:
 
-    Provide the simplest valid JSON possible. Example object for an 'article':
-    {"id":"article_001","type":"article","topic":"${focusTopics[0] || 'general'}","title":"Short article","xp_reward":100,"theme":"blue-gradient","likes":5,"likedByUser":false,"shares":0,"comments":[],"summary":"1-2 sentence summary","full_article_content":"Paragraph 1. Paragraph 2.","visualPrompt":"background image prompt"}
+QUIZ example:
+{
+  "id": "quiz_1",
+  "type": "quiz",
+  "topic": "${focusTopics[0]}",
+  "title": "Test Your Knowledge",
+  "question": "What is photosynthesis?",
+  "options": [
+    "Process plants use to make food from sunlight",
+    "How animals digest food",
+    "The water cycle in nature",
+    "Rock formation process"
+  ],
+  "correctIndex": 0,
+  "explanation": "Photosynthesis is how plants convert light energy into chemical energy.",
+  "xp_reward": 100
+}
 
-    If you cannot comply, return an empty array []
-    `;
+ARTICLE example:
+{
+  "id": "article_1",
+  "type": "article",
+  "topic": "${focusTopics[1] || focusTopics[0]}",
+  "title": "Understanding Quantum Physics",
+  "summary": "A brief introduction to the fascinating world of quantum mechanics.",
+  "full_article_content": "Quantum physics is the study of matter and energy at the smallest scales. At the quantum level, particles behave in ways that seem impossible in our everyday world. For example, a particle can be in two places at once, a phenomenon called superposition. Another strange quantum property is entanglement, where two particles can be connected across vast distances. These principles are the foundation of modern technology including computers, lasers, and MRI machines. Understanding quantum physics helps us grasp the fundamental nature of reality itself.",
+  "xp_reward": 150
+}
 
-    // Prefer configured model, fall back to supported defaults if decommissioned
-    const preferredModel = process.env.GROQ_MODEL || 'meta-llama/llama-guard-4-12b';
+FACT example:
+{
+  "id": "fact_1",
+  "type": "fact",
+  "topic": "${focusTopics[2] || focusTopics[0]}",
+  "title": "Amazing Discovery",
+  "explanation": "The human brain contains approximately 86 billion neurons, each forming thousands of connections with other neurons. This creates a network more complex than any computer ever built. Your brain uses about 20% of your body's energy despite being only 2% of your body weight. Every time you learn something new, your brain physically changes by forming new neural pathways.",
+  "xp_reward": 75
+}
 
-        try {
-            const completion = await groq.chat.completions.create({
-                messages: [{ role: 'user', content: prompt }],
-                model: preferredModel,
-                temperature: 0.6,
-                max_tokens: 1200,
-                response_format: { type: 'json_object' }
-            });
+CHALLENGE example:
+{
+  "id": "challenge_1",
+  "type": "challenge",
+  "topic": "${focusTopics[3] || focusTopics[0]}",
+  "title": "Solve This Problem",
+  "question": "If you have a 5-liter jug and a 3-liter jug, how can you measure exactly 4 liters of water?",
+  "answer": "1. Fill the 5L jug completely. 2. Pour from 5L into 3L jug (5L jug now has 2L). 3. Empty the 3L jug. 4. Pour the 2L from 5L jug into 3L jug. 5. Fill the 5L jug again. 6. Pour from 5L into 3L jug until 3L is full (this takes 1L). 7. The 5L jug now contains exactly 4L.",
+  "time_limit": 120,
+  "xp_reward": 200
+}
 
-            const raw = completion.choices[0]?.message?.content;
-            if (!raw) return [];
+STORY example:
+{
+  "id": "story_1",
+  "type": "story",
+  "topic": "${focusTopics[4] || focusTopics[0]}",
+  "title": "Journey Through Time",
+  "slides": [
+    {"text": "In the year 2150, humanity discovered a way to travel through time."},
+    {"text": "The first expedition went back to observe the construction of the pyramids."},
+    {"text": "What they found changed our understanding of ancient civilizations forever."},
+    {"text": "The ancient Egyptians had help from an unexpected source - future humans teaching them advanced mathematics."},
+    {"text": "This created a time loop that ensured humanity's survival through the ages."}
+  ],
+  "xp_reward": 125
+}
 
-            // Try strict parse, then try to extract JSON bracketed substring if needed
-            let parsed: any;
-            try {
-                parsed = JSON.parse(raw);
-            } catch (parseErr) {
-                // Attempt to extract first JSON array in the string
-                const match = raw.match(/\[([\s\S]*?)\]/m);
-                if (match) {
-                    try {
-                        parsed = JSON.parse(match[0]);
-                    } catch (innerErr) {
-                        parsed = null;
-                    }
-                }
-            }
+Generate 7 items with diverse types. Each item needs ALL required fields with real, educational content. Return ONLY the JSON array.`;
 
-            const items = Array.isArray(parsed) ? parsed : (parsed?.items || parsed?.feed || []);
+    try {
+        const completion = await groq.chat.completions.create({
+            messages: [{ role: 'user', content: prompt }],
+            model: 'llama-3.1-8b-instant',
+            temperature: 0.8,
+            max_tokens: 3000,
+        });
 
-            // Validate and normalize items
-            const allowedTypes = new Set(['quiz', 'article', 'fact', 'challenge', 'story']);
-            const normalized: FeedItem[] = (items || []).map((it: any, idx: number) => {
-                const type = allowedTypes.has(it.type) ? it.type : (selectedTypes[idx] || 'article');
-                const topic = it.topic || focusTopics[idx % focusTopics.length] || 'general';
+        const raw = completion.choices[0]?.message?.content?.trim();
+        if (!raw) return createFallbackFeed(interests);
 
-                // Provide minimal defaults for type-specific fields
-                const options = Array.isArray(it.options) && it.options.length === 4 ? it.options : ['A', 'B', 'C', 'D'];
-                const answer = it.answer || options[0];
-                const correctIndex = typeof it.correctIndex === 'number' ? it.correctIndex : options.indexOf(answer);
-                const summary = it.summary || (typeof it.full_article_content === 'string' ? it.full_article_content.split('. ')[0] : undefined) || `Short summary about ${topic}.`;
-
-                const base: FeedItem = {
-                    id: it.id || `${type}_${Date.now()}_${idx}`,
-                    type: type as any,
-                    topic,
-                    title: it.title || `${type} about ${topic}`,
-                    xp_reward: typeof it.xp_reward === 'number' ? it.xp_reward : 100,
-                    genie_reaction: it.genie_reaction || 'wink',
-                    theme: it.theme || 'purple-gradient',
-                    likedByUser: !!it.likedByUser,
-                    likes: typeof it.likes === 'number' ? it.likes : 0,
-                    shares: typeof it.shares === 'number' ? it.shares : 0,
-                    comments: Array.isArray(it.comments) ? it.comments : [],
-                } as FeedItem;
-
-                // Attach type-specific normalized fields
-                if (type === 'article') {
-                    (base as any).summary = summary;
-                    (base as any).full_article_content = it.full_article_content || `${summary} (more content not available)`;
-                }
-
-                if (type === 'fact') {
-                    (base as any).explanation = it.explanation || `A concise explanation about ${topic}.`;
-                }
-
-                if (type === 'quiz') {
-                    (base as any).question = it.question || `Quick ${topic} question`;
-                    (base as any).options = options;
-                    (base as any).answer = answer;
-                    (base as any).correctIndex = typeof correctIndex === 'number' && correctIndex >= 0 ? correctIndex : 0;
-                    (base as any).explanation = it.explanation || 'Explanation not provided.';
-                }
-
-                if (type === 'challenge') {
-                    (base as any).question = it.question || `Challenge: ${topic}`;
-                    (base as any).answer = it.answer || 'Solution not provided.';
-                    (base as any).time_limit = typeof it.time_limit === 'number' ? it.time_limit : 60;
-                }
-
-                if (type === 'story') {
-                    (base as any).slides = Array.isArray(it.slides) && it.slides.length > 0 ? it.slides : [{ text: summary }];
-                }
-
-                // Template hint for frontend
-                (base as any).template = `${type}-template`;
-
-                return base;
-            });
-
-            // If normalized is empty, fall through to fallback generation
-            if (normalized.length > 0) return normalized;
-
-        } catch (err: any) {
-            // If model was decommissioned, retry with a safe fallback
-            const isModelDecommissioned = err?.message?.includes('decommissioned') || err?.error?.code === 'model_decommissioned';
-            if (isModelDecommissioned) {
-                console.warn('Groq model decommissioned; retrying with fallback model llama-3.1-8b-instant');
-                try {
-                    const completion = await groq.chat.completions.create({
-                        messages: [{ role: 'user', content: prompt }],
-                        model: 'llama-3.1-8b-instant',
-                        temperature: 0.6,
-                        max_tokens: 1200,
-                        response_format: { type: 'json_object' }
-                    });
-
-                    const raw = completion.choices[0]?.message?.content;
-                    if (raw) {
-                        try {
-                            const parsed = JSON.parse(raw);
-                            const items = Array.isArray(parsed) ? parsed : (parsed?.items || parsed?.feed || []);
-                            if (items && items.length) return items;
-                        } catch (e) {
-                            // ignore and fall through
-                        }
-                    }
-                } catch (fallbackErr) {
-                    console.error('Groq fallback model also failed:', fallbackErr);
-                }
-            }
-
-            console.error('Groq Gen Error:', err);
+        // Extract JSON array
+        let jsonStr = raw;
+        const arrayMatch = raw.match(/\[[\s\S]*\]/);
+        if (arrayMatch) {
+            jsonStr = arrayMatch[0];
         }
 
-        // Final fallback: deterministic generation when Groq fails to produce valid items
-        console.warn('Falling back to deterministic generator using interests');
-        const fallbackTypes: string[] = ['quiz', 'article', 'fact', 'challenge', 'story'];
-        const generated: FeedItem[] = [];
-        for (let i = 0; i < 8; i++) {
-            const type = fallbackTypes[i % fallbackTypes.length];
-            const topic = interests[i % Math.max(1, interests.length)] || 'general';
-            generated.push({
-                id: `det_${type}_${i}`,
-                type: type as any,
-                topic,
-                title: `${type.charAt(0).toUpperCase() + type.slice(1)}: Quick ${topic} insight #${i + 1}`,
-                xp_reward: 50 + (i * 5),
-                genie_reaction: 'wink' as any,
-                theme: 'purple-gradient' as any,
+        const parsed = JSON.parse(jsonStr);
+        const items = Array.isArray(parsed) ? parsed : [];
+
+        if (items.length === 0) return createFallbackFeed(interests);
+
+        // Normalize items with guaranteed unique IDs
+        const timestamp = Date.now();
+        const normalized: FeedItem[] = items.map((item, idx) => {
+            const validTypes = ['quiz', 'article', 'fact', 'challenge', 'story'];
+            const type = validTypes.includes(item.type) ? item.type : 'article';
+            
+            // Generate truly unique ID using timestamp + random + index
+            const uniqueId = `${type}_${timestamp}_${Math.random().toString(36).substr(2, 9)}_${idx}`;
+            
+            const base: any = {
+                id: uniqueId,
+                type,
+                topic: item.topic || focusTopics[idx % focusTopics.length] || 'general',
+                title: item.title || `Learn about ${item.topic}`,
+                xp_reward: item.xp_reward || 100,
+                genie_reaction: 'wink',
+                theme: 'purple-gradient',
                 likedByUser: false,
-                likes: 0,
-                shares: 0,
+                likes: Math.floor(Math.random() * 50),
+                shares: Math.floor(Math.random() * 20),
                 comments: [],
-                // Type-specific shallow fields
-                summary: type === 'article' ? `Short summary about ${topic}.` : undefined,
-                explanation: type === 'fact' ? `A concise explanation about ${topic}.` : undefined,
-                question: type === 'quiz' || type === 'challenge' ? `Solve this ${topic} problem.` : undefined,
-                slides: type === 'story' ? [{ text: `A quick slide about ${topic}.` }] : undefined,
-            } as any);
-        }
+            };
 
-        return generated;
+            // Add type-specific fields with validation
+            if (type === 'quiz') {
+                base.question = item.question || 'Quiz question';
+                base.options = Array.isArray(item.options) && item.options.length === 4 
+                    ? item.options 
+                    : ['Option 1', 'Option 2', 'Option 3', 'Option 4'];
+                base.correctIndex = typeof item.correctIndex === 'number' ? item.correctIndex : 0;
+                base.explanation = item.explanation || 'This is the correct answer.';
+            } else if (type === 'article') {
+                base.summary = item.summary || item.title || 'Article summary';
+                base.full_article_content = item.full_article_content || item.summary || 'Article content not available.';
+            } else if (type === 'fact') {
+                base.explanation = item.explanation || 'Interesting fact.';
+            } else if (type === 'challenge') {
+                base.question = item.question || 'Challenge question';
+                base.answer = item.answer || 'Challenge answer';
+                base.time_limit = item.time_limit || 60;
+            } else if (type === 'story') {
+                // Stories: only text content, no background images
+                base.slides = Array.isArray(item.slides) && item.slides.length > 0
+                    ? item.slides.map((slide: any) => ({ 
+                        text: slide.text || slide 
+                        // Removed any image/visualPrompt/background fields
+                      }))
+                    : [{ text: item.title || 'Story content' }];
+            }
+
+            return base as FeedItem;
+        });
+
+        console.log(`✅ Groq generated ${normalized.length} items`);
+        return normalized;
+
+    } catch (error: any) {
+        console.error('Groq Generation Error:', error?.message);
+        return createFallbackFeed(interests);
     }
+}
+
+// ============= FALLBACK GENERATOR =============
+
+function createFallbackFeed(interests: string[]): FeedItem[] {
+    const topics = interests.length > 0 ? interests.slice(0, 3) : ['science', 'technology', 'history'];
+    const timestamp = Date.now();
+    
+    return [
+        {
+            id: `fallback_quiz_${timestamp}_${Math.random().toString(36).substr(2, 9)}`,
+            type: 'quiz',
+            topic: topics[0],
+            title: `Quick ${topics[0]} Quiz`,
+            question: `What is an important concept in ${topics[0]}?`,
+            options: [
+                'The fundamental principle',
+                'An alternative theory',
+                'A common misconception',
+                'An outdated idea'
+            ],
+            correctIndex: 0,
+            explanation: 'The fundamental principle is the most important concept to understand.',
+            xp_reward: 100,
+            genie_reaction: 'wink',
+            theme: 'purple-gradient',
+            likedByUser: false,
+            likes: 10,
+            shares: 2,
+            comments: [],
+        } as any,
+        {
+            id: `fallback_article_${timestamp}_${Math.random().toString(36).substr(2, 9)}`,
+            type: 'article',
+            topic: topics[1] || topics[0],
+            title: `Introduction to ${topics[1] || topics[0]}`,
+            summary: `Learn the basics of ${topics[1] || topics[0]} in this comprehensive guide.`,
+            full_article_content: `${topics[1] || topics[0]} is a fascinating subject that impacts our daily lives in many ways. Understanding its principles helps us make better decisions and appreciate the world around us. This article explores the key concepts and provides practical insights you can apply immediately. From historical context to modern applications, we'll cover everything you need to know to get started with ${topics[1] || topics[0]}.`,
+            xp_reward: 150,
+            genie_reaction: 'wink',
+            theme: 'blue-gradient',
+            likedByUser: false,
+            likes: 25,
+            shares: 5,
+            comments: [],
+        } as any,
+        {
+            id: `fallback_fact_${timestamp}_${Math.random().toString(36).substr(2, 9)}`,
+            type: 'fact',
+            topic: topics[2] || topics[0],
+            title: `Did You Know?`,
+            explanation: `Here's an interesting fact about ${topics[2] || topics[0]}: It has been studied for centuries and continues to reveal new insights that shape our understanding of the world. Scientists and researchers are constantly making new discoveries that challenge what we thought we knew.`,
+            xp_reward: 75,
+            genie_reaction: 'wink',
+            theme: 'green-gradient',
+            likedByUser: false,
+            likes: 15,
+            shares: 3,
+            comments: [],
+        } as any,
+    ];
+}
 
 // ============= MAIN HANDLER =============
 
 export const POST = async (request: NextRequest) => {
     try {
         const body = await request.json();
-        const { interests = [], likedTopics = [], excludeTypes = [] } = body;
+        const { interests = [], likedTopics = [] } = body;
 
-        console.log('Generating feed for:', interests.length, 'interests', 'excluding:', excludeTypes);
+        console.log('🔄 Generating feed for:', interests.length, 'interests');
 
-        // 1. Generate text content via Groq
-        const textItems = await generateFeedWithGroq(interests, likedTopics, excludeTypes);
+        // 1. Generate text content
+        const textItems = await generateFeedWithGroq(interests, likedTopics);
 
-        // 2. Add YouTube Shorts only (no regular videos)
+        // 2. Add YouTube Shorts (max 3)
         const videoItems: FeedItem[] = [];
-        if (interests.length > 0) {
-            const shortsQuery = `${interests[0]} shorts quick facts tutorial`;
-            const shorts = await searchYouTubeVideos(shortsQuery, 4); // Get up to 4 shorts to include in feed
+        if (interests.length > 0 && YOUTUBE_API_KEY) {
+            const shorts = await searchYouTubeVideos(interests[0], 3);
             
-            // Deduplicate and include valid results
-            const seenShorts = new Set<string>();
-            shorts.forEach((s) => {
-                if (!s || !s.id || seenShorts.has(s.id)) return;
-                seenShorts.add(s.id);
+            shorts.forEach((s, idx) => {
+                if (!s?.id) return;
+                
                 videoItems.push({
-                    id: `short_${s.id}`,
+                    id: `video_${s.id}_${idx}`,
                     type: 'video',
-                    topic: interests[0] || 'general',
-                    title: `${s.title.length > 60 ? s.title.substring(0, 57) + '...' : s.title}`,
+                    topic: interests[0],
+                    title: s.title.length > 60 ? s.title.substring(0, 57) + '...' : s.title,
                     xp_reward: 75,
                     genie_reaction: 'cheer',
                     theme: 'orange-gradient',
                     likedByUser: false,
-                    likes: Math.floor(Math.random() * 200),
-                    shares: Math.floor(Math.random() * 50),
+                    likes: Math.floor(Math.random() * 100) + 10,
+                    shares: Math.floor(Math.random() * 20),
                     comments: [],
-                    script: (s.description || '').substring(0, 150) + '...',
-                    visualPrompt: 'short_form_content',
+                    script: (s.description || 'Educational YouTube short').substring(0, 150),
+                    visualPrompt: 'youtube_short',
                     imageUrl: s.thumbnail,
                     video_url: `https://www.youtube.com/embed/${s.id}`
                 } as any);
             });
+            
+            console.log(`✅ Added ${videoItems.length} YouTube shorts`);
+        } else if (!YOUTUBE_API_KEY) {
+            console.warn('⚠️  YouTube API key not configured - skipping video search');
         }
 
-        console.log(`Added ${videoItems.length} video items to feed for interests: ${interests.slice(0,1).join(',')}`);
+        // 3. Combine and shuffle (take 10 items max)
+        let finalFeed = [...textItems, ...videoItems]
+            .slice(0, 10)
+            .sort(() => Math.random() - 0.5);
 
-        // 3. Combine to make exactly 10 items and shuffle for variety
-        let finalFeed = [...textItems, ...videoItems].slice(0, 10).sort(() => Math.random() - 0.5);
+        console.log(`✅ Final feed: ${finalFeed.length} items (${textItems.length} text, ${videoItems.length} videos)`);
 
-        // If generation failed and no videos found, return small fallback content to avoid repeated reloads
-        if (finalFeed.length === 0) {
-            console.warn('Feed generation returned no items; returning fallback content');
-            const fallback = (interests.length ? interests : ['general']).slice(0, 3).map((t: string, i: number) => ({
-                id: `fallback_${i}`,
-                type: 'article',
-                topic: t,
-                title: `Quick fact about ${t}`,
-                xp_reward: 50,
-                genie_reaction: 'wink',
-                theme: 'blue-gradient',
-                likedByUser: false,
-                likes: 0,
-                shares: 0,
-                comments: [],
-                summary: `A short, fallback fact about ${t}.`,
-                full_article_content: `Fallback content for ${t}. This is placeholder text.`
-            } as any));
-
-            finalFeed = fallback;
-        }
-
-        return NextResponse.json(finalFeed);
+        return NextResponse.json(finalFeed, {
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+            }
+        });
 
     } catch (error: any) {
         console.error('❌ Feed Generation Failed:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        
+        // Return minimal fallback instead of error
+        const fallback = createFallbackFeed(['science', 'technology']);
+        return NextResponse.json(fallback);
     }
 }

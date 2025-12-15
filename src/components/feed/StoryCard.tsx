@@ -1,7 +1,5 @@
-
 import React, { useState } from 'react';
 import type { StoryFeedItem } from '@/types/feed';
-import { CardImage } from './CardImage';
 import { ChevronLeftIcon, ChevronRightIcon, FinishIcon } from './MediaIcons';
 
 interface StoryCardProps {
@@ -28,6 +26,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({ item, onSwipe }) => {
     };
 
     const slide = item.slides[currentSlide];
+    const slideText = typeof slide === 'string' ? slide : slide.text;
 
     return (
         <div className="w-full h-full flex flex-col items-center justify-center relative text-white px-2 sm:px-4">
@@ -45,29 +44,30 @@ export const StoryCard: React.FC<StoryCardProps> = ({ item, onSwipe }) => {
                 ))}
             </div>
 
-            <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-3 sm:mb-4 z-20 px-2 sm:px-4 text-center drop-shadow-lg">{item.title}</h2>
+            <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-3 sm:mb-4 z-20 px-2 sm:px-4 text-center">{item.title}</h2>
 
-            {/* Image Container with Navigation */}
-            <div className="relative w-full max-w-[90%] sm:max-w-[320px] aspect-[9/16] bg-gray-900 rounded-2xl shadow-lg overflow-hidden flex items-center justify-center group">
-                <CardImage
-                    generationState={slide.imageGenerationState}
-                    imageUrl={slide.image_url}
-                    altText={`Slide ${currentSlide + 1} for ${item.title}`}
-                />
+            {/* Text Content Container (no images) */}
+            <div className="relative w-full max-w-[90%] sm:max-w-2xl bg-gradient-to-br from-purple-900/50 to-indigo-900/50 rounded-2xl shadow-lg p-6 sm:p-8 flex items-center justify-center group border border-purple-500/20">
+                {/* Story Text */}
+                <div className="text-center">
+                    <p className="text-base sm:text-lg md:text-xl leading-relaxed text-gray-100">
+                        {slideText}
+                    </p>
+                </div>
 
                 {/* Navigation Overlays */}
-                {currentSlide > 0 &&
+                {currentSlide > 0 && (
                     <div
-                        className="absolute left-0 top-0 h-full w-1/2 z-10"
+                        className="absolute left-0 top-0 h-full w-1/3 z-10 cursor-pointer"
                         onClick={handlePrev}
                         onMouseDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
                         role="button"
                         aria-label="Previous slide"
                     />
-                }
+                )}
                 <div
-                    className="absolute right-0 top-0 h-full w-1/2 z-10"
+                    className="absolute right-0 top-0 h-full w-1/3 z-10 cursor-pointer"
                     onClick={handleNext}
                     onMouseDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
@@ -77,18 +77,18 @@ export const StoryCard: React.FC<StoryCardProps> = ({ item, onSwipe }) => {
 
                 {/* Navigation Icons (visible on hover/active) */}
                 {currentSlide > 0 && (
-                    <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20 p-2 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-3 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                         <ChevronLeftIcon />
                     </div>
                 )}
 
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20 p-2 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-3 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                     {isLastSlide ? <FinishIcon /> : <ChevronRightIcon />}
                 </div>
             </div>
 
-            <p className="mt-3 sm:mt-4 text-gray-300 text-xs sm:text-sm h-5 z-20">
-                {isLastSlide ? 'Tap right to finish!' : `${currentSlide + 1} / ${totalSlides}`}
+            <p className="mt-3 sm:mt-4 text-gray-400 text-xs sm:text-sm z-20">
+                {isLastSlide ? 'Tap right to finish! 🎉' : `${currentSlide + 1} / ${totalSlides}`}
             </p>
         </div>
     );

@@ -43,6 +43,8 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        e.stopPropagation();
+        
         if (answered) return;
         if (timerRef.current) clearInterval(timerRef.current);
 
@@ -58,7 +60,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
 
         setTimeout(() => {
             onSwipe(item.id, 'answered');
-        }, 1500); // Delay to show result and answer
+        }, 1500);
     };
 
     const getTimerColor = () => {
@@ -75,13 +77,11 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
 
     return (
         <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden">
-            {/* Background Effects */}
             <div className="absolute inset-0 bg-gradient-to-br from-orange-900/20 via-transparent to-red-900/20" />
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 animate-pulse" />
             
             <Confetti isFiring={isCorrect === true} />
 
-            {/* Header with Challenge Icon and Timer */}
             <motion.div 
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -113,7 +113,6 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                 </motion.div>
             </motion.div>
 
-            {/* Title */}
             <motion.h2 
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -123,7 +122,6 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                 {item.title}
             </motion.h2>
 
-            {/* Image */}
             {item.imageGenerationState && (
                 <motion.div 
                     initial={{ scale: 0.8, opacity: 0 }}
@@ -139,7 +137,6 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                 </motion.div>
             )}
 
-            {/* Question */}
             <motion.p 
                 initial={{ y: 30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -149,12 +146,14 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                 {item.question}
             </motion.p>
 
-            {/* Input Form */}
             <motion.form 
                 initial={{ y: 40, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.6 }}
-                onSubmit={handleSubmit} 
+                onSubmit={handleSubmit}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 className="w-full max-w-sm"
             >
                 <div className="relative">
@@ -162,6 +161,9 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                         type="text"
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
                         disabled={answered}
                         placeholder="Type your answer..."
                         className={`w-full p-4 bg-black/40 backdrop-blur-sm border-2 rounded-xl text-white placeholder-gray-400 focus:outline-none transition-all duration-200 ${getBorderColor()}`}
@@ -169,6 +171,9 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                     <motion.button
                         type="submit"
                         disabled={answered || !inputValue.trim()}
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
                         whileHover={{ scale: answered ? 1 : 1.05 }}
                         whileTap={{ scale: answered ? 1 : 0.95 }}
                         className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 disabled:from-gray-600 disabled:to-gray-600 rounded-lg transition-all duration-200 disabled:cursor-not-allowed"
@@ -178,7 +183,6 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                 </div>
             </motion.form>
 
-            {/* XP Reward */}
             <motion.div 
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -189,7 +193,6 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                 <span className="text-yellow-400 font-bold text-sm">{item.xp_reward} XP</span>
             </motion.div>
 
-            {/* Result Display */}
             <AnimatePresence>
                 {answered && (
                     <motion.div

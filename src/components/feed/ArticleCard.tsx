@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import type { ArticleFeedItem, AudioGenerationState } from '@/types/feed';
 import { BookOpenIcon, BookmarkIcon, ListenIcon, PauseIcon, SpinnerIcon, VideoErrorIcon } from './MediaIcons';
@@ -18,7 +17,6 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
     const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
 
-    // Cleanup audio on component unmount
     useEffect(() => {
         return () => {
             if (audioSourceRef.current) {
@@ -30,9 +28,9 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
         };
     }, []);
 
-
-    const handleListenClick = () => {
-        // Stop playing
+    const handleListenClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        
         if (isPlaying) {
             audioSourceRef.current?.stop();
             audioSourceRef.current = null;
@@ -40,16 +38,13 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
             return;
         }
 
-        // Generate audio if not available
         if (!audioState || audioState.state === 'idle' || audioState.state === 'error') {
             onGenerateAudio();
             return;
         }
 
-        // Play audio if ready
         if (audioState.state === 'ready' && audioState.buffer) {
             if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-                // FIX: Cast window to `any` to support `webkitAudioContext` for older browsers without TypeScript errors.
                 audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
             }
             const source = audioContextRef.current.createBufferSource();
@@ -67,25 +62,17 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
 
     const renderListenButtonIcon = () => {
         const state = audioState?.state;
-        if (state === 'generating') {
-            return <SpinnerIcon />;
-        }
-        if (state === 'error') {
-            return <VideoErrorIcon />;
-        }
-        if (isPlaying) {
-            return <PauseIcon />;
-        }
+        if (state === 'generating') return <SpinnerIcon />;
+        if (state === 'error') return <VideoErrorIcon />;
+        if (isPlaying) return <PauseIcon />;
         return <ListenIcon />;
     };
 
     return (
         <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden">
-            {/* Background Effects */}
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 via-transparent to-purple-900/20" />
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
             
-            {/* Article Header */}
             <motion.div 
                 initial={{ y: -30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -106,7 +93,6 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
                 </div>
             </motion.div>
 
-            {/* Image */}
             {item.imageGenerationState && (
                 <motion.div 
                     initial={{ scale: 0.8, opacity: 0 }}
@@ -122,7 +108,6 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
                 </motion.div>
             )}
 
-            {/* Title */}
             <motion.h2 
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -132,7 +117,6 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
                 {item.title}
             </motion.h2>
 
-            {/* Summary */}
             <motion.div
                 initial={{ y: 30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -146,7 +130,6 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
                 </div>
             </motion.div>
 
-            {/* Action Buttons */}
             <motion.div 
                 initial={{ y: 40, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -156,8 +139,13 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
                 <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => onViewArticle(item)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-indigo-500/25"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onViewArticle(item);
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-indigo-500/25 cursor-pointer"
                 >
                     <BookOpenIcon />
                     <span>Read Full Article</span>
@@ -167,15 +155,16 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleListenClick}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
                     disabled={audioState?.state === 'generating'}
-                    className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600/20 to-pink-600/20 hover:from-purple-600/30 hover:to-pink-600/30 border border-purple-400/30 text-purple-300 font-semibold py-3 px-4 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-wait"
+                    className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600/20 to-pink-600/20 hover:from-purple-600/30 hover:to-pink-600/30 border border-purple-400/30 text-purple-300 font-semibold py-3 px-4 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-wait cursor-pointer"
                 >
                     {renderListenButtonIcon()}
                     <span className="hidden sm:inline">{isPlaying ? 'Stop' : 'Listen'}</span>
                 </motion.button>
             </motion.div>
 
-            {/* Bottom Actions */}
             <motion.div 
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -186,7 +175,10 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
                     <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        className="p-2 bg-indigo-500/20 hover:bg-indigo-500/30 rounded-full transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        className="p-2 bg-indigo-500/20 hover:bg-indigo-500/30 rounded-full transition-colors cursor-pointer"
                     >
                         <Bookmark className="w-4 h-4 text-indigo-400" />
                     </motion.button>
@@ -194,7 +186,10 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
                     <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        className="p-2 bg-purple-500/20 hover:bg-purple-500/30 rounded-full transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        className="p-2 bg-purple-500/20 hover:bg-purple-500/30 rounded-full transition-colors cursor-pointer"
                     >
                         <Share2 className="w-4 h-4 text-purple-400" />
                     </motion.button>
@@ -206,7 +201,6 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
                 </div>
             </motion.div>
 
-            {/* Audio Playing Indicator */}
             {isPlaying && (
                 <motion.div
                     initial={{ scale: 0 }}

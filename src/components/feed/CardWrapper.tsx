@@ -12,7 +12,6 @@ interface CardWrapperProps {
     onFeedback: (id: string, feedback: Feedback) => void;
 }
 
-// Using consistent homepage styling - zinc/gray theme
 const cardBaseClass = 'bg-zinc-900/50 border border-zinc-800 hover:border-zinc-600';
 
 export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwipe, children, onFeedback }) => {
@@ -22,6 +21,7 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
     const [swipeFeedback, setSwipeFeedback] = useState<'got_it' | 'skip' | null>(null);
     const [isSaved, setIsSaved] = useState(false);
     const startX = useRef(0);
+    const startY = useRef(0);
     const { playSwipe } = useSounds();
     const supabase = createSupabaseBrowserClient();
 
@@ -47,7 +47,7 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
         const shareData = {
             title: item.title,
             text: `Check out this ${item.type} on EdBox: ${item.title}`,
-            url: window.location.href, // Or a specific deep link if available
+            url: window.location.href,
         };
 
         if (navigator.share) {
@@ -57,44 +57,63 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
                 console.error('Error sharing:', err);
             }
         } else {
-            // Fallback to clipboard
             try {
                 await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
-                alert('Link copied to clipboard!'); // Could be a toast
+                alert('Link copied to clipboard!');
             } catch (err) {
                 console.error('Failed to copy info:', err);
             }
         }
     };
 
-    const handleSwipeStart = (clientX: number) => {
+    const handleSwipeStart = (clientX: number, clientY: number) => {
+        // Check if user clicked on an interactive element
+        const target = document.elementFromPoint(clientX, clientY) as HTMLElement;
+        if (target) {
+            const isInteractive = target.closest('button, input, textarea, a, [role="button"]');
+            if (isInteractive) {
+                return; // Don't start swipe on interactive elements
+            }
+        }
+        
         setIsSwiping(true);
         startX.current = clientX;
+        startY.current = clientY;
     };
 
-    const handleSwipeMove = (clientX: number) => {
+    const handleSwipeMove = (clientX: number, clientY: number) => {
         if (!isSwiping) return;
-        const diff = clientX - startX.current;
-        setTranslateX(diff);
+        
+        const diffX = clientX - startX.current;
+        const diffY = Math.abs(clientY - startY.current);
+        
+        // Only track horizontal swipes (not vertical scrolls)
+        if (diffY > 30) {
+            setIsSwiping(false);
+            setTranslateX(0);
+            return;
+        }
+        
+        setTranslateX(diffX);
     };
 
     const handleSwipeEnd = () => {
         if (!isSwiping || swipeFeedback) return;
 
-        if (translateX > 100) { // Swipe right
+        if (translateX > 100) {
             playSwipe();
             setSwipeFeedback('got_it');
             setTimeout(() => {
-                setIsSwiping(false); // Enable transition
+                setIsSwiping(false);
                 setTranslateX(500);
                 setOpacity(0);
                 setTimeout(() => onSwipe(item.id, 'got_it', item.xp_reward), 300);
             }, 500);
-        } else if (translateX < -100) { // Swipe left
+        } else if (translateX < -100) {
             playSwipe();
             setSwipeFeedback('skip');
             setTimeout(() => {
-                setIsSwiping(false); // Enable transition
+                setIsSwiping(false);
                 setTranslateX(-500);
                 setOpacity(0);
                 setTimeout(() => onSwipe(item.id, 'skip'), 300);
@@ -106,13 +125,32 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
         }
     };
 
-    const handleMouseDown = (e: React.MouseEvent) => handleSwipeStart(e.clientX);
-    const handleMouseMove = (e: React.MouseEvent) => handleSwipeMove(e.clientX);
+    const handleMouseDown = (e: React.MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('button, input, textarea, a, [role="button"]')) {
+            return; // Don't interfere with interactive elements
+        }
+        handleSwipeStart(e.clientX, e.clientY);
+    };
+    
+    const handleMouseMove = (e: React.MouseEvent) => handleSwipeMove(e.clientX, e.clientY);
     const handleMouseUp = () => handleSwipeEnd();
     const handleMouseLeave = () => handleSwipeEnd();
 
-    const handleTouchStart = (e: React.TouchEvent) => handleSwipeStart(e.touches[0].clientX);
-    const handleTouchMove = (e: React.TouchEvent) => handleSwipeMove(e.touches[0].clientX);
+    const handleTouchStart = (e: React.TouchEvent) => {
+        const touch = e.touches[0];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement;
+        if (target?.closest('button, input, textarea, a, [role="button"]')) {
+            return; // Don't interfere with interactive elements
+        }
+        handleSwipeStart(touch.clientX, touch.clientY);
+    };
+    
+    const handleTouchMove = (e: React.TouchEvent) => {
+        const touch = e.touches[0];
+        handleSwipeMove(touch.clientX, touch.clientY);
+    };
+    
     const handleTouchEnd = () => handleSwipeEnd();
 
     const getFeedbackButtonClass = (type: Feedback) => {
@@ -122,7 +160,7 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
             }
             return 'text-gray-600 cursor-not-allowed';
         }
-        return 'text-white hover:bg-zinc-700/50';
+        return 'text-white hover:bg-zinc-700/50 cursor-pointer';
     };
 
     const scale = isActive ? 1.02 : 1;
@@ -155,12 +193,12 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
                 </div>
             )}
 
-            {/* Main Content Area */}
-            <div className="flex-grow flex flex-col justify-center items-center z-10 w-full">
+            {/* Main Content Area - Interactive elements enabled */}
+            <div className="flex-grow flex flex-col justify-center items-center z-10 w-full pointer-events-auto">
                 {children}
             </div>
 
-            {/* Bottom UI - Consistent with homepage styling */}
+            {/* Bottom UI */}
             <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end gap-3 z-20 pointer-events-none">
                 <div className="flex items-center gap-3">
                     <div className="hidden sm:block">
@@ -171,27 +209,21 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
                 <div className="flex items-center gap-2 pointer-events-auto">
                     <button
                         onClick={handleSave}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
                         disabled={isSaved}
                         aria-label="Save for later"
-                        className={`p-2 rounded-lg transition-colors duration-200 ${isSaved ? 'text-yellow-400 bg-zinc-800' : 'text-white hover:bg-zinc-700/50'}`}
+                        className={`p-2 rounded-lg transition-colors duration-200 cursor-pointer ${isSaved ? 'text-yellow-400 bg-zinc-800' : 'text-white hover:bg-zinc-700/50'}`}
                     >
                         <BookmarkIcon filled={isSaved} />
                     </button>
                     <button
                         onClick={handleShare}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
                         aria-label="Share content"
-                        className="p-2 rounded-lg transition-colors duration-200 text-white hover:bg-zinc-700/50"
+                        className="p-2 rounded-lg transition-colors duration-200 text-white hover:bg-zinc-700/50 cursor-pointer"
                     >
                         <ShareIcon className="h-5 w-5" />
                     </button>
                     <button
                         onClick={() => onFeedback(item.id, 'like')}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
                         disabled={!!item.feedback}
                         aria-label="Like this content"
                         className={`p-2 rounded-lg transition-colors duration-200 ${getFeedbackButtonClass('like')}`}
@@ -200,8 +232,6 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
                     </button>
                     <button
                         onClick={() => onFeedback(item.id, 'dislike')}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
                         disabled={!!item.feedback}
                         aria-label="Dislike this content"
                         className={`p-2 rounded-lg transition-colors duration-200 ${getFeedbackButtonClass('dislike')}`}

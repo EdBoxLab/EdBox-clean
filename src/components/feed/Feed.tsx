@@ -12,7 +12,6 @@ import { ChallengeCard } from './ChallengeCard';
 import { FactCard } from './FactCard';
 import { StoryCard } from './StoryCard';
 import { SkeletonCard } from './SkeletonCard';
-// Removed GenieResponseView import
 import { ArticleView } from './ArticleView';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { XPStreakDisplay } from '@/components/XPStreakDisplay';
@@ -54,8 +53,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
   const [likedTopics, setLikedTopics] = useState<string[]>([]);
   const [viewedTypes, setViewedTypes] = useState<Set<string>>(new Set());
   const [currentBatch, setCurrentBatch] = useState(0);
-
-  // Removed genie functionality
+  const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
 
   // Audio State for Articles
   const [summaryAudio, setSummaryAudio] = useState<Record<string, { state: AudioGenerationState, buffer?: AudioBuffer }>>({});
@@ -67,6 +65,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
   const observer = useRef<IntersectionObserver | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processingRef = useRef(false);
+  const lastLoadRef = useRef<number>(0);
   const supabase = createSupabaseBrowserClient();
 
   const initAudio = () => {
@@ -79,16 +78,23 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     return audioContextRef.current;
   };
 
-  const lastLoadRef = useRef<number>(0);
-
   const loadMoreItems = useCallback(async (initial = false) => {
     // Prevent rapid repeated calls
-    if (Date.now() - lastLoadRef.current < 5000) return;
-    lastLoadRef.current = Date.now();
+    const now = Date.now();
+    if (now - lastLoadRef.current < 5000) {
+      console.log('⏳ Throttling feed load - too soon since last load');
+      return;
+    }
 
-    if (processingRef.current) return;
+    if (processingRef.current) {
+      console.log('⏳ Already processing feed request - skipping');
+      return;
+    }
 
+    console.log('📥 Starting feed load...', { initial, currentBatch });
+    lastLoadRef.current = now;
     processingRef.current = true;
+    
     if (initial) setLoading(true);
 
     try {
@@ -98,22 +104,22 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       }
 
       // For new batches, exclude previously viewed content types
-      // Reset if all content types have been viewed (5 main types: quiz, article, fact, challenge, story)
       const allContentTypes = ['quiz', 'article', 'fact', 'challenge', 'story'];
       const shouldReset = viewedTypes.size >= allContentTypes.length;
       const excludeTypes = initial || shouldReset ? [] : Array.from(viewedTypes);
       
       if (shouldReset) {
-        console.log('🔄 Resetting content types - all types have been viewed');
+        console.log('🔄 Resetting content types - all types viewed');
         setViewedTypes(new Set());
       }
       
       const itemBatch = await generateFeedBatch(preferences.interests, likedTopics, excludeTypes);
+      console.log('✅ Received', itemBatch.length, 'items from API');
 
       // Persist generated items
       await persistFeedItems(itemBatch, user?.id);
 
-      // Process items (removed client-side image gen)
+      // Process items
       const processedItems = itemBatch.filter(item => item.type !== 'meme');
 
       // Track content types in this batch
@@ -125,22 +131,28 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       if (initial) {
         setItems(newItems);
         setCurrentBatch(1);
+        setHasLoadedInitial(true);
+        console.log('✅ Initial feed loaded:', newItems.length, 'items');
       } else {
         setItems(prev => [...prev, ...newItems]);
         setCurrentBatch(prev => prev + 1);
+        console.log('✅ Loaded batch', currentBatch + 1, ':', newItems.length, 'new items');
       }
     } catch (err) {
-      console.error("Failed to load feed items", err);
+      console.error("❌ Failed to load feed items", err);
     } finally {
       processingRef.current = false;
       setLoading(false);
     }
-  }, [preferences.interests, likedTopics, supabase, viewedTypes]);
+  }, [preferences.interests, likedTopics]); // Removed viewedTypes and currentBatch from dependencies
 
-  // Initial Load
+  // Initial Load - ONLY ONCE
   useEffect(() => {
-    loadMoreItems(true);
-  }, [loadMoreItems]);
+    if (!hasLoadedInitial) {
+      console.log('🚀 Initial feed load triggered');
+      loadMoreItems(true);
+    }
+  }, [hasLoadedInitial]); // Only depend on hasLoadedInitial, NOT loadMoreItems
 
   // Infinite Scroll Observer
   useEffect(() => {
@@ -156,8 +168,12 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
               const index = items.findIndex(item => item.id === newActiveId);
               setActiveIndex(index);
 
-              // Load more when user has viewed all 10 items in current batch
-              if (index !== -1 && index >= (currentBatch * 10) - 1 && !loading && !processingRef.current) {
+              // Load more when user reaches the last 2 items in current batch
+              const itemsPerBatch = 7; // Based on your feed generation
+              const batchEndThreshold = (currentBatch * itemsPerBatch) - 2;
+              
+              if (index !== -1 && index >= batchEndThreshold && !loading && !processingRef.current) {
+                console.log('📍 Near end of batch - loading more...', { index, threshold: batchEndThreshold });
                 loadMoreItems();
               }
               return newActiveId;
@@ -176,7 +192,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     }
 
     return () => observer.current?.disconnect();
-  }, [items, loading, loadMoreItems]);
+  }, [items, loading, currentBatch]); // Removed loadMoreItems from dependencies
 
   const handleFeedback = async (id: string, feedback: Feedback) => {
     // Optimistic update
@@ -188,7 +204,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     if (user) {
       const ok = await trackInteraction(user.id, id, feedback);
       if (!ok) console.warn('trackInteraction failed for', id, feedback);
-      }
+    }
 
     const item = items.find(i => i.id === id);
     if (item && feedback === 'like') {
@@ -244,10 +260,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     console.log("Incorrect");
   };
 
-  // Removed genie functionality
-
   const handleGenerateSummaryAudio = (item: ArticleFeedItem) => {
-    // Placeholder for audio generation
     console.log("Generate audio for:", item.id);
   };
 
@@ -258,7 +271,6 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       case 'video':
         return <VideoCard item={item as any} />;
       case 'article':
-
         return (
           <ArticleCard
             item={item as ArticleFeedItem}
@@ -295,7 +307,6 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
         <XPStreakDisplay showCompact={true} />
       </div>
 
-      {/* Header matching homepage style */}
       <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8 pt-20">
         <div className="mb-8">
           <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4">
@@ -304,11 +315,9 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
           <p className="text-lg text-gray-400">
             Personalized content to accelerate your learning journey.
           </p>
-          {/* Status header removed per product request - no batch/type/shorthand info shown to users */}
         </div>
 
-        {/* Feed Grid - fullscreen single-column deck */}
-        <div className="grid grid-cols-1 gap-0">
+        <div className="grid grid-cols-1 gap-0" ref={feedRef}>
           {items.map((item, index) => (
             <div
               key={item.id}
@@ -337,7 +346,6 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
             </>
           )}
 
-          {/* Loading indicator for new batches */}
           {loading && items.length > 0 && (
             <div className="col-span-full flex items-center justify-center py-8">
               <div className="flex items-center gap-3 text-gray-400">

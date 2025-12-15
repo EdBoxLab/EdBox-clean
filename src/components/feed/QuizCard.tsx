@@ -16,17 +16,15 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
     const [selected, setSelected] = useState<string | null>(null);
     const [answered, setAnswered] = useState(false);
     const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-    const [timeLeft, setTimeLeft] = useState(30); // 30 second timer
+    const [timeLeft, setTimeLeft] = useState(30);
     const [showExplanation, setShowExplanation] = useState(false);
 
-    // Timer effect
     useEffect(() => {
         if (answered) return;
         
         const timer = setInterval(() => {
             setTimeLeft(prev => {
                 if (prev <= 1) {
-                    // Time's up - auto-select wrong answer
                     handleAnswer('');
                     return 0;
                 }
@@ -50,12 +48,10 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
             onIncorrect();
         }
 
-        // Show explanation after a brief delay
         setTimeout(() => {
             setShowExplanation(true);
         }, 800);
 
-        // Automatically advance after showing result
         setTimeout(() => {
             onSwipe(item.id, 'answered');
         }, 2500);
@@ -63,15 +59,15 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
 
     const getButtonClass = (option: string) => {
         if (!answered) {
-            return 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-400/30 hover:border-purple-400/50';
+            return 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-400/30 hover:border-purple-400/50 cursor-pointer';
         }
         if (option === item.answer) {
-            return 'bg-gradient-to-r from-green-500 to-emerald-500 ring-2 ring-green-300 shadow-lg shadow-green-500/50';
+            return 'bg-gradient-to-r from-green-500 to-emerald-500 ring-2 ring-green-300 shadow-lg shadow-green-500/50 cursor-default';
         }
         if (option === selected && option !== item.answer) {
-            return 'bg-gradient-to-r from-red-500 to-pink-500 ring-2 ring-red-300 shadow-lg shadow-red-500/50';
+            return 'bg-gradient-to-r from-red-500 to-pink-500 ring-2 ring-red-300 shadow-lg shadow-red-500/50 cursor-default';
         }
-        return 'bg-white/10 opacity-50';
+        return 'bg-white/10 opacity-50 cursor-default';
     };
 
     const getTimerColor = () => {
@@ -82,13 +78,11 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
 
     return (
         <div className="w-full text-center flex flex-col justify-center items-center h-full relative overflow-hidden">
-            {/* Background Effects */}
             <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-transparent to-pink-900/20" />
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 animate-pulse" />
             
             <Confetti isFiring={isCorrect === true} />
 
-            {/* Header with Brain Icon and Timer */}
             <motion.div 
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -145,16 +139,20 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
                         transition={{ delay: 0.3 + index * 0.1 }}
                         whileHover={{ scale: answered ? 1 : 1.02 }}
                         whileTap={{ scale: answered ? 1 : 0.98 }}
-                        onClick={() => handleAnswer(option)}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleAnswer(option);
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
                         disabled={answered}
-                        className={`p-3 sm:p-4 rounded-xl font-semibold text-sm sm:text-base transition-all duration-300 transform ${getButtonClass(option)}`}
+                        className={`p-3 sm:p-4 rounded-xl font-semibold text-sm sm:text-base transition-all duration-300 transform select-none ${getButtonClass(option)}`}
                     >
                         {option}
                     </motion.button>
                 ))}
             </motion.div>
 
-            {/* XP Reward Display */}
             <motion.div 
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -165,7 +163,6 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
                 <span className="text-yellow-400 font-bold text-sm">{item.xp_reward} XP</span>
             </motion.div>
 
-            {/* Result and Explanation */}
             <AnimatePresence>
                 {answered && (
                     <motion.div

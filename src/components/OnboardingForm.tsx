@@ -89,6 +89,7 @@ export default function OnboardingForm() {
     if (step > 1) setStep(step - 1);
   };
 
+  // 🔥 THIS IS WHERE DATA GETS SENT TO SUPABASE DATABASE 🔥
   const handleSubmit = async () => {
     if (!user || isSubmitting) return;
 
@@ -98,23 +99,25 @@ export default function OnboardingForm() {
     setIsSubmitting(true);
 
     try {
+      // THIS UPDATES THE 'profiles' TABLE IN SUPABASE
       const { error } = await supabase
-        .from('profiles')
-        .update({
-          country: formData.country,
-          education: formData.education,
-          age: parseInt(formData.age, 10),
-          interests: formData.interests,
-          goal: formData.goal,
-          onboarding_completed: true,
+        .from('profiles')              // Table name in your Supabase database
+        .update({                      // SQL UPDATE operation
+          country: formData.country,   // Column: country
+          education: formData.education, // Column: education
+          age: parseInt(formData.age, 10), // Column: age (converted to integer)
+          interests: formData.interests,   // Column: interests (array)
+          goal: formData.goal,            // Column: goal
+          onboarding_completed: true,     // Column: onboarding_completed (boolean flag)
         })
-        .eq('id', user.id);
+        .eq('id', user.id);           // WHERE id = user.id (only update this user's row)
 
       if (error) {
         console.error('Error updating profile:', error);
         alert('Failed to save profile. Please try again.');
         setIsSubmitting(false);
       } else {
+        // Successfully saved - redirect to home page
         router.push('/');
       }
     } catch (err) {
@@ -147,13 +150,14 @@ export default function OnboardingForm() {
         <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
 
+      {/* 🔥 FIXED: Added max-h and overflow-y-auto for scrollability */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative w-full max-w-2xl bg-zinc-900/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-zinc-800/50 overflow-hidden"
+        className="relative w-full max-w-2xl max-h-[90vh] bg-zinc-900/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-zinc-800/50 overflow-hidden flex flex-col"
       >
         {/* Progress bar */}
-        <div className="h-1.5 bg-zinc-800">
+        <div className="h-1.5 bg-zinc-800 flex-shrink-0">
           <motion.div
             className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
             initial={{ width: '25%' }}
@@ -162,7 +166,8 @@ export default function OnboardingForm() {
           />
         </div>
 
-        <div className="p-8 sm:p-12">
+        {/* 🔥 FIXED: Made content area scrollable */}
+        <div className="p-8 sm:p-12 overflow-y-auto flex-1">
           {/* Header */}
           <div className="text-center mb-8">
             <motion.div

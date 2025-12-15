@@ -105,25 +105,25 @@ Your challenges must:
 const DIFFICULTY_SPECS = {
   Beginner: {
     timeRange: [5, 15],
-    conceptCount: 1,
+    conceptCount: "1 core concept",
     guidance: "Step-by-step instructions with examples",
     validationType: "Clear pass/fail criteria"
   },
   Intermediate: {
     timeRange: [15, 30],
-    conceptCount: 2-3,
+    conceptCount: "2-3 related concepts",
     guidance: "General approach with hints available",
     validationType: "Multiple test cases with edge cases"
   },
   Advanced: {
     timeRange: [30, 60],
-    conceptCount: 3-5,
+    conceptCount: "3-5 interconnected concepts",
     guidance: "Problem statement only, minimal hints",
     validationType: "Complex scenarios, optimization required"
   },
   Expert: {
     timeRange: [60, 120],
-    conceptCount: 5+,
+    conceptCount: "5+ concepts with synthesis",
     guidance: "Open-ended, multiple solutions possible",
     validationType: "Subjective rubric with trade-off analysis"
   }
@@ -194,11 +194,10 @@ OUTPUT REQUIREMENTS:
    - WHY this challenge matters (1-2 sentences)
    - WHAT the user will build/create (specific deliverable)
    - SUCCESS criteria (how they know they're done)
-3. StarterCode or placeholder(if applicable):
-   - Must be valid, runnable code or valid helpful text
-   - Include helpful comments
-   - Use placeholder functions/TODOs for user to complete or text that helps the user understand better
-
+3. StarterCode or starter placeholder (if applicable):
+   - Must be valid, runnable code or helpful starting point
+   - Include helpful comments or helpful guides
+   - Use placeholder functions/TODOs for user to complete or helpful starter text 
 4. Hints must be progressive:
    - Hint 1: Conceptual nudge
    - Hint 2: Approach suggestion

@@ -76,7 +76,7 @@ export const metadata: Metadata = {
     telephone: false,
   },
   verification: {
-    google: 'your-google-verification-code',
+    google: 'YzGOxq7ul48yIOan9gd3sigS4kTp-9aiimYHo01po0s',
   },
 };
 
@@ -88,6 +88,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <meta name="google-site-verification" content="YzGOxq7ul48yIOan9gd3sigS4kTp-9aiimYHo01po0s" />
         <meta name="theme-color" content="#3b82f6" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/logo.jpg" />

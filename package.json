@@ -9,7 +9,7 @@
     "lint": "eslint",
     "type-check": "tsc --noEmit",
     "test": "jest",
-    "vercel-build": "npm run prepare && next build"
+    "vercel-build": "next build"
   },
   "dependencies": {
     "@google/genai": "^1.29.1",

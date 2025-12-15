@@ -29,13 +29,11 @@ interface Conversation {
   created_at: string;
 }
 
-// 🔥 FIXED: Better file content processing with proper encoding detection
+// Process file content with proper encoding
 async function processFileContent(file: FileAttachment): Promise<string> {
   try {
-    // Decode base64 to buffer
     const buffer = Buffer.from(file.content, 'base64');
     
-    // Check if it's a text-based file by extension or mime type
     const isTextFile = 
       file.type.startsWith('text/') ||
       file.type.includes('json') ||
@@ -71,57 +69,45 @@ async function processFileContent(file: FileAttachment): Promise<string> {
       file.name.endsWith('.bat');
 
     if (isTextFile) {
-      // Try to decode as UTF-8 first
       let content = buffer.toString('utf-8');
       
-      // Check if the content looks valid (no replacement characters)
-      // If we see too many � characters, the encoding might be wrong
       const replacementChars = (content.match(/�/g) || []).length;
-      const totalChars = content.length;
-      
-      // If more than 5% are replacement characters, try different encoding
-      if (replacementChars > totalChars * 0.05) {
-        // Try latin1 encoding as fallback
+      if (replacementChars > content.length * 0.05) {
         content = buffer.toString('latin1');
       }
       
-      // Clean up any null bytes or control characters that might confuse the AI
       content = content
-        .replace(/\0/g, '') // Remove null bytes
-        .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '') // Remove control characters except newlines/tabs
+        .replace(/\0/g, '')
+        .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')
         .trim();
       
-      // Limit content size to prevent token overflow
-      const maxLength = 10000;
+      const maxLength = 12000;
       if (content.length > maxLength) {
-        return `File: ${file.name}\n${'='.repeat(50)}\n${content.substring(0, maxLength)}\n\n[... Content truncated due to length. Showing first ${maxLength} characters of ${content.length} total ...]`;
+        return `📄 FILE: ${file.name}\n${'─'.repeat(60)}\n${content.substring(0, maxLength)}\n\n... [Content truncated - showing first ${maxLength} of ${content.length} characters]\n${'─'.repeat(60)}`;
       }
       
-      return `File: ${file.name}\n${'='.repeat(50)}\n${content}\n${'='.repeat(50)}`;
+      return `📄 FILE: ${file.name}\n${'─'.repeat(60)}\n${content}\n${'─'.repeat(60)}`;
     }
     
-    // Handle images
     if (file.type.startsWith('image/')) {
-      return `[Image: ${file.name} - ${(file.size / 1024).toFixed(2)} KB. Image content cannot be displayed as text.]`;
+      return `🖼️ IMAGE FILE: ${file.name} (${(file.size / 1024).toFixed(2)} KB)\nNote: This is an image file. I cannot view images, but I can help if you describe what's in it or what you need help with.`;
     }
     
-    // Handle PDFs
     if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-      return `[PDF Document: ${file.name} - ${(file.size / 1024).toFixed(2)} KB. PDF text extraction is not currently supported. Please describe what you need help with regarding this PDF.]`;
+      return `📕 PDF FILE: ${file.name} (${(file.size / 1024).toFixed(2)} KB)\nNote: This is a PDF. I cannot extract text from PDFs yet, but I can help if you describe its content or paste relevant sections.`;
     }
     
-    // Handle other binary files
-    return `[Binary File: ${file.name}, Type: ${file.type}, Size: ${(file.size / 1024).toFixed(2)} KB. This file type cannot be read as text. Please describe what you need help with.]`;
+    return `📎 BINARY FILE: ${file.name} (Type: ${file.type}, Size: ${(file.size / 1024).toFixed(2)} KB)\nNote: This is a binary file that cannot be read as text. Please describe what you need help with.`;
     
   } catch (err) {
     console.error('Error processing file:', file.name, err);
-    return `[Error: Unable to read file "${file.name}". The file may be corrupted or in an unsupported format.]`;
+    return `❌ ERROR: Unable to read file "${file.name}". The file may be corrupted.`;
   }
 }
 
-export async function POST(req: NextRequest) {
+// 🔥 NEW: GET endpoint to fetch conversations and messages
+export async function GET(req: NextRequest) {
   try {
-    // 1. Authenticate
     const supabase = await createSupabaseServerClient();
     const {
       data: { user },
@@ -132,7 +118,117 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 2. Parse request
+    const { searchParams } = new URL(req.url);
+    const conversationId = searchParams.get('conversationId');
+
+    // If conversationId provided, fetch messages for that conversation
+    if (conversationId) {
+      console.log('📨 Fetching messages for conversation:', conversationId);
+      
+      // Verify user owns this conversation
+      const { data: conversation, error: convError } = await supabase
+        .from('chat_conversations')
+        .select('*')
+        .eq('id', conversationId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (convError || !conversation) {
+        console.error('❌ Conversation not found or access denied:', convError);
+        return NextResponse.json(
+          { error: 'Conversation not found' },
+          { status: 404 }
+        );
+      }
+
+      // Fetch all messages for this conversation
+      const { data: messages, error: messagesError } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
+
+      if (messagesError) {
+        console.error('❌ Error fetching messages:', messagesError);
+        return NextResponse.json(
+          { error: 'Failed to fetch messages' },
+          { status: 500 }
+        );
+      }
+
+      console.log('✅ Found messages:', messages?.length || 0);
+
+      return NextResponse.json({
+        conversation,
+        messages: messages || [],
+      });
+    }
+
+    // Otherwise, fetch all conversations for the user
+    console.log('📋 Fetching all conversations for user:', user.id);
+    
+    const { data: conversations, error: conversationsError } = await supabase
+      .from('chat_conversations')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (conversationsError) {
+      console.error('❌ Error fetching conversations:', conversationsError);
+      return NextResponse.json(
+        { error: 'Failed to fetch conversations' },
+        { status: 500 }
+      );
+    }
+
+    console.log('✅ Found conversations:', conversations?.length || 0);
+
+    // Optionally, fetch the last message for each conversation
+    const conversationsWithLastMessage = await Promise.all(
+      (conversations || []).map(async (conv) => {
+        const { data: lastMessage } = await supabase
+          .from('chat_messages')
+          .select('content, created_at')
+          .eq('conversation_id', conv.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        return {
+          ...conv,
+          lastMessage: lastMessage?.content || null,
+          lastMessageAt: lastMessage?.created_at || conv.created_at,
+        };
+      })
+    );
+
+    return NextResponse.json({
+      conversations: conversationsWithLastMessage,
+    });
+    
+  } catch (err: any) {
+    console.error('❌ GET error:', err);
+    return NextResponse.json(
+      { error: err.message || 'Server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST endpoint for sending messages
+export async function POST(req: NextRequest) {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     let message: string | null = null;
     let conversationId: string | null = null;
     let attachments: FileAttachment[] = [];
@@ -151,7 +247,7 @@ export async function POST(req: NextRequest) {
 
       for (const [key, value] of formData.entries()) {
         if (value instanceof File) {
-          const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+          const MAX_FILE_SIZE = 10 * 1024 * 1024;
           if (value.size > MAX_FILE_SIZE) {
             return NextResponse.json(
               { error: `File "${value.name}" exceeds 10MB limit` },
@@ -171,13 +267,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (!message || !message.trim()) {
-      return NextResponse.json(
-        { error: 'Message is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    // 3. Create or validate conversation
+    // Create or validate conversation
     if (!conversationId) {
       const { data: newConv, error: convError } = await supabase
         .from('chat_conversations')
@@ -191,33 +284,37 @@ export async function POST(req: NextRequest) {
       if (convError) throw new Error('Failed to create conversation');
       conversationId = (newConv as Conversation).id;
     } else {
-      const { data: existingConv, error: convCheckError } = await supabase
+      const { data: existingConv } = await supabase
         .from('chat_conversations')
         .select('id')
         .eq('id', conversationId)
         .eq('user_id', user.id)
         .single();
 
-      if (convCheckError || !existingConv) {
-        return NextResponse.json(
-          { error: 'Conversation not found' },
-          { status: 403 }
-        );
+      if (!existingConv) {
+        return NextResponse.json({ error: 'Conversation not found' }, { status: 403 });
       }
     }
 
-    // 4. Process attachments - THIS IS THE KEY PART
+    // Process attachments
     let enhancedMessage = message;
     if (attachments.length > 0) {
       const fileContents = await Promise.all(
         attachments.map(file => processFileContent(file))
       );
       
-      // Add files to the message with clear formatting
-      enhancedMessage = `${message}\n\n${'*'.repeat(60)}\nATTACHED FILES:\n${'*'.repeat(60)}\n\n${fileContents.join('\n\n')}\n\n${'*'.repeat(60)}\nEND OF ATTACHED FILES\n${'*'.repeat(60)}`;
+      enhancedMessage = `${message}
+
+${'═'.repeat(70)}
+📎 ATTACHED FILES (${attachments.length})
+${'═'.repeat(70)}
+
+${fileContents.join('\n\n')}
+
+${'═'.repeat(70)}`;
     }
 
-    // 5. Save user message
+    // Save user message
     const { data: userMessageData, error: userMsgError } = await supabase
       .from('chat_messages')
       .insert({
@@ -241,16 +338,15 @@ export async function POST(req: NextRequest) {
     if (userMsgError) throw new Error('Failed to save message');
     const userMessageId = (userMessageData as { id: string }).id;
 
-    // 6. Fetch conversation history
+    // Fetch conversation history
     const { data: history } = await supabase
       .from('chat_messages')
       .select('role, content, metadata, created_at')
       .eq('conversation_id', conversationId)
       .neq('id', userMessageId)
       .order('created_at', { ascending: true })
-      .limit(15); // Keep last 15 messages for context
+      .limit(15);
 
-    // 7. Build conversation context
     const conversationHistory: Array<{ role: ChatRole; content: string }> = (
       history || []
     ).map((msg: any) => ({
@@ -258,34 +354,42 @@ export async function POST(req: NextRequest) {
       content: String(msg.content || ''),
     }));
 
-    // 8. Enhanced system prompt
-    const systemPrompt = `You are EdBox AI, an intelligent tutoring assistant. 
+    const systemPrompt = `You are EdBox AI, an intelligent tutoring assistant.
 
-IMPORTANT INSTRUCTIONS:
-- When files are attached, they will appear clearly marked between "ATTACHED FILES" sections
-- Read and analyze the FULL content of any attached files carefully
-- Reference specific parts of the files in your responses
-- If code is shared, provide detailed explanations and suggestions
-- If you see garbled text or symbols, indicate that the file may be corrupted
-- Always acknowledge when you're working with attached files
+🔥 CRITICAL: When users attach text files (code, documents, etc.), the COMPLETE file content is extracted and provided to you as plain text within the user's message. You CAN and MUST read and analyze these files.
 
-Your goals:
-- Provide clear, educational explanations
+When you see sections marked "📎 ATTACHED FILES" in the user's message:
+- These are NOT external files you can't access
+- The full text content IS ALREADY in the message
+- You MUST read and analyze the file content thoroughly
+- Reference specific parts of the code/text in your response
+- Provide detailed explanations, debugging help, or improvements
+
+For text files (.txt, .js, .py, .java, .cpp, .html, .css, .json, etc.):
+✅ YOU CAN READ THEM - the content is right there in the message
+✅ Analyze the code/text in detail
+✅ Point out specific lines, errors, or improvements
+✅ Provide code examples and explanations
+
+For images/PDFs:
+❌ You genuinely cannot view these - ask the user to describe them
+
+Your teaching approach:
+- Be clear and educational
 - Break down complex topics
-- Encourage learning and understanding
-- Be patient and supportive`;
+- Provide examples and explanations
+- Encourage understanding
+- Be patient and supportive
 
-    // 9. Call Groq API
+NEVER say "I cannot read files" when text file content is clearly provided in the message. You CAN read it because it's text in the prompt.`;
+
     const groqApiKey =
       process.env.GROQ_API_KEY ||
       process.env.GROQ_API_KEY_3 ||
       process.env.GROQ_API_KEY_4;
 
     if (!groqApiKey) {
-      return NextResponse.json(
-        { error: 'AI service unavailable' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'AI service unavailable' }, { status: 500 });
     }
 
     const groq = new Groq({ apiKey: groqApiKey });
@@ -302,19 +406,17 @@ Your goals:
         ] as any,
         model,
         temperature: 0.7,
-        max_tokens: 3000, // Increased for longer responses
+        max_tokens: 3000,
         top_p: 1,
       });
 
-      aiResponse =
-        completion.choices?.[0]?.message?.content ||
-        "I couldn't generate a response. Please try again.";
+      aiResponse = completion.choices?.[0]?.message?.content || "I couldn't generate a response. Please try again.";
     } catch (groqError: any) {
       console.error('Groq error:', groqError);
       
       if (groqError.status === 429) {
         return NextResponse.json(
-          { error: 'Too many requests. Please wait a moment.' },
+          { error: 'Rate limit exceeded. Please wait.' },
           { status: 429 }
         );
       }
@@ -322,17 +424,22 @@ Your goals:
       throw new Error('AI service error');
     }
 
-    // 10. Save AI response
-    await supabase.from('chat_messages').insert({
-      conversation_id: conversationId,
-      role: 'assistant' as ChatRole,
-      content: aiResponse,
-    });
+    // Save AI response
+    const { data: aiMessageData } = await supabase
+      .from('chat_messages')
+      .insert({
+        conversation_id: conversationId,
+        role: 'assistant' as ChatRole,
+        content: aiResponse,
+      })
+      .select('id')
+      .single();
 
     return NextResponse.json({
       conversationId,
       response: aiResponse,
       messageId: userMessageId,
+      aiMessageId: (aiMessageData as any)?.id,
     });
     
   } catch (err: any) {

@@ -164,6 +164,7 @@ QUALITY STANDARDS:
    - Explain the core concept using analogies or examples
    - Preview what the user will learn through the challenges
    - Keep language clear, engaging, and jargon-free
+   - and then state the actual challenge
 
 2. CHALLENGE TITLES:
    - Action-oriented verbs (Build, Design, Analyze, Create)

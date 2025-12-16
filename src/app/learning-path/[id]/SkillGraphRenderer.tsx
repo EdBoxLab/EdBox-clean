@@ -98,7 +98,7 @@ export default function SkillGraphRenderer({
       });
   }, [graph.nodes, getSkillState]);
 
-  // --- RECALCULATE "RECOMMENDED PATH" (FIXED LOGIC) ---
+  // --- RECALCULATE "RECOMMENDED PATH" ---
   const recommendedSkill = useMemo(() => {
     // 1. Handle loading and empty graph states
     if (progressLoading || !graph.nodes.length) return null;
@@ -117,7 +117,7 @@ export default function SkillGraphRenderer({
     if (nextUp) return nextUp;
 
     // 4. Fallback: If nothing is in progress and nothing is unlockable, 
-    //    return the very first skill if it's not yet mastered. (Robust Fallback)
+    //    return the very first skill if it's not yet mastered.
     const firstSkill = graph.nodes[0];
     if (firstSkill && getSkillState(firstSkill.id) !== 'mastered') {
         return firstSkill;
@@ -176,7 +176,7 @@ export default function SkillGraphRenderer({
           setConceptExplanation(batch.explanation || '');
           setActiveChallengeIndex(-1); // Show intro modal first
         } else {
-            // Fallback for demo/error
+            // Fallback for demo/error (FIX: Added hints and explanation)
             setSessionChallenges([{
                 id: `fallback-${Date.now()}`,
                 skillId: skill.id,
@@ -185,7 +185,9 @@ export default function SkillGraphRenderer({
                 engine: skill.engine || 'default',
                 difficulty: 'Medium',
                 xpReward: 50,
-                validationCriteria: []
+                validationCriteria: [],
+                hints: [], // Required by Challenge interface
+                explanation: "This is a fallback practice challenge because the AI challenge generation service is currently unavailable.", // Required by Challenge interface
             }]);
             setConceptExplanation("No generated challenges available.");
             setActiveChallengeIndex(0);
@@ -325,7 +327,7 @@ export default function SkillGraphRenderer({
 
                 <button 
                   onClick={(e) => {
-                    e.stopPropagation(); // FIX: Prevents double-triggering from parent div click
+                    e.stopPropagation(); // Prevents double-triggering from parent div click
                     handleSkillClick(recommendedSkill.id);
                   }}
                   className="whitespace-nowrap flex items-center gap-3 px-8 py-4 bg-white hover:bg-indigo-50 text-indigo-950 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
@@ -469,7 +471,6 @@ export default function SkillGraphRenderer({
         sessionChallenges={sessionChallenges}
         conceptExplanation={conceptExplanation}
         activeChallengeIndex={activeChallengeIndex}
-        // Ensure currentChallenge is null if index is out of bounds
         currentChallenge={currentChallenge || sessionChallenges[activeChallengeIndex] || null} 
         isGenerating={isGenerating}
         onClose={() => {

@@ -1,491 +1,562 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Target, Sparkles, Trophy, Lock, Play, 
-  Star, ArrowRight, Zap, BookOpen, AlertCircle, CheckCircle 
-} from 'lucide-react';
-
-// Hooks & Types
+import { SkillGraph, SkillNode, Challenge } from '@/lib/courseCreation/types';
+import { motion } from 'framer-motion';
+import { Target, Sparkles, Trophy, AlertCircle } from 'lucide-react';
 import { useMultipleSkillsProgress, useProgressTracker } from '@/lib/hooks/useProgressTracker';
-import type { SkillGraph, SkillNode, Challenge } from '@/lib/courseCreation/types';
+import { usePerformanceMonitoring } from '@/lib/hooks/usePerformanceMonitoring';
 import type { SkillState, DifficultyLevel } from '@/types/skill-progression';
 import type { SkillGraph as ProgressionSkillGraph } from '@/lib/services/skill-progression-manager';
 
-// Sub-components
+// Import our new components
+import HeroSection from './components/HeroSection';
+import SkillCard from './components/SkillCard';
 import NotificationSystem from './components/NotificationSystem';
 import PrerequisitesModal from './components/PrerequisitesModal';
 import EngineModal from './components/EngineModal';
 
-// --- PROPS ---
+// Import source map utilities
+import { performSourceMapHealthCheck, enhanceConsoleLogging, logComponentError } from './utils/sourceMapUtils';
+
+// Props for renderer
 interface SkillGraphRendererProps {
-  graph: SkillGraph;
-  courseTitle?: string;
-  challenges?: Record<string, Challenge>;
+graph: SkillGraph;
+challenges?: Record<string, Challenge>;
 }
 
 interface Notification {
-  id: string;
-  type: 'unlock' | 'mastery' | 'xp' | 'error' | 'info';
-  message: string;
-  skillId?: string;
+id: string;
+type: 'unlock' | 'mastery' | 'xp' | 'error' | 'info';
+message: string;
+skillId?: string;
 }
 
-export default function SkillGraphRenderer({ 
-  graph, 
-  courseTitle = "Learning Path", 
-  challenges = {} 
-}: SkillGraphRendererProps) {
+export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGraphRendererProps) {
+// Debug render count to detect infinite loops
+const renderCount = React.useRef(0);
+renderCount.current += 1;
 
-  // --- STATE MANAGEMENT ---
-  const [selectedSkill, setSelectedSkill] = useState<SkillNode | null>(null);
-  const [currentChallenge, setCurrentChallenge] = useState<Challenge | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [showPrerequisites, setShowPrerequisites] = useState<string | null>(null);
+if (renderCount.current > 100) {
+console.error('SkillGraphRenderer: Excessive renders detected!', renderCount.current);
+}
+// Core state
+const [selectedSkill, setSelectedSkill] = useState<SkillNode | null>(null);
+const [currentChallenge, setCurrentChallenge] = useState<Challenge | null>(null);
+const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+const [showPrerequisites, setShowPrerequisites] = useState<string | null>(null);
+const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  // Engine / Session State
-  const [sessionChallenges, setSessionChallenges] = useState<Challenge[]>([]);
-  const [activeChallengeIndex, setActiveChallengeIndex] = useState<number>(-1);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [conceptExplanation, setConceptExplanation] = useState<string>('');
+// Session state for challenges
+const [sessionChallenges, setSessionChallenges] = useState<Challenge[]>([]);
+const [conceptExplanation, setConceptExplanation] = useState<string>('');
+const [activeChallengeIndex, setActiveChallengeIndex] = useState<number>(-1);
+const [isGenerating, setIsGenerating] = useState(false);
+const [consecutiveFailures, setConsecutiveFailures] = useState<number>(0);
 
-  // --- PROGRESS TRACKING INIT ---
-  
-  // Transform graph for the progress hook
-  const progressionGraph = useMemo((): ProgressionSkillGraph => ({
-    nodes: graph.nodes.map(node => ({
-      id: node.id,
-      title: node.title,
-      description: node.description,
-      prerequisites: node.prerequisites || [],
-      engine: node.engine || 'default',
-      difficulty: (node.level as DifficultyLevel) || 'Medium'
-    })),
-    edges: graph.edges || []
-  }), [graph]);
+// Progress tracking state
+const [previousProgressData, setPreviousProgressData] = useState<typeof progressData>([]);
 
-  // Load Progress
-  const { 
-    progressData, 
-    loading: progressLoading, 
-    refreshProgress 
-  } = useMultipleSkillsProgress(progressionGraph);
+// Performance monitoring
+const { timeAsync } = usePerformanceMonitoring('SkillGraphRenderer');
 
-  // Challenge Tracker
-  const { recordChallengeAttempt } = useProgressTracker(selectedSkill?.id, selectedSkill?.title);
+// Convert the graph to the format expected by the progress tracker
+const progressionGraph = useMemo((): ProgressionSkillGraph => {
+return {
+nodes: graph.nodes.map(node => ({
+id: node.id,
+title: node.title,
+description: node.description,
+prerequisites: node.prerequisites || [],
+engine: node.engine || 'default',
+difficulty: (node.level as DifficultyLevel) || 'Medium'
+})),
+edges: graph.edges || []
+};
+}, [graph]);
 
-  // --- HELPER LOGIC ---
+// Use the progress tracker hook for multiple skills
+const { progressData, loading: progressLoading, error: progressError, refreshProgress: refreshGraphProgress } = useMultipleSkillsProgress(progressionGraph);
 
-  const getSkillState = useCallback((skillId: string): SkillState => {
-    if (!progressData || progressData.length === 0) return 'locked';
-    const data = progressData.find(p => p.skillId === skillId);
-    return data?.progressData.state || 'locked';
-  }, [progressData]);
+// Use progress tracker for the specific selected skill
+const { recordChallengeAttempt } = useProgressTracker(selectedSkill?.id, selectedSkill?.title);
 
-  const getSkillProgress = useCallback((skillId: string) => {
-    return progressData.find(p => p.skillId === skillId)?.progressData || null;
-  }, [progressData]);
+// Initialize source map utilities and health check
+useEffect(() => {
+try {
+enhanceConsoleLogging();
+performSourceMapHealthCheck();
+} catch (error) {
+logComponentError('SkillGraphRenderer', error as Error, { phase: 'initialization' });
+}
+}, []);
 
-  const getUnmetPrerequisites = useCallback((skill: SkillNode) => {
-    if (!skill.prerequisites?.length) return [];
-    return skill.prerequisites
-      .map(id => graph.nodes.find(n => n.id === id))
-      .filter((n): n is SkillNode => {
-        if (!n) return false;
-        const state = getSkillState(n.id);
-        return state !== 'mastered';
-      });
-  }, [graph.nodes, getSkillState]);
+// Track mouse for background animations
+useEffect(() => {
+const handleMouseMove = (e: MouseEvent) => setMousePosition({ x: e.clientX, y: e.clientY });
+window.addEventListener('mousemove', handleMouseMove);
+return () => window.removeEventListener('mousemove', handleMouseMove);
+}, []);
 
-  // --- RECALCULATE "RECOMMENDED PATH" ---
-  const recommendedSkill = useMemo(() => {
-    // 1. Handle loading and empty graph states
-    if (progressLoading || !graph.nodes.length) return null;
+// Helper functions
+const getSkillState = (skillId: string): SkillState => {
+const skillProgress = progressData.find(p => p.skillId === skillId);
+return skillProgress?.progressData.state || 'locked';
+};
 
-    // 2. Find In-Progress (Unlocked but not Mastered)
-    const inProgress = graph.nodes.find(n => getSkillState(n.id) === 'unlocked');
-    if (inProgress) return inProgress;
+const getSkillProgress = (skillId: string) => {
+const skillProgress = progressData.find(p => p.skillId === skillId);
+return skillProgress?.progressData || null;
+};
 
-    // 3. Find Next Unlockable (Locked but prereqs met)
-    const nextUp = graph.nodes.find(n => {
-      // Check if node is currently locked
-      if (getSkillState(n.id) !== 'locked') return false;
-      // Check if all prerequisites are met (unmet length is 0)
-      return getUnmetPrerequisites(n).length === 0;
-    });
-    if (nextUp) return nextUp;
+const getUnmetPrerequisites = (skill: SkillNode): SkillNode[] => {
+if (!skill.prerequisites || !Array.isArray(skill.prerequisites)) {
+return [];
+}
+return skill.prerequisites
+.map(prereqId => graph.nodes.find(node => node.id === prereqId))
+.filter((prereq): prereq is SkillNode => {
+if (!prereq) return false;
+const state = getSkillState(prereq.id);
+return state !== 'mastered';
+});
+};
 
-    // 4. Fallback: If nothing is in progress and nothing is unlockable, 
-    //    return the very first skill if it's not yet mastered.
-    const firstSkill = graph.nodes[0];
-    if (firstSkill && getSkillState(firstSkill.id) !== 'mastered') {
-        return firstSkill;
-    }
+// Notification management
+const addNotification = useCallback((type: 'unlock' | 'mastery' | 'xp' | 'error' | 'info', message: string, skillId?: string) => {
+const id = Date.now().toString();
+setNotifications(prev => [...prev, { id, type, message, skillId }]);
+
+// Add celebratory effects for mastery  
+if (type === 'mastery') {  
+  const colors = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0'];  
+  for (let i = 0; i < 20; i++) {  
+    setTimeout(() => {  
+      const particle = document.createElement('div');  
+      particle.className = 'fixed w-2 h-2 rounded-full pointer-events-none z-50';  
+      particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];  
+      particle.style.left = Math.random() * window.innerWidth + 'px';  
+      particle.style.top = '20px';  
+      document.body.appendChild(particle);  
+
+      particle.animate([  
+        { transform: 'translateY(0) rotate(0deg)', opacity: 1 },  
+        { transform: `translateY(${window.innerHeight}px) rotate(720deg)`, opacity: 0 }  
+      ], {  
+        duration: 3000 + Math.random() * 2000,  
+        easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'  
+      }).onfinish = () => particle.remove();  
+    }, i * 100);  
+  }  
+}  
+
+const duration = type === 'mastery' ? 8000 : 5000;  
+setTimeout(() => {  
+  setNotifications(prev => prev.filter(n => n.id !== id));  
+}, duration);
+
+}, []);
+
+const removeNotification = (id: string) => {
+setNotifications(prev => prev.filter(n => n.id !== id));
+};
+
+// Modal handlers
+const handleCloseEngine = () => {
+setSelectedSkill(null);
+setCurrentChallenge(null);
+};
+
+// Listen for progress updates to show notifications
+useEffect(() => {
+// Only process if we have both current and previous data
+if (progressData.length === 0) {
+return;
+}
+
+// If this is the first load, just store the data without notifications  
+if (previousProgressData.length === 0) {  
+  setPreviousProgressData(progressData);  
+  return;  
+}  
+
+// Compare progress and show notifications  
+progressData.forEach(current => {  
+  const previous = previousProgressData.find(p => p.skillId === current.skillId);  
+
+  if (previous && current.progressData && previous.progressData) {  
+    // Check for unlock  
+    if (previous.progressData.state === 'locked' && current.progressData.state === 'unlocked') {  
+      addNotification('unlock', `🎉 ${current.title} unlocked!`, current.skillId);  
+    }  
+
+    // Check for mastery  
+    if (!previous.progressData.masteryAchieved && current.progressData.masteryAchieved) {  
+      addNotification('mastery', `🏆 ${current.title} mastered!`, current.skillId);  
+    }  
+
+    // Check for XP gain  
+    const previousXP = previous.progressData.xpEarned || 0;  
+    const currentXP = current.progressData.xpEarned || 0;  
+    const xpGain = currentXP - previousXP;  
+    if (xpGain > 0) {  
+      addNotification('xp', `+${xpGain} XP earned!`, current.skillId);  
+    }  
+  }  
+});  
+
+// Update previous data for next comparison  
+setPreviousProgressData(progressData);
+
+}, [progressData]); // Remove previousProgressData from dependencies to prevent infinite loop
+
+// Skill interaction handlers
+const handleSkillClick = async (skillId: string) => {
+const skill = graph.nodes.find((n) => n.id === skillId) || null;
+if (!skill) return;
+
+const skillState = getSkillState(skillId);  
+
+if (skillState === 'locked') {  
+  const unmetPrereqs = getUnmetPrerequisites(skill);  
+  if (unmetPrereqs.length > 0) {  
+    setShowPrerequisites(skillId);  
+    return;  
+  }  
+}  
+
+if (skillState === 'unlocked' || skillState === 'mastered') {  
+  setSelectedSkill(skill);  
+  setSessionChallenges([]);  
+  setConceptExplanation('');  
+  setActiveChallengeIndex(-1);  
+  setConsecutiveFailures(0);  
+
+  const existing = challenges[skillId];  
+  if (existing) {  
+    setSessionChallenges([existing]);  
+    setConceptExplanation(existing.explanation || "Let's dive in!");  
+    setActiveChallengeIndex(0);  
+  } else {  
+    setIsGenerating(true);  
+    try {  
+      const { generateChallengeBatch } = await import('@/app/actions/generate-challenges');  
+        
+      // Validate required parameters  
+      const skillTitle = skill.title || `Skill ${skill.id}`;  
+      const skillEngine = skill.engine || 'default';  
+        
+      console.log('Generating challenges for:', { skillId: skill.id, skillTitle, skillEngine });  
+        
+      const batch = await generateChallengeBatch(skill.id, skillTitle, skillEngine);  
+
+      if (batch.challenges && batch.challenges.length > 0) {  
+        console.log('Successfully generated', batch.challenges.length, 'challenges for', skillTitle);  
+        setSessionChallenges(batch.challenges);  
+        setConceptExplanation(batch.explanation || `Learn about ${skillTitle} through hands-on practice.`);  
+        setActiveChallengeIndex(-1);  
+      } else {  
+        console.warn('No challenges generated for', skillTitle);  
+        // Create a fallback challenge  
+        const fallbackChallenge: Challenge = {  
+          id: `fallback_${skill.id}_${Date.now()}`,  
+          skillId: skill.id,  
+          title: `Practice ${skillTitle}`,  
+          description: `Practice your understanding of ${skillTitle} concepts.`,  
+          engine: skillEngine,  
+          difficulty: 'Medium',  
+          estimatedMinutes: 15,  
+          xpReward: 100,  
+          starterCode: '',  
+          validationCriteria: [{ type: 'ai_eval', rubric: 'Demonstrate understanding of the concept.' }],  
+          hints: ['Take your time to understand the concept', 'Ask for help if needed'],  
+          explanation: `This is a practice exercise for ${skillTitle}.`  
+        };  
+        setSessionChallenges([fallbackChallenge]);  
+        setConceptExplanation(`Learn about ${skillTitle} through hands-on practice.`);  
+        setActiveChallengeIndex(-1);  
+      }  
+    } catch (e) {  
+      console.error("Generation failed", e);  
+      addNotification('error', 'Failed to generate challenges. Please try again.', skillId);  
+    } finally {  
+      setIsGenerating(false);  
+    }  
+  }  
+}
+
+};
+
+const handleChallengeSelect = (index: number) => {
+setActiveChallengeIndex(index);
+if (index >= 0 && index < sessionChallenges.length) {
+setCurrentChallenge(sessionChallenges[index]);
+setConsecutiveFailures(0);
+} else {
+setCurrentChallenge(null);
+}
+};
+
+const fetchAdaptiveChallenge = async () => {
+if (!selectedSkill) return;
+
+setIsGenerating(true);  
+try {  
+  addNotification('info', 'Generating helpful practice challenge...', selectedSkill.id);  
+
+  const response = await fetch('/api/challenge/adaptive', {  
+    method: 'POST',  
+    headers: { 'Content-Type': 'application/json' },  
+    body: JSON.stringify({  
+      skillId: selectedSkill.id,  
+      skillTitle: selectedSkill.title,  
+      engine: selectedSkill.engine,  
+      userMastery: 0.2,  
+      previousAttempts: [{ success: false }, { success: false }]  
+    })  
+  });  
+
+  const data = await response.json();  
+  if (data.success && data.challenge) {  
+    const newChallenge = { ...data.challenge, title: `Support: ${data.challenge.title}` };  
+    const newSession = [...sessionChallenges];  
+    newSession.splice(activeChallengeIndex + 1, 0, newChallenge);  
+    setSessionChallenges(newSession);  
+    setActiveChallengeIndex(prev => prev + 1);  
+    setCurrentChallenge(newChallenge);  
+    setConsecutiveFailures(0);  
+  }  
+} catch (error) {  
+  console.error("Adaptive generation failed", error);  
+} finally {  
+  setIsGenerating(false);  
+}
+
+};
+
+const handleChallengeComplete = async (success: boolean) => {
+if (!selectedSkill || activeChallengeIndex === -1) return;
+
+const currentChal = sessionChallenges[activeChallengeIndex];  
+if (currentChal) {  
+  await recordChallengeAttempt(  
+    currentChal.id,  
+    success,  
+    progressionGraph,  
+    { difficultyLevel: (selectedSkill.level as DifficultyLevel) || 'Medium' }  
+  );  
+}  
+
+await refreshGraphProgress();  
+
+if (success) {  
+  setConsecutiveFailures(0);  
     
-    // 5. Default return null (e.g., if everything is mastered)
-    return null; 
-  }, [graph.nodes, progressLoading, getSkillState, getUnmetPrerequisites]);
+  // Show progress feedback  
+  const skillProgress = getSkillProgress(selectedSkill.id);  
+  if (skillProgress) {  
+    const progressPercent = Math.round((skillProgress.challengesCompleted / skillProgress.challengesRequired) * 100);  
+    addNotification('xp', `Progress: ${progressPercent}% complete! +${currentChal.xpReward || 100} XP`, selectedSkill.id);  
+  }  
+    
+  if (activeChallengeIndex < sessionChallenges.length - 1) {  
+    setTimeout(() => handleChallengeSelect(activeChallengeIndex + 1), 1500);  
+  } else {  
+    addNotification('mastery', 'Session Complete! Great work.', selectedSkill.id);  
+  }  
+} else {  
+  const fails = consecutiveFailures + 1;  
+  setConsecutiveFailures(fails);  
 
+  if (fails >= 2) {  
+    await fetchAdaptiveChallenge();  
+  }  
+}
 
-  // --- INTERACTION HANDLERS ---
+};
 
-  const handleSkillClick = async (skillId: string) => {
-    const skill = graph.nodes.find(n => n.id === skillId);
-    if (!skill) return;
+// Calculate stats
+const totalMinutes = graph.nodes.reduce((sum, n) => sum + (n.estimatedMinutes || 0), 0);
+const totalXP = graph.nodes.reduce((sum, n) => sum + (n.xpReward || 0), 0);
+const earnedXP = progressData.reduce((sum, p) => sum + (p.progressData.xpEarned || 0), 0);
+const masteredSkills = progressData.filter(p => p.progressData.masteryAchieved).length;
+const unlockedSkills = progressData.filter(p => p.progressData.state === 'unlocked' || p.progressData.state === 'mastered').length;
 
-    const state = getSkillState(skillId);
+// Loading and error states
+if (progressLoading) {
+return (
+<div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+<div className="text-center">
+<motion.div
+animate={{ rotate: 360 }}
+transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full mx-auto mb-4"
+/>
+<p className="text-gray-400">Loading progress data...</p>
+</div>
+</div>
+);
+}
 
-    // Locked Logic
-    if (state === 'locked') {
-      const unmet = getUnmetPrerequisites(skill);
-      if (unmet.length > 0) {
-        setShowPrerequisites(skillId);
-      } else {
-        // Ready to start/unlock
-        setSelectedSkill(skill);
-        startSession(skill);
-      }
-      return;
-    }
+if (progressError) {
+return (
+<div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+<div className="text-center max-w-md">
+<AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+<h2 className="text-xl font-bold mb-2">Failed to Load Progress</h2>
+<p className="text-gray-400 mb-4">{progressError}</p>
+<button
+onClick={() => window.location.reload()}
+className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
+>
+Retry
+</button>
+</div>
+</div>
+);
+}
 
-    // Unlocked/In-Progress Logic
-    setSelectedSkill(skill);
-    startSession(skill);
-  };
+return (
+<div className="min-h-screen bg-gray-900 text-white overflow-hidden pb-20 md:pb-0">
+<div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
 
-  const startSession = async (skill: SkillNode) => {
-    // 1. Reset State
-    setSessionChallenges([]);
-    setActiveChallengeIndex(-1);
-    setConceptExplanation('');
+{/* Hero Section */}  
+    <HeroSection  
+      graph={graph}  
+      mousePosition={mousePosition}  
+      totalMinutes={totalMinutes}  
+      totalXP={totalXP}  
+      earnedXP={earnedXP}  
+      masteredSkills={masteredSkills}  
+      unlockedSkills={unlockedSkills}  
+    />  
 
-    // 2. Load Existing or Generate
-    if (challenges[skill.id]) {
-      setSessionChallenges([challenges[skill.id]]);
-      setConceptExplanation(challenges[skill.id].explanation || '');
-      setActiveChallengeIndex(0);
-    } else {
-      setIsGenerating(true);
-      try {
-        const { generateChallengeBatch } = await import('@/app/actions/generate-challenges');
-        const batch = await generateChallengeBatch(skill.id, skill.title, skill.engine || 'default');
-        
-        if (batch?.challenges?.length) {
-          setSessionChallenges(batch.challenges);
-          setConceptExplanation(batch.explanation || '');
-          setActiveChallengeIndex(-1); // Show intro modal first
-        } else {
-            // Fallback for demo/error
-            setSessionChallenges([{
-                id: `fallback-${Date.now()}`,
-                skillId: skill.id,
-                title: `Practice: ${skill.title}`,
-                description: "AI generation failed. Practice freely.",
-                engine: skill.engine || 'default',
-                difficulty: 'Medium',
-                xpReward: 50,
-                validationCriteria: [],
-                hints: [], 
-                explanation: "This is a fallback practice challenge because the AI challenge generation service is currently unavailable.", 
-            }]);
-            setConceptExplanation("No generated challenges available.");
-            setActiveChallengeIndex(0);
-        }
-      } catch (e) {
-        console.error("Generator Error:", e);
-        setNotifications(prev => [...prev, { id: Date.now().toString(), type: 'error', message: 'Could not generate challenges.' }]);
-      } finally {
-        setIsGenerating(false);
-      }
-    }
-  };
+    {/* Skill Graph Section Title */}  
+    <motion.div  
+      initial={{ opacity: 0, y: 20 }}  
+      animate={{ opacity: 1, y: 0 }}  
+      transition={{ delay: 0.3 }}  
+      className="mb-4 md:mb-6"  
+    >  
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">  
+        <div>  
+          <h2 className="text-2xl md:text-3xl font-bold text-white">Your Learning Path</h2>  
+          <p className="text-sm text-gray-400 mt-1">  
+            {masteredSkills} mastered • {unlockedSkills - masteredSkills} available • {graph.nodes.length - unlockedSkills} locked  
+          </p>  
+        </div>  
+        <div className="flex items-center gap-3">  
+          {(() => {  
+            const nextSkill = progressData.find(p =>  
+              p.progressData.state === 'unlocked' &&  
+              !p.progressData.masteryAchieved &&  
+              p.progressData.challengesCompleted < p.progressData.challengesRequired  
+            );  
 
-  const handleChallengeComplete = async (success: boolean) => {
-    if (!selectedSkill || !currentChallenge) return;
+            return nextSkill ? (  
+              <motion.button  
+                whileHover={{ scale: 1.05 }}  
+                whileTap={{ scale: 0.95 }}  
+                onClick={() => handleSkillClick(nextSkill.skillId)}  
+                className="flex items-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors"  
+              >  
+                <Target className="w-4 h-4" />  
+                <span>Continue: {nextSkill.title}</span>  
+              </motion.button>  
+            ) : (  
+              <div className="flex items-center gap-2 text-xs md:text-sm text-gray-400">  
+                <Sparkles className="w-4 h-4" />  
+                <span>Click any skill to start</span>  
+              </div>  
+            );  
+          })()}  
+        </div>  
+      </div>  
+    </motion.div>  
 
-    // Record Attempt
-    await recordChallengeAttempt(currentChallenge.id, success, progressionGraph, {
-      difficultyLevel: (selectedSkill.level as DifficultyLevel) || 'Medium'
-    });
-    await refreshProgress();
+    {/* Skill Cards Grid */}  
+    <motion.div  
+      initial={{ opacity: 0, y: 20 }}  
+      animate={{ opacity: 1, y: 0 }}  
+      transition={{ delay: 0.4 }}  
+      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"  
+    >  
+      {graph.nodes.map((skill, index) => (  
+        <SkillCard  
+          key={skill.id}  
+          skill={skill}  
+          index={index}  
+          skillState={getSkillState(skill.id)}  
+          progress={getSkillProgress(skill.id)}  
+          unmetPrereqs={getUnmetPrerequisites(skill)}  
+          onSkillClick={handleSkillClick}  
+        />  
+      ))}  
+    </motion.div>  
 
-    if (success) {
-      if (activeChallengeIndex < sessionChallenges.length - 1) {
-        // Next challenge
-        const nextIdx = activeChallengeIndex + 1;
-        setActiveChallengeIndex(nextIdx);
-        setCurrentChallenge(sessionChallenges[nextIdx]);
-      } else {
-        // Finished
-        setNotifications(prev => [...prev, { id: Date.now().toString(), type: 'mastery', message: `Completed ${selectedSkill.title}!` }]);
-        setSelectedSkill(null);
-        setCurrentChallenge(null);
-      }
-    }
-  };
+    {/* How It Works Section */}  
+    <motion.div  
+      initial={{ opacity: 0, y: 20 }}  
+      animate={{ opacity: 1, y: 0 }}  
+      transition={{ delay: 0.7 }}  
+      className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6"  
+    >  
+      {[  
+        { icon: Target, title: 'Click a Skill', description: 'Select any skill node from your learning path', color: 'from-blue-500 to-cyan-500' },  
+        { icon: Sparkles, title: 'Practice in Engine', description: 'Solve real challenges in our interactive environment', color: 'from-purple-500 to-pink-500' },  
+        { icon: Trophy, title: 'Master & Progress', description: 'Unlock new skills as you demonstrate mastery', color: 'from-emerald-500 to-green-500' }  
+      ].map((step, index) => (  
+        <motion.div  
+          key={index}  
+          initial={{ opacity: 0, y: 20 }}  
+          animate={{ opacity: 1, y: 0 }}  
+          transition={{ delay: 0.8 + index * 0.1 }}  
+          className="relative group"  
+        >  
+          <div className="relative bg-gray-800 rounded-2xl p-4 md:p-6 border border-gray-700 hover:border-gray-600 transition-colors">  
+            <div className={`w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br ${step.color} rounded-xl flex items-center justify-center mb-3 md:mb-4 shadow-lg`}>  
+              <step.icon className="w-5 h-5 md:w-6 md:h-6 text-white" />  
+            </div>  
+            <h3 className="text-lg md:text-xl font-bold text-white mb-2">{step.title}</h3>  
+            <p className="text-gray-400 text-xs md:text-sm">{step.description}</p>  
+          </div>  
+        </motion.div>  
+      ))}  
+    </motion.div>  
 
+  </div>  
 
-  // --- RENDER ---
+  {/* Notification System */}  
+  <NotificationSystem  
+    notifications={notifications}  
+    onRemoveNotification={removeNotification}  
+  />  
 
-  if (progressLoading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center bg-gray-950">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400 font-medium">Loading Learning Path Data...</p>
-        </div>
-      </div>
-    );
-  }
+  {/* Prerequisites Modal */}  
+  <PrerequisitesModal  
+    showPrerequisites={showPrerequisites}  
+    graph={graph}  
+    getSkillState={getSkillState}  
+    getSkillProgress={getSkillProgress}  
+    getUnmetPrerequisites={getUnmetPrerequisites}  
+    onClose={() => setShowPrerequisites(null)}  
+    onSkillClick={handleSkillClick}  
+  />  
 
-  // Calculate Stats
-  const currentXP = progressData.reduce((acc, p) => acc + (p.progressData.xpEarned || 0), 0);
-  const masteredCount = progressData.filter(p => p.progressData.masteryAchieved).length;
-  const progressPercent = graph.nodes.length > 0 ? Math.round((masteredCount / graph.nodes.length) * 100) : 0;
+  {/* Engine Modal */}  
+  <EngineModal  
+    selectedSkill={selectedSkill}  
+    sessionChallenges={sessionChallenges}  
+    conceptExplanation={conceptExplanation}  
+    activeChallengeIndex={activeChallengeIndex}  
+    currentChallenge={currentChallenge}  
+    isGenerating={isGenerating}  
+    onClose={handleCloseEngine}  
+    onChallengeSelect={handleChallengeSelect}  
+    onChallengeComplete={handleChallengeComplete}  
+  />  
+</div>
 
-  return (
-    <div className="min-h-screen bg-[#0f111a] text-white font-sans selection:bg-indigo-500/30 pb-20">
-      
-      {/* 1. HERO HEADER */}
-      <div className="relative bg-gray-900 border-b border-gray-800">
-        <div className="absolute inset-0 bg-indigo-500/5 bg-[url('/grid.svg')] [mask-image:linear-gradient(to_bottom,white,transparent)]" />
-        
-        <div className="max-w-7xl mx-auto px-6 py-10 relative z-10">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-2 text-indigo-400 font-bold tracking-wider text-xs uppercase mb-2">
-                <BookOpen size={14} />
-                Learning Path Dashboard
-              </div>
-              <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
-                {courseTitle}
-              </h1>
-              <p className="text-gray-400 mt-2 max-w-2xl text-lg">
-                Master the skills by completing the nodes below.
-              </p>
-            </div>
-
-            {/* Global Stats */}
-            <div className="flex items-center gap-6 bg-gray-950/50 p-4 rounded-xl border border-gray-800 backdrop-blur-sm">
-              <div className="text-center px-2">
-                <div className="text-2xl font-bold text-white">{progressPercent}%</div>
-                <div className="text-xs text-gray-500 uppercase font-bold">Complete</div>
-              </div>
-              <div className="w-px h-10 bg-gray-800" />
-              <div className="text-center px-2">
-                <div className="text-2xl font-bold text-yellow-400">{currentXP}</div>
-                <div className="text-xs text-yellow-600/80 uppercase font-bold">XP Earned</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-6 mt-8">
-        
-        {/* 2. THE RECOMMENDED ACTION (CTA) */}
-        {recommendedSkill ? (
-          <div className="mb-12">
-            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-indigo-500" />
-              Current Objective
-            </h3>
-            
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              onClick={() => handleSkillClick(recommendedSkill.id)}
-              className="relative group overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-900/40 to-gray-900 border border-indigo-500/30 hover:border-indigo-500/50 transition-all duration-300 shadow-2xl shadow-indigo-900/20 cursor-pointer"
-            >
-              <div className="absolute top-0 right-0 p-32 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
-              
-              <div className="p-8 md:p-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-8 relative z-10">
-                <div className="flex-1">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold border border-indigo-500/20 mb-3">
-                    <Target size={12} />
-                    RECOMMENDED NEXT STEP
-                  </div>
-                  <h2 className="text-3xl font-bold text-white mb-3">
-                    {recommendedSkill.title}
-                  </h2>
-                  <p className="text-gray-300 text-lg leading-relaxed max-w-2xl">
-                    {recommendedSkill.description || "Master this core concept to unlock advanced topics."}
-                  </p>
-                  
-                  <div className="flex items-center gap-6 mt-6">
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
-                      <Star className="w-4 h-4 text-yellow-500" />
-                      <span>{recommendedSkill.xpReward || 100} XP Reward</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
-                      <Target className="w-4 h-4 text-cyan-500" />
-                      <span>{recommendedSkill.level || 'Medium'} Difficulty</span>
-                    </div>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation(); 
-                    handleSkillClick(recommendedSkill.id);
-                  }}
-                  className="whitespace-nowrap flex items-center gap-3 px-8 py-4 bg-white hover:bg-indigo-50 text-indigo-950 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
-                >
-                  <Play className="fill-current w-5 h-5" />
-                  Start Challenge
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        ) : (
-           // Fallback if no recommended skill exists (e.g., everything mastered)
-           <div className="mb-12 p-8 bg-green-900/20 border border-green-500/30 rounded-xl text-center">
-                <Trophy className="w-12 h-12 text-green-400 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-white">Mission Complete!</h2>
-                <p className="text-gray-400">You have mastered all available skills in this learning path.</p>
-           </div>
-        )}
-
-        {/* 3. SKILL GRID */}
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-            <BookOpen className="w-4 h-4" />
-            Learning Path Skills
-          </h3>
-          <span className="text-xs text-gray-600 bg-gray-900 px-2 py-1 rounded border border-gray-800">
-            {graph.nodes.length} Skills
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {graph.nodes.map((skill, i) => {
-            const state = getSkillState(skill.id);
-            const isMastered = state === 'mastered';
-            const isLocked = state === 'locked';
-            const isActive = skill.id === recommendedSkill?.id;
-            
-            // Logic for "Why is this locked?"
-            const unmetPrereqs = isLocked ? getUnmetPrerequisites(skill) : [];
-            const prereqName = unmetPrereqs.length > 0 ? unmetPrereqs[0].title : null;
-
-            return (
-              <motion.div
-                key={skill.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                onClick={() => handleSkillClick(skill.id)}
-                className={`
-                  relative p-6 rounded-xl border flex flex-col h-full transition-all duration-300 group
-                  ${isActive ? 'ring-2 ring-indigo-500 shadow-lg shadow-indigo-900/20' : ''}
-                  ${isMastered 
-                    ? 'bg-gradient-to-br from-gray-900 to-gray-900 border-emerald-500/30' 
-                    : isLocked 
-                      ? 'bg-gray-950/80 border-gray-800 hover:border-gray-700' 
-                      : 'bg-gray-900 border-gray-700 hover:border-indigo-500/50'
-                  }
-                  cursor-pointer
-                `}
-              >
-                {/* Header Row */}
-                <div className="flex justify-between items-start mb-4">
-                  <div className={`
-                    w-10 h-10 rounded-lg flex items-center justify-center
-                    ${isMastered ? 'bg-emerald-500/10 text-emerald-400' : 
-                      isLocked ? 'bg-gray-900 border border-gray-800 text-gray-500' : 
-                      'bg-indigo-500/10 text-indigo-400'}
-                  `}>
-                    {isMastered ? <CheckCircle size={20} /> : 
-                     isLocked ? <Lock size={18} /> : 
-                     <Zap size={20} />}
-                  </div>
-                  
-                  {isMastered && (
-                    <span className="px-2 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase rounded border border-emerald-500/20">
-                      Mastered
-                    </span>
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1">
-                  {/* FIX: Set text color to white for visibility */}
-                  <h4 className={`text-lg font-bold mb-2 text-white`}>
-                    {skill.title}
-                  </h4>
-                  {/* FIX: Set description text to a readable gray/white */}
-                  <p className={`text-sm leading-relaxed mb-4 ${isLocked ? 'text-gray-500' : 'text-gray-400'}`}>
-                    {skill.description}
-                  </p>
-                </div>
-
-                {/* Footer / Connectors */}
-                <div className="pt-4 border-t border-gray-800/50 mt-auto">
-                  {isLocked && prereqName ? (
-                    <div className="flex items-center gap-2 text-xs text-orange-400/80 font-medium">
-                      <Lock size={12} />
-                      <span>Requires: {prereqName}</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between text-xs text-gray-500 font-medium">
-                      <span>{skill.level || 'Medium'}</span>
-                      <span className="flex items-center gap-1 group-hover:text-indigo-400 transition-colors">
-                        {skill.estimatedMinutes || 15}m <ArrowRight size={12} />
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Subtle Progress Bar */}
-                {state !== 'locked' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-800 rounded-b-xl overflow-hidden">
-                    <div 
-                      className={`h-full ${isMastered ? 'bg-emerald-500' : 'bg-indigo-500'}`} 
-                      style={{ width: isMastered ? '100%' : '0%' }}
-                    />
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* --- MODALS --- */}
-      <NotificationSystem 
-        notifications={notifications} 
-        onRemoveNotification={(id) => setNotifications(prev => prev.filter(n => n.id !== id))} 
-      />
-
-      <PrerequisitesModal
-        showPrerequisites={showPrerequisites}
-        graph={graph}
-        getSkillState={getSkillState}
-        getSkillProgress={getSkillProgress}
-        getUnmetPrerequisites={getUnmetPrerequisites}
-        onClose={() => setShowPrerequisites(null)}
-        onSkillClick={handleSkillClick}
-      />
-
-      <EngineModal
-        selectedSkill={selectedSkill}
-        sessionChallenges={sessionChallenges}
-        conceptExplanation={conceptExplanation}
-        activeChallengeIndex={activeChallengeIndex}
-        currentChallenge={currentChallenge || sessionChallenges[activeChallengeIndex] || null} 
-        isGenerating={isGenerating}
-        onClose={() => {
-          setSelectedSkill(null);
-          setCurrentChallenge(null);
-          setActiveChallengeIndex(-1);
-        }}
-        onChallengeSelect={(idx) => {
-            setActiveChallengeIndex(idx);
-            setCurrentChallenge(sessionChallenges[idx]);
-        }}
-        onChallengeComplete={handleChallengeComplete}
-      />
-    </div> 
-  );
+);
 }

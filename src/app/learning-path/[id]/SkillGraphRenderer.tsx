@@ -10,11 +10,6 @@ export interface Skill {
   prerequisitesMet: boolean;
 }
 
-
-
-
-
-
 'use client';
 
 import { motion } from 'framer-motion';
@@ -57,23 +52,8 @@ export function SkillCard({ skill, onClick }: SkillCardProps) {
   );
 }
 
-What this does:
-
-Locked → gray, no hover, no click
-
-Available / In progress → white, interactive
-
-Mastered → black, confident, done
 
 
-Nothing fancy. Just clear state communication.
-
-
----
-
-2️⃣ Animated Next Skill Renderer (safe + predictable)
-
-Logic (no type tricks)
 
 const nextSkill = skills.find(
   s => s.prerequisitesMet && s.status !== 'mastered'
@@ -84,9 +64,7 @@ const remainingSkills = skills.filter(
 );
 
 
----
 
-Renderer
 
 'use client';
 

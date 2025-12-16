@@ -34,7 +34,7 @@ interface Notification {
 
 export default function SkillGraphRenderer({ 
   graph, 
-  courseTitle = "Course Curriculum", 
+  courseTitle = "Learning Path", 
   challenges = {} 
 }: SkillGraphRendererProps) {
 
@@ -176,7 +176,7 @@ export default function SkillGraphRenderer({
           setConceptExplanation(batch.explanation || '');
           setActiveChallengeIndex(-1); // Show intro modal first
         } else {
-            // Fallback for demo/error (FIX: Added hints and explanation)
+            // Fallback for demo/error
             setSessionChallenges([{
                 id: `fallback-${Date.now()}`,
                 skillId: skill.id,
@@ -186,8 +186,8 @@ export default function SkillGraphRenderer({
                 difficulty: 'Medium',
                 xpReward: 50,
                 validationCriteria: [],
-                hints: [], // Required by Challenge interface
-                explanation: "This is a fallback practice challenge because the AI challenge generation service is currently unavailable.", // Required by Challenge interface
+                hints: [], 
+                explanation: "This is a fallback practice challenge because the AI challenge generation service is currently unavailable.", 
             }]);
             setConceptExplanation("No generated challenges available.");
             setActiveChallengeIndex(0);
@@ -233,7 +233,8 @@ export default function SkillGraphRenderer({
       <div className="min-h-[60vh] flex items-center justify-center bg-gray-950">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400 font-medium">Loading Course Data...</p>
+          {/* FIX: Changed wording */}
+          <p className="text-gray-400 font-medium">Loading Learning Path Data...</p>
         </div>
       </div>
     );
@@ -256,13 +257,14 @@ export default function SkillGraphRenderer({
             <div>
               <div className="flex items-center gap-2 text-indigo-400 font-bold tracking-wider text-xs uppercase mb-2">
                 <BookOpen size={14} />
-                Course Dashboard
+                {/* FIX: Changed wording */}
+                Learning Path Dashboard
               </div>
               <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
                 {courseTitle}
               </h1>
               <p className="text-gray-400 mt-2 max-w-2xl text-lg">
-                Master the curriculum by completing the skill nodes below.
+                Master the skills by completing the nodes below.
               </p>
             </div>
 
@@ -327,7 +329,7 @@ export default function SkillGraphRenderer({
 
                 <button 
                   onClick={(e) => {
-                    e.stopPropagation(); // Prevents double-triggering from parent div click
+                    e.stopPropagation(); 
                     handleSkillClick(recommendedSkill.id);
                   }}
                   className="whitespace-nowrap flex items-center gap-3 px-8 py-4 bg-white hover:bg-indigo-50 text-indigo-950 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
@@ -343,7 +345,7 @@ export default function SkillGraphRenderer({
            <div className="mb-12 p-8 bg-green-900/20 border border-green-500/30 rounded-xl text-center">
                 <Trophy className="w-12 h-12 text-green-400 mx-auto mb-4" />
                 <h2 className="text-2xl font-bold text-white">Mission Complete!</h2>
-                <p className="text-gray-400">You have mastered all available skills in this curriculum.</p>
+                <p className="text-gray-400">You have mastered all available skills in this learning path.</p>
            </div>
         )}
 
@@ -351,10 +353,11 @@ export default function SkillGraphRenderer({
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
             <BookOpen className="w-4 h-4" />
-            Full Curriculum
+            {/* FIX: Changed wording */}
+            Learning Path Skills
           </h3>
           <span className="text-xs text-gray-600 bg-gray-900 px-2 py-1 rounded border border-gray-800">
-            {graph.nodes.length} Modules
+            {graph.nodes.length} Skills
           </span>
         </div>
 
@@ -410,10 +413,12 @@ export default function SkillGraphRenderer({
 
                 {/* Content */}
                 <div className="flex-1">
-                  <h4 className={`text-lg font-bold mb-2 ${isMastered ? 'text-emerald-50' : isLocked ? 'text-gray-400' : 'text-white'}`}>
+                  {/* FIX: Set text color to white for visibility, regardless of state */}
+                  <h4 className={`text-lg font-bold mb-2 text-white`}>
                     {skill.title}
                   </h4>
-                  <p className={`text-sm leading-relaxed mb-4 ${isLocked ? 'text-gray-600' : 'text-gray-400'}`}>
+                  {/* FIX: Set description text to a readable gray/white */}
+                  <p className={`text-sm leading-relaxed mb-4 ${isLocked ? 'text-gray-500' : 'text-gray-400'}`}>
                     {skill.description}
                   </p>
                 </div>
@@ -474,16 +479,3 @@ export default function SkillGraphRenderer({
         currentChallenge={currentChallenge || sessionChallenges[activeChallengeIndex] || null} 
         isGenerating={isGenerating}
         onClose={() => {
-          setSelectedSkill(null);
-          setCurrentChallenge(null);
-          setActiveChallengeIndex(-1);
-        }}
-        onChallengeSelect={(idx) => {
-            setActiveChallengeIndex(idx);
-            setCurrentChallenge(sessionChallenges[idx]);
-        }}
-        onChallengeComplete={handleChallengeComplete}
-      />
-    </div>
-  );
-}

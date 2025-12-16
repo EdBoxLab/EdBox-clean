@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { Skill } from './types';
-import { SkillCard } from './SkillCard';
+import { SkillCard } from './components/SkillCard'; // import from components folder
 
 interface SkillRendererProps {
   skills: Skill[];

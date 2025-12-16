@@ -117,9 +117,10 @@ export default function SkillGraphRenderer({
     if (nextUp) return nextUp;
 
     // 4. Fallback: If nothing is in progress and nothing is unlockable, 
-    //    start with the very first skill, provided it exists and is not mastered.
-    if (graph.nodes.length > 0 && getSkillState(graph.nodes[0].id) === 'locked') {
-        return graph.nodes[0];
+    //    return the very first skill if it's not yet mastered. (Robust Fallback)
+    const firstSkill = graph.nodes[0];
+    if (firstSkill && getSkillState(firstSkill.id) !== 'mastered') {
+        return firstSkill;
     }
     
     // 5. Default return null (e.g., if everything is mastered)
@@ -141,14 +142,14 @@ export default function SkillGraphRenderer({
       if (unmet.length > 0) {
         setShowPrerequisites(skillId);
       } else {
-        // Technically locked but ready to start? Just unlock it.
+        // Ready to start/unlock
         setSelectedSkill(skill);
         startSession(skill);
       }
       return;
     }
 
-    // Unlocked Logic
+    // Unlocked/In-Progress Logic
     setSelectedSkill(skill);
     startSession(skill);
   };
@@ -167,7 +168,6 @@ export default function SkillGraphRenderer({
     } else {
       setIsGenerating(true);
       try {
-        // Dynamic import moved inside the try block for better error handling
         const { generateChallengeBatch } = await import('@/app/actions/generate-challenges');
         const batch = await generateChallengeBatch(skill.id, skill.title, skill.engine || 'default');
         
@@ -325,7 +325,7 @@ export default function SkillGraphRenderer({
 
                 <button 
                   onClick={(e) => {
-                    e.stopPropagation(); // Prevent click from bubbling up and double-triggering
+                    e.stopPropagation(); // FIX: Prevents double-triggering from parent div click
                     handleSkillClick(recommendedSkill.id);
                   }}
                   className="whitespace-nowrap flex items-center gap-3 px-8 py-4 bg-white hover:bg-indigo-50 text-indigo-950 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
@@ -469,7 +469,8 @@ export default function SkillGraphRenderer({
         sessionChallenges={sessionChallenges}
         conceptExplanation={conceptExplanation}
         activeChallengeIndex={activeChallengeIndex}
-        currentChallenge={currentChallenge || sessionChallenges[activeChallengeIndex] || null}
+        // Ensure currentChallenge is null if index is out of bounds
+        currentChallenge={currentChallenge || sessionChallenges[activeChallengeIndex] || null} 
         isGenerating={isGenerating}
         onClose={() => {
           setSelectedSkill(null);

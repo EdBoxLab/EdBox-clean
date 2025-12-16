@@ -4,12 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
     "test": "jest",
-    "vercel-build": "next build"
+    "vercel-build": "next build       --webpack"
   },
   "dependencies": {
     "@google/genai": "^1.29.1",

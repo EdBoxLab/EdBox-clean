@@ -21,7 +21,7 @@ import EngineModal from './components/EngineModal';
 // --- PROPS ---
 interface SkillGraphRendererProps {
   graph: SkillGraph;
-  courseTitle?: string; // Added to restore course branding
+  courseTitle?: string;
   challenges?: Record<string, Challenge>;
 }
 
@@ -98,23 +98,32 @@ export default function SkillGraphRenderer({
       });
   }, [graph.nodes, getSkillState]);
 
-  // --- RECALCULATE "RECOMMENDED PATH" ---
+  // --- RECALCULATE "RECOMMENDED PATH" (FIXED LOGIC) ---
   const recommendedSkill = useMemo(() => {
-    if (!graph.nodes.length || progressLoading) return null;
+    // 1. Handle loading and empty graph states
+    if (progressLoading || !graph.nodes.length) return null;
 
-    // 1. Find In-Progress (Unlocked but not Mastered)
+    // 2. Find In-Progress (Unlocked but not Mastered)
     const inProgress = graph.nodes.find(n => getSkillState(n.id) === 'unlocked');
     if (inProgress) return inProgress;
 
-    // 2. Find Next Unlockable (Locked but prereqs met)
+    // 3. Find Next Unlockable (Locked but prereqs met)
     const nextUp = graph.nodes.find(n => {
+      // Check if node is currently locked
       if (getSkillState(n.id) !== 'locked') return false;
+      // Check if all prerequisites are met (unmet length is 0)
       return getUnmetPrerequisites(n).length === 0;
     });
     if (nextUp) return nextUp;
 
-    // 3. Fallback to first node if nothing started
-    return graph.nodes[0];
+    // 4. Fallback: If nothing is in progress and nothing is unlockable, 
+    //    start with the very first skill, provided it exists and is not mastered.
+    if (graph.nodes.length > 0 && getSkillState(graph.nodes[0].id) === 'locked') {
+        return graph.nodes[0];
+    }
+    
+    // 5. Default return null (e.g., if everything is mastered)
+    return null; 
   }, [graph.nodes, progressLoading, getSkillState, getUnmetPrerequisites]);
 
 
@@ -158,6 +167,7 @@ export default function SkillGraphRenderer({
     } else {
       setIsGenerating(true);
       try {
+        // Dynamic import moved inside the try block for better error handling
         const { generateChallengeBatch } = await import('@/app/actions/generate-challenges');
         const batch = await generateChallengeBatch(skill.id, skill.title, skill.engine || 'default');
         
@@ -177,6 +187,8 @@ export default function SkillGraphRenderer({
                 xpReward: 50,
                 validationCriteria: []
             }]);
+            setConceptExplanation("No generated challenges available.");
+            setActiveChallengeIndex(0);
         }
       } catch (e) {
         console.error("Generator Error:", e);
@@ -226,10 +238,9 @@ export default function SkillGraphRenderer({
   }
 
   // Calculate Stats
-  const totalXP = graph.nodes.reduce((acc, n) => acc + (n.xpReward || 100), 0);
   const currentXP = progressData.reduce((acc, p) => acc + (p.progressData.xpEarned || 0), 0);
   const masteredCount = progressData.filter(p => p.progressData.masteryAchieved).length;
-  const progressPercent = Math.round((masteredCount / graph.nodes.length) * 100) || 0;
+  const progressPercent = graph.nodes.length > 0 ? Math.round((masteredCount / graph.nodes.length) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-[#0f111a] text-white font-sans selection:bg-indigo-500/30 pb-20">
@@ -272,7 +283,7 @@ export default function SkillGraphRenderer({
       <div className="max-w-7xl mx-auto px-6 mt-8">
         
         {/* 2. THE RECOMMENDED ACTION (CTA) */}
-        {recommendedSkill && (
+        {recommendedSkill ? (
           <div className="mb-12">
             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
               <Zap className="w-4 h-4 text-indigo-500" />
@@ -282,7 +293,8 @@ export default function SkillGraphRenderer({
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="relative group overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-900/40 to-gray-900 border border-indigo-500/30 hover:border-indigo-500/50 transition-all duration-300 shadow-2xl shadow-indigo-900/20"
+              onClick={() => handleSkillClick(recommendedSkill.id)}
+              className="relative group overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-900/40 to-gray-900 border border-indigo-500/30 hover:border-indigo-500/50 transition-all duration-300 shadow-2xl shadow-indigo-900/20 cursor-pointer"
             >
               <div className="absolute top-0 right-0 p-32 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
               
@@ -312,7 +324,10 @@ export default function SkillGraphRenderer({
                 </div>
 
                 <button 
-                  onClick={() => handleSkillClick(recommendedSkill.id)}
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent click from bubbling up and double-triggering
+                    handleSkillClick(recommendedSkill.id);
+                  }}
                   className="whitespace-nowrap flex items-center gap-3 px-8 py-4 bg-white hover:bg-indigo-50 text-indigo-950 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
                 >
                   <Play className="fill-current w-5 h-5" />
@@ -321,6 +336,13 @@ export default function SkillGraphRenderer({
               </div>
             </motion.div>
           </div>
+        ) : (
+           // Fallback if no recommended skill exists (e.g., everything mastered)
+           <div className="mb-12 p-8 bg-green-900/20 border border-green-500/30 rounded-xl text-center">
+                <Trophy className="w-12 h-12 text-green-400 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-white">Mission Complete!</h2>
+                <p className="text-gray-400">You have mastered all available skills in this curriculum.</p>
+           </div>
         )}
 
         {/* 3. SKILL GRID */}
@@ -358,7 +380,7 @@ export default function SkillGraphRenderer({
                   ${isMastered 
                     ? 'bg-gradient-to-br from-gray-900 to-gray-900 border-emerald-500/30' 
                     : isLocked 
-                      ? 'bg-gray-950 border-gray-800 opacity-80 hover:opacity-100 hover:border-gray-700' 
+                      ? 'bg-gray-950/80 border-gray-800 hover:border-gray-700' 
                       : 'bg-gray-900 border-gray-700 hover:border-indigo-500/50'
                   }
                   cursor-pointer
@@ -447,7 +469,7 @@ export default function SkillGraphRenderer({
         sessionChallenges={sessionChallenges}
         conceptExplanation={conceptExplanation}
         activeChallengeIndex={activeChallengeIndex}
-        currentChallenge={currentChallenge || sessionChallenges[activeChallengeIndex]}
+        currentChallenge={currentChallenge || sessionChallenges[activeChallengeIndex] || null}
         isGenerating={isGenerating}
         onClose={() => {
           setSelectedSkill(null);

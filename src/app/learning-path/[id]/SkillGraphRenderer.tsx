@@ -233,7 +233,6 @@ export default function SkillGraphRenderer({
       <div className="min-h-[60vh] flex items-center justify-center bg-gray-950">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          {/* FIX: Changed wording */}
           <p className="text-gray-400 font-medium">Loading Learning Path Data...</p>
         </div>
       </div>
@@ -257,7 +256,6 @@ export default function SkillGraphRenderer({
             <div>
               <div className="flex items-center gap-2 text-indigo-400 font-bold tracking-wider text-xs uppercase mb-2">
                 <BookOpen size={14} />
-                {/* FIX: Changed wording */}
                 Learning Path Dashboard
               </div>
               <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
@@ -353,7 +351,6 @@ export default function SkillGraphRenderer({
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
             <BookOpen className="w-4 h-4" />
-            {/* FIX: Changed wording */}
             Learning Path Skills
           </h3>
           <span className="text-xs text-gray-600 bg-gray-900 px-2 py-1 rounded border border-gray-800">
@@ -413,7 +410,7 @@ export default function SkillGraphRenderer({
 
                 {/* Content */}
                 <div className="flex-1">
-                  {/* FIX: Set text color to white for visibility, regardless of state */}
+                  {/* FIX: Set text color to white for visibility */}
                   <h4 className={`text-lg font-bold mb-2 text-white`}>
                     {skill.title}
                   </h4>
@@ -479,3 +476,16 @@ export default function SkillGraphRenderer({
         currentChallenge={currentChallenge || sessionChallenges[activeChallengeIndex] || null} 
         isGenerating={isGenerating}
         onClose={() => {
+          setSelectedSkill(null);
+          setCurrentChallenge(null);
+          setActiveChallengeIndex(-1);
+        }}
+        onChallengeSelect={(idx) => {
+            setActiveChallengeIndex(idx);
+            setCurrentChallenge(sessionChallenges[idx]);
+        }}
+        onChallengeComplete={handleChallengeComplete}
+      />
+    </div> 
+  );
+}

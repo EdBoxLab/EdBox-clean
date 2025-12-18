@@ -1,14 +1,14 @@
 
 export const QUIZ_TEMPLATE = `
-Generate 10 highly professional and educationally sound multiple-choice questions.
+Generate 20 highly professional and educationally sound multiple-choice questions.
 Each question must include:
 - A clear, concise question stems.
 - 4 plausible options (A, B, C, D).
 - The index of the correct answer (0-3).
 - A detailed explanation of why the correct answer is right and why others are wrong.
 - A difficulty level (Easy, Medium, Hard).
-
-Format the output as a JSON array of objects:
+it must match exactly this I repeat.
+Format the output strictly as a JSON array of objects:
 [
   {
     "question": "string",

@@ -13,7 +13,7 @@ export const FactCard: React.FC<FactCardProps> = ({ item, isActive }) => {
     const [isRevealed, setIsRevealed] = useState(false);
 
     return (
-        <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden">
+        <div className="w-full text-center flex flex-col justify-center items-center h-full px-2 sm:px-4 relative overflow-hidden">
             {/* Background Effects */}
             <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-transparent to-cyan-900/20" />
             <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-cyan-500/20 to-transparent" />
@@ -24,14 +24,14 @@ export const FactCard: React.FC<FactCardProps> = ({ item, isActive }) => {
                 initial={{ scale: 0, rotate: -180 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                className="flex items-center gap-2 mb-4"
+                className="flex items-center gap-1 sm:gap-2 mb-3 sm:mb-4"
             >
-                <div className="p-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full shadow-lg shadow-cyan-500/30">
-                    <Lightbulb className="w-6 h-6 text-white" />
+                <div className="p-2 sm:p-3 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full shadow-lg shadow-cyan-500/30">
+                    <Lightbulb className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
                 <div className="flex items-center gap-1">
                     <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
-                    <span className="text-cyan-400 font-bold text-sm">DID YOU KNOW?</span>
+                    <span className="text-cyan-400 font-bold text-xs sm:text-sm">DID YOU KNOW?</span>
                     <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
                 </div>
             </motion.div>
@@ -41,7 +41,7 @@ export const FactCard: React.FC<FactCardProps> = ({ item, isActive }) => {
                 initial={{ y: 50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="w-full max-w-sm mb-4 rounded-xl overflow-hidden shadow-2xl ring-2 ring-cyan-500/20"
+                className="w-full max-w-[280px] sm:max-w-sm mb-3 sm:mb-4 rounded-xl overflow-hidden shadow-2xl ring-2 ring-cyan-500/20"
             >
                 <CardImage
                     generationState={item.imageGenerationState}
@@ -55,9 +55,9 @@ export const FactCard: React.FC<FactCardProps> = ({ item, isActive }) => {
                 initial={{ y: 30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.4 }}
-                className="w-full max-w-md"
+                className="w-full max-w-sm sm:max-w-md"
             >
-                <div className="bg-gradient-to-r from-black/40 to-black/20 backdrop-blur-sm rounded-xl p-4 border border-cyan-500/20">
+                <div className="bg-gradient-to-r from-black/40 to-black/20 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-cyan-500/20">
 
                     <motion.div
                         initial={{ height: 0, opacity: 0 }}
@@ -65,7 +65,7 @@ export const FactCard: React.FC<FactCardProps> = ({ item, isActive }) => {
                         transition={{ delay: 0.8, duration: 0.5 }}
                         className="overflow-hidden"
                     >
-                        <p className="text-gray-300 text-sm leading-relaxed mb-4">
+                        <p className="text-gray-300 text-xs sm:text-sm leading-relaxed mb-3 sm:mb-4">
                             {item.explanation}
                         </p>
                     </motion.div>

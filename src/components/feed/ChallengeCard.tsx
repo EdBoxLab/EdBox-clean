@@ -86,7 +86,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, isActive, on
     }
 
     return (
-        <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden">
+        <div className="w-full text-center flex flex-col justify-center items-center h-full px-2 sm:px-4 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-orange-900/20 via-transparent to-red-900/20" />
             <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-500/20 to-transparent" />
 
@@ -95,7 +95,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, isActive, on
             <motion.div
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                className="flex items-center justify-between w-full max-w-md mb-4"
+                className="flex items-center justify-between w-full max-w-sm sm:max-w-md mb-3 sm:mb-4"
             >
                 <div className="flex items-center gap-2">
                     <div className="p-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-full">
@@ -127,7 +127,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, isActive, on
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="text-lg sm:text-xl font-bold mb-4 drop-shadow-lg bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent px-2"
+                className="text-base sm:text-lg lg:text-xl font-bold mb-3 sm:mb-4 drop-shadow-lg bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent px-1 sm:px-2 leading-tight"
             >
                 {item.title}
             </motion.h2>
@@ -137,7 +137,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, isActive, on
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ delay: 0.3 }}
-                    className="w-full max-w-xs mb-4 rounded-xl overflow-hidden shadow-2xl ring-2 ring-orange-500/20"
+                    className="w-full max-w-[280px] sm:max-w-xs mb-3 sm:mb-4 rounded-xl overflow-hidden shadow-2xl ring-2 ring-orange-500/20"
                 >
                     <CardImage
                         generationState={item.imageGenerationState}
@@ -151,7 +151,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, isActive, on
                 initial={{ y: 30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.4 }}
-                className="text-base sm:text-lg max-w-md leading-relaxed mb-6 px-2 bg-black/30 p-4 rounded-xl border border-orange-500/20"
+                className="text-sm sm:text-base lg:text-lg max-w-sm sm:max-w-md leading-relaxed mb-4 sm:mb-6 px-1 sm:px-2 bg-black/30 p-3 sm:p-4 rounded-xl border border-orange-500/20"
             >
                 {item.question}
             </motion.p>
@@ -164,7 +164,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, isActive, on
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
-                className="w-full max-w-sm"
+                className="w-full max-w-xs sm:max-w-sm"
             >
                 <div className="relative">
                     <input
@@ -176,7 +176,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, isActive, on
                         onTouchStart={(e) => e.stopPropagation()}
                         disabled={answered}
                         placeholder="Type your answer..."
-                        className={`w-full p-4 bg-black/40 backdrop-blur-sm border-2 rounded-xl text-white placeholder-gray-400 focus:outline-none transition-all duration-200 ${getBorderColor()}`}
+                        className={`w-full p-3 sm:p-4 bg-black/40 backdrop-blur-sm border-2 rounded-xl text-white placeholder-gray-400 focus:outline-none transition-all duration-200 text-sm sm:text-base ${getBorderColor()}`}
                     />
                     <motion.button
                         type="submit"

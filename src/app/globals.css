@@ -139,6 +139,14 @@
   display: none;
 }
 
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -152,4 +160,26 @@
 }
 .glass-hover {
     @apply hover:bg-white/10 transition-colors duration-200;
+}
+
+/* Feed Responsive Utilities */
+@media (max-width: 375px) {
+  .feed-card {
+    padding: 0.75rem;
+  }
+  
+  .feed-card h1, .feed-card h2 {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  
+  .feed-card p {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+  
+  .feed-card button {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
 }

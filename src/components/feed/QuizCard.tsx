@@ -121,7 +121,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
             <motion.h2
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                className="text-lg sm:text-xl md:text-2xl font-bold mb-6 drop-shadow-lg px-4 bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent"
+                className="text-base sm:text-lg lg:text-xl font-bold mb-4 sm:mb-6 drop-shadow-lg px-2 sm:px-4 bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent leading-tight"
             >
                 {item.question}
             </motion.h2>
@@ -130,7 +130,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                 initial={{ y: 30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg px-4"
+                className="grid grid-cols-1 gap-2 sm:gap-3 w-full max-w-sm sm:max-w-lg px-2 sm:px-4"
             >
                 {item.options?.map((option, index) => (
                     <motion.button
@@ -147,7 +147,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                         onMouseDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
                         disabled={answered}
-                        className={`p-3 sm:p-4 rounded-xl font-semibold text-sm sm:text-base transition-all duration-300 transform select-none ${getButtonClass(option)}`}
+                        className={`p-2 sm:p-3 lg:p-4 rounded-xl font-semibold text-xs sm:text-sm lg:text-base transition-all duration-300 transform select-none ${getButtonClass(option)}`}
                     >
                         {option}
                     </motion.button>

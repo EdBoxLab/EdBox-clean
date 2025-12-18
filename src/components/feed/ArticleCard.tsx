@@ -70,14 +70,14 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, isActive, onView
     };
 
     return (
-        <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden">
+        <div className="w-full text-center flex flex-col justify-center items-center h-full px-2 sm:px-4 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 via-transparent to-purple-900/20" />
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
 
             <motion.div
                 initial={{ y: -30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                className="flex items-center gap-3 mb-4"
+                className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4"
             >
                 <div className="p-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full">
                     <FileText className="w-5 h-5 text-white" />
@@ -99,7 +99,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, isActive, onView
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="w-full max-w-sm mb-4 rounded-xl overflow-hidden shadow-2xl ring-2 ring-indigo-500/20"
+                    className="w-full max-w-[280px] sm:max-w-sm mb-3 sm:mb-4 rounded-xl overflow-hidden shadow-2xl ring-2 ring-indigo-500/20"
                 >
                     <CardImage
                         generationState={item.imageGenerationState}
@@ -113,7 +113,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, isActive, onView
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
-                className="text-lg sm:text-xl font-bold mb-4 drop-shadow-lg px-2 bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent"
+                className="text-base sm:text-lg lg:text-xl font-bold mb-3 sm:mb-4 drop-shadow-lg px-1 sm:px-2 bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent leading-tight"
             >
                 {item.title}
             </motion.h2>
@@ -122,10 +122,10 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, isActive, onView
                 initial={{ y: 30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.4 }}
-                className="w-full max-w-md"
+                className="w-full max-w-sm sm:max-w-md"
             >
-                <div className="bg-gradient-to-r from-black/40 to-black/20 backdrop-blur-sm rounded-xl p-4 border border-indigo-500/20 mb-6">
-                    <p className="text-gray-200 leading-relaxed text-sm">
+                <div className="bg-gradient-to-r from-black/40 to-black/20 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-indigo-500/20 mb-4 sm:mb-6">
+                    <p className="text-gray-200 leading-relaxed text-xs sm:text-sm">
                         {item.summary}
                     </p>
                 </div>
@@ -135,7 +135,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, isActive, onView
                 initial={{ y: 40, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.6 }}
-                className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-md"
+                className="flex flex-col gap-2 sm:gap-3 w-full max-w-sm sm:max-w-md"
             >
                 <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -146,7 +146,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, isActive, onView
                     }}
                     onMouseDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
-                    className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg shadow-indigo-500/25 cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold py-2 sm:py-3 px-4 sm:px-6 rounded-xl transition-all duration-200 shadow-lg shadow-indigo-500/25 cursor-pointer text-sm sm:text-base"
                 >
                     <BookOpenIcon />
                     <span>Read Full Article</span>
@@ -159,7 +159,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, isActive, onView
                     onMouseDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
                     disabled={audioState?.state === 'generating'}
-                    className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600/20 to-pink-600/20 hover:from-purple-600/30 hover:to-pink-600/30 border border-purple-400/30 text-purple-300 font-semibold py-3 px-4 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-wait cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600/20 to-pink-600/20 hover:from-purple-600/30 hover:to-pink-600/30 border border-purple-400/30 text-purple-300 font-semibold py-2 sm:py-3 px-3 sm:px-4 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-wait cursor-pointer text-sm sm:text-base"
                 >
                     {renderListenButtonIcon()}
                     <span className="hidden sm:inline">{isPlaying ? 'Stop' : 'Listen'}</span>
@@ -170,7 +170,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, isActive, onView
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.8 }}
-                className="flex items-center justify-between w-full max-w-md mt-4"
+                className="flex items-center justify-between w-full max-w-sm sm:max-w-md mt-3 sm:mt-4"
             >
                 <div className="flex items-center gap-3">
                     <motion.button

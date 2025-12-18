@@ -307,7 +307,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
         <XPStreakDisplay showCompact={true} />
       </div>
 
-      <div className="max-w-md mx-auto h-screen snap-y snap-mandatory overflow-y-auto scroll-smooth no-scrollbar pt-10 px-4" ref={feedRef}>
+      <div className="w-full max-w-sm sm:max-w-md lg:max-w-lg mx-auto h-screen snap-y snap-mandatory overflow-y-auto scroll-smooth no-scrollbar pt-10 px-3 sm:px-4" ref={feedRef}>
         {items.map((item, index) => (
           <div
             key={item.id}

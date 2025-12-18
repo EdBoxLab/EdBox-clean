@@ -52,13 +52,13 @@ export const InsightCard: React.FC<InsightCardProps> = ({ item, isActive }) => {
     }, [isActive, item.full_content]);
 
     return (
-        <div className="w-full h-full flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <div className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-4 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/10 via-transparent to-purple-900/10" />
 
             {/* Header */}
 
             {/* Chat Area */}
-            <div className="w-full max-w-sm flex flex-col gap-3 z-10 h-[300px] overflow-y-auto no-scrollbar py-4 px-2">
+            <div className="w-full max-w-xs sm:max-w-sm flex flex-col gap-2 sm:gap-3 z-10 h-[250px] sm:h-[300px] overflow-y-auto no-scrollbar py-2 sm:py-4 px-1 sm:px-2">
                 <AnimatePresence>
                     {messages.map((msg, i) => (
                         <motion.div
@@ -67,8 +67,8 @@ export const InsightCard: React.FC<InsightCardProps> = ({ item, isActive }) => {
                             animate={{ opacity: 1, x: 0, scale: 1 }}
                             className="flex justify-start"
                         >
-                            <div className="bg-zinc-800/80 backdrop-blur-md border border-zinc-700/50 p-3 rounded-2xl rounded-tl-none max-w-[85%] shadow-md">
-                                <p className="text-sm sm:text-base text-gray-100 leading-relaxed font-medium">
+                            <div className="bg-zinc-800/80 backdrop-blur-md border border-zinc-700/50 p-2 sm:p-3 rounded-2xl rounded-tl-none max-w-[90%] sm:max-w-[85%] shadow-md">
+                                <p className="text-xs sm:text-sm lg:text-base text-gray-100 leading-relaxed font-medium">
                                     {msg.text}
                                 </p>
                             </div>

@@ -1,27 +1,23 @@
 export const QUIZ_TEMPLATE = `
 Generate 20 high-quality multiple-choice questions.
 
-STRICT REQUIREMENTS:
-1. Each question MUST have exactly 4 options
-2. correctAnswer MUST be a number from 0-3 (not 1-4!)
-3. difficulty MUST be exactly "Easy", "Medium", or "Hard"
-4. All strings must be properly escaped for JSON
+CRITICAL REQUIREMENTS:
+- correctAnswer MUST be 0, 1, 2, or 3 (NOT 1-4!)
+- 0 = first option
+- 1 = second option  
+- 2 = third option
+- 3 = fourth option
 
-Output ONLY valid JSON with NO other text:
+Output format (ONLY JSON, no other text):
 [
   {
-    "question": "Clear, specific question text",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "question": "What is the capital of France?",
+    "options": ["London", "Berlin", "Paris", "Madrid"],
     "correctAnswer": 2,
-    "explanation": "Why option C (index 2) is correct. Why others are wrong.",
-    "difficulty": "Medium"
+    "explanation": "Paris is correct (index 2, third option).",
+    "difficulty": "Easy"
   }
 ]
-
-CRITICAL: 
-- correctAnswer is 0-indexed (0 = first option, 3 = fourth option)
-- Include explanations for ALL options
-- No markdown, no code blocks, just pure JSON
 `;
 
 export const FLASHCARD_TEMPLATE = `

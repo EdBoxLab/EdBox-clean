@@ -1,23 +1,27 @@
-
 export const QUIZ_TEMPLATE = `
-Generate 20 highly professional and educationally sound multiple-choice questions.
-Each question must include:
-- A clear, concise question stems.
-- 4 plausible options (A, B, C, D).
-- The index of the correct answer (0-3).
-- A detailed explanation of why the correct answer is right and why others are wrong.
-- A difficulty level (Easy, Medium, Hard).
-it must match exactly this I repeat.
-Format the output strictly as a JSON array of objects:
+Generate 20 high-quality multiple-choice questions.
+
+STRICT REQUIREMENTS:
+1. Each question MUST have exactly 4 options
+2. correctAnswer MUST be a number from 0-3 (not 1-4!)
+3. difficulty MUST be exactly "Easy", "Medium", or "Hard"
+4. All strings must be properly escaped for JSON
+
+Output ONLY valid JSON with NO other text:
 [
   {
-    "question": "string",
-    "options": ["string", "string", "string", "string"],
-    "correctAnswer": number,
-    "explanation": "string",
-    "difficulty": "string"
+    "question": "Clear, specific question text",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correctAnswer": 2,
+    "explanation": "Why option C (index 2) is correct. Why others are wrong.",
+    "difficulty": "Medium"
   }
 ]
+
+CRITICAL: 
+- correctAnswer is 0-indexed (0 = first option, 3 = fourth option)
+- Include explanations for ALL options
+- No markdown, no code blocks, just pure JSON
 `;
 
 export const FLASHCARD_TEMPLATE = `

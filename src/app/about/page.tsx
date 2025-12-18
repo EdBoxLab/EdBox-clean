@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { 
-  Sparkles, Brain, Zap, Users, Target, BookOpen, 
-  GraduationCap, Globe, Award, MessageCircle, 
-  ArrowRight, Check, Star, AlertCircle 
+import {
+  Sparkles, Brain, Zap, Users, Target, BookOpen,
+  GraduationCap, Globe, Award, MessageCircle,
+  ArrowRight, Check, Star, AlertCircle
 } from 'lucide-react';
 
 export default function AboutPage() {
@@ -33,8 +33,8 @@ export default function AboutPage() {
     },
     {
       icon: <Zap className="w-8 h-8" />,
-      title: 'Instant Study Tools',
-      description: 'Generate flashcards, quizzes, and study guides from any content in seconds',
+      title: 'Study Kits',
+      description: 'Make life easier with quizzes, notes, mind maps, and flashcards',
       color: 'from-purple-500 to-pink-500'
     },
     {
@@ -168,8 +168,8 @@ export default function AboutPage() {
             </h1>
 
             <p className="text-xl text-zinc-400 max-w-3xl mx-auto mb-8">
-              EdBox is your AI-powered learning companion that transforms how you study. 
-              Create personalized study materials, collaborate with peers, and achieve your goals faster.
+              Ditch passive watching for active learning. EdBox helps you land that dream job
+              and ace your grades with less effort—getting you smarter with every scroll.
             </p>
 
             {betaStatus && (
@@ -314,7 +314,7 @@ export default function AboutPage() {
             className="relative bg-gradient-to-br from-indigo-900/50 to-purple-900/50 backdrop-blur-xl border border-indigo-500/30 rounded-3xl p-12 text-center overflow-hidden"
           >
             <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
-            
+
             <div className="relative">
               <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl mb-6 shadow-2xl shadow-indigo-500/50">
                 <GraduationCap className="w-10 h-10 text-white" />
@@ -324,8 +324,8 @@ export default function AboutPage() {
                 Ready to Transform Your Learning?
               </h2>
               <p className="text-xl text-zinc-300 mb-8 max-w-2xl mx-auto">
-                {betaStatus?.isFull 
-                  ? "Join our waitlist to get early access when we launch fully!" 
+                {betaStatus?.isFull
+                  ? "Join our waitlist to get early access when we launch fully!"
                   : "Join the first 100 students to get exclusive beta access"}
               </p>
 

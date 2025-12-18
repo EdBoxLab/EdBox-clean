@@ -41,6 +41,13 @@ const FeedAnimations = () => (
     .active-card-indicator {
       box-shadow: 0 0 25px 5px rgba(168, 85, 247, 0.4);
     }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
   `}</style>
 );
 
@@ -56,8 +63,6 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
 
   // Audio State for Articles
   const [summaryAudio, setSummaryAudio] = useState<Record<string, { state: AudioGenerationState, buffer?: AudioBuffer }>>({});
-
-  // No Article Reading State needed anymore
 
   const feedRef = useRef<HTMLDivElement>(null);
   const observer = useRef<IntersectionObserver | null>(null);
@@ -146,7 +151,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       processingRef.current = false;
       setLoading(false);
     }
-  }, [preferences.interests, likedTopics]); // Removed viewedTypes and currentBatch from dependencies
+  }, [preferences.interests, likedTopics, viewedTypes, currentBatch, supabase]);
 
   // Initial Load - ONLY ONCE
   useEffect(() => {
@@ -154,7 +159,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       console.log('🚀 Initial feed load triggered');
       loadMoreItems(true);
     }
-  }, [hasLoadedInitial]); // Only depend on hasLoadedInitial, NOT loadMoreItems
+  }, [hasLoadedInitial, loadMoreItems]);
 
   // Infinite Scroll Observer
   useEffect(() => {
@@ -307,37 +312,37 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
         <XPStreakDisplay showCompact={true} />
       </div>
 
-      <div className="w-full max-w-sm sm:max-w-md lg:max-w-lg mx-auto h-screen snap-y snap-mandatory overflow-y-auto scroll-smooth no-scrollbar pt-10 px-3 sm:px-4" ref={feedRef}>
+      <div className="w-full h-screen snap-y snap-mandatory overflow-y-auto scroll-smooth no-scrollbar" ref={feedRef}>
         {items.map((item, index) => (
           <div
             key={item.id}
             id={item.id}
-            className="feed-card opacity-0 animate-card-enter min-h-screen flex items-stretch snap-start"
+            className="feed-card opacity-0 animate-card-enter h-screen w-full snap-start snap-always flex items-center justify-center px-4 py-20"
             style={{ animationDelay: `${(index % 5) * 100}ms` }}
           >
-            <CardWrapper
-              item={item}
-              isActive={activeCardId === item.id}
-              onSwipe={handleSwipe}
-              onFeedback={handleFeedback}
-            >
-              <div className="w-full h-full flex flex-col justify-center">
+            <div className="w-full max-w-2xl h-full flex items-center justify-center">
+              <CardWrapper
+                item={item}
+                isActive={activeCardId === item.id}
+                onSwipe={handleSwipe}
+                onFeedback={handleFeedback}
+              >
                 {renderCardContent(item, activeCardId === item.id)}
-              </div>
-            </CardWrapper>
+              </CardWrapper>
+            </div>
           </div>
         ))}
 
         {(loading || items.length === 0) && (
-          <>
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </>
+          <div className="h-screen snap-start flex items-center justify-center px-4 py-20">
+            <div className="w-full max-w-2xl">
+              <SkeletonCard />
+            </div>
+          </div>
         )}
 
         {loading && items.length > 0 && (
-          <div className="col-span-full flex items-center justify-center py-8">
+          <div className="h-screen snap-start flex items-center justify-center px-4">
             <div className="flex items-center gap-3 text-gray-400">
               <Loader2 className="w-5 h-5 animate-spin" />
               <span>Loading fresh content...</span>

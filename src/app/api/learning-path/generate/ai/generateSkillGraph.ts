@@ -199,7 +199,7 @@ Use EXACT JSON SHAPE:
       "engine": "LinguaLab | CodeStudio | MathLab | FinLab",  // CASE-SENSITIVE
       "estimatedMinutes": number,
       "xpReward": number
-    }
+    }(skill title must never start with node but regular text that referencs an actual skill, description should be comprehensive enough for users to easily understand.)
   ],
   "miniProjects": [
     {

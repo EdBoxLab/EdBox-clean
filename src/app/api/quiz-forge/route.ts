@@ -25,7 +25,7 @@ export async function POST(request: Request) {
           }
         ]
       }
-
+in total the quiz should consist of between 10-20 questions.
       Notes:
       ${notes}
     `;

@@ -6,8 +6,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 type Theme = 'light' | 'dark';
 
 interface ThemeContextType {
-  theme: Theme;
-  toggleTheme: () => void;
+    theme: Theme;
+    toggleTheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -18,9 +18,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     useEffect(() => {
         const root = window.document.documentElement;
         const initialTheme = localStorage.getItem('theme') as Theme | null;
+
         if (initialTheme) {
             setTheme(initialTheme);
+            root.classList.remove('light', 'dark');
             root.classList.add(initialTheme);
+        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            setTheme('dark');
+            root.classList.remove('light', 'dark');
+            root.classList.add('dark');
         } else {
             root.classList.add('light');
         }
@@ -29,7 +35,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const toggleTheme = () => {
         const root = window.document.documentElement;
         const newTheme = theme === 'light' ? 'dark' : 'light';
-        root.classList.remove(theme);
+        root.classList.remove('light', 'dark');
         root.classList.add(newTheme);
         localStorage.setItem('theme', newTheme);
         setTheme(newTheme);

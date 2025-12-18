@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
+import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useState, useEffect } from 'react';
@@ -20,7 +21,6 @@ export const Header = () => {
     };
     getUser();
   }, []);
-
   return (
     <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-200 dark:border-slate-800">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
@@ -45,7 +45,8 @@ export const Header = () => {
               <Link href="/about" className="text-sm lg:text-base font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white whitespace-nowrap">About</Link>
               <Link href="/contact" className="text-sm lg:text-base font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white whitespace-nowrap">Contact</Link>
             </nav>
-            <div className="ml-2 sm:ml-4 md:ml-8">
+            <div className="flex items-center gap-2 sm:gap-4 ml-2 sm:ml-4 md:ml-8">
+              <ThemeToggle />
               {user ? <UserMenu /> : <Link href="/login" className="text-sm lg:text-base font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white whitespace-nowrap">Login</Link>}
             </div>
           </div>

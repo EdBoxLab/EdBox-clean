@@ -7,12 +7,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface ChallengeCardProps {
     item: ChallengeFeedItem;
+    isActive: boolean;
     onCorrect: (xp: number, isStreak: boolean) => void;
     onIncorrect: () => void;
     onSwipe: (id: string, action: 'answered') => void;
 }
 
-export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, onIncorrect, onSwipe }) => {
+export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, isActive, onCorrect, onIncorrect, onSwipe }) => {
     const [timeLeft, setTimeLeft] = useState(item.time_limit);
     const [inputValue, setInputValue] = useState('');
     const [answered, setAnswered] = useState(false);
@@ -20,6 +21,8 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
+        if (!isActive) return;
+
         timerRef.current = setInterval(() => {
             setTimeLeft(prev => (prev > 0 ? prev - 1 : 0));
         }, 1000);
@@ -27,7 +30,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
         };
-    }, []);
+    }, [isActive]);
 
     useEffect(() => {
         if (timeLeft === 0 && !answered) {
@@ -44,12 +47,19 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         if (answered) return;
         if (timerRef.current) clearInterval(timerRef.current);
 
         setAnswered(true);
-        const correct = inputValue.trim().toLowerCase() === item.answer.toLowerCase();
+        const userAnsw = inputValue.trim().toLowerCase();
+        const correctAnsw = item.answer.toLowerCase();
+
+        // Fuzzy match: exact, or user input contains correct answer, or vice versa
+        // We only allow this if the answer is at least 3 chars to avoid false positives
+        const isFuzzyMatch = userAnsw.includes(correctAnsw) || correctAnsw.includes(userAnsw);
+        const correct = userAnsw === correctAnsw || (correctAnsw.length > 3 && isFuzzyMatch);
+
         setIsCorrect(correct);
 
         if (correct) {
@@ -60,7 +70,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
 
         setTimeout(() => {
             onSwipe(item.id, 'answered');
-        }, 1500);
+        }, 1200);
     };
 
     const getTimerColor = () => {
@@ -78,11 +88,11 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
     return (
         <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-orange-900/20 via-transparent to-red-900/20" />
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 animate-pulse" />
-            
+            <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-500/20 to-transparent" />
+
             <Confetti isFiring={isCorrect === true} />
 
-            <motion.div 
+            <motion.div
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 className="flex items-center justify-between w-full max-w-md mb-4"
@@ -99,11 +109,11 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                         </div>
                     )}
                 </div>
-                
-                <motion.div 
-                    animate={{ 
+
+                <motion.div
+                    animate={{
                         scale: timeLeft <= 10 ? [1, 1.1, 1] : 1,
-                        rotate: timeLeft <= 5 ? [0, -5, 5, 0] : 0 
+                        rotate: timeLeft <= 5 ? [0, -5, 5, 0] : 0
                     }}
                     transition={{ duration: 0.5, repeat: timeLeft <= 10 ? Infinity : 0 }}
                     className="flex items-center gap-2 bg-black/40 px-3 py-2 rounded-full"
@@ -113,7 +123,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                 </motion.div>
             </motion.div>
 
-            <motion.h2 
+            <motion.h2
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
@@ -123,7 +133,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
             </motion.h2>
 
             {item.imageGenerationState && (
-                <motion.div 
+                <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ delay: 0.3 }}
@@ -137,7 +147,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                 </motion.div>
             )}
 
-            <motion.p 
+            <motion.p
                 initial={{ y: 30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.4 }}
@@ -146,7 +156,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                 {item.question}
             </motion.p>
 
-            <motion.form 
+            <motion.form
                 initial={{ y: 40, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.6 }}
@@ -183,15 +193,6 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                 </div>
             </motion.form>
 
-            <motion.div 
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.8 }}
-                className="mt-4 flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-full border border-yellow-400/30"
-            >
-                <Trophy className="w-4 h-4 text-yellow-400" />
-                <span className="text-yellow-400 font-bold text-sm">{item.xp_reward} XP</span>
-            </motion.div>
 
             <AnimatePresence>
                 {answered && (
@@ -204,7 +205,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                         <div className={`text-lg font-bold mb-2 ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
                             {isCorrect ? '🎯 Correct!' : '❌ Time\'s up!'}
                         </div>
-                        
+
                         {!isCorrect && (
                             <motion.div
                                 initial={{ opacity: 0 }}
@@ -214,7 +215,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onCorrect, o
                                 The answer was: <span className="text-green-400 font-bold">{item.answer}</span>
                             </motion.div>
                         )}
-                        
+
                         <p className="mt-3 text-gray-400 text-xs animate-pulse">Next challenge coming up...</p>
                     </motion.div>
                 )}

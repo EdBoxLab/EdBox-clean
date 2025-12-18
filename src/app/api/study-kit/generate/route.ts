@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { generateWithRetry } from '@/lib/ai-providers';
+import { QUIZ_TEMPLATE, FLASHCARD_TEMPLATE, NOTES_TEMPLATE, MINDMAP_TEMPLATE } from './templates';
 
 type ContentType = 'quizzes' | 'flashcards' | 'mindmaps' | 'notes';
 
@@ -8,28 +9,30 @@ function extractJSON(text: string) {
   try {
     const fenced = text.match(/```json([\s\S]*?)```/i);
     const raw = fenced ? fenced[1] : text;
-    return JSON.parse(
-      raw
-        .replace(/[\n\r]+/g, '')
-        .replace(/,\s*}/g, '}')
-        .replace(/,\s*]/g, ']')
-    );
-  } catch {
+    // Clean up potentially problematic characters that might break JSON.parse
+    const cleaned = raw
+      .replace(/[\n\r]+/g, ' ')
+      .replace(/,\s*}/g, '}')
+      .replace(/,\s*]/g, ']');
+
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error('JSON Extraction Error:', e, 'Raw text:', text);
     return text;
   }
 }
 
 function buildPrompt(type: ContentType, prompt: string) {
-  const base = `Base content:\n"${prompt}"\n\n`;
+  const base = `Topic/Content to process: "${prompt}"\n\n`;
   switch (type) {
     case 'quizzes':
-      return base + 'Generate EXACTLY 10 MCQ questions as strict JSON array.';
+      return base + QUIZ_TEMPLATE;
     case 'flashcards':
-      return base + 'Generate EXACTLY 10 flashcards as strict JSON array.';
+      return base + FLASHCARD_TEMPLATE;
     case 'mindmaps':
-      return base + 'Generate a mindmap in strict JSON format.';
+      return base + MINDMAP_TEMPLATE;
     case 'notes':
-      return base + 'Generate structured notes in markdown headings.';
+      return base + NOTES_TEMPLATE;
   }
 }
 
@@ -55,10 +58,9 @@ export async function POST(request: NextRequest) {
       contentTypes.map(async (type: ContentType) => {
         const result = await generateWithRetry({
           prompt: buildPrompt(type, prompt),
-          systemPrompt: 'You are a study-kit AI assistant. Generate quizzes, flashcards, mindmaps, or notes in strict JSON or markdown format.',
-          schema: {},
+          systemPrompt: 'You are an elite, professional study-kit AI assistant. Your goal is to create beautiful, organized, and deeply educational resources. Follow templates exactly. Ensure notes are comprehensive and long-form.',
           temperature: 0.7,
-          maxTokens: 1000,
+          maxTokens: type === 'notes' ? 3000 : 2000,
         });
 
         const output = type === 'notes' ? result.text : extractJSON(result.text);

@@ -12,6 +12,7 @@ import {
   X,
   MessageCircle
 } from 'lucide-react';
+import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
 import { ContactSupport } from './ContactSupport';
 
@@ -41,13 +42,13 @@ const SideMenu = () => {
       {/* Sidebar Navigation */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-50 w-64 bg-[#18181b] border-r border-zinc-800 
+          fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border 
           flex flex-col transition-transform duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
         {/* Header/Logo */}
-        <div className="h-16 flex items-center px-6 border-b border-zinc-800 bg-[#18181b]">
+        <div className="h-16 flex items-center px-6 border-b border-border bg-card">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-purple-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-purple-900/50">
               E
@@ -60,7 +61,7 @@ const SideMenu = () => {
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="ml-auto lg:hidden text-zinc-400 hover:text-white"
+            className="ml-auto lg:hidden text-muted-foreground hover:text-foreground"
           >
             <X size={20} />
           </button>
@@ -100,30 +101,34 @@ const SideMenu = () => {
           </button>
         </div>
 
-        {/* User Menu */}
-        <div className="p-4 border-t border-zinc-800 mt-auto">
+        {/* Theme and User Menu */}
+        <div className="p-4 border-t border-border mt-auto flex items-center justify-between gap-4">
+          <ThemeToggle />
           <UserMenu />
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-zinc-800 bg-[#18181b]">
-          <p className="text-xs text-zinc-500 text-center">&copy; {new Date().getFullYear()} EdBox</p>
+        <div className="p-4 border-t border-border bg-card">
+          <p className="text-xs text-muted-foreground text-center">&copy; {new Date().getFullYear()} EdBox</p>
         </div>
       </aside>
 
       {/* Mobile Header */}
-      <header className="lg:hidden h-16 bg-[#18181b] border-b border-zinc-800 flex items-center px-4 shrink-0 sticky top-0 z-30">
+      <header className="lg:hidden h-16 bg-card border-b border-border flex items-center px-4 shrink-0 sticky top-0 z-30">
         <button
           onClick={() => setSidebarOpen(true)}
-          className="text-zinc-400 hover:text-white mr-4"
+          className="text-muted-foreground hover:text-foreground mr-4"
         >
           <Menu size={24} />
         </button>
-        <span className="font-semibold text-zinc-100">EdBox</span>
+        <span className="font-semibold text-foreground">EdBox</span>
+        <div className="ml-auto">
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Mobile Bottom Navigation - Icons Only */}
-      <nav className="fixed bottom-0 inset-x-0 z-50 bg-[#18181b]/95 backdrop-blur border-t border-zinc-800 lg:hidden">
+      <nav className="fixed bottom-0 inset-x-0 z-50 bg-card/95 backdrop-blur border-t border-border lg:hidden">
         <ul className="flex justify-around items-center py-2">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href;

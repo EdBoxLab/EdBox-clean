@@ -5,7 +5,7 @@ export interface Comment {
   avatar: string;
 }
 
-export type FeedItemType = 'video' | 'story' | 'infographic' | 'quiz' | 'article' | 'challenge' | 'fact' | 'meme' | 'ad';
+export type FeedItemType = 'video' | 'story' | 'infographic' | 'quiz' | 'article' | 'challenge' | 'fact' | 'meme' | 'ad' | 'insight';
 
 export type GenieReaction = 'cheer' | 'wink' | 'hint' | 'hype' | 'default' | 'sad';
 export type Theme = 'purple-gradient' | 'blue-gradient' | 'green-gradient' | 'orange-gradient' | 'red-gradient';
@@ -27,6 +27,7 @@ export interface BaseFeedItem {
   shares: number;
   comments: Comment[];
   feedback?: Feedback | null;
+  courseReference?: string;
 }
 
 // === Content Specific Interfaces ===
@@ -83,6 +84,15 @@ export interface ArticleFeedItem extends BaseFeedItem {
   imageGenerationState?: ImageGenerationState;
 }
 
+export interface InsightFeedItem extends BaseFeedItem {
+  type: 'insight';
+  summary: string;
+  full_content: string;
+  visualPrompt?: string;
+  imageUrl?: string;
+  imageGenerationState?: ImageGenerationState;
+}
+
 export interface ChallengeFeedItem extends BaseFeedItem {
   type: 'challenge';
   question: string;
@@ -120,6 +130,7 @@ export type FeedItem =
   | VideoFeedItem
   | QuizFeedItem
   | ArticleFeedItem
+  | InsightFeedItem
   | ChallengeFeedItem
   | FactFeedItem
   | MemeFeedItem;

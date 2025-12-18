@@ -4,10 +4,11 @@ import { ChevronLeftIcon, ChevronRightIcon, FinishIcon } from './MediaIcons';
 
 interface StoryCardProps {
     item: StoryFeedItem;
+    isActive: boolean;
     onSwipe: (id: string, action: 'got_it' | 'answered', xp?: number) => void;
 }
 
-export const StoryCard: React.FC<StoryCardProps> = ({ item, onSwipe }) => {
+export const StoryCard: React.FC<StoryCardProps> = ({ item, isActive, onSwipe }) => {
     const [currentSlide, setCurrentSlide] = useState(0);
 
     const totalSlides = item.slides.length;
@@ -44,7 +45,6 @@ export const StoryCard: React.FC<StoryCardProps> = ({ item, onSwipe }) => {
                 ))}
             </div>
 
-            <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-3 sm:mb-4 z-20 px-2 sm:px-4 text-center">{item.title}</h2>
 
             {/* Text Content Container (no images) */}
             <div className="relative w-full max-w-[90%] sm:max-w-2xl bg-gradient-to-br from-purple-900/50 to-indigo-900/50 rounded-2xl shadow-lg p-6 sm:p-8 flex items-center justify-center group border border-purple-500/20">

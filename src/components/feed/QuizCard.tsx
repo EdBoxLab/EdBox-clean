@@ -7,12 +7,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface QuizCardProps {
     item: QuizFeedItem;
+    isActive: boolean;
     onCorrect: (xp: number, isStreak: boolean) => void;
     onIncorrect: () => void;
     onSwipe: (id: string, action: 'answered') => void;
 }
 
-export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect, onSwipe }) => {
+export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, onIncorrect, onSwipe }) => {
     const [selected, setSelected] = useState<string | null>(null);
     const [answered, setAnswered] = useState(false);
     const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
@@ -20,8 +21,8 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
     const [showExplanation, setShowExplanation] = useState(false);
 
     useEffect(() => {
-        if (answered) return;
-        
+        if (!isActive || answered) return;
+
         const timer = setInterval(() => {
             setTimeLeft(prev => {
                 if (prev <= 1) {
@@ -33,7 +34,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [answered]);
+    }, [isActive, answered]);
 
     const handleAnswer = (option: string) => {
         if (answered) return;
@@ -41,7 +42,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
         setAnswered(true);
         const correct = option === item.answer;
         setIsCorrect(correct);
-        
+
         if (correct) {
             onCorrect(item.xp_reward, item.streak_bonus);
         } else {
@@ -54,7 +55,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
 
         setTimeout(() => {
             onSwipe(item.id, 'answered');
-        }, 2500);
+        }, 1200);
     };
 
     const getButtonClass = (option: string) => {
@@ -79,11 +80,11 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
     return (
         <div className="w-full text-center flex flex-col justify-center items-center h-full relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-transparent to-pink-900/20" />
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 animate-pulse" />
-            
+            <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-purple-500/20 to-transparent" />
+
             <Confetti isFiring={isCorrect === true} />
 
-            <motion.div 
+            <motion.div
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 className="flex items-center gap-3 mb-4"
@@ -104,7 +105,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
             </motion.div>
 
             {item.imageGenerationState && (
-                <motion.div 
+                <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     className="w-full max-w-[90%] sm:max-w-sm mb-4 rounded-xl overflow-hidden shadow-2xl"
@@ -117,7 +118,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
                 </motion.div>
             )}
 
-            <motion.h2 
+            <motion.h2
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 className="text-lg sm:text-xl md:text-2xl font-bold mb-6 drop-shadow-lg px-4 bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent"
@@ -125,7 +126,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
                 {item.question}
             </motion.h2>
 
-            <motion.div 
+            <motion.div
                 initial={{ y: 30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
@@ -153,15 +154,6 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
                 ))}
             </motion.div>
 
-            <motion.div 
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.5 }}
-                className="mt-4 flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-full border border-yellow-400/30"
-            >
-                <Trophy className="w-4 h-4 text-yellow-400" />
-                <span className="text-yellow-400 font-bold text-sm">{item.xp_reward} XP</span>
-            </motion.div>
 
             <AnimatePresence>
                 {answered && (
@@ -174,7 +166,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
                         <div className={`text-lg font-bold mb-2 ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
                             {isCorrect ? '🎉 Correct!' : '❌ Incorrect'}
                         </div>
-                        
+
                         {showExplanation && item.explanation && (
                             <motion.div
                                 initial={{ opacity: 0 }}
@@ -184,7 +176,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, onCorrect, onIncorrect
                                 {item.explanation}
                             </motion.div>
                         )}
-                        
+
                         <p className="mt-3 text-gray-400 text-xs animate-pulse">Next card coming up...</p>
                     </motion.div>
                 )}

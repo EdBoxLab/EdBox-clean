@@ -2,17 +2,16 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
-import type { FeedItem, ArticleFeedItem, StoryFeedItem, QuizFeedItem, ChallengeFeedItem, FactFeedItem, Feedback, UserPreferences, AudioGenerationState } from '@/types/feed';
+import type { FeedItem, InsightFeedItem, StoryFeedItem, QuizFeedItem, ChallengeFeedItem, FactFeedItem, Feedback, UserPreferences, AudioGenerationState } from '@/types/feed';
 import { generateFeedBatch, persistFeedItems, trackInteraction } from '@/services/feedService';
 import { CardWrapper } from './CardWrapper';
 import { QuizCard } from './QuizCard';
 import { VideoCard } from './VideoCard';
-import { ArticleCard } from './ArticleCard';
+import { InsightCard } from './InsightCard';
 import { ChallengeCard } from './ChallengeCard';
 import { FactCard } from './FactCard';
 import { StoryCard } from './StoryCard';
 import { SkeletonCard } from './SkeletonCard';
-import { ArticleView } from './ArticleView';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { XPStreakDisplay } from '@/components/XPStreakDisplay';
 
@@ -58,8 +57,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
   // Audio State for Articles
   const [summaryAudio, setSummaryAudio] = useState<Record<string, { state: AudioGenerationState, buffer?: AudioBuffer }>>({});
 
-  // Article Reading State
-  const [readingArticle, setReadingArticle] = useState<ArticleFeedItem | null>(null);
+  // No Article Reading State needed anymore
 
   const feedRef = useRef<HTMLDivElement>(null);
   const observer = useRef<IntersectionObserver | null>(null);
@@ -94,7 +92,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     console.log('📥 Starting feed load...', { initial, currentBatch });
     lastLoadRef.current = now;
     processingRef.current = true;
-    
+
     if (initial) setLoading(true);
 
     try {
@@ -107,12 +105,12 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       const allContentTypes = ['quiz', 'article', 'fact', 'challenge', 'story'];
       const shouldReset = viewedTypes.size >= allContentTypes.length;
       const excludeTypes = initial || shouldReset ? [] : Array.from(viewedTypes);
-      
+
       if (shouldReset) {
         console.log('🔄 Resetting content types - all types viewed');
         setViewedTypes(new Set());
       }
-      
+
       const itemBatch = await generateFeedBatch(preferences.interests, likedTopics, excludeTypes);
       console.log('✅ Received', itemBatch.length, 'items from API');
 
@@ -127,11 +125,15 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       setViewedTypes(prev => shouldReset ? newTypes : new Set([...prev, ...newTypes]));
 
       const newItems = processedItems;
-      
+
       if (initial) {
         setItems(newItems);
         setCurrentBatch(1);
         setHasLoadedInitial(true);
+        if (newItems.length > 0) {
+          setActiveCardId(newItems[0].id);
+          setActiveIndex(0);
+        }
         console.log('✅ Initial feed loaded:', newItems.length, 'items');
       } else {
         setItems(prev => [...prev, ...newItems]);
@@ -160,7 +162,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
 
     observer.current = new IntersectionObserver(
       (entries) => {
-        const intersectingEntry = entries.find(entry => entry.isIntersecting);
+        const intersectingEntry = entries.find(entry => entry.isIntersecting && entry.intersectionRatio > 0.5);
         if (intersectingEntry) {
           const newActiveId = intersectingEntry.target.id;
           setActiveCardId(prevId => {
@@ -169,9 +171,9 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
               setActiveIndex(index);
 
               // Load more when user reaches the last 2 items in current batch
-              const itemsPerBatch = 7; // Based on your feed generation
+              const itemsPerBatch = 7;
               const batchEndThreshold = (currentBatch * itemsPerBatch) - 2;
-              
+
               if (index !== -1 && index >= batchEndThreshold && !loading && !processingRef.current) {
                 console.log('📍 Near end of batch - loading more...', { index, threshold: batchEndThreshold });
                 loadMoreItems();
@@ -182,7 +184,10 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
           });
         }
       },
-      { threshold: 0.6 }
+      {
+        threshold: 0.6,
+        root: feedRef.current
+      }
     );
 
     const currentFeedRef = feedRef.current;
@@ -192,7 +197,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     }
 
     return () => observer.current?.disconnect();
-  }, [items, loading, currentBatch]); // Removed loadMoreItems from dependencies
+  }, [items, loading, currentBatch, loadMoreItems]);
 
   const handleFeedback = async (id: string, feedback: Feedback) => {
     // Optimistic update
@@ -260,31 +265,26 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     console.log("Incorrect");
   };
 
-  const handleGenerateSummaryAudio = (item: ArticleFeedItem) => {
-    console.log("Generate audio for:", item.id);
-  };
-
-  const renderCardContent = (item: FeedItem) => {
+  const renderCardContent = (item: FeedItem, isActive: boolean) => {
     switch (item.type) {
       case 'quiz':
-        return <QuizCard item={item as QuizFeedItem} onCorrect={handleCorrectAnswer} onIncorrect={handleIncorrectAnswer} onSwipe={handleSwipe} />;
+        return <QuizCard item={item as QuizFeedItem} isActive={isActive} onCorrect={handleCorrectAnswer} onIncorrect={handleIncorrectAnswer} onSwipe={handleSwipe} />;
       case 'video':
-        return <VideoCard item={item as any} />;
+        return <VideoCard item={item as any} isActive={isActive} />;
+      case 'insight':
       case 'article':
         return (
-          <ArticleCard
-            item={item as ArticleFeedItem}
-            onViewArticle={(i) => setReadingArticle(i)}
-            audioState={summaryAudio[item.id]}
-            onGenerateAudio={() => handleGenerateSummaryAudio(item as ArticleFeedItem)}
+          <InsightCard
+            item={item as InsightFeedItem}
+            isActive={isActive}
           />
         );
       case 'challenge':
-        return <ChallengeCard item={item as ChallengeFeedItem} onCorrect={handleCorrectAnswer} onIncorrect={handleIncorrectAnswer} onSwipe={handleSwipe} />;
+        return <ChallengeCard item={item as ChallengeFeedItem} isActive={isActive} onCorrect={handleCorrectAnswer} onIncorrect={handleIncorrectAnswer} onSwipe={handleSwipe} />;
       case 'fact':
-        return <FactCard item={item as FactFeedItem} />;
+        return <FactCard item={item as FactFeedItem} isActive={isActive} />;
       case 'story':
-        return <StoryCard item={item as StoryFeedItem} onSwipe={handleSwipe} />;
+        return <StoryCard item={item as StoryFeedItem} isActive={isActive} onSwipe={handleSwipe} />;
       default:
         return null;
     }
@@ -307,65 +307,44 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
         <XPStreakDisplay showCompact={true} />
       </div>
 
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8 pt-20">
-        <div className="mb-8">
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4">
-            Your Learning Feed
-          </h1>
-          <p className="text-lg text-gray-400">
-            Personalized content to accelerate your learning journey.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-0" ref={feedRef}>
-          {items.map((item, index) => (
-            <div
-              key={item.id}
-              id={item.id}
-              className="feed-card opacity-0 animate-card-enter min-h-screen flex items-stretch"
-              style={{ animationDelay: `${(index % 5) * 100}ms` }}
+      <div className="max-w-md mx-auto h-screen snap-y snap-mandatory overflow-y-auto scroll-smooth no-scrollbar pt-10 px-4" ref={feedRef}>
+        {items.map((item, index) => (
+          <div
+            key={item.id}
+            id={item.id}
+            className="feed-card opacity-0 animate-card-enter min-h-screen flex items-stretch snap-start"
+            style={{ animationDelay: `${(index % 5) * 100}ms` }}
+          >
+            <CardWrapper
+              item={item}
+              isActive={activeCardId === item.id}
+              onSwipe={handleSwipe}
+              onFeedback={handleFeedback}
             >
-              <CardWrapper
-                item={item}
-                isActive={activeCardId === item.id}
-                onSwipe={handleSwipe}
-                onFeedback={handleFeedback}
-              >
-                <div className="min-h-screen flex flex-col justify-center w-full">
-                  {renderCardContent(item)}
-                </div>
-              </CardWrapper>
-            </div>
-          ))}
-
-          {(loading || items.length === 0) && (
-            <>
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-            </>
-          )}
-
-          {loading && items.length > 0 && (
-            <div className="col-span-full flex items-center justify-center py-8">
-              <div className="flex items-center gap-3 text-gray-400">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Loading fresh content...</span>
+              <div className="w-full h-full flex flex-col justify-center">
+                {renderCardContent(item, activeCardId === item.id)}
               </div>
-            </div>
-          )}
-        </div>
-      </div>
+            </CardWrapper>
+          </div>
+        ))}
 
-      {readingArticle && (
-        <div className="fixed inset-0 z-50">
-          <ArticleView
-            item={readingArticle}
-            onClose={() => setReadingArticle(null)}
-            onApiKeyError={() => alert("API Key Error: Please check your configuration.")}
-          />
-        </div>
-      )}
+        {(loading || items.length === 0) && (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
+        )}
+
+        {loading && items.length > 0 && (
+          <div className="col-span-full flex items-center justify-center py-8">
+            <div className="flex items-center gap-3 text-gray-400">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Loading fresh content...</span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

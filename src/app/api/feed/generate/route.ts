@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 import { FeedItem } from '@/types/feed';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 // ============= CONFIGURATION =============
 const YOUTUBE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
@@ -20,7 +21,7 @@ async function searchYouTubeVideos(query: string, limit = 3): Promise<any[]> {
     // You can re-enable when quota resets (midnight Pacific Time)
     console.log('⚠️  YouTube search disabled - quota exceeded');
     return [];
-    
+
     /* Uncomment when quota resets:
     if (!YOUTUBE_API_KEY) {
         console.warn("No YouTube API Key configured");
@@ -75,7 +76,7 @@ async function searchYouTubeVideos(query: string, limit = 3): Promise<any[]> {
 
 // ============= GROQ GENERATION =============
 
-async function generateFeedWithGroq(interests: string[], likedTopics: string[]): Promise<FeedItem[]> {
+async function generateFeedWithGroq(interests: string[], likedTopics: string[], userCourses: string[] = []): Promise<FeedItem[]> {
     const apiKey = getRandomGroqKey();
     if (!apiKey) {
         console.warn("No Groq API Keys available");
@@ -83,13 +84,25 @@ async function generateFeedWithGroq(interests: string[], likedTopics: string[]):
     }
 
     const groq = new Groq({ apiKey });
-    const focusTopics = [...new Set([...likedTopics, ...interests])].slice(0, 5);
-    
+
+    // Mix course topics into focus
+    const courseTopics = userCourses.slice(0, 3);
+    const focusTopics = [...new Set([...likedTopics, ...interests, ...courseTopics])].slice(0, 8);
+
     if (focusTopics.length === 0) {
         focusTopics.push('science', 'technology', 'history');
     }
 
-    const prompt = `Create 7 educational feed items about: ${focusTopics.join(', ')}.
+    const prompt = `Create 7 *high-impact, addictive* educational feed items.
+TARGET TOPICS: ${focusTopics.join(', ')}
+USER'S ACTIVE COURSES: ${userCourses.join(', ')}
+
+STRATEGIC INSTRUCTIONS:
+1. PERSONALIZATION: Reference the user's courses explicitly in 3 items. Example: "Since you're mastering [Course Name], here's a deep cut..."
+2. RADICAL DIVERSITY: Vary personas (Genius Genie, Skeptic Researcher, Future Historian). Vary formats (surprising facts, hard challenges, interactive stories, controversial insights).
+3. THE "HOOK": Use click-worthy, question-based titles. Focus on "Mind-blowing" or "Hidden" knowledge.
+4. NO REPETITION: Every item must feel distinct. Avoid 7 similar "How-to" insights.
+5. COURSE LINKING: For items referencing a course, add a "courseReference" field with the EXACT course name.
 
 Return a JSON array with these exact structures:
 
@@ -97,76 +110,37 @@ QUIZ example:
 {
   "id": "quiz_1",
   "type": "quiz",
-  "topic": "${focusTopics[0]}",
-  "title": "Test Your Knowledge",
-  "question": "What is photosynthesis?",
-  "options": [
-    "Process plants use to make food from sunlight",
-    "How animals digest food",
-    "The water cycle in nature",
-    "Rock formation process"
-  ],
+  "topic": "Topic Name",
+  "title": "Wait, You Didn't Know This?",
+  "question": "Which of these actually [Surprising Fact]?",
+  "options": ["A", "B", "C", "D"],
   "correctIndex": 0,
-  "explanation": "Photosynthesis is how plants convert light energy into chemical energy.",
-  "xp_reward": 100
+  "explanation": "Brief, punchy explanation.",
+  "xp_reward": 100,
+  "courseReference": "[Optional Course Name]"
 }
 
-ARTICLE example:
+INSIGHT example:
 {
-  "id": "article_1",
-  "type": "article",
-  "topic": "${focusTopics[1] || focusTopics[0]}",
-  "title": "Understanding Quantum Physics",
-  "summary": "A brief introduction to the fascinating world of quantum mechanics.",
-  "full_article_content": "Quantum physics is the study of matter and energy at the smallest scales. At the quantum level, particles behave in ways that seem impossible in our everyday world. For example, a particle can be in two places at once, a phenomenon called superposition. Another strange quantum property is entanglement, where two particles can be connected across vast distances. These principles are the foundation of modern technology including computers, lasers, and MRI machines. Understanding quantum physics helps us grasp the fundamental nature of reality itself.",
-  "xp_reward": 150
+  "id": "insight_1",
+  "type": "insight",
+  "topic": "Topic Name",
+  "title": "The Lie They Told You About [Topic]",
+  "summary": "Everything you know about X is slightly wrong.",
+  "full_content": "Deep, engaging detail that hooks the reader...",
+  "xp_reward": 150,
+  "courseReference": "[Optional Course Name]"
 }
 
-FACT example:
-{
-  "id": "fact_1",
-  "type": "fact",
-  "topic": "${focusTopics[2] || focusTopics[0]}",
-  "title": "Amazing Discovery",
-  "explanation": "The human brain contains approximately 86 billion neurons, each forming thousands of connections with other neurons. This creates a network more complex than any computer ever built. Your brain uses about 20% of your body's energy despite being only 2% of your body weight. Every time you learn something new, your brain physically changes by forming new neural pathways.",
-  "xp_reward": 75
-}
+[Also generate CHALLENGE, FACT, and STORY with similar high-engagement styles and optional courseReference]
 
-CHALLENGE example:
-{
-  "id": "challenge_1",
-  "type": "challenge",
-  "topic": "${focusTopics[3] || focusTopics[0]}",
-  "title": "Solve This Problem",
-  "question": "If you have a 5-liter jug and a 3-liter jug, how can you measure exactly 4 liters of water?",
-  "answer": "1. Fill the 5L jug completely. 2. Pour from 5L into 3L jug (5L jug now has 2L). 3. Empty the 3L jug. 4. Pour the 2L from 5L jug into 3L jug. 5. Fill the 5L jug again. 6. Pour from 5L into 3L jug until 3L is full (this takes 1L). 7. The 5L jug now contains exactly 4L.",
-  "time_limit": 120,
-  "xp_reward": 200
-}
-
-STORY example:
-{
-  "id": "story_1",
-  "type": "story",
-  "topic": "${focusTopics[4] || focusTopics[0]}",
-  "title": "Journey Through Time",
-  "slides": [
-    {"text": "In the year 2150, humanity discovered a way to travel through time."},
-    {"text": "The first expedition went back to observe the construction of the pyramids."},
-    {"text": "What they found changed our understanding of ancient civilizations forever."},
-    {"text": "The ancient Egyptians had help from an unexpected source - future humans teaching them advanced mathematics."},
-    {"text": "This created a time loop that ensured humanity's survival through the ages."}
-  ],
-  "xp_reward": 125
-}
-
-Generate 7 items with diverse types. Each item needs ALL required fields with real, educational content. Return ONLY the JSON array.`;
+Return ONLY the JSON array.`;
 
     try {
         const completion = await groq.chat.completions.create({
             messages: [{ role: 'user', content: prompt }],
             model: 'llama-3.1-8b-instant',
-            temperature: 0.8,
+            temperature: 0.9, // Higher temp for more diversity
             max_tokens: 3000,
         });
 
@@ -188,37 +162,37 @@ Generate 7 items with diverse types. Each item needs ALL required fields with re
         // Normalize items with guaranteed unique IDs
         const timestamp = Date.now();
         const normalized: FeedItem[] = items.map((item, idx) => {
-            const validTypes = ['quiz', 'article', 'fact', 'challenge', 'story'];
-            const type = validTypes.includes(item.type) ? item.type : 'article';
-            
-            // Generate truly unique ID using timestamp + random + index
+            const validTypes = ['quiz', 'insight', 'fact', 'challenge', 'story', 'article'];
+            const type = validTypes.includes(item.type) ? item.type : 'insight';
+
             const uniqueId = `${type}_${timestamp}_${Math.random().toString(36).substr(2, 9)}_${idx}`;
-            
+
             const base: any = {
                 id: uniqueId,
                 type,
                 topic: item.topic || focusTopics[idx % focusTopics.length] || 'general',
                 title: item.title || `Learn about ${item.topic}`,
                 xp_reward: item.xp_reward || 100,
-                genie_reaction: 'wink',
-                theme: 'purple-gradient',
+                genie_reaction: ['wink', 'cheer', 'hype', 'hint'][idx % 4],
+                theme: ['purple-gradient', 'blue-gradient', 'green-gradient', 'orange-gradient'][idx % 4],
                 likedByUser: false,
-                likes: Math.floor(Math.random() * 50),
-                shares: Math.floor(Math.random() * 20),
+                likes: Math.floor(Math.random() * 500) + 50, // Higher likes for better aesthetics
+                shares: Math.floor(Math.random() * 50),
                 comments: [],
+                courseReference: item.courseReference || null,
             };
 
-            // Add type-specific fields with validation
             if (type === 'quiz') {
                 base.question = item.question || 'Quiz question';
-                base.options = Array.isArray(item.options) && item.options.length === 4 
-                    ? item.options 
+                base.options = Array.isArray(item.options) && item.options.length === 4
+                    ? item.options
                     : ['Option 1', 'Option 2', 'Option 3', 'Option 4'];
                 base.correctIndex = typeof item.correctIndex === 'number' ? item.correctIndex : 0;
                 base.explanation = item.explanation || 'This is the correct answer.';
-            } else if (type === 'article') {
-                base.summary = item.summary || item.title || 'Article summary';
-                base.full_article_content = item.full_article_content || item.summary || 'Article content not available.';
+            } else if (type === 'insight' || type === 'article') {
+                base.type = 'insight';
+                base.summary = item.summary || item.title || 'Insight summary';
+                base.full_content = item.full_content || item.summary || 'Content not available.';
             } else if (type === 'fact') {
                 base.explanation = item.explanation || 'Interesting fact.';
             } else if (type === 'challenge') {
@@ -226,19 +200,17 @@ Generate 7 items with diverse types. Each item needs ALL required fields with re
                 base.answer = item.answer || 'Challenge answer';
                 base.time_limit = item.time_limit || 60;
             } else if (type === 'story') {
-                // Stories: only text content, no background images
                 base.slides = Array.isArray(item.slides) && item.slides.length > 0
-                    ? item.slides.map((slide: any) => ({ 
-                        text: slide.text || slide 
-                        // Removed any image/visualPrompt/background fields
-                      }))
+                    ? item.slides.map((slide: any) => ({
+                        text: slide.text || slide
+                    }))
                     : [{ text: item.title || 'Story content' }];
             }
 
             return base as FeedItem;
         });
 
-        console.log(`✅ Groq generated ${normalized.length} items`);
+        console.log(`✅ Groq generated ${normalized.length} personalized items`);
         return normalized;
 
     } catch (error: any) {
@@ -252,7 +224,7 @@ Generate 7 items with diverse types. Each item needs ALL required fields with re
 function createFallbackFeed(interests: string[]): FeedItem[] {
     const topics = interests.length > 0 ? interests.slice(0, 3) : ['science', 'technology', 'history'];
     const timestamp = Date.now();
-    
+
     return [
         {
             id: `fallback_quiz_${timestamp}_${Math.random().toString(36).substr(2, 9)}`,
@@ -260,49 +232,15 @@ function createFallbackFeed(interests: string[]): FeedItem[] {
             topic: topics[0],
             title: `Quick ${topics[0]} Quiz`,
             question: `What is an important concept in ${topics[0]}?`,
-            options: [
-                'The fundamental principle',
-                'An alternative theory',
-                'A common misconception',
-                'An outdated idea'
-            ],
+            options: ['Principle A', 'Principle B', 'Principle C', 'Principle D'],
             correctIndex: 0,
-            explanation: 'The fundamental principle is the most important concept to understand.',
+            explanation: 'Brief explanation.',
             xp_reward: 100,
             genie_reaction: 'wink',
             theme: 'purple-gradient',
             likedByUser: false,
-            likes: 10,
-            shares: 2,
-            comments: [],
-        } as any,
-        {
-            id: `fallback_article_${timestamp}_${Math.random().toString(36).substr(2, 9)}`,
-            type: 'article',
-            topic: topics[1] || topics[0],
-            title: `Introduction to ${topics[1] || topics[0]}`,
-            summary: `Learn the basics of ${topics[1] || topics[0]} in this comprehensive guide.`,
-            full_article_content: `${topics[1] || topics[0]} is a fascinating subject that impacts our daily lives in many ways. Understanding its principles helps us make better decisions and appreciate the world around us. This article explores the key concepts and provides practical insights you can apply immediately. From historical context to modern applications, we'll cover everything you need to know to get started with ${topics[1] || topics[0]}.`,
-            xp_reward: 150,
-            genie_reaction: 'wink',
-            theme: 'blue-gradient',
-            likedByUser: false,
-            likes: 25,
-            shares: 5,
-            comments: [],
-        } as any,
-        {
-            id: `fallback_fact_${timestamp}_${Math.random().toString(36).substr(2, 9)}`,
-            type: 'fact',
-            topic: topics[2] || topics[0],
-            title: `Did You Know?`,
-            explanation: `Here's an interesting fact about ${topics[2] || topics[0]}: It has been studied for centuries and continues to reveal new insights that shape our understanding of the world. Scientists and researchers are constantly making new discoveries that challenge what we thought we knew.`,
-            xp_reward: 75,
-            genie_reaction: 'wink',
-            theme: 'green-gradient',
-            likedByUser: false,
-            likes: 15,
-            shares: 3,
+            likes: 120,
+            shares: 12,
             comments: [],
         } as any,
     ];
@@ -313,63 +251,67 @@ function createFallbackFeed(interests: string[]): FeedItem[] {
 export const POST = async (request: NextRequest) => {
     try {
         const body = await request.json();
-        const { interests = [], likedTopics = [] } = body;
+        const { interests = [], likedTopics = [], excludeTypes = [] } = body;
 
-        console.log('🔄 Generating feed for:', interests.length, 'interests');
+        // 0. Fetch user courses for personalization
+        const supabase = await createSupabaseServerClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        let userCourses: string[] = [];
+
+        if (user) {
+            const { data: courses } = await supabase
+                .from('skill_graphs')
+                .select('title')
+                .eq('user_id', user.id)
+                .limit(5);
+
+            if (courses) {
+                userCourses = courses.map(c => c.title);
+            }
+        }
+
+        console.log('🔄 Generating feed for user with', userCourses.length, 'courses');
 
         // 1. Generate text content
-        const textItems = await generateFeedWithGroq(interests, likedTopics);
+        const textItems = await generateFeedWithGroq(interests, likedTopics, userCourses);
 
         // 2. Add YouTube Shorts (max 3)
         const videoItems: FeedItem[] = [];
         if (interests.length > 0 && YOUTUBE_API_KEY) {
-            const shorts = await searchYouTubeVideos(interests[0], 3);
-            
+            const shorts = await searchYouTubeVideos(interests[0], 2);
+
             shorts.forEach((s, idx) => {
                 if (!s?.id) return;
-                
                 videoItems.push({
                     id: `video_${s.id}_${idx}`,
                     type: 'video',
                     topic: interests[0],
-                    title: s.title.length > 60 ? s.title.substring(0, 57) + '...' : s.title,
+                    title: s.title,
                     xp_reward: 75,
                     genie_reaction: 'cheer',
                     theme: 'orange-gradient',
                     likedByUser: false,
-                    likes: Math.floor(Math.random() * 100) + 10,
-                    shares: Math.floor(Math.random() * 20),
+                    likes: Math.floor(Math.random() * 1000) + 100,
+                    shares: Math.floor(Math.random() * 50),
                     comments: [],
-                    script: (s.description || 'Educational YouTube short').substring(0, 150),
+                    script: s.description?.substring(0, 150),
                     visualPrompt: 'youtube_short',
                     imageUrl: s.thumbnail,
                     video_url: `https://www.youtube.com/embed/${s.id}`
                 } as any);
             });
-            
-            console.log(`✅ Added ${videoItems.length} YouTube shorts`);
-        } else if (!YOUTUBE_API_KEY) {
-            console.warn('⚠️  YouTube API key not configured - skipping video search');
         }
 
-        // 3. Combine and shuffle (take 10 items max)
+        // 3. Combine and shuffle
         let finalFeed = [...textItems, ...videoItems]
-            .slice(0, 10)
-            .sort(() => Math.random() - 0.5);
+            .filter(item => !excludeTypes.includes(item.type))
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 10);
 
-        console.log(`✅ Final feed: ${finalFeed.length} items (${textItems.length} text, ${videoItems.length} videos)`);
-
-        return NextResponse.json(finalFeed, {
-            headers: {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-            }
-        });
+        return NextResponse.json(finalFeed);
 
     } catch (error: any) {
         console.error('❌ Feed Generation Failed:', error);
-        
-        // Return minimal fallback instead of error
-        const fallback = createFallbackFeed(['science', 'technology']);
-        return NextResponse.json(fallback);
+        return NextResponse.json(createFallbackFeed(['learning']));
     }
 }

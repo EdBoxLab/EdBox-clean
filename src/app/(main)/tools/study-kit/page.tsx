@@ -12,6 +12,47 @@ const contentTypes = [
     { id: 'mindmaps', label: 'Mind Maps', icon: Map, description: 'Visual concept connections' },
 ];
 
+const FlashcardItem = ({ card }: { card: any }) => {
+    const [isFlipped, setIsFlipped] = useState(false);
+    const [showHint, setShowHint] = useState(false);
+
+    return (
+        <div className="h-64 perspective-1000 cursor-pointer" onClick={() => setIsFlipped(!isFlipped)}>
+            <motion.div
+                className="relative w-full h-full"
+                transition={{ duration: 0.6, type: 'spring', stiffness: 260, damping: 20 }}
+                animate={{ rotateY: isFlipped ? 180 : 0 }}
+                style={{ transformStyle: 'preserve-3d' }}
+            >
+                {/* Front */}
+                <div
+                    className="absolute inset-0 w-full h-full backface-hidden bg-zinc-950 border border-zinc-800 rounded-2xl p-6 flex flex-col items-center justify-center text-center shadow-2xl"
+                    style={{ backfaceVisibility: 'hidden' }}
+                >
+                    <div className="absolute top-4 left-4 text-[10px] uppercase tracking-widest text-indigo-400 font-bold">Front</div>
+                    <p className="font-bold text-xl text-white leading-tight">{card.front}</p>
+                    {card.hint && (
+                        <div className="mt-4" onClick={(e) => { e.stopPropagation(); setShowHint(!showHint); }}>
+                            <p className={`text-xs px-2 py-1 bg-zinc-800 rounded-full transition-all ${showHint ? 'text-indigo-300' : 'text-zinc-500'}`}>
+                                {showHint ? card.hint : 'Tap for hint'}
+                            </p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Back */}
+                <div
+                    className="absolute inset-0 w-full h-full backface-hidden bg-indigo-950 border border-indigo-500/30 rounded-2xl p-6 flex flex-col items-center justify-center text-center shadow-2xl"
+                    style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                >
+                    <div className="absolute top-4 left-4 text-[10px] uppercase tracking-widest text-indigo-300 font-bold">Back</div>
+                    <p className="font-medium text-lg text-indigo-50 leading-relaxed">{card.back}</p>
+                </div>
+            </motion.div>
+        </div>
+    );
+};
+
 function StudyKitContent() {
     const searchParams = useSearchParams();
     const id = searchParams.get('id');
@@ -27,6 +68,10 @@ function StudyKitContent() {
     const [isLoadingKit, setIsLoadingKit] = useState(false);
     const [studyKit, setStudyKit] = useState<any>(null);
 
+    // Quiz State moved to top level
+    const [currentQuizStates, setCurrentQuizStates] = useState<any[]>([]);
+    const [score, setScore] = useState<{ correct: number, total: number } | null>(null);
+
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
     // Fetch specific study kit if ID is present
@@ -40,14 +85,37 @@ function StudyKitContent() {
         console.log('🔍 Starting normalization with:', JSON.stringify(content, null, 2));
 
         const parseIfString = (data: any) => {
-            if (typeof data === 'string') {
-                try {
-                    return JSON.parse(data);
-                } catch {
-                    return data;
-                }
+            if (typeof data !== 'string') return data;
+
+            let sanitized = data.trim();
+
+            // 1. Extract JSON from Markdown code blocks if present
+            const jsonMatch = sanitized.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
+            if (jsonMatch && jsonMatch[1]) {
+                sanitized = jsonMatch[1].trim();
             }
-            return data;
+
+            // 2. Try parsing directly
+            try {
+                return JSON.parse(sanitized);
+            } catch (e) {
+                // 3. Last ditch attempt: find the first { or [ and last } or ]
+                const startIndex = sanitized.search(/[{\[]/);
+                const endIndex = sanitized.lastIndexOf('}') > sanitized.lastIndexOf(']')
+                    ? sanitized.lastIndexOf('}')
+                    : sanitized.lastIndexOf(']');
+
+                if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+                    const extracted = sanitized.substring(startIndex, endIndex + 1);
+                    try {
+                        return JSON.parse(extracted);
+                    } catch (innerE) {
+                        console.error('Failed to parse extracted JSON:', innerE);
+                    }
+                }
+
+                return sanitized;
+            }
         };
 
         const normalized: any = {};
@@ -172,6 +240,15 @@ function StudyKitContent() {
                     setGeneratedContent(normalized);
                     setSelectedTypes(kit.content_types || []);
                     setActiveTab(kit.content_types?.[0] || null);
+
+                    // Initialize quiz states for loaded kit
+                    if (normalized.quizzes && Array.isArray(normalized.quizzes)) {
+                        setCurrentQuizStates(normalized.quizzes.map(() => ({
+                            selectedOption: null,
+                            isConfirmed: false
+                        })));
+                        setScore(null);
+                    }
                 } else {
                     setError('Study kit not found');
                 }
@@ -250,6 +327,15 @@ function StudyKitContent() {
                 setTimeout(() => {
                     setGeneratedContent(normalized);
                     setActiveTab(selectedTypes[0]);
+
+                    // Initialize quiz states if quizzes are generated
+                    if (normalized.quizzes && Array.isArray(normalized.quizzes)) {
+                        setCurrentQuizStates(normalized.quizzes.map(() => ({
+                            selectedOption: null,
+                            isConfirmed: false
+                        })));
+                        setScore(null);
+                    }
                 }, 0);
             } else {
                 alert('Generation failed: ' + data.error);
@@ -548,59 +634,123 @@ function StudyKitContent() {
                                     {activeTab === 'quizzes' && generatedContent.quizzes && (
                                         <div className="grid gap-6">
                                             {(() => {
-                                                console.log('Quiz data structure:', generatedContent.quizzes);
+                                                const handleOptionSelect = (quizIndex: number, optionIndex: number) => {
+                                                    if (currentQuizStates[quizIndex]?.isConfirmed) return;
 
-                                                // Handle different data structures
+                                                    const newStates = [...currentQuizStates];
+                                                    newStates[quizIndex] = { ...newStates[quizIndex], selectedOption: optionIndex };
+                                                    setCurrentQuizStates(newStates);
+                                                };
+
+                                                const handleConfirm = (quizIndex: number) => {
+                                                    const newStates = [...currentQuizStates];
+                                                    newStates[quizIndex] = { ...newStates[quizIndex], isConfirmed: true };
+                                                    setCurrentQuizStates(newStates);
+
+                                                    // Update score if all are confirmed
+                                                    if (newStates.every(s => s.isConfirmed)) {
+                                                        const correctCount = newStates.reduce((acc, s, idx) => {
+                                                            return acc + (s.selectedOption === generatedContent.quizzes[idx].correctAnswer ? 1 : 0);
+                                                        }, 0);
+                                                        setScore({ correct: correctCount, total: generatedContent.quizzes.length });
+                                                    }
+                                                };
+
                                                 let quizData = generatedContent.quizzes;
+                                                if (!Array.isArray(quizData) && quizData.questions) quizData = quizData.questions;
+                                                if (!Array.isArray(quizData) || quizData.length === 0) return <div className="p-6 bg-zinc-900 rounded-xl text-center text-zinc-400">No quizzes available</div>;
 
-                                                // If it's an object with questions property, extract it
-                                                if (!Array.isArray(quizData) && quizData.questions) {
-                                                    quizData = quizData.questions;
-                                                }
+                                                return (
+                                                    <>
+                                                        {score && (
+                                                            <motion.div
+                                                                initial={{ opacity: 0, scale: 0.9 }}
+                                                                animate={{ opacity: 1, scale: 1 }}
+                                                                className="bg-indigo-600 rounded-xl p-6 text-center mb-6"
+                                                            >
+                                                                <h4 className="text-2xl font-bold mb-2">Quiz Complete!</h4>
+                                                                <p className="text-indigo-100 text-lg">Your Score: {score.correct} / {score.total} ({Math.round((score.correct / score.total) * 100)}%)</p>
+                                                            </motion.div>
+                                                        )}
+                                                        {quizData.map((quiz: any, i: number) => {
+                                                            const state = currentQuizStates[i];
+                                                            const isCorrect = state?.selectedOption === quiz.correctAnswer;
+                                                            const showExplanation = state?.isConfirmed;
 
-                                                // Ensure it's an array
-                                                if (!Array.isArray(quizData)) {
-                                                    return (
-                                                        <div className="p-6 bg-zinc-900 rounded-xl">
-                                                            <p className="text-zinc-400 mb-4">Unexpected quiz data format:</p>
-                                                            <pre className="text-xs text-zinc-500 whitespace-pre-wrap">
-                                                                {JSON.stringify(generatedContent.quizzes, null, 2)}
-                                                            </pre>
-                                                        </div>
-                                                    );
-                                                }
+                                                            return (
+                                                                <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                                                                    <div className="flex justify-between items-start mb-4">
+                                                                        <h3 className="font-bold text-lg flex gap-3">
+                                                                            <span className="bg-indigo-500/20 text-indigo-400 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm">
+                                                                                {i + 1}
+                                                                            </span>
+                                                                            {quiz.question}
+                                                                        </h3>
+                                                                        {quiz.difficulty && (
+                                                                            <span className={`text-xs px-2 py-1 rounded-full ${quiz.difficulty === 'Hard' ? 'bg-red-500/10 text-red-400' :
+                                                                                quiz.difficulty === 'Medium' ? 'bg-yellow-500/10 text-yellow-400' :
+                                                                                    'bg-green-500/10 text-green-400'
+                                                                                }`}>
+                                                                                {quiz.difficulty}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="space-y-2 pl-11">
+                                                                        {quiz.options?.map((opt: string, optIndex: number) => {
+                                                                            const isSelected = state?.selectedOption === optIndex;
+                                                                            const isAnswer = optIndex === quiz.correctAnswer;
 
-                                                if (quizData.length === 0) {
-                                                    return (
-                                                        <div className="p-6 bg-zinc-900 rounded-xl text-center text-zinc-400">
-                                                            No quizzes available
-                                                        </div>
-                                                    );
-                                                }
+                                                                            let borderColor = 'border-zinc-800';
+                                                                            let bgColor = 'bg-zinc-950/50';
 
-                                                return quizData.map((quiz: any, i: number) => (
-                                                    <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                                                        <h3 className="font-bold text-lg mb-4 flex gap-3">
-                                                            <span className="bg-indigo-500/20 text-indigo-400 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm">
-                                                                {i + 1}
-                                                            </span>
-                                                            {quiz.question || 'No question available'}
-                                                        </h3>
-                                                        <div className="space-y-2 pl-11">
-                                                            {quiz.options?.map((opt: string, optIndex: number) => (
-                                                                <div
-                                                                    key={optIndex}
-                                                                    className={`p-3 rounded-lg border ${optIndex === quiz.correctAnswer
-                                                                        ? 'border-green-500/50 bg-green-500/10 text-green-200'
-                                                                        : 'border-zinc-800 bg-zinc-950/50'
-                                                                        }`}
-                                                                >
-                                                                    {opt}
+                                                                            if (state?.isConfirmed) {
+                                                                                if (isAnswer) {
+                                                                                    borderColor = 'border-green-500';
+                                                                                    bgColor = 'bg-green-500/10';
+                                                                                } else if (isSelected && !isCorrect) {
+                                                                                    borderColor = 'border-red-500';
+                                                                                    bgColor = 'bg-red-500/10';
+                                                                                }
+                                                                            } else if (isSelected) {
+                                                                                borderColor = 'border-indigo-500';
+                                                                                bgColor = 'bg-indigo-500/10';
+                                                                            }
+
+                                                                            return (
+                                                                                <button
+                                                                                    key={optIndex}
+                                                                                    disabled={state?.isConfirmed}
+                                                                                    onClick={() => handleOptionSelect(i, optIndex)}
+                                                                                    className={`w-full text-left p-3 rounded-lg border transition ${borderColor} ${bgColor} ${!state?.isConfirmed && 'hover:border-zinc-600'}`}
+                                                                                >
+                                                                                    {opt}
+                                                                                </button>
+                                                                            );
+                                                                        })}
+                                                                        {!state?.isConfirmed && state?.selectedOption !== null && (
+                                                                            <button
+                                                                                onClick={() => handleConfirm(i)}
+                                                                                className="mt-4 px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-bold transition"
+                                                                            >
+                                                                                Check Answer
+                                                                            </button>
+                                                                        )}
+                                                                        {showExplanation && (
+                                                                            <motion.div
+                                                                                initial={{ opacity: 0, height: 0 }}
+                                                                                animate={{ opacity: 1, height: 'auto' }}
+                                                                                className="mt-4 p-4 bg-zinc-800/50 rounded-lg text-sm border-l-4 border-indigo-500"
+                                                                            >
+                                                                                <p className="font-bold text-indigo-400 mb-1">Explanation:</p>
+                                                                                <p className="text-zinc-300">{quiz.explanation}</p>
+                                                                            </motion.div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
-                                                            )) || <p className="text-zinc-500">No options available</p>}
-                                                        </div>
-                                                    </div>
-                                                ));
+                                                            );
+                                                        })}
+                                                    </>
+                                                );
                                             })()}
                                         </div>
                                     )}
@@ -608,151 +758,124 @@ function StudyKitContent() {
                                     {activeTab === 'flashcards' && generatedContent.flashcards && (
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                             {(() => {
-                                                console.log('Flashcard data structure:', generatedContent.flashcards);
-
                                                 let flashcardData = generatedContent.flashcards;
-
-                                                // If it's an object with flashcards or cards property, extract it
                                                 if (!Array.isArray(flashcardData)) {
-                                                    if (flashcardData.flashcards) {
-                                                        flashcardData = flashcardData.flashcards;
-                                                    } else if (flashcardData.cards) {
-                                                        flashcardData = flashcardData.cards;
-                                                    }
+                                                    if (flashcardData.flashcards) flashcardData = flashcardData.flashcards;
+                                                    else if (flashcardData.cards) flashcardData = flashcardData.cards;
                                                 }
-
-                                                // Ensure it's an array
-                                                if (!Array.isArray(flashcardData)) {
-                                                    return (
-                                                        <div className="col-span-full p-6 bg-zinc-900 rounded-xl">
-                                                            <p className="text-zinc-400 mb-4">Unexpected flashcard data format:</p>
-                                                            <pre className="text-xs text-zinc-500 whitespace-pre-wrap">
-                                                                {JSON.stringify(generatedContent.flashcards, null, 2)}
-                                                            </pre>
-                                                        </div>
-                                                    );
-                                                }
-
-                                                if (flashcardData.length === 0) {
-                                                    return (
-                                                        <div className="col-span-full p-6 bg-zinc-900 rounded-xl text-center text-zinc-400">
-                                                            No flashcards available
-                                                        </div>
-                                                    );
-                                                }
+                                                if (!Array.isArray(flashcardData) || flashcardData.length === 0) return <div className="col-span-full p-6 bg-zinc-900 rounded-xl text-center text-zinc-400">No flashcards available</div>;
 
                                                 return flashcardData.map((card: any, i: number) => (
-                                                    <div key={i} className="group relative h-64 perspective-1000">
-                                                        <div className="relative w-full h-full transition-all duration-500 bg-zinc-900 border border-zinc-700 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-500/50">
-                                                            <h4 className="text-zinc-500 text-xs uppercase font-bold mb-2">Front</h4>
-                                                            <p className="font-medium text-lg">{card.front || 'No content'}</p>
-
-                                                            <div className="absolute inset-0 bg-indigo-900/90 rounded-xl p-6 flex flex-col items-center justify-center text-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                                                                <h4 className="text-indigo-300 text-xs uppercase font-bold mb-2">Back</h4>
-                                                                <p className="font-medium text-lg text-white">{card.back || 'No content'}</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                                                    <FlashcardItem key={i} card={card} />
                                                 ));
                                             })()}
                                         </div>
                                     )}
 
                                     {activeTab === 'notes' && generatedContent.notes && (
-                                        <div className="prose prose-invert max-w-none bg-zinc-900 border border-zinc-800 rounded-xl p-8">
-                                            {(() => {
-                                                console.log('Notes data structure:', generatedContent.notes);
-
-                                                let notesContent = generatedContent.notes;
-
-                                                // If it's an object with notes property, extract it
-                                                if (typeof notesContent === 'object' && !Array.isArray(notesContent)) {
-                                                    if (notesContent.notes) {
-                                                        notesContent = Array.isArray(notesContent.notes)
-                                                            ? notesContent.notes.join('\n\n')
-                                                            : notesContent.notes;
-                                                    } else {
-                                                        return (
-                                                            <div>
-                                                                <p className="text-zinc-400 mb-4">Unexpected notes format:</p>
-                                                                <pre className="text-xs text-zinc-500 whitespace-pre-wrap">
-                                                                    {JSON.stringify(generatedContent.notes, null, 2)}
-                                                                </pre>
-                                                            </div>
-                                                        );
+                                        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-8 lg:p-12 shadow-2xl">
+                                            <div className="prose prose-invert prose-indigo max-w-none">
+                                                {(() => {
+                                                    let notesContent = generatedContent.notes;
+                                                    if (typeof notesContent === 'object' && !Array.isArray(notesContent)) {
+                                                        notesContent = notesContent.notes || JSON.stringify(notesContent, null, 2);
+                                                    } else if (Array.isArray(notesContent)) {
+                                                        notesContent = notesContent.join('\n\n');
                                                     }
-                                                } else if (Array.isArray(notesContent)) {
-                                                    notesContent = notesContent.join('\n\n');
-                                                }
 
-                                                // Now notesContent should be a string
-                                                if (typeof notesContent !== 'string') {
+                                                    if (typeof notesContent !== 'string') return <div className="text-zinc-400">Invalid notes format</div>;
+
+                                                    // Use a simpler approach for internal HTML rendering to avoid overly complex regex
                                                     return (
-                                                        <div className="whitespace-pre-wrap text-zinc-300">
-                                                            {JSON.stringify(notesContent, null, 2)}
+                                                        <div className="text-zinc-200 leading-relaxed space-y-6 whitespace-pre-wrap">
+                                                            {notesContent.split('\n').map((line, idx) => {
+                                                                if (line.startsWith('# ')) return <h1 key={idx} className="text-4xl font-bold text-white mb-6 border-b border-zinc-800 pb-4">{line.replace('# ', '')}</h1>;
+                                                                if (line.startsWith('## ')) return <h2 key={idx} className="text-2xl font-bold text-indigo-400 mt-10 mb-4">{line.replace('## ', '')}</h2>;
+                                                                if (line.startsWith('### ')) return <h3 key={idx} className="text-xl font-bold text-white mt-8 mb-3">{line.replace('### ', '')}</h3>;
+                                                                if (line.startsWith('- ') || line.startsWith('* ')) return <li key={idx} className="ml-4 text-zinc-300">{line.replace(/^[-*] /, '')}</li>;
+                                                                if (line.trim() === '') return <div key={idx} className="h-2" />;
+                                                                return <p key={idx} className="text-zinc-300">{line}</p>;
+                                                            })}
                                                         </div>
                                                     );
-                                                }
-
-                                                return (
-                                                    <div
-                                                        className="whitespace-pre-wrap"
-                                                        dangerouslySetInnerHTML={{
-                                                            __html: notesContent
-                                                                .replace(/\n/g, '<br/>')
-                                                                .replace(/#{3,} /g, '<h3 class="text-xl font-bold mt-6 mb-3 text-white">')
-                                                                .replace(/## /g, '<h2 class="text-2xl font-bold mt-8 mb-4 text-white">')
-                                                                .replace(/# /g, '<h1 class="text-3xl font-bold mt-8 mb-4 text-white">')
-                                                        }}
-                                                    />
-                                                );
-                                            })()}
+                                                })()}
+                                            </div>
                                         </div>
                                     )}
 
                                     {activeTab === 'mindmaps' && generatedContent.mindmaps && (
-                                        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 min-h-[500px] flex items-center justify-center">
-                                            {/* Simplified Mind Map Visualization */}
-                                            {typeof generatedContent.mindmaps === 'object' && (generatedContent.mindmaps.central || generatedContent.mindmaps.center) ? (
-                                                <div className="relative w-full h-full flex items-center justify-center">
-                                                    <div className="bg-indigo-600 text-white p-6 rounded-full font-bold text-xl shadow-lg shadow-indigo-500/30 z-10 relative">
-                                                        {generatedContent.mindmaps.central || generatedContent.mindmaps.center?.topic || generatedContent.mindmaps.center}
-                                                    </div>
+                                        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl h-[600px] flex flex-col items-center shadow-2xl overflow-hidden relative touch-none">
+                                            <div className="absolute top-4 left-4 flex items-center gap-2 z-50">
+                                                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                                                <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500">Interactive Map • Drag to Pan</span>
+                                            </div>
 
-                                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                        {(generatedContent.mindmaps.branches || generatedContent.mindmaps.center?.subtopics)?.map((branch: any, i: number, arr: any[]) => {
-                                                            const angle = (i / arr.length) * 2 * Math.PI;
-                                                            const x = Math.cos(angle) * 200;
-                                                            const y = Math.sin(angle) * 150;
+                                            {(() => {
+                                                const data = generatedContent.mindmaps;
+                                                if (!data || (!data.central && !data.center)) return <div className="text-zinc-500">Generating visualization...</div>;
 
-                                                            // Handle different branch structures
-                                                            const branchTopic = typeof branch === 'string' ? branch : branch.topic || branch.name;
-                                                            const branchSubtopics = branch.subtopics || [];
+                                                const centralTopic = data.central || (typeof data.center === 'object' ? data.center.topic : data.center);
+                                                const branches = data.branches || (typeof data.center === 'object' ? data.center.subtopics : []);
 
-                                                            return (
-                                                                <div
-                                                                    key={i}
-                                                                    className="absolute flex flex-col items-center"
-                                                                    style={{ transform: `translate(${x}px, ${y}px)` }}
-                                                                >
-                                                                    <div className="bg-zinc-800 border border-zinc-700 p-3 rounded-lg text-sm font-medium w-32 text-center mb-2 shadow-lg">
-                                                                        {branchTopic}
-                                                                    </div>
-                                                                    {Array.isArray(branchSubtopics) && branchSubtopics.length > 0 && (
-                                                                        <div className="bg-zinc-900/80 p-2 rounded text-xs text-zinc-400 w-40 text-center">
-                                                                            {branchSubtopics.slice(0, 3).join(', ')}
+                                                return (
+                                                    <motion.div
+                                                        drag
+                                                        dragConstraints={{ left: -1000, right: 1000, top: -1000, bottom: 1000 }}
+                                                        className="relative w-full h-full cursor-grab active:cursor-grabbing flex items-center justify-center p-20"
+                                                    >
+                                                        {/* Central Node */}
+                                                        <motion.div
+                                                            initial={{ scale: 0 }}
+                                                            animate={{ scale: 1 }}
+                                                            className="bg-indigo-600 text-white px-6 py-4 sm:px-8 sm:py-5 rounded-3xl font-bold text-lg sm:text-2xl shadow-[0_0_50px_rgba(79,70,229,0.3)] z-50 relative border-2 border-indigo-400 text-center max-w-[200px] sm:max-w-none"
+                                                        >
+                                                            {centralTopic}
+                                                        </motion.div>
+
+                                                        {/* Branches */}
+                                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                            {branches.map((branch: any, i: number, arr: any[]) => {
+                                                                const angle = (i / arr.length) * 2 * Math.PI;
+                                                                // Adjust radius based on screen size
+                                                                const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+                                                                const radius = isMobile ? 220 : 300;
+                                                                const x = Math.cos(angle) * radius;
+                                                                const y = Math.sin(angle) * (radius * 0.7);
+
+                                                                const branchTopic = typeof branch === 'string' ? branch : branch.topic || branch.name;
+                                                                const subtopics = branch.subtopics || [];
+
+                                                                return (
+                                                                    <motion.div
+                                                                        key={i}
+                                                                        initial={{ opacity: 0, x: 0, y: 0 }}
+                                                                        animate={{ opacity: 1, x, y }}
+                                                                        transition={{ delay: i * 0.1, duration: 0.8, type: 'spring' }}
+                                                                        className="absolute flex flex-col items-center z-10 pointer-events-auto"
+                                                                    >
+                                                                        <div className="bg-zinc-900 border border-zinc-800 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xl w-40 sm:w-56 hover:border-indigo-500 transition-colors group">
+                                                                            <h5 className="font-bold text-[11px] sm:text-sm text-white mb-2 group-hover:text-indigo-300 transition-colors line-clamp-2">{branchTopic}</h5>
+                                                                            {subtopics.length > 0 && (
+                                                                                <div className="space-y-1">
+                                                                                    {subtopics.slice(0, 3).map((s: string, idx: number) => (
+                                                                                        <div key={idx} className="text-[9px] sm:text-[10px] text-zinc-400 flex items-center gap-1">
+                                                                                            <span className="w-1 h-1 rounded-full bg-zinc-600 shrink-0"></span>
+                                                                                            <span className="line-clamp-1">{s}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
                                                                         </div>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="whitespace-pre-wrap text-zinc-300 text-sm max-w-2xl">
-                                                    {JSON.stringify(generatedContent.mindmaps, null, 2)}
-                                                </div>
-                                            )}
+                                                                    </motion.div>
+                                                                );
+                                                            })}
+                                                        </div>
+
+                                                        {/* Decorative Background Glows */}
+                                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] bg-indigo-600/5 rounded-full blur-[100px] -z-10"></div>
+                                                    </motion.div>
+                                                );
+                                            })()}
                                         </div>
                                     )}
                                 </motion.div>

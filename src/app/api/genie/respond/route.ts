@@ -2,11 +2,52 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { generateWithRetry } from '@/lib/ai-providers';
 import { handleAPIError } from '@/lib/utils/errorHandler';
+import { bufferToBase64, extractTextFromPPTX, extractTextFromPDF, isImageType, isPDFType } from '@/lib/utils/fileProcessing';
 
 export async function POST(request: NextRequest) {
     try {
         const supabase = await createSupabaseServerClient();
-        const { userMessage, skillTitle, context } = await request.json();
+        const contentType = request.headers.get('content-type') || '';
+
+        let userMessage = '';
+        let skillTitle = '';
+        let context = '';
+        let attachments: { mimeType: string; data: string }[] = [];
+        let extraContextFromFiles = '';
+
+        if (contentType.includes('multipart/form-data')) {
+            const formData = await request.formData();
+            userMessage = formData.get('userMessage') as string;
+            skillTitle = formData.get('skillTitle') as string;
+            context = formData.get('context') as string;
+
+            const files = formData.getAll('files') as File[];
+            for (const file of files) {
+                const buffer = Buffer.from(await file.arrayBuffer());
+
+                if (isImageType(file.type)) {
+                    attachments.push({
+                        mimeType: file.type,
+                        data: bufferToBase64(buffer)
+                    });
+                } else if (isPDFType(file.type)) {
+                    const extractedText = await extractTextFromPDF(buffer);
+                    extraContextFromFiles += `\n\nContent from PDF (${file.name}):\n${extractedText}`;
+                } else if (file.name.endsWith('.pptx')) {
+                    const extractedText = await extractTextFromPPTX(buffer);
+                    extraContextFromFiles += `\n\nContent from PPTX (${file.name}):\n${extractedText}`;
+                } else {
+                    // For other text files, just read the content
+                    const textContent = buffer.toString('utf-8');
+                    extraContextFromFiles += `\n\nContent from File (${file.name}):\n${textContent}`;
+                }
+            }
+        } else {
+            const json = await request.json();
+            userMessage = json.userMessage;
+            skillTitle = json.skillTitle;
+            context = json.context;
+        }
 
         if (!userMessage) {
             return NextResponse.json({ error: 'Message required' }, { status: 400 });
@@ -42,7 +83,7 @@ User Profile:
                 .limit(10);
 
             if (studySets && studySets.length > 0) {
-                studySetsContext = `\n\nUser's Study Sets:\n${studySets.map(set => 
+                studySetsContext = `\n\nUser's Study Sets:\n${studySets.map(set =>
                     `- "${set.title}"${set.description ? `: ${set.description}` : ''} (${set.flashcards?.length || 0} flashcards)`
                 ).join('\n')}`;
             }
@@ -56,7 +97,7 @@ User Profile:
                 .limit(10);
 
             if (notes && notes.length > 0) {
-                notesContext = `\n\nUser's Recent Notes:\n${notes.map(note => 
+                notesContext = `\n\nUser's Recent Notes:\n${notes.map(note =>
                     `- "${note.title}"${note.content ? `: ${note.content.substring(0, 100)}...` : ''}`
                 ).join('\n')}`;
             }
@@ -66,6 +107,7 @@ User Profile:
 ${userProfileContext}${studySetsContext}${notesContext}
 
 Current context: ${context || 'User is learning this skill'}
+${extraContextFromFiles}
 
 Guidelines:
 - You have full knowledge of the user's study materials, notes, and learning progress above.
@@ -88,6 +130,7 @@ Respond naturally as a friendly companion:`;
             schema: {},
             temperature: 0.7,
             maxTokens: 150,
+            attachments,
         });
 
         const genieResponse = result.text || "Hey! I'm Genie, your study buddy. What would you like to know?";

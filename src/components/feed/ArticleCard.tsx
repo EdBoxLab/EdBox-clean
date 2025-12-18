@@ -7,12 +7,13 @@ import { motion } from 'framer-motion';
 
 interface ArticleCardProps {
     item: ArticleFeedItem;
+    isActive: boolean;
     onViewArticle: (item: ArticleFeedItem) => void;
     audioState?: { state: AudioGenerationState; buffer?: AudioBuffer };
     onGenerateAudio: () => void;
 }
 
-export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, audioState, onGenerateAudio }) => {
+export const ArticleCard: React.FC<ArticleCardProps> = ({ item, isActive, onViewArticle, audioState, onGenerateAudio }) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -30,7 +31,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
 
     const handleListenClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        
+
         if (isPlaying) {
             audioSourceRef.current?.stop();
             audioSourceRef.current = null;
@@ -72,8 +73,8 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
         <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 via-transparent to-purple-900/20" />
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
-            
-            <motion.div 
+
+            <motion.div
                 initial={{ y: -30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 className="flex items-center gap-3 mb-4"
@@ -94,7 +95,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
             </motion.div>
 
             {item.imageGenerationState && (
-                <motion.div 
+                <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ delay: 0.2 }}
@@ -108,7 +109,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
                 </motion.div>
             )}
 
-            <motion.h2 
+            <motion.h2
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
@@ -130,7 +131,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
                 </div>
             </motion.div>
 
-            <motion.div 
+            <motion.div
                 initial={{ y: 40, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.6 }}
@@ -165,7 +166,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
                 </motion.button>
             </motion.div>
 
-            <motion.div 
+            <motion.div
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.8 }}
@@ -182,7 +183,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
                     >
                         <Bookmark className="w-4 h-4 text-indigo-400" />
                     </motion.button>
-                    
+
                     <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
@@ -194,7 +195,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ item, onViewArticle, a
                         <Share2 className="w-4 h-4 text-purple-400" />
                     </motion.button>
                 </div>
-                
+
                 <div className="flex items-center gap-1 px-3 py-1 bg-yellow-500/20 rounded-full">
                     <FileText className="w-3 h-3 text-yellow-400" />
                     <span className="text-xs text-yellow-400 font-bold">{item.xp_reward} XP</span>

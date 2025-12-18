@@ -201,6 +201,22 @@ export interface Challenge {
     rubric?: string; // For AI eval
   }[];
 
+  // Immersive Experience (New)
+  warmUp?: {
+    description: string;
+    type: 'concept_tap' | 'ordering' | 'true_false';
+    steps: {
+      prompt: string;
+      options?: string[];
+      correctAnswer: string;
+    }[];
+  };
+
+  interactivePayloads?: {
+    type: 'quiz' | 'drag_drop' | 'slider_model' | 'sort';
+    data: any; // Type-specific data
+  }[];
+
   hints: string[];
   explanation: string;
 }

@@ -5,9 +5,10 @@ import { Play } from 'lucide-react';
 
 interface VideoCardProps {
     item: VideoFeedItem;
+    isActive: boolean;
 }
 
-export const VideoCard: React.FC<VideoCardProps> = ({ item }) => {
+export const VideoCard: React.FC<VideoCardProps> = ({ item, isActive }) => {
     return (
         <div className="flex flex-col h-full space-y-4">
             <div className="relative w-full aspect-video rounded-xl overflow-hidden shadow-lg bg-black">
@@ -26,12 +27,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({ item }) => {
                 )}
             </div>
 
-            <div className="prose prose-invert max-w-none">
-                <h3 className="text-xl font-bold text-white mb-2">{item.title}</h3>
-                <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">
-                    {item.script}
-                </p>
-            </div>
         </div>
     );
 };

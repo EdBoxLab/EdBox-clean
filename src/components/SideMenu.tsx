@@ -102,9 +102,13 @@ const SideMenu = () => {
         </div>
 
         {/* Theme and User Menu */}
-        <div className="p-4 border-t border-border mt-auto flex items-center justify-between gap-4">
-          <ThemeToggle />
-          <UserMenu />
+        <div className="p-4 border-t border-border mt-auto flex items-center gap-3 min-w-0 bg-card/50">
+          <div className="shrink-0">
+            <ThemeToggle />
+          </div>
+          <div className="flex-1 min-w-0">
+            <UserMenu />
+          </div>
         </div>
 
         {/* Footer */}

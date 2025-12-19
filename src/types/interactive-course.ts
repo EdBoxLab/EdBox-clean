@@ -37,7 +37,7 @@ export interface ConversationMessage {
 /**
  * Types of messages in conversational learning
  */
-export type MessageType = 'explanation' | 'question' | 'assessment' | 'challenge' | 'feedback' | 'encouragement' | 'summary';
+export type MessageType = 'explanation' | 'question' | 'assessment' | 'quiz' | 'challenge_trigger' | 'challenge' | 'feedback' | 'encouragement' | 'summary';
 
 /**
  * Learning context maintained throughout the session
@@ -108,6 +108,8 @@ export interface AssessmentQuestionData {
   correctAnswer: string;
   explanation?: string;
   hints?: string[];
+  answered?: string;
+  isCorrect?: boolean;
 }
 
 /**
@@ -374,10 +376,10 @@ export interface InteractionEvent {
 /**
  * Types of interaction events
  */
-export type InteractionEventType = 
-  | 'message_sent' 
-  | 'assessment_completed' 
-  | 'challenge_attempted' 
+export type InteractionEventType =
+  | 'message_sent'
+  | 'assessment_completed'
+  | 'challenge_attempted'
   | 'hint_requested'
   | 'session_started'
   | 'session_resumed'

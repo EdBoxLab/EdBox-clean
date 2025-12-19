@@ -236,7 +236,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
       });
 
       const response = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'meta-llama/llama-guard-4-12b',
         messages,
         temperature,
         max_tokens: maxTokens,

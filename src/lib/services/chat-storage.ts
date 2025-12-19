@@ -10,8 +10,23 @@ interface ChatMessage {
   role: 'genie' | 'learner';
   content: string;
   timestamp: Date;
-  type?: 'message' | 'assessment' | 'challenge';
+  type?: 'message' | 'assessment' | 'challenge' | 'quiz' | 'challenge_trigger';
   assessmentData?: any;
+  quizData?: {
+    question: string;
+    options: string[];
+    correctAnswer: string;
+    explanation: string;
+    answered?: string;
+    isCorrect?: boolean;
+  };
+  challengeData?: {
+    challengeId: string;
+    title: string;
+    description: string;
+    difficulty: 'Easy' | 'Medium' | 'Hard';
+    status: 'pending' | 'started' | 'completed' | 'failed';
+  };
 }
 
 interface StoredSession {
@@ -109,7 +124,7 @@ class ChatStorageService {
           result.session.createdAt = new Date(result.session.createdAt);
           result.session.updatedAt = new Date(result.session.updatedAt);
           result.lastUpdated = new Date(result.lastUpdated);
-          
+
           result.messages = result.messages.map((msg: any) => ({
             ...msg,
             timestamp: new Date(msg.timestamp)
@@ -168,7 +183,7 @@ class ChatStorageService {
           result.session.createdAt = new Date(result.session.createdAt);
           result.session.updatedAt = new Date(result.session.updatedAt);
           result.lastUpdated = new Date(result.lastUpdated);
-          
+
           result.messages = result.messages.map((msg: any) => ({
             ...msg,
             timestamp: new Date(msg.timestamp)
@@ -224,12 +239,12 @@ class ChatStorageService {
           session.session.createdAt = new Date(session.session.createdAt);
           session.session.updatedAt = new Date(session.session.updatedAt);
           session.lastUpdated = new Date(session.lastUpdated);
-          
+
           session.messages = session.messages.map((msg: any) => ({
             ...msg,
             timestamp: new Date(msg.timestamp)
           }));
-          
+
           return session;
         });
         resolve(results);

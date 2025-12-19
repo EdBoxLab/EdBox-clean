@@ -2,15 +2,15 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
-import type { FeedItem, InsightFeedItem, StoryFeedItem, QuizFeedItem, ChallengeFeedItem, FactFeedItem, Feedback, UserPreferences, AudioGenerationState } from '@/types/feed';
+import type { FeedItem, InsightFeedItem, StoryFeedItem, QuizFeedItem, FactFeedItem, PollFeedItem, Feedback, UserPreferences, AudioGenerationState } from '@/types/feed';
 import { generateFeedBatch, persistFeedItems, trackInteraction } from '@/services/feedService';
 import { CardWrapper } from './CardWrapper';
 import { QuizCard } from './QuizCard';
 import { VideoCard } from './VideoCard';
 import { InsightCard } from './InsightCard';
-import { ChallengeCard } from './ChallengeCard';
 import { FactCard } from './FactCard';
 import { StoryCard } from './StoryCard';
+import { PollCard } from './PollCard';
 import { SkeletonCard } from './SkeletonCard';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { XPStreakDisplay } from '@/components/XPStreakDisplay';
@@ -107,7 +107,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       }
 
       // For new batches, exclude previously viewed content types
-      const allContentTypes = ['quiz', 'article', 'fact', 'challenge', 'story'];
+      const allContentTypes = ['quiz', 'article', 'fact', 'poll', 'story'];
       const shouldReset = viewedTypes.size >= allContentTypes.length;
       const excludeTypes = initial || shouldReset ? [] : Array.from(viewedTypes);
 
@@ -284,8 +284,8 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
             isActive={isActive}
           />
         );
-      case 'challenge':
-        return <ChallengeCard item={item as ChallengeFeedItem} isActive={isActive} onCorrect={handleCorrectAnswer} onIncorrect={handleIncorrectAnswer} onSwipe={handleSwipe} />;
+      case 'poll':
+        return <PollCard item={item as PollFeedItem} isActive={isActive} />;
       case 'fact':
         return <FactCard item={item as FactFeedItem} isActive={isActive} />;
       case 'story':

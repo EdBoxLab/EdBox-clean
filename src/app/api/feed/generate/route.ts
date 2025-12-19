@@ -9,7 +9,15 @@ const YOUTUBE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 const GROQ_KEYS = [
     process.env.GROQ_API_KEY_8,
     process.env.GROQ_API_KEY_5,
+    process.env.GROQ_API_KEY_20,
+    process.env.GROQ_API_KEY_12,
+    process.env.GROQ_API_KEY_15,
     process.env.GROQ_API_KEY_7,
+    process.env.GROQ_API_KEY_14,
+    process.env.GROQ_API_KEY_18,
+    process.env.GROQ_API_KEY_38,
+    process.env.GROQ_API_KEY_28,
+    process.env.GROQ_API_KEY_37,
 ].filter(Boolean) as string[];
 
 const getRandomGroqKey = () => GROQ_KEYS[Math.floor(Math.random() * GROQ_KEYS.length)];
@@ -22,7 +30,7 @@ async function searchYouTubeVideos(query: string, limit = 3): Promise<any[]> {
     console.log('⚠️  YouTube search disabled - quota exceeded');
     return [];
 
-    /* Uncomment when quota resets:
+
     if (!YOUTUBE_API_KEY) {
         console.warn("No YouTube API Key configured");
         return [];
@@ -31,15 +39,15 @@ async function searchYouTubeVideos(query: string, limit = 3): Promise<any[]> {
     try {
         const shortsQuery = `${query} #shorts educational`;
         const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(shortsQuery)}&type=video&maxResults=${limit}&videoDuration=short&key=${YOUTUBE_API_KEY}`;
-        
+
         console.log('🔍 Searching YouTube:', shortsQuery);
         const response = await fetch(url);
-        
+
         if (!response.ok) {
             console.error('YouTube API error:', response.status, await response.text());
             return [];
         }
-        
+
         const data = await response.json();
 
         if (data.error) {
@@ -71,7 +79,7 @@ async function searchYouTubeVideos(query: string, limit = 3): Promise<any[]> {
         console.error("YouTube Search Error:", error);
         return [];
     }
-    */
+
 }
 
 // ============= GROQ GENERATION =============
@@ -93,7 +101,7 @@ async function generateFeedWithGroq(interests: string[], likedTopics: string[], 
         focusTopics.push('science', 'technology', 'history');
     }
 
-    const prompt = `Create 7 *high-impact, addictive* educational feed items.
+    const prompt = `Create 7 *high-impact, * feed items  that makes the user smarter with every scroll.
 TARGET TOPICS: ${focusTopics.join(', ')}
 USER'S ACTIVE COURSES: ${userCourses.join(', ')}
 
@@ -132,14 +140,30 @@ INSIGHT example:
   "courseReference": "[Optional Course Name]"
 }
 
-[Also generate CHALLENGE, FACT, and STORY with similar high-engagement styles and optional courseReference]
+[Also generate POLL, FACT, and STORY with similar high-engagement styles and optional courseReference]
+
+POLL example:
+{
+  "id": "poll_1",
+  "type": "poll",
+  "topic": "Topic Name",
+  "title": "Genie's Pulse Check",
+  "question": "Which of these [Controversial/Interesting Topic] do you agree with most?",
+  "options": [
+    {"id": "opt_1", "text": "Option A", "votes": 45},
+    {"id": "opt_2", "text": "Option B", "votes": 30},
+    {"id": "opt_3", "text": "Option C", "votes": 25}
+  ],
+  "total_votes": 100,
+  "courseReference": "[Optional Course Name]"
+}
 
 Return ONLY the JSON array.`;
 
     try {
         const completion = await groq.chat.completions.create({
             messages: [{ role: 'user', content: prompt }],
-            model: 'llama-3.1-8b-instant',
+            model: 'llama-3.3-70b-versatile',
             temperature: 0.9, // Higher temp for more diversity
             max_tokens: 3000,
         });
@@ -189,6 +213,13 @@ Return ONLY the JSON array.`;
                     : ['Option 1', 'Option 2', 'Option 3', 'Option 4'];
                 base.correctIndex = typeof item.correctIndex === 'number' ? item.correctIndex : 0;
                 base.explanation = item.explanation || 'This is the correct answer.';
+            } else if (type === 'poll') {
+                base.question = item.question || 'What is your take on this?';
+                base.options = Array.isArray(item.options) ? item.options : [
+                    { id: 'opt_1', text: 'Yes', votes: 10 },
+                    { id: 'opt_2', text: 'No', votes: 5 }
+                ];
+                base.total_votes = item.total_votes || base.options.reduce((sum: number, o: any) => sum + (o.votes || 0), 0);
             } else if (type === 'insight' || type === 'article') {
                 base.type = 'insight';
                 base.summary = item.summary || item.title || 'Insight summary';
@@ -261,12 +292,12 @@ export const POST = async (request: NextRequest) => {
         if (user) {
             const { data: courses } = await supabase
                 .from('skill_graphs')
-                .select('title')
+                .select('goal')
                 .eq('user_id', user.id)
                 .limit(5);
 
             if (courses) {
-                userCourses = courses.map(c => c.title);
+                userCourses = courses.map(c => c.goal);
             }
         }
 

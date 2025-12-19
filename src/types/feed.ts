@@ -5,7 +5,7 @@ export interface Comment {
   avatar: string;
 }
 
-export type FeedItemType = 'video' | 'story' | 'infographic' | 'quiz' | 'article' | 'challenge' | 'fact' | 'meme' | 'ad' | 'insight';
+export type FeedItemType = 'video' | 'story' | 'infographic' | 'quiz' | 'article' | 'challenge' | 'fact' | 'meme' | 'ad' | 'insight' | 'poll';
 
 export type GenieReaction = 'cheer' | 'wink' | 'hint' | 'hype' | 'default' | 'sad';
 export type Theme = 'purple-gradient' | 'blue-gradient' | 'green-gradient' | 'orange-gradient' | 'red-gradient';
@@ -112,6 +112,18 @@ export interface FactFeedItem extends BaseFeedItem {
   imageGenerationState: ImageGenerationState;
 }
 
+export interface PollFeedItem extends BaseFeedItem {
+  type: 'poll';
+  question: string;
+  options: {
+    id: string;
+    text: string;
+    votes: number;
+  }[];
+  total_votes: number;
+  visualPrompt?: string;
+}
+
 export interface MemeFeedItem extends BaseFeedItem {
   type: 'meme';
   concept: string;
@@ -133,7 +145,8 @@ export type FeedItem =
   | InsightFeedItem
   | ChallengeFeedItem
   | FactFeedItem
-  | MemeFeedItem;
+  | MemeFeedItem
+  | PollFeedItem;
 
 // Legacy alias to support existing code during migration (will be removed)
 export type Lesson = FeedItem;

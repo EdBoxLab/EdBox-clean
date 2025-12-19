@@ -10,48 +10,17 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { ShareableContent } from '@/lib/services/sharing-service';
 import { Users } from 'lucide-react';
 
-// Mock Course Data - In a real app, this would be fetched based on the courseId
-const mockCourseData: { [key: string]: any } = {
-    '1': {
-        title: 'Introduction to Python',
-        creator: 'CodeWizard',
-        description: 'Learn Python programming from scratch with hands-on exercises and real-world projects. Perfect for beginners!',
-        imageUrl: '/courses/python-intro.jpg',
-        modules: [
-            { id: 'm1', title: 'Getting Started', type: 'video', content: '...' },
-            { id: 'm2', title: 'Variables and Data Types', type: 'text', content: '...' },
-            { id: 'm3', title: 'Your First Function', type: 'challenge', content: '...' },
-            { id: 'm4', title: 'Quiz: Python Basics', type: 'quiz', content: '...' },
-        ]
-    },
-    '2': {
-        title: 'The Science of Well-being',
-        creator: 'Dr. Happy',
-        description: 'Discover the science behind happiness and learn practical strategies to improve your well-being and life satisfaction.',
-        imageUrl: '/courses/wellbeing.jpg',
-        modules: [
-            { id: 'm1', title: 'Introduction to Positive Psychology', type: 'video', content: '...' },
-            { id: 'm2', title: 'The PERMA Model', type: 'text', content: '...' },
-            { id: 'm3', title: 'Gratitude Journaling Challenge', type: 'challenge', content: '...' },
-        ]
-    }
-};
-
-const ModuleItem = ({ module, isActive, isCompleted }: { module: any, isActive: boolean, isCompleted?: boolean }) => (
-    <div className={`p-4 rounded-lg cursor-pointer transition-all ${isActive ? 'bg-purple-600/30' : 'hover:bg-gray-700/50'}`}>
-        <p className={`font-bold ${isActive ? 'text-purple-300' : 'text-gray-300'}`}>{module.title}</p>
-        <p className="text-sm text-gray-500">{module.type.charAt(0).toUpperCase() + module.type.slice(1)}</p>
-    </div>
-);
 
 export default function CoursePlayerPage() {
     const params = useParams();
     const courseId = params.courseId as string;
-    const course = mockCourseData[courseId];
     const supabase = createSupabaseBrowserClient();
     const { isOpen, content, openShareModal, closeShareModal } = useShareModal();
 
     const [user, setUser] = React.useState<any>(null);
+    const [course, setCourse] = React.useState<any>(null);
+    const [loading, setLoading] = React.useState(true);
+    const [error, setError] = React.useState<string | null>(null);
     const [useInteractiveMode, setUseInteractiveMode] = useState(true);
     const [activeModuleId, setActiveModuleId] = React.useState('m1');
     const [completedModules, setCompletedModules] = React.useState<string[]>([]);
@@ -67,43 +36,89 @@ export default function CoursePlayerPage() {
     }), [courseId, course]);
 
     React.useEffect(() => {
-        const getUser = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            setUser(user);
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                // Get current user
+                const { data: { user } } = await supabase.auth.getUser();
+                setUser(user);
+
+                if (!user) {
+                    setLoading(false);
+                    return;
+                }
+
+                // Fetch skill graph (course)
+                const { data: graphData, error: graphError } = await supabase
+                    .from('skill_graphs')
+                    .select('*')
+                    .eq('id', courseId)
+                    .single();
+
+                if (graphError || !graphData) {
+                    console.error('Error fetching course:', graphError);
+                    setError('Course not found');
+                    setLoading(false);
+                    return;
+                }
+
+                // Fetch creator profile
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('full_name, username')
+                    .eq('id', graphData.userId)
+                    .single();
+
+                setCourse({
+                    id: graphData.id,
+                    title: graphData.goal,
+                    creator: profileData?.full_name || profileData?.username || 'AI Tutor',
+                    description: graphData.goal,
+                    imageUrl: '/courses/default.jpg',
+                    modules: [],
+                    rawGraph: graphData // Pass the full graph for Interactive Mode
+                });
+
+            } catch (err) {
+                console.error('Unexpected error:', err);
+                setError('Failed to load course');
+            } finally {
+                setLoading(false);
+            }
         };
-        getUser();
-    }, []);
+
+        fetchData();
+    }, [courseId, supabase]);
 
     const handleModuleComplete = async (moduleId: string) => {
-        if (completedModules.includes(moduleId)) return;
-
-        setCompletedModules([...completedModules, moduleId]);
-
-        // Award XP based on module type
-        const module = course.modules.find((m: any) => m.id === moduleId);
-        let xpAmount = 10;
-        
-        if (module?.type === 'challenge') xpAmount = 25;
-        if (module?.type === 'quiz') xpAmount = 20;
-        if (module?.type === 'video') xpAmount = 15;
-
-        try {
-            await fetch('/api/xp/update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    xpGained: xpAmount,
-                    activity: `course_module_${module?.type}`,
-                    skillGraphId: courseId
-                })
-            });
-        } catch (error) {
-            console.error('Failed to update XP:', error);
-        }
+        // Since modules are not used, this might be simplified or removed
+        // Keeping it for potential future use or interactive mode needs
     };
 
-    if (!course) {
-        return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">Course not found.</div>;
+    if (loading) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white">
+                <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-gray-400">Loading course experience...</p>
+            </div>
+        );
+    }
+
+    if (error || !course) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4 text-center">
+                <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl max-w-md">
+                    <h2 className="text-2xl font-bold text-red-400 mb-2">Oops!</h2>
+                    <p className="text-gray-300 mb-6">{error || 'Course not found.'}</p>
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2 rounded-xl transition-colors"
+                    >
+                        Try Again
+                    </button>
+                </div>
+            </div>
+        );
     }
 
     if (!user) {
@@ -118,112 +133,98 @@ export default function CoursePlayerPage() {
                 <div className="absolute top-4 right-4 z-10">
                     <button
                         onClick={() => setUseInteractiveMode(false)}
-                        className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                        className="bg-gray-700/50 hover:bg-gray-600/50 border border-gray-600/30 backdrop-blur-sm text-white px-4 py-2 rounded-xl text-sm font-medium transition-all"
                     >
                         Switch to Classic View
                     </button>
                 </div>
-                
+
                 <InteractiveCourseSession
                     courseId={courseId}
                     userId={user.id}
                     courseTitle={course.title}
                     courseCreator={course.creator}
+                    skillGraph={course.rawGraph}
                 />
             </div>
         );
     }
 
-    const activeModule = course.modules.find((m: any) => m.id === activeModuleId);
-
-  return (
-    <div className="flex min-h-screen bg-gray-900 text-white relative">
-        {/* Mode Toggle */}
-        <div className="absolute top-4 right-4 z-10">
-            <button
-                onClick={() => setUseInteractiveMode(true)}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm transition-colors"
-            >
-                Switch to Interactive Mode
-            </button>
-        </div>
-
-        {/* Sidebar */}
-        <aside className="w-1/4 bg-gray-800 p-6 border-r border-gray-700">
-            <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                    <h2 className="text-2xl font-bold mb-2">{course.title}</h2>
-                    <p className="text-sm text-gray-400 mb-2">By {course.creator}</p>
-                </div>
-                <ShareButton
-                    content={shareableContent}
-                    userId={user?.id}
-                    variant="icon"
-                    size="sm"
-                    showCount={true}
-                />
-            </div>
-            
-            {/* Course Description */}
-            {course.description && (
-                <p className="text-sm text-gray-300 mb-4 leading-relaxed">
-                    {course.description}
-                </p>
-            )}
-            
-            {/* XP Display */}
-            <div className="mb-6">
-                <XPStreakDisplay showCompact={true} skillGraphId={courseId} />
+    return (
+        <div className="flex min-h-screen bg-gray-900 text-white relative">
+            {/* Mode Toggle */}
+            <div className="absolute top-4 right-4 z-10">
+                <button
+                    onClick={() => setUseInteractiveMode(true)}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-lg shadow-purple-900/20"
+                >
+                    Switch to Interactive Mode
+                </button>
             </div>
 
-            <div className="space-y-2">
-                {course.modules.map((module: any) => (
-                    <div key={module.id} onClick={() => setActiveModuleId(module.id)}>
-                        <ModuleItem 
-                            module={module} 
-                            isActive={module.id === activeModuleId}
-                            isCompleted={completedModules.includes(module.id)}
-                        />
+            {/* Sidebar */}
+            <aside className="w-1/4 bg-gray-800/50 backdrop-blur-sm p-6 border-r border-gray-700/50">
+                <div className="flex items-start justify-between mb-6">
+                    <div className="flex-1">
+                        <h2 className="text-2xl font-bold mb-1 leading-tight">{course.title}</h2>
+                        <p className="text-sm text-purple-400 font-medium">By {course.creator}</p>
                     </div>
-                ))}
-            </div>
-        </aside>
+                    <ShareButton
+                        content={shareableContent}
+                        userId={user?.id}
+                        variant="icon"
+                        size="sm"
+                        showCount={true}
+                    />
+                </div>
 
-        {/* Main Content */}
-        <main className="flex-1 p-8">
-            {activeModule ? (
-                <div>
-                    <h1 className="text-4xl font-bold mb-4">{activeModule.title}</h1>
-                    <p className="text-xl text-gray-400 mb-8">
-                        This is where the <span className="font-mono text-purple-400">{activeModule.type}</span> content will be rendered.
-                    </p>
+                {/* Course Description */}
+                {course.description && (
+                    <div className="mb-6">
+                        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">About this Course</h3>
+                        <p className="text-sm text-gray-300 leading-relaxed bg-gray-900/50 p-4 rounded-xl border border-gray-700/30">
+                            {course.description}
+                        </p>
+                    </div>
+                )}
 
-                    {!completedModules.includes(activeModule.id) && (
-                        <button
-                            onClick={() => handleModuleComplete(activeModule.id)}
-                            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-bold transition-colors"
-                        >
-                            Mark as Complete
-                        </button>
-                    )}
+                {/* XP Display */}
+                <div className="mb-6">
+                    <XPStreakDisplay showCompact={true} skillGraphId={courseId} />
+                </div>
+            </aside>
 
-                    {completedModules.includes(activeModule.id) && (
-                        <div className="text-green-400 font-bold">✓ Completed</div>
-                    )}
+            {/* Main Content */}
+            <main className="flex-1 p-8 overflow-y-auto">
+                <div className="max-w-3xl mx-auto">
+                    <div className="mb-8 text-center sm:text-left">
+                        <span className="px-3 py-1 bg-purple-500/10 text-purple-400 text-xs font-bold uppercase tracking-wider rounded-full border border-purple-500/20 mb-4 inline-block">
+                            Step-by-Step Learning
+                        </span>
+                        <h1 className="text-5xl font-black mb-4 tracking-tight leading-tight">
+                            {course.title}
+                        </h1>
+                        <p className="text-xl text-gray-400 mb-8 leading-relaxed">
+                            Welcome to your personalized learning journey. This course is dynamically generated to help you master <span className="text-white font-semibold">{course.title}</span> through interactive dialogue and hands-on practice.
+                        </p>
+                    </div>
 
                     {/* Share Course Section */}
-                    <div className="mt-8 p-6 bg-gray-800/50 rounded-xl border border-gray-700">
-                        <h3 className="text-lg font-semibold mb-3">Enjoying this course?</h3>
-                        <p className="text-gray-400 mb-4">
-                            Share it with your study circles and friends! 🚀
+                    <div className="p-8 bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl border border-gray-700 shadow-2xl relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 rounded-full blur-3xl -mr-32 -mt-32 group-hover:bg-purple-600/20 transition-all duration-500"></div>
+
+                        <h3 className="text-2xl font-bold mb-3 relative z-10 text-white">Enjoying this course?</h3>
+                        <p className="text-gray-400 mb-8 relative z-10 max-w-md">
+                            Share it with your study circles and friends! Everything is better when learned together. 🚀
                         </p>
-                        <div className="flex flex-col sm:flex-row gap-3">
+
+                        <div className="flex flex-col sm:flex-row gap-4 relative z-10">
                             <button
                                 onClick={() => openShareModal(shareableContent)}
-                                className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                                className="flex-1 px-6 py-4 bg-white text-black hover:bg-gray-200 rounded-2xl font-bold transition-all flex items-center justify-center gap-3 active:scale-95"
                             >
-                                <Users className="w-4 h-4" />
-                                Share to Study Circle
+                                <Users className="w-5 h-5 text-purple-600" />
+                                Share to Circle
                             </button>
                             <ShareButton
                                 content={shareableContent}
@@ -231,33 +232,26 @@ export default function CoursePlayerPage() {
                                 variant="button"
                                 size="md"
                                 showCount={true}
-                                className="flex-1"
+                                className="flex-1 !h-[unset] !py-4 !rounded-2xl border-2 border-gray-700 hover:border-gray-500 transition-all active:scale-95"
                             />
                         </div>
-                        <div className="mt-3 text-center">
-                            <button
-                                onClick={() => openShareModal(shareableContent)}
-                                className="text-sm text-gray-400 hover:text-gray-300 transition-colors"
-                            >
-                                More sharing options →
-                            </button>
-                        </div>
+                    </div>
+
+                    <div className="mt-12 text-center text-gray-500">
+                        <p className="text-sm">
+                            Tip: Switch to <span className="text-purple-400 font-medium">Interactive Mode</span> for the best experience with Genie, your AI tutor.
+                        </p>
                     </div>
                 </div>
-            ) : (
-                 <div className="flex items-center justify-center h-full">
-                    <p className="text-gray-500">Select a module to begin.</p>
-                </div>
-            )}
-        </main>
-        
-        {/* Share Modal */}
-        <ShareModal
-            isOpen={isOpen}
-            onClose={closeShareModal}
-            content={content || shareableContent}
-            userId={user?.id}
-        />
-    </div>
-  );
+            </main>
+
+            {/* Share Modal */}
+            <ShareModal
+                isOpen={isOpen}
+                onClose={closeShareModal}
+                content={content || shareableContent}
+                userId={user?.id}
+            />
+        </div>
+    );
 }

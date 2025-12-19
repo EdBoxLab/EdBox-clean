@@ -48,7 +48,7 @@ interface Conversation {
 async function processFileContent(file: FileAttachment): Promise<ProcessedFile> {
   try {
     const buffer = Buffer.from(file.content, 'base64');
-    
+
     // ===== IMAGE FILES (USE VISION API) =====
     if (file.type.startsWith('image/')) {
       return {
@@ -65,20 +65,20 @@ async function processFileContent(file: FileAttachment): Promise<ProcessedFile> 
         },
       };
     }
-    
+
     // ===== PDF FILES (EXTRACT TEXT) =====
     if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
       try {
         const pdfData = await pdf(buffer);
         const text = pdfData.text.trim();
-        
+
         if (text && text.length > 50) {
           // Successfully extracted meaningful text
           const maxLength = 15000;
-          const truncatedText = text.length > maxLength 
+          const truncatedText = text.length > maxLength
             ? text.substring(0, maxLength) + '\n\n[... Content truncated ...]'
             : text;
-          
+
           return {
             type: 'pdf',
             content: `📕 PDF: ${file.name}\n${'═'.repeat(60)}\n${truncatedText}\n${'═'.repeat(60)}`,
@@ -113,39 +113,39 @@ async function processFileContent(file: FileAttachment): Promise<ProcessedFile> 
         };
       }
     }
-    
+
     // ===== TEXT FILES =====
-    const isTextFile = 
+    const isTextFile =
       file.type.startsWith('text/') ||
       file.type.includes('json') ||
       file.type.includes('javascript') ||
       file.type.includes('typescript') ||
       file.type.includes('xml') ||
       file.type.includes('html') ||
-      ['.txt', '.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.c', 
-       '.h', '.cs', '.php', '.rb', '.go', '.rs', '.swift', '.kt', '.md', 
-       '.json', '.xml', '.yaml', '.yml', '.csv', '.sql', '.sh', '.bat']
+      ['.txt', '.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.c',
+        '.h', '.cs', '.php', '.rb', '.go', '.rs', '.swift', '.kt', '.md',
+        '.json', '.xml', '.yaml', '.yml', '.csv', '.sql', '.sh', '.bat']
         .some(ext => file.name.toLowerCase().endsWith(ext));
 
     if (isTextFile) {
       let content = buffer.toString('utf-8');
-      
+
       // Check for encoding issues
       const replacementChars = (content.match(/�/g) || []).length;
       if (replacementChars > content.length * 0.05) {
         content = buffer.toString('latin1');
       }
-      
+
       content = content
         .replace(/\0/g, '')
         .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')
         .trim();
-      
+
       const maxLength = 12000;
       const truncatedContent = content.length > maxLength
         ? content.substring(0, maxLength) + '\n\n[... Content truncated ...]'
         : content;
-      
+
       return {
         type: 'text',
         content: `📄 FILE: ${file.name}\n${'─'.repeat(60)}\n${truncatedContent}\n${'─'.repeat(60)}`,
@@ -156,7 +156,7 @@ async function processFileContent(file: FileAttachment): Promise<ProcessedFile> 
         },
       };
     }
-    
+
     // ===== UNSUPPORTED FILES =====
     return {
       type: 'unsupported',
@@ -167,7 +167,7 @@ async function processFileContent(file: FileAttachment): Promise<ProcessedFile> 
         mimeType: file.type,
       },
     };
-    
+
   } catch (err) {
     console.error('Error processing file:', file.name, err);
     return {
@@ -256,7 +256,7 @@ export async function GET(req: NextRequest) {
     );
 
     return NextResponse.json({ conversations: conversationsWithLastMessage });
-    
+
   } catch (err: any) {
     console.error('GET error:', err);
     return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
@@ -281,7 +281,7 @@ export async function POST(req: NextRequest) {
     let attachments: FileAttachment[] = [];
 
     const contentType = req.headers.get('content-type') || '';
-    
+
     if (contentType.includes('application/json')) {
       const body = await req.json();
       message = body.message;
@@ -371,12 +371,12 @@ export async function POST(req: NextRequest) {
         metadata:
           attachments.length > 0
             ? {
-                attachments: attachments.map(a => ({
-                  name: a.name,
-                  type: a.type,
-                  size: a.size,
-                })),
-              }
+              attachments: attachments.map(a => ({
+                name: a.name,
+                type: a.type,
+                size: a.size,
+              })),
+            }
             : null,
       })
       .select('id')
@@ -397,12 +397,12 @@ export async function POST(req: NextRequest) {
     const conversationHistory: Array<{ role: ChatRole; content: string }> = (
       history || []
     ).map((msg: any) => ({
-        role: msg.role as ChatRole,
-        content: String(msg.content || ''),
-      }));
+      role: msg.role as ChatRole,
+      content: String(msg.content || ''),
+    }));
 
     // System prompt
-    const systemPrompt = `You are EdBox AI, an intelligent tutoring assistant with advanced capabilities.
+    const systemPrompt = `You are Genie, an intelligent tutoring assistant with advanced capabilities.
 
 🎯 YOUR CAPABILITIES:
 - ✅ Read and analyze text files (code, documents, data)
@@ -451,9 +451,9 @@ export async function POST(req: NextRequest) {
     try {
       // 🔥 CHOOSE MODEL BASED ON CONTENT TYPE
       const hasImages = imageFiles.length > 0;
-      const model = hasImages 
+      const model = hasImages
         ? 'llama-3.2-90b-vision-preview'  // Use vision model for images
-        : (process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'); // Use text model otherwise
+        : (process.env.GROQ_MODEL || 'meta-llama/llama-guard-4-12b'); // Use text model otherwise
 
       // 🔥 BUILD MESSAGES ARRAY WITH VISION SUPPORT
       const messages: any[] = [
@@ -503,14 +503,14 @@ export async function POST(req: NextRequest) {
       aiResponse = completion.choices?.[0]?.message?.content || "I couldn't generate a response. Please try again.";
     } catch (groqError: any) {
       console.error('Groq error:', groqError);
-      
+
       if (groqError.status === 429) {
         return NextResponse.json(
           { error: 'Rate limit exceeded. Please wait.' },
           { status: 429 }
         );
       }
-      
+
       throw new Error('AI service error');
     }
 
@@ -526,7 +526,7 @@ export async function POST(req: NextRequest) {
       response: aiResponse,
       messageId: userMessageId,
     });
-    
+
   } catch (err: any) {
     console.error('Chat error:', err);
     return NextResponse.json(

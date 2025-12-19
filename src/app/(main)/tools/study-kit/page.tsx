@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
-import { Upload, FileText, Brain, Zap, Map, CheckCircle2, Loader2, X, ChevronRight, Copy, Check, ArrowLeft } from 'lucide-react';
+import { useState, useEffect, Suspense } from 'react';
+import { Upload, FileText, Brain, Zap, Map, CheckCircle2, Loader2, X, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams } from 'next/navigation';
+import ShareButton from '@/components/ShareButton';
+import ShareModal, { useShareModal } from '@/components/ShareModal';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 const contentTypes = [
     { id: 'quizzes', label: 'Quizzes', icon: Brain, description: 'Multiple choice, true/false, and short answer' },
@@ -56,6 +59,8 @@ const FlashcardItem = ({ card }: { card: any }) => {
 function StudyKitContent() {
     const searchParams = useSearchParams();
     const id = searchParams.get('id');
+    const supabase = createSupabaseBrowserClient();
+    const { isOpen, content, openShareModal, closeShareModal } = useShareModal();
 
     const [prompt, setPrompt] = useState('');
     const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -67,6 +72,7 @@ function StudyKitContent() {
     const [error, setError] = useState<string>('');
     const [isLoadingKit, setIsLoadingKit] = useState(false);
     const [studyKit, setStudyKit] = useState<any>(null);
+    const [user, setUser] = useState<any>(null);
 
     // Quiz State moved to top level
     const [currentQuizStates, setCurrentQuizStates] = useState<any[]>([]);
@@ -79,7 +85,13 @@ function StudyKitContent() {
         if (id) {
             fetchStudyKit(id);
         }
+        getUser();
     }, [id]);
+
+    const getUser = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+    };
 
     const normalizeContent = (content: any) => {
         console.log('🔍 Starting normalization with:', JSON.stringify(content, null, 2));
@@ -390,21 +402,36 @@ function StudyKitContent() {
                 {/* Header */}
                 <div className="mb-8">
                     {id && studyKit ? (
-                        <div className="flex items-center gap-4 mb-4">
-                            <button
-                                onClick={handleBackToCreate}
-                                className="p-2 hover:bg-zinc-800 rounded-lg transition"
-                            >
-                                <ArrowLeft className="w-5 h-5" />
-                            </button>
-                            <div>
-                                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
-                                    {studyKit.title}
-                                </h1>
-                                <p className="text-zinc-400 text-sm mt-1">
-                                    Created {new Date(studyKit.created_at).toLocaleDateString()}
-                                </p>
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    onClick={handleBackToCreate}
+                                    className="p-2 hover:bg-zinc-800 rounded-lg transition"
+                                >
+                                    <ArrowLeft className="w-5 h-5" />
+                                </button>
+                                <div>
+                                    <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
+                                        {studyKit.title}
+                                    </h1>
+                                    <p className="text-zinc-400 text-sm mt-1">
+                                        Created {new Date(studyKit.created_at).toLocaleDateString()}
+                                    </p>
+                                </div>
                             </div>
+                            <ShareButton
+                                content={{
+                                    type: 'studylist',
+                                    id: studyKit.id,
+                                    title: studyKit.title,
+                                    description: `Comprehensive study materials including ${selectedTypes.join(', ')}`,
+                                    creatorName: user?.user_metadata?.full_name || user?.email || 'EdBox User'
+                                }}
+                                userId={user?.id}
+                                variant="button"
+                                size="md"
+                                showCount={true}
+                            />
                         </div>
                     ) : (
                         <>
@@ -884,6 +911,19 @@ function StudyKitContent() {
                     </div>
                 ) : null}
             </div>
+            
+            {/* Share Modal */}
+            <ShareModal
+                isOpen={isOpen}
+                onClose={closeShareModal}
+                content={content || {
+                    type: 'studylist',
+                    id: studyKit?.id || '',
+                    title: studyKit?.title || 'Study Kit',
+                    description: 'Comprehensive study materials created with EdBox'
+                }}
+                userId={user?.id}
+            />
         </div>
     );
 }

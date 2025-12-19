@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { BookOpen, Clock, Trophy, Plus, Loader2, TrendingUp } from 'lucide-react';
+import ShareButton from '@/components/ShareButton';
+import ShareModal, { useShareModal } from '@/components/ShareModal';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 interface SkillGraph {
   id: string;
@@ -12,20 +15,26 @@ interface SkillGraph {
   created_at: string;
 }
 
-interface UserProgress {
-  skill_graph_id: string;
-  mastery_level: number;
-}
+
 
 export default function CoursesPage() {
   const router = useRouter();
+  const supabase = createSupabaseBrowserClient();
+  const { isOpen, content, openShareModal, closeShareModal } = useShareModal();
   const [courses, setCourses] = useState<SkillGraph[]>([]);
   const [progress, setProgress] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     fetchCourses();
+    getUser();
   }, []);
+
+  const getUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    setUser(user);
+  };
 
   const fetchCourses = async () => {
     try {
@@ -116,6 +125,28 @@ export default function CoursesPage() {
                       </div>
                     )}
 
+                    {/* Share Button */}
+                    <div 
+                      className="absolute bottom-4 right-4 z-10"
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                      }}
+                    >
+                      <ShareButton
+                        content={{
+                          type: 'learning-path',
+                          id: course.id,
+                          title: course.goal,
+                          description: `Master ${course.goal} with this personalized learning path containing ${course.nodes.length} skills`,
+                          creatorName: user?.user_metadata?.full_name || user?.email || 'EdBox User'
+                        }}
+                        userId={user?.id}
+                        variant="icon"
+                        size="sm"
+                        className="bg-gray-900/90 hover:bg-gray-800 text-white border border-gray-600 shadow-lg"
+                      />
+                    </div>
+
                     {/* Icon */}
                     <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                       <BookOpen className="w-6 h-6 text-white" />
@@ -179,6 +210,19 @@ export default function CoursesPage() {
         )}
 
       </div>
+      
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={isOpen}
+        onClose={closeShareModal}
+        content={content || {
+          type: 'learning-path',
+          id: '',
+          title: 'Learning Path',
+          description: 'Discover amazing learning content on EdBox'
+        }}
+        userId={user?.id}
+      />
     </div>
   );
 }

@@ -11,20 +11,27 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { recipientId, message } = body;
+    const { recipientId, message, shared_content } = body;
 
     if (!recipientId || !message) {
       return NextResponse.json({ error: 'Recipient and message are required' }, { status: 400 });
     }
 
+    const messageData: any = {
+      sender_id: user.id,
+      recipient_id: recipientId,
+      message,
+      read: false,
+    };
+
+    // Add shared content if provided
+    if (shared_content) {
+      messageData.shared_content = shared_content;
+    }
+
     const { data: newMessage, error: messageError } = await supabase
       .from('direct_messages')
-      .insert({
-        sender_id: user.id,
-        recipient_id: recipientId,
-        message,
-        read: false,
-      })
+      .insert(messageData)
       .select()
       .single();
 

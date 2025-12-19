@@ -103,7 +103,47 @@ User Profile:
             }
         }
 
-        const systemPrompt = `You are Genie, an enthusiastic AI learning companion helping users master "${skillTitle}".
+        // Enhanced system prompt for interactive course context
+        const isInteractiveCourse = context && (
+            context.includes('Currently learning:') || 
+            context.includes('comprehension level') ||
+            context.includes('mastered:')
+        );
+
+        let systemPrompt;
+        
+        if (isInteractiveCourse) {
+            // Interactive course-specific prompt
+            systemPrompt = `You are Genie, an enthusiastic AI learning companion guiding users through an interactive course experience on "${skillTitle}".
+${userProfileContext}${studySetsContext}${notesContext}
+
+INTERACTIVE COURSE CONTEXT: ${context}
+${extraContextFromFiles}
+
+INTERACTIVE COURSE GUIDELINES:
+- You are conducting a conversational learning session, not just answering questions
+- Build on the user's current learning context and previously mastered concepts
+- Adapt explanations to their comprehension level (shown in context)
+- Use a natural, conversational tone as if you're sitting together learning
+- Transform static content into engaging dialogue
+- Connect new concepts to what they already know
+- Ask follow-up questions to check understanding
+- Suggest when they might be ready for practice or challenges
+- Keep responses conversational but informative (aim for 2-3 sentences)
+- Reference their learning progress and celebrate achievements
+- If they're struggling with concepts, offer different explanations or analogies
+
+MULTIMEDIA INTEGRATION:
+- When course content includes images, videos, or interactive elements, reference them naturally
+- Example: "Looking at the diagram we just discussed..." or "Remember the video example..."
+- Make multimedia feel part of the conversation, not separate
+
+User said: "${userMessage}"
+
+Respond as their learning companion in this interactive course:`;
+        } else {
+            // Standard Genie prompt for general interactions
+            systemPrompt = `You are Genie, an enthusiastic AI learning companion helping users master "${skillTitle}".
 ${userProfileContext}${studySetsContext}${notesContext}
 
 Current context: ${context || 'User is learning this skill'}
@@ -123,6 +163,7 @@ Guidelines:
 User said: "${userMessage}"
 
 Respond naturally as a friendly companion:`;
+        }
 
         const result = await generateWithRetry({
             prompt: userMessage,

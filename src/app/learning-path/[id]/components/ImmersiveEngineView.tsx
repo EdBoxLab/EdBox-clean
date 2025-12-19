@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { SkillNode, Challenge } from '@/lib/courseCreation/types';
 import UnifiedLearningShell from './UnifiedLearningShell';
-import WarmUpView from './WarmUpView';
-import { Trophy, ArrowRight, RefreshCcw } from 'lucide-react';
+import InteractiveCourseSession from '@/components/InteractiveCourseSession';
+import { Trophy } from 'lucide-react';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 // Dynamic imports for engines
 const CodeStudio = dynamic(() => import('@/lib/courseCreation/engines/codestudio/App'), { ssr: false });
@@ -35,18 +36,34 @@ export default function ImmersiveEngineView({
     onChallengeSelect,
     onChallengeComplete
 }: ImmersiveEngineViewProps) {
-    const [viewState, setViewState] = useState<'warmup' | 'engine' | 'success'>('warmup');
+    const [viewState, setViewState] = useState<'interactive' | 'engine' | 'success'>('interactive');
     const [showGenie, setShowGenie] = useState(false);
+    const [user, setUser] = useState<any>(null);
+    const supabase = createSupabaseBrowserClient();
 
-    // Switch to engine after warm-up
-    const handleWarmUpComplete = () => {
-        if (activeChallengeIndex === -1 && sessionChallenges.length > 0) {
-            // If we were on the "Intro", move to the first real challenge
-            onChallengeSelect(0);
-        } else {
-            setViewState('engine');
-        }
+    // Get user for interactive session
+    useEffect(() => {
+        const getUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+        };
+        getUser();
+    }, []);
+
+    // Switch to engine after interactive learning
+    const handleInteractiveComplete = () => {
+        console.log('Skipping to challenges...', { activeChallengeIndex, sessionChallenges: sessionChallenges.length });
+        
+        // Always switch to engine view first
+        setViewState('engine');
         setShowGenie(true);
+        
+        // If we have challenges and we're at the intro (-1), move to first challenge
+        if (activeChallengeIndex === -1 && sessionChallenges.length > 0) {
+            setTimeout(() => {
+                onChallengeSelect(0);
+            }, 100);
+        }
     };
 
     // Handle completion with radical UX feedback
@@ -63,7 +80,7 @@ export default function ImmersiveEngineView({
     // Reset view state when challenge changes
     useEffect(() => {
         if (activeChallengeIndex === -1) {
-            setViewState('warmup');
+            setViewState('interactive');
         } else if (viewState !== 'success') {
             // Stay in 'success' if we just finished, otherwise go to engine
             setViewState('engine');
@@ -73,8 +90,8 @@ export default function ImmersiveEngineView({
     if (!selectedSkill) return null;
 
     const skillTitle = selectedSkill.title || (selectedSkill as any).name || 'this skill';
-    const totalSteps = sessionChallenges.length + 1; // +1 for warm-up
-    const currentStep = activeChallengeIndex + 2; // +1 for 0-index, +1 for warm-up
+    const totalSteps = sessionChallenges.length + 1; // +1 for interactive learning
+    const currentStep = activeChallengeIndex + 2; // +1 for 0-index, +1 for interactive learning
     const progressPercent = (currentStep / totalSteps) * 100;
 
     const renderEngine = () => {
@@ -105,25 +122,37 @@ export default function ImmersiveEngineView({
             showGenie={showGenie}
         >
             <AnimatePresence mode="wait">
-                {viewState === 'warmup' && (
+                {viewState === 'interactive' && (
                     <motion.div
-                        key="warmup"
+                        key="interactive"
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 1.05 }}
-                        className="flex-1"
+                        className="flex-1 h-full"
                     >
-                        <WarmUpView
-                            description={selectedSkill.description}
-                            steps={currentChallenge?.warmUp?.steps || [
-                                {
-                                    prompt: `Let's start by understanding ___ in ${skillTitle}.`,
-                                    options: [skillTitle, 'concepts'],
-                                    correctAnswer: skillTitle
-                                }
-                            ]}
-                            onComplete={handleWarmUpComplete}
-                        />
+                        <div className="relative h-full">
+                            {user ? (
+                                <InteractiveCourseSession
+                                    courseId={selectedSkill.id}
+                                    userId={user.id}
+                                    courseTitle={skillTitle}
+                                    courseCreator="AI Learning Assistant"
+                                    onStartChallenge={handleInteractiveComplete}
+                                />
+                            ) : (
+                                <div className="flex items-center justify-center h-full">
+                                    <div className="text-center">
+                                        <p className="text-gray-400 mb-4">Please log in to start your interactive learning session</p>
+                                        <button
+                                            onClick={handleInteractiveComplete}
+                                            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded transition-colors"
+                                        >
+                                            Continue to Challenges
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </motion.div>
                 )}
 

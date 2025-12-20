@@ -438,6 +438,9 @@ export async function POST(req: NextRequest) {
     const groqApiKey =
       process.env.GROQ_API_KEY ||
       process.env.GROQ_API_KEY_3 ||
+      process.env.GROQ_API_KEY_10 ||
+      process.env.GROQ_API_KEY_15 ||
+      process.env.GROQ_API_KEY_32 ||
       process.env.GROQ_API_KEY_4;
 
     if (!groqApiKey) {
@@ -453,7 +456,7 @@ export async function POST(req: NextRequest) {
       const hasImages = imageFiles.length > 0;
       const model = hasImages
         ? 'llama-3.2-90b-vision-preview'  // Use vision model for images
-        : (process.env.GROQ_MODEL || 'meta-llama/llama-guard-4-12b'); // Use text model otherwise
+        : (process.env.GROQ_MODEL || 'llama-guard-4-12b'); // Use text model otherwise
 
       // 🔥 BUILD MESSAGES ARRAY WITH VISION SUPPORT
       const messages: any[] = [

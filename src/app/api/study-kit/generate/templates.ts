@@ -41,7 +41,7 @@ Format as a JSON array:
 export const NOTES_TEMPLATE = `
 Generate comprehensive, professionally structured study notes.
 Use Markdown for formatting. The notes should be detailed, reliable, and cover:
-1. Executive Summary: High-level overview.
+1. Overview: High-level overview.
 2. Core Concepts: Detailed breakdown of key ideas with definitions.
 3. Examples & Use Cases: Concrete examples to illustrate concepts.
 4. Deep Dive: Nuanced details, edge cases, or advanced context.

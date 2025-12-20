@@ -456,7 +456,7 @@ export async function POST(req: NextRequest) {
       const hasImages = imageFiles.length > 0;
       const model = hasImages
         ? 'llama-3.2-90b-vision-preview'  // Use vision model for images
-        : (process.env.GROQ_MODEL || 'llama-guard-4-12b'); // Use text model otherwise
+        : (process.env.GROQ_MODEL || 'llama-3.1-8b-instant'); // Use text model otherwise
 
       // 🔥 BUILD MESSAGES ARRAY WITH VISION SUPPORT
       const messages: any[] = [

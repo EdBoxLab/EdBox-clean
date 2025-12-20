@@ -34,7 +34,7 @@ Return a JSON object with:
 - "score": number (0-1) representing the quality of the answer.
 - "xrReward": number (calculated based on difficulty and score. Easy: 50, Medium: 100, Hard: 200 max).
 
-Format: JSON only.`;
+Format: Return ONLY the JSON object. DO NOT include any explanatory text or markdown code block wrappers (e.g.,text, json).`;
 
         const result = await generateWithRetry({
             prompt: `Evaluate this submission: "${answer}"`,

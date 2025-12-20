@@ -5,7 +5,7 @@
 
 // ============= API KEYS =============
 
-const GEMINI_API_KEYS = [
+  const GEMINI_API_KEYS = [
   process.env.GEMINI_API_KEY_1,
   process.env.GEMINI_API_KEY_2,
   process.env.GEMINI_API_KEY_3,
@@ -236,7 +236,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
       });
 
       const response = await groq.chat.completions.create({
-        model: 'meta-llama/llama-guard-4-12b',
+        model: 'llama-3.3-70b-versatile',
         messages,
         temperature,
         max_tokens: maxTokens,

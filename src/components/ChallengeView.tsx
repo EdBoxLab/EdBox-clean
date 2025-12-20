@@ -36,6 +36,28 @@ export default function ChallengeView({
     const [status, setStatus] = useState<'idle' | 'success' | 'fail'>('idle');
     const [feedback, setFeedback] = useState('');
 
+    // Parse challenge title for a leading "Phase" prefix like "Phase 03: Practical Challenge"
+    const parseChallengeHeader = (title: string) => {
+        const phaseRegex = /^\s*(Phase\s*\d+)\s*[:\-–]\s*(.+)$/i;
+        const match = title.match(phaseRegex);
+        if (match) {
+            return { phase: match[1].trim(), titleText: match[2].trim() };
+        }
+
+        // fallback: try to split on first colon if present (e.g., "Phase 03: ..." variations)
+        const splitColon = title.split(':');
+        if (splitColon.length > 1) {
+            return { phase: splitColon[0].trim(), titleText: splitColon.slice(1).join(':').trim() };
+        }
+
+        return { phase: null as string | null, titleText: title };
+    };
+
+    const { phase, titleText } = parseChallengeHeader(challenge.title);
+
+    // Derive a compact subtitle to show beneath the title (skill id, first objective, or first line of description)
+    const subtitle = challenge.skillId || challenge.learningObjectives?.[0] || (challenge.description ? challenge.description.split('\n')[0].slice(0, 120) : '');
+
     const xpReward = challenge.difficultyLevel === 'Easy' ? 50 : challenge.difficultyLevel === 'Medium' ? 100 : 200;
 
     const handleSubmit = async () => {
@@ -89,10 +111,24 @@ export default function ChallengeView({
                     >
                         <ArrowLeft className="w-5 h-5" />
                     </button>
+
                     <div className="flex flex-col items-center">
-                        <span className="text-xs font-bold text-purple-400 uppercase tracking-widest mb-1">Challenge</span>
-                        <h2 className="text-xl font-bold text-white">{challenge.title}</h2>
+                        <div className="flex items-center gap-2 mb-1">
+                            {/* show parsed phase badge if present, otherwise the generic label */}
+                            {phase ? (
+                                <span className="text-[10px] font-black px-3 py-1 bg-white/5 rounded-full text-gray-300 uppercase tracking-widest">{phase}</span>
+                            ) : (
+                                <span className="text-xs font-bold text-purple-400 uppercase tracking-widest">Challenge</span>
+                            )}
+                        </div>
+
+                        <h2 className="text-xl font-bold text-white">{titleText}</h2>
+
+                        {subtitle && (
+                            <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
+                        )}
                     </div>
+
                     <div className="flex items-center gap-2 px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-full">
                         <Zap className="w-4 h-4 text-purple-400" />
                         <span className="text-sm font-bold text-purple-400">{xpReward} XP</span>

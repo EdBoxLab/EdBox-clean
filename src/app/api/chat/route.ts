@@ -685,7 +685,7 @@ FORMATTING RULES:
         );
       }
 
-      throw new Error('AI service error');
+      throw new Error('problem with AI service error');
     }
 
     // Save AI response

@@ -146,7 +146,7 @@ export default function NotesPage() {
   }
 
   return (
-    <div className="relative flex h-full md:border md:rounded-lg overflow-hidden">
+    <div className="relative flex h-full lg:border lg:rounded-lg overflow-hidden">
 
       {/* ERROR TOAST */}
       {error && (
@@ -161,7 +161,7 @@ export default function NotesPage() {
 
       {/* ================= LIST SCREEN ================= */}
       {screen === 'list' && (
-        <aside className="w-full md:w-80 border-r bg-white flex flex-col">
+        <aside className="w-full lg:w-80 border-r bg-white flex flex-col">
           <div className="p-4 border-b">
             <h1 className="text-xl font-bold mb-4">My Notes</h1>
             <button
@@ -203,8 +203,8 @@ export default function NotesPage() {
       {screen === 'editor' && selectedNote && (
         <main className="flex-1 flex flex-col bg-gray-50">
 
-          {/* MOBILE HEADER - FIXED WITH ACTION BUTTONS */}
-          <div className="md:hidden sticky top-0 z-10 bg-white border-b p-3 flex items-center gap-2">
+          {/* UNIFIED HEADER - Works on all screen sizes */}
+          <div className="sticky top-0 z-10 bg-white border-b p-3 flex items-center gap-2">
             <button 
               onClick={() => setScreen('list')}
               className="p-2 -ml-2 hover:bg-gray-100 rounded-lg active:bg-gray-200"
@@ -226,7 +226,7 @@ export default function NotesPage() {
               </h2>
             )}
 
-            {/* Action buttons in mobile header */}
+            {/* Action buttons - always visible */}
             {!isEditing ? (
               <div className="flex items-center gap-1">
                 <button
@@ -252,24 +252,21 @@ export default function NotesPage() {
                     setEditedTitle(selectedNote.title);
                     setEditedContent(selectedNote.content);
                   }}
-                  className="px-3 py-1.5 text-sm bg-gray-200 rounded-md hover:bg-gray-300 active:bg-gray-400"
+                  className="px-2 py-1.5 text-xs bg-gray-200 rounded-md hover:bg-gray-300 active:bg-gray-400"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveNote}
                   disabled={isSaving}
-                  className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 active:bg-green-800 disabled:opacity-50 flex items-center gap-1"
+                  className="px-2 py-1.5 text-xs bg-green-600 text-white rounded-md hover:bg-green-700 active:bg-green-800 disabled:opacity-50 flex items-center gap-1"
                 >
-                  <Save className="h-4 w-4" strokeWidth={2} />
-                  {isSaving ? 'Saving...' : 'Save'}
+                  <Save className="h-3 w-3" strokeWidth={2} />
+                  {isSaving ? 'Saving' : 'Save'}
                 </button>
               </div>
             )}
           </div>
-
-          {/* DESKTOP HEADER */}
-          <div className="hidden md:flex items-center justify-between p-4 border-b bg-white">
             {isEditing ? (
               <input
                 value={editedTitle}

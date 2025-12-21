@@ -203,7 +203,7 @@ export default function NotesPage() {
       {screen === 'editor' && selectedNote && (
         <main className="flex-1 flex flex-col bg-gray-50">
 
-          {/* UNIFIED HEADER - Works on all screen sizes */}
+          {/* HEADER WITH ACTION BUTTONS */}
           <div className="sticky top-0 z-10 bg-white border-b p-3 flex items-center gap-2">
             <button 
               onClick={() => setScreen('list')}
@@ -226,7 +226,6 @@ export default function NotesPage() {
               </h2>
             )}
 
-            {/* Action buttons - always visible */}
             {!isEditing ? (
               <div className="flex items-center gap-1">
                 <button
@@ -266,61 +265,6 @@ export default function NotesPage() {
                 </button>
               </div>
             )}
-          </div>
-            {isEditing ? (
-              <input
-                value={editedTitle}
-                onChange={e => setEditedTitle(e.target.value)}
-                className="text-xl font-bold border-b outline-none flex-1"
-                placeholder="Note title"
-              />
-            ) : (
-              <h2 className="text-xl font-bold truncate">
-                {selectedNote.title}
-              </h2>
-            )}
-
-            <div className="flex gap-2">
-              {!isEditing ? (
-                <>
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                  >
-                    <Edit className="h-4 w-4" strokeWidth={2} />
-                    Edit
-                  </button>
-                  <button
-                    onClick={handleDeleteNote}
-                    className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center justify-center"
-                    aria-label="Delete note"
-                  >
-                    <Trash className="h-4 w-4" strokeWidth={2} />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => {
-                      setIsEditing(false);
-                      setEditedTitle(selectedNote.title);
-                      setEditedContent(selectedNote.content);
-                    }}
-                    className="px-3 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSaveNote}
-                    disabled={isSaving}
-                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    <Save className="h-4 w-4" strokeWidth={2} />
-                    {isSaving ? 'Saving...' : 'Save'}
-                  </button>
-                </>
-              )}
-            </div>
           </div>
 
           {/* CONTENT */}

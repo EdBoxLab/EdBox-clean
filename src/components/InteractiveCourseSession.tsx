@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, BookOpen, Brain, Trophy, MessageCircle, Zap, Menu, X } from 'lucide-react';
+import { Send, BookOpen, Brain, Trophy, MessageCircle, Menu, X, Loader, Check, AlertCircle } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { XPStreakDisplay } from '@/components/XPStreakDisplay';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import {
   InteractiveCourseSession as SessionType,
   QuickCheckQuestion
@@ -13,8 +16,6 @@ import { sessionManager } from '@/lib/services/interactive-course-session-manage
 import QuizBubble from './QuizBubble';
 import ChallengeView from './ChallengeView';
 import { GeneratedChallenge } from '@/types/skill-progression';
-
-// --- Interface and Component Definition ---
 
 interface InteractiveCourseSessionProps {
   courseId: string;
@@ -45,11 +46,26 @@ export default function InteractiveCourseSession({
   const [showActionButtons, setShowActionButtons] = useState(false);
   const [activeChallenge, setActiveChallenge] = useState<GeneratedChallenge | null>(null);
   const [learningStage, setLearningStage] = useState<'EXPLAIN' | 'QUIZ' | 'CHALLENGE'>('EXPLAIN');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // NEW: Sidebar state for mobile
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Initialize session on component mount
   useEffect(() => {
@@ -96,7 +112,7 @@ export default function InteractiveCourseSession({
           const welcomeBackMessage: ChatMessage = {
             id: 'welcome-back-' + Date.now(),
             role: 'genie',
-            content: "Welcome back! I remember our conversation. Feel free to continue where we left off or ask me anything new! 😊",
+            content: "Welcome back! I remember our conversation. Feel free to continue where we left off or ask me anything new!",
             timestamp: new Date(),
             type: 'message'
           };
@@ -106,7 +122,6 @@ export default function InteractiveCourseSession({
         return;
       }
 
-      // --- NEW SESSION INITIALIZATION (Real Data Logic) ---
       const newSession: SessionType = {
         id: `session_${userId}_${courseId}_${Date.now()}`,
         courseId,
@@ -144,7 +159,7 @@ export default function InteractiveCourseSession({
         const allSkills = skillGraph?.nodes || [];
         const firstSkill = allSkills[0]?.title || 'the fundamentals';
 
-        return `Hey there! 👋 Welcome to your interactive learning journey! I'm Genie, and I'm super excited to help you master **${title}**. Today we'll start with **${firstSkill}**. What would you like to know about it?`;
+        return `Hey there! Welcome to your interactive learning journey! I'm Genie, and I'm excited to help you master ${title}. Today we'll start with ${firstSkill}. What would you like to know about it?`;
       };
 
       const introMessage: ChatMessage = {
@@ -198,8 +213,6 @@ export default function InteractiveCourseSession({
   };
 
   const handleChallengeTrigger = (challengeId: string) => {
-    // MOCK DATA REMOVED. This should simulate fetching a real challenge structure.
-    // For now, keeping a placeholder structure but acknowledging the data source.
     const mockChallenge: GeneratedChallenge = {
       id: challengeId,
       skillId: courseId,
@@ -236,7 +249,7 @@ export default function InteractiveCourseSession({
       return updatedSession;
     });
 
-    handleSendMessage(`Success! I nailed the challenge and earned ${xpValue} XP! 🚀`, true);
+    handleSendMessage(`Success! I nailed the challenge and earned ${xpValue} XP!`, true);
     setLearningStage('EXPLAIN');
   };
 
@@ -246,11 +259,9 @@ export default function InteractiveCourseSession({
     setLearningStage('EXPLAIN');
   };
 
-  // NEW FUNCTION: Handles closing the challenge view and returning to chat
   const handleCloseChallenge = () => {
     setActiveChallenge(null);
     setLearningStage('EXPLAIN');
-    // Add a message to the chat indicating the challenge was left
     handleSendMessage("I'm pausing the challenge for now. Let's go over the concepts again.", true);
   };
 
@@ -400,106 +411,113 @@ export default function InteractiveCourseSession({
 
   const handleExplainFurther = () => {
     setShowActionButtons(false);
-    handleSendMessage("Can you explain this concepts more deeply with examples?", true);
+    handleSendMessage("Can you explain this concept more deeply with examples?", true);
+  };
+
+  const handleAskQuestion = () => {
+    setShowActionButtons(false);
+    inputRef.current?.focus();
   };
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // --- Main Render ---
+  // Get stage label
+  const getStageLabel = () => {
+    switch (learningStage) {
+      case 'EXPLAIN': return '1. Learn';
+      case 'QUIZ': return '2. Practice';
+      case 'CHALLENGE': return '3. Master';
+      default: return 'Learning';
+    }
+  };
 
-  // Renders the ChallengeView as a full-screen overlay when active
+  // Render challenge view as overlay
   if (activeChallenge) {
     return (
       <ChallengeView 
         challenge={activeChallenge} 
         onSuccess={onChallengeSuccess} 
         onFail={onChallengeFail}
-        onClose={handleCloseChallenge} // Pass the new close handler
+        onClose={handleCloseChallenge}
       />
     );
   }
 
-
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-[#0a0a0f] text-white font-sans selection:bg-purple-500/30 overflow-hidden relative">
-      {/* Dynamic Background Elements */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-900/10 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-900/10 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '2s' }} />
-      </div>
-
-      {/* Modern Sidebar (Responsive implementation) */}
+    <div className="flex flex-col lg:flex-row min-h-screen bg-gray-950 text-white font-sans selection:bg-purple-500/30 overflow-hidden">
+      
+      {/* Sidebar */}
       <motion.aside
         initial={false}
         animate={{ x: isSidebarOpen ? 0 : '-100%' }}
         transition={{ type: "tween", duration: 0.3 }}
-        className={`fixed inset-y-0 left-0 z-40 w-[320px] bg-gray-950/95 backdrop-blur-2xl p-6 border-r border-white/5 flex flex-col gap-8 transition-transform lg:relative lg:translate-x-0 lg:w-[320px]`}
+        className="fixed inset-y-0 left-0 z-40 w-[320px] bg-gray-900/95 backdrop-blur-xl p-6 border-r border-gray-800 flex flex-col gap-6 lg:relative lg:translate-x-0"
       >
         <button
           onClick={() => setIsSidebarOpen(false)}
-          className="lg:hidden absolute top-4 right-4 p-2 text-white/50 hover:text-white rounded-full transition-colors z-50"
+          className="lg:hidden absolute top-4 right-4 p-2 text-gray-400 hover:text-white rounded-lg transition-colors"
           aria-label="Close sidebar"
         >
-          <X className="w-6 h-6" />
+          <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-4 group cursor-default mt-6 lg:mt-0">
-          <div className="p-3.5 bg-gradient-to-tr from-purple-600/20 to-blue-600/20 rounded-2xl group-hover:rotate-6 transition-all duration-500 border border-white/5 shadow-xl shadow-purple-900/10">
-            <BookOpen className="w-6 h-6 text-purple-400 group-hover:scale-110 transition-transform" />
+        {/* Course Header */}
+        <div className="flex items-center gap-3 mt-6 lg:mt-0">
+          <div className="p-3 bg-purple-600/20 rounded-xl border border-purple-500/20">
+            <BookOpen className="w-5 h-5 text-purple-400" />
           </div>
-          <div className="min-w-0">
-            <h2 className="text-xl font-black bg-gradient-to-r from-white via-white to-gray-500 bg-clip-text text-transparent truncate tracking-tight">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-bold text-white truncate">
               {courseTitle}
             </h2>
-            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-[0.2em] leading-tight">Mastery Stream</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wider">Learning Path</p>
           </div>
         </div>
 
-        <div className="relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-3xl blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
-          <div className="relative">
-            <XPStreakDisplay showCompact={true} skillGraphId={courseId} />
-          </div>
+        {/* XP Display */}
+        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+          <XPStreakDisplay showCompact={true} skillGraphId={courseId} />
         </div>
 
+        {/* Progress Section */}
         {session && (
-          <div className="space-y-6">
-            <div className="bg-white/[0.03] border border-white/5 p-5 rounded-[2.5rem] backdrop-blur-sm relative overflow-hidden group hover:border-white/10 transition-colors">
-              <div className="absolute top-0 right-0 p-8 bg-blue-500/5 rounded-full blur-2xl -mr-8 -mt-8" />
-              <h3 className="text-xs font-black mb-4 flex items-center gap-3 text-white/50 uppercase tracking-[0.2em]">
-                <div className="p-2 bg-blue-500/10 rounded-xl">
-                  <Brain className="w-4 h-4 text-blue-400" />
+          <div className="space-y-4">
+            {/* Comprehension Level */}
+            <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+              <div className="flex items-center gap-2 mb-3">
+                <Brain className="w-4 h-4 text-blue-400" />
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  Understanding Level
+                </h3>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-bold text-white">
+                    {Math.round(session.learningContext.comprehensionLevel * 100)}%
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {session.learningContext.masteredConcepts.length}/{session.learningContext.currentConcepts.length} concepts
+                  </span>
                 </div>
-                Mind Mastery
-              </h3>
-              <div className="relative pt-1">
-                <div className="flex mb-2 items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-black py-1 px-2 uppercase rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                      {Math.round(session.learningContext.comprehensionLevel * 100)}% Sync
-                    </span>
-                  </div>
-                </div>
-                <div className="overflow-hidden h-2.5 text-xs flex rounded-full bg-gray-950 border border-white/5">
+                <div className="h-2 bg-gray-900 rounded-full overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${session.learningContext.comprehensionLevel * 100}%` }}
-                    transition={{ duration: 1.5, ease: "easeOut" }}
-                    className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600"
+                    transition={{ duration: 1, ease: "easeOut" }}
+                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
                   />
-                </div>
-                <div className="flex justify-between mt-3 px-1">
-                  <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest">Awaiting Insight</span>
-                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Enlightened</span>
                 </div>
               </div>
             </div>
 
+            {/* Current Concepts */}
             {session.learningContext.currentConcepts.length > 0 && (
-              <div className="space-y-4">
-                <h4 className="text-[10px] font-black text-gray-600 uppercase tracking-[0.3em] px-1">Active Concepts</h4>
+              <div>
+                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">
+                  Learning Now
+                </h4>
                 <div className="flex flex-wrap gap-2">
                   {session.learningContext.currentConcepts.map((concept, i) => (
                     <motion.span
@@ -507,7 +525,11 @@ export default function InteractiveCourseSession({
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: i * 0.1 }}
-                      className="px-3.5 py-2 bg-purple-500/5 border border-purple-500/10 hover:border-purple-500/30 text-purple-300 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all cursor-default"
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${
+                        session.learningContext.masteredConcepts.includes(concept)
+                          ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                          : 'bg-purple-500/10 border-purple-500/30 text-purple-300'
+                      }`}
                     >
                       {concept}
                     </motion.span>
@@ -519,204 +541,242 @@ export default function InteractiveCourseSession({
         )}
       </motion.aside>
 
-      {/* Immersive Main Display */}
-      <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" aria-hidden="true" onClick={() => setIsSidebarOpen(false)} style={{ display: isSidebarOpen ? 'block' : 'none' }} />
-      <main className="flex-1 flex flex-col min-h-screen lg:min-h-0 bg-transparent relative z-10">
-        {/* Sleek Floating Header (Responsive + Jargon Free) */}
-        <header className="h-16 md:h-20 flex items-center px-4 md:px-8 border-b border-white/5 bg-gray-950/20 backdrop-blur-xl sticky top-0 z-20">
-          <div className="flex items-center gap-4 md:gap-5 flex-1">
+      {/* Backdrop for mobile sidebar */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden" 
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-h-screen lg:min-h-0">
+        {/* Header */}
+        <header className="h-16 flex items-center justify-between px-4 lg:px-6 border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl sticky top-0 z-20">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="lg:hidden p-2 text-white/50 hover:text-white rounded-full transition-colors"
+              className="lg:hidden p-2 text-gray-400 hover:text-white rounded-lg transition-colors"
               aria-label="Open sidebar"
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="w-5 h-5" />
             </button>
 
-            <div className="relative group">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-blue-500 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-500"></div>
-              <div className="relative w-9 h-9 md:w-11 md:h-11 bg-gray-900 rounded-2xl flex items-center justify-center border border-white/10 ring-1 ring-white/5">
-                <MessageCircle className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-10 h-10 bg-gray-800 rounded-xl flex items-center justify-center border border-gray-700">
+                  <MessageCircle className="w-5 h-5 text-purple-400" />
+                </div>
+                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 ${isOnline ? 'bg-green-500' : 'bg-red-500'} border-2 border-gray-900 rounded-full`} />
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 md:w-3.5 md:h-3.5 bg-emerald-500 border-[3px] border-gray-950 rounded-full shadow-lg" />
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2">
-                {/* JARGON REMOVED: Genie Protocol V2 -> AI Learning Companion */}
-                <h1 className="font-black text-sm text-white tracking-tight">AI Learning Companion</h1>
-                <span className="hidden sm:inline px-1.5 py-0.5 bg-white/5 rounded-md text-[8px] font-black text-gray-500 border border-white/5 uppercase">Active</span>
+              <div>
+                <h1 className="font-bold text-sm text-white">AI Learning Companion</h1>
+                <p className="text-xs text-gray-400">{getStageLabel()}</p>
               </div>
-              {/* JARGON REMOVED: Quantum Pulse Active -> Ready to Learn */}
-              <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-[0.2em] mt-0.5">Ready to Learn</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 md:gap-6">
-            <AnimatePresence>
-              {isSaving && (
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="hidden sm:flex items-center gap-3"
-                >
-                  <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-ping" />
-                  {/* JARGON REMOVED: Neural Link Syncing -> Saving Progress */}
-                  <span className="text-[9px] font-black text-purple-400 uppercase tracking-[0.15em]">Saving Progress</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <div className="h-4 w-px bg-white/10" />
-            <button className="p-2 hover:bg-white/5 rounded-xl transition-colors text-white/40 hover:text-white">
-              <Trophy className="w-4 h-4" />
+          <div className="flex items-center gap-4">
+            {!isOnline && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-lg">
+                <div className="w-2 h-2 bg-red-500 rounded-full" />
+                <span className="text-xs font-semibold text-red-400">Offline</span>
+              </div>
+            )}
+            {isSaving && (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                <Loader className="w-3 h-3 text-purple-400 animate-spin" />
+                <span className="text-xs font-semibold text-purple-400">Saving</span>
+              </div>
+            )}
+            <button 
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+              aria-label="View achievements"
+            >
+              <Trophy className="w-5 h-5" />
             </button>
           </div>
         </header>
 
-        {/* Message Stream */}
-        <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 md:py-10 space-y-6 md:space-y-10 scrollbar-hide">
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto px-4 lg:px-6 py-6 space-y-6">
+          {/* Loading State */}
+          {isInitializing && (
+            <div className="space-y-4">
+              <div className="h-20 bg-gray-800/50 rounded-xl animate-pulse" />
+              <div className="h-32 bg-gray-800/50 rounded-xl animate-pulse" />
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!isInitializing && messages.length === 0 && (
+            <div className="text-center py-20">
+              <BookOpen className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+              <h3 className="text-xl font-bold mb-2 text-white">Start Your Learning Journey</h3>
+              <p className="text-gray-400">Ask a question or request an explanation to begin</p>
+            </div>
+          )}
+
+          {/* Messages */}
           <AnimatePresence initial={false}>
-            {messages.map((message) => (
+            {messages.map((message, index) => (
               <motion.div
                 key={message.id}
-                initial={{ opacity: 0, y: 30, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
+                initial={index >= messages.length - 1 ? { opacity: 0, y: 20 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
                 className={`flex ${message.role === 'learner' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`max-w-[90%] md:max-w-[75%] relative ${message.role === 'learner'
-                  ? 'bg-gradient-to-tr from-purple-600 to-indigo-700 text-white px-5 py-4 md:px-7 md:py-5 rounded-[1.5rem] rounded-tr-lg shadow-2xl shadow-purple-900/30 ring-1 ring-white/10'
-                  : message.type === 'quiz' || message.type === 'challenge_trigger'
-                    ? 'w-full'
-                    : 'bg-white/[0.03] border border-white/5 px-5 py-4 md:px-7 md:py-5 rounded-[1.5rem] rounded-tl-lg backdrop-blur-md'
-                  }`}>
+                <div className={`max-w-[85%] lg:max-w-[75%] ${
+                  message.role === 'learner'
+                    ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white px-4 py-3 rounded-2xl rounded-tr-md'
+                    : message.type === 'quiz' || message.type === 'challenge_trigger'
+                      ? 'w-full'
+                      : 'bg-gray-800/50 border border-gray-700 px-4 py-3 rounded-2xl rounded-tl-md'
+                }`}>
                   {message.type === 'quiz' && message.quizData ? (
                     <QuizBubble {...message.quizData} onAnswer={(ans, corr) => handleQuizAnswer(message.id, ans, corr)} />
                   ) : message.type === 'challenge_trigger' && message.challengeData ? (
-                    <motion.div
-                      whileHover={{ scale: 1.01 }}
-                      className="p-6 md:p-10 bg-gradient-to-br from-indigo-600/90 via-purple-600/90 to-blue-700/90 rounded-[2rem] md:rounded-[3rem] shadow-[0_30px_60px_-15px_rgba(79,70,229,0.4)] border border-white/20 relative overflow-hidden group"
-                    >
-                      <div className="absolute top-0 right-0 p-24 bg-white/5 rounded-full -mr-24 -mt-24 blur-3xl group-hover:bg-white/10 transition-colors duration-700" />
-                      <div className="relative z-10">
-                        <div className="flex items-center gap-4 md:gap-5 mb-6 md:mb-8">
-                          <div className="p-3 md:p-4 bg-white/10 rounded-[1rem] md:rounded-[1.5rem] backdrop-blur-xl border border-white/10 shadow-inner">
-                            <Zap className="w-5 h-5 md:w-7 md:h-7 text-yellow-300 animate-pulse fill-yellow-300/20" />
-                          </div>
-                          <div>
-                            {/* JARGON REMOVED: The Gauntlet -> Practical Challenge */}
-                            <h3 className="text-xl md:text-3xl font-black text-white tracking-tighter">Phase 03: Practical Challenge</h3>
-                            <p className="text-[10px] text-white/50 font-black uppercase tracking-[0.3em]">Skill Application</p>
-                          </div>
+                    <div className="p-6 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl border border-white/10">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="p-3 bg-white/10 rounded-xl">
+                          <Trophy className="w-6 h-6 text-yellow-300" />
                         </div>
-                        <p className="text-base md:text-xl text-white/90 mb-8 md:mb-10 leading-relaxed font-bold tracking-tight">
-                          {message.challengeData.description}
-                        </p>
-                        <button
-                          onClick={() => handleChallengeTrigger(message.challengeData!.challengeId)}
-                          // JARGON REMOVED: Initialize Studio -> Start Challenge
-                          className="w-full py-4 md:py-6 bg-white text-indigo-700 rounded-[1.5rem] font-black text-lg md:text-xl hover:shadow-[0_20px_40px_-10px_rgba(255,255,255,0.3)] hover:-translate-y-1 active:translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-4 group/btn"
-                        >
-                          <Brain className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-                          Start Challenge
-                        </button>
+                        <div>
+                          <h3 className="text-xl font-bold text-white">Practical Challenge</h3>
+                          <p className="text-xs text-white/60 uppercase tracking-wider">Apply Your Knowledge</p>
+                        </div>
                       </div>
-                    </motion.div>
+                      <p className="text-white/90 mb-6 leading-relaxed">
+                        {message.challengeData.description}
+                      </p>
+                      <button
+                        onClick={() => handleChallengeTrigger(message.challengeData!.challengeId)}
+                        className="w-full py-3 bg-white text-indigo-700 rounded-xl font-bold hover:bg-gray-100 transition-colors flex items-center justify-center gap-3"
+                      >
+                        <Brain className="w-5 h-5" />
+                        Start Challenge
+                      </button>
+                    </div>
                   ) : (
-                    <div className="prose prose-invert max-w-none text-white/90 leading-[1.7] font-medium tracking-tight text-[15px]">
-                      {message.content}
+                    <div>
+                      <div className="prose prose-invert max-w-none text-white leading-relaxed">
+                        <ReactMarkdown
+                          components={{
+                            code({ node, inline, className, children, ...props }: { node?: any; inline?: boolean; className?: string; children?: React.ReactNode; [key: string]: any }) {
+                              const match = /language-(\w+)/.exec(className || '');
+                              return !inline && match ? (
+                                <SyntaxHighlighter
+                                  style={vscDarkPlus}
+                                  language={match[1]}
+                                  PreTag="div"
+                                  className="rounded-lg text-sm"
+                                  {...props}
+                                >
+                                  {String(children).replace(/\n$/, '')}
+                                </SyntaxHighlighter>
+                              ) : (
+                                <code className="bg-gray-900 px-1.5 py-0.5 rounded text-sm" {...props}>
+                                  {children}
+                                </code>
+                              );
+                            }
+                          }}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
+                      <div className="flex items-center gap-2 mt-3 text-xs text-gray-400">
+                        <span>{formatTime(message.timestamp)}</span>
+                      </div>
                     </div>
                   )}
-
-                  <div className={`text-[9px] font-black mt-3 md:mt-4 opacity-25 uppercase tracking-[0.25em] flex items-center gap-2 ${message.role === 'learner' ? 'justify-end' : 'justify-start'}`}>
-                    <span>{formatTime(message.timestamp)}</span>
-                    <div className="w-1 h-1 bg-white rounded-full opacity-50" />
-                    <span>0{message.role === 'learner' ? '1' : '2'}</span>
-                  </div>
                 </div>
               </motion.div>
             ))}
           </AnimatePresence>
 
+          {/* Loading Indicator */}
           {isLoading && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex justify-start"
+            >
+              <div className="bg-gray-800/50 border border-gray-700 px-4 py-3 rounded-2xl rounded-tl-md flex items-center gap-3">
+                <div className="flex gap-1.5">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                <span className="text-xs font-semibold text-gray-400">Genie is thinking...</span>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Action Buttons */}
+          {showActionButtons && !isLoading && !activeChallenge && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className="flex justify-start"
             >
-              <div className="bg-white/[0.03] border border-white/5 px-4 py-3 md:px-6 md:py-4 rounded-[1.5rem] rounded-tl-lg flex items-center gap-4 md:gap-5">
-                <div className="flex gap-2">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-[bounce_1s_infinite_0ms] shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-[bounce_1s_infinite_200ms] shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
-                  <div className="w-2 h-2 bg-indigo-500 rounded-full animate-[bounce_1s_infinite_400ms] shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
-                </div>
-                {/* JARGON REMOVED: Quantum Compute... -> Genie is typing... */}
-                <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Genie is typing...</span>
-              </div>
-            </motion.div>
-          )}
-
-          {showActionButtons && !isLoading && !activeChallenge && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              className="flex justify-center pt-4 md:pt-6"
-            >
-              <div className="bg-gray-950/40 backdrop-blur-2xl border border-white/10 p-2.5 rounded-[2rem] flex flex-col sm:flex-row items-center gap-3 shadow-2xl ring-1 ring-white/5">
+              <div className="bg-gray-800/50 backdrop-blur-xl border border-gray-700 p-2 rounded-xl flex flex-wrap gap-2">
                 <button
                   onClick={handleStartChallenge}
-                  // JARGON REMOVED: Battle Ready -> Take Challenge
-                  className="w-full sm:w-auto px-6 py-3 md:px-8 md:py-4 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-black text-xs uppercase tracking-[0.15em] rounded-[1.5rem] hover:shadow-[0_15px_30px_-10px_rgba(16,185,129,0.4)] transition-all duration-300 flex items-center justify-center gap-3"
+                  className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white font-semibold text-sm rounded-lg transition-colors flex items-center gap-2 min-h-[44px]"
                 >
                   <Trophy className="w-4 h-4" />
                   Take Challenge
                 </button>
-                <div className="w-full sm:w-px h-px sm:h-8 bg-white/10 sm:mx-1" />
                 <button
                   onClick={handleExplainFurther}
-                  // JARGON REMOVED: Deep Scan -> Explain Further
-                  className="w-full sm:w-auto px-6 py-3 md:px-8 md:py-4 bg-white/5 hover:bg-white/10 text-white font-black text-xs uppercase tracking-[0.15em] rounded-[1.5rem] transition-all duration-300 flex items-center justify-center gap-3 border border-white/5"
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold text-sm rounded-lg transition-colors flex items-center gap-2 min-h-[44px]"
                 >
-                  <Brain className="w-4 h-4 text-purple-400" />
+                  <Brain className="w-4 h-4" />
                   Explain Further
+                </button>
+                <button
+                  onClick={handleAskQuestion}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold text-sm rounded-lg transition-colors flex items-center gap-2 min-h-[44px]"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Ask Question
                 </button>
               </div>
             </motion.div>
           )}
+
           <div ref={messagesEndRef} className="h-4" />
         </div>
 
-        {/* Input Control (Responsive + Jargon Free) */}
-        <footer className="p-4 md:p-8 bg-gray-950/20 backdrop-blur-2xl border-t border-white/5 relative">
-          <div className="max-w-5xl mx-auto flex gap-3 md:gap-5">
-            <div className="flex-1 relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-[1.5rem] md:rounded-[2rem] blur opacity-0 group-focus-within:opacity-100 transition duration-500"></div>
+        {/* Input Area */}
+        <footer className="p-4 lg:px-6 lg:py-4 bg-gray-900/50 backdrop-blur-xl border-t border-gray-800">
+          <div className="max-w-5xl mx-auto flex gap-3">
+            <div className="flex-1 relative">
               <input
                 ref={inputRef}
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
-                // JARGON REMOVED: Submit neural query... -> Ask Genie a question...
                 placeholder="Ask Genie a question or type your response..."
-                className="w-full bg-white/[0.03] border border-white/5 rounded-[1.5rem] md:rounded-[1.5rem] px-5 py-3 md:px-8 md:py-5 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500/30 focus:bg-white/[0.05] transition-all font-bold tracking-tight text-sm md:text-base relative z-10"
-                disabled={isLoading}
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-base min-h-[44px]"
+                disabled={isLoading || !isOnline}
+                inputMode="text"
               />
-              <div className="absolute right-3 md:right-5 top-1/2 -translate-y-1/2 flex items-center gap-3 opacity-0 group-focus-within:opacity-100 transition-all z-10 translate-x-2 group-focus-within:translate-x-0">
-                {/* JARGON REMOVED: Transmit -> Send */}
-                <span className="text-[10px] font-black bg-white/10 px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-gray-400 uppercase tracking-widest border border-white/5">Send</span>
-              </div>
             </div>
             <button
               onClick={sendMessage}
-              disabled={!inputMessage.trim() || isLoading}
-              className={`p-3 md:p-5 rounded-[1.5rem] md:rounded-[1.5rem] transition-all duration-300 relative z-10 
-                ${!inputMessage.trim() || isLoading
-                  ? 'bg-white/5 text-white/30 cursor-not-allowed'
-                  : 'bg-gradient-to-br from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white shadow-xl hover:shadow-purple-500/50 active:scale-95'
-                }`}
+              disabled={!inputMessage.trim() || isLoading || !isOnline}
+              className={`p-3 rounded-xl transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${
+                !inputMessage.trim() || isLoading || !isOnline
+                  ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                  : 'bg-gradient-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white'
+              }`}
+              aria-label="Send message"
             >
-              <Send className="w-5 h-5 md:w-6 md:h-6" />
+              <Send className="w-5 h-5" />
             </button>
           </div>
         </footer>

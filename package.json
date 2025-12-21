@@ -41,6 +41,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",
+    "react-syntax-highlighter": "^16.1.0",
     "recharts": "^3.4.1",
     "tailwind-merge": "^3.4.0",
     "zod": "^3.23.8"
@@ -54,6 +55,7 @@
     "@types/node": "^20.19.25",
     "@types/react": "^19.1.1",
     "@types/react-dom": "^19.1.1",
+    "@types/react-syntax-highlighter": "^15.5.13",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",

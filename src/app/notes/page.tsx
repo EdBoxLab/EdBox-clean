@@ -11,7 +11,6 @@ import {
   AlertCircle,
   X,
 } from 'lucide-react';
-import { ViewNoteDialog } from '@/components/view-note-dialog';
 
 /* ================= TYPES ================= */
 

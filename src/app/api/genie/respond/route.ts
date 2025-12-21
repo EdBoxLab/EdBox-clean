@@ -76,15 +76,15 @@ User Profile:
 
             // Get user's study sets
             const { data: studySets } = await supabase
-                .from('study_sets')
-                .select('id, title, description, flashcards')
+                .from('skill_graphs')
+                .select('id,goal,nodes,edges')
                 .eq('user_id', session.user.id)
                 .order('created_at', { ascending: false })
                 .limit(10);
 
             if (studySets && studySets.length > 0) {
                 studySetsContext = `\n\nUser's Study Sets:\n${studySets.map(set =>
-                    `- "${set.title}"${set.description ? `: ${set.description}` : ''} (${set.flashcards?.length || 0} flashcards)`
+                    `- "${set.goal}" (${set.nodes?.length || 0} nodes, ${set.edges?.length || 0} edges)`
                 ).join('\n')}`;
             }
 

@@ -19,7 +19,7 @@ const Step1Goal = memo(function Step1Goal({
     "Learn Python",
     "Create mobile apps",
     "Make AI projects",
-    "Learn Spanish"
+    "Learn Cold Email marketing"
   ];
 
   return (
@@ -43,9 +43,9 @@ const Step1Goal = memo(function Step1Goal({
         <textarea
           value={goal}
           onChange={(e) => setGoal(e.target.value)}
-          placeholder="I want to build AI chatbots 🤖
-I want to learn Spanish for my trip 🌍
-I want to make digital art 🎨"
+          placeholder="I want to build AI chatbots 
+I want to learn Spanish for my trip 
+I want to make digital art "
           className="w-full bg-gray-800 border-2 border-gray-700 focus:border-blue-500 rounded-2xl p-6 text-white placeholder-gray-500 focus:outline-none min-h-[180px] text-lg resize-none transition-colors"
           maxLength={500}
         />

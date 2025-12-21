@@ -6,17 +6,21 @@ import { getTemplateContent } from "../utils/templates";
 export async function analyzeGoal(
   goal: string,
   context: LearningContext,
+  time: string,
   templateName?: string
 ) {
   const templateText = templateName ? getTemplateContent(templateName) : "";
 
   const systemPrompt = `
-You are an AI learning path architect. Your role is to design a professional, competitive curriculum that can rival platforms like Coursera.
+You are an AI learning path architect. Your role is to design a professional,Comprehensive but not overwhelming, competitive curriculum that can rival platforms like Coursera.
 
 Analyze the following:
-- Goal: ${goal}
-- Context: ${context}
-${templateText ? `- Template guidance:\n${templateText}` : ""}
+- Goal: ${goal} make sure each path is tailored to the learner’s specific objective.
+-Time Available:${time} Analyze the learner’s available time commitment to ensure the learning path is realistic and achievable.
+- Context: ${context} use this to adapt the learning path to the learner’s background and needs.
+${templateText ? `- Template guidance:\n${templateText}` : ""} make sure to incorporate relevant elements from the template to enhance the learning path.
+
+Your output must be a detailed JSON object that includes the following fields:
 
 Output requirements:
 - Return ONLY valid JSON (no extra text).

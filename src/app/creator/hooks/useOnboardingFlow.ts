@@ -19,7 +19,7 @@ export function useOnboardingFlow() {
   // Auto-advance logic
   useEffect(() => {
     const shouldShow = 
-      (step === 1 && goal.length > 10) ||
+      (step === 1 && goal.length > 1) ||
       (step === 2 && context !== null) ||
       (step === 3 && timeAvailable !== null);
     

@@ -161,6 +161,7 @@ export async function POST(req: Request) {
     const body: {
       goal: string;
       context: LearningContext;
+      time: string;
       templatePath?: string;
       user_id?: string;
       timeAvailable?: string;

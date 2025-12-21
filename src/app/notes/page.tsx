@@ -152,10 +152,10 @@ export default function NotesPage() {
       {/* ERROR TOAST */}
       {error && (
         <div className="fixed top-4 left-4 right-4 z-50 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2 shadow">
-          <AlertCircle className="h-5 w-5 text-red-600" />
+          <AlertCircle className="h-5 w-5 text-red-600" strokeWidth={2} />
           <p className="text-sm text-red-800 flex-1">{error}</p>
-          <button onClick={() => setError(null)}>
-            <X className="h-4 w-4 text-red-600" />
+          <button onClick={() => setError(null)} className="p-0.5">
+            <X className="h-4 w-4 text-red-600" strokeWidth={2} />
           </button>
         </div>
       )}
@@ -167,9 +167,9 @@ export default function NotesPage() {
             <h1 className="text-xl font-bold mb-4">My Notes</h1>
             <button
               onClick={handleNewNote}
-              className="w-full flex items-center justify-center gap-2 p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="w-full flex items-center justify-center gap-2 p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800"
             >
-              <Plus className="h-5 w-5" />
+              <Plus className="h-5 w-5" strokeWidth={2} />
               New Note
             </button>
           </div>
@@ -177,7 +177,7 @@ export default function NotesPage() {
           <div className="flex-1 overflow-y-auto p-4">
             {notes.length === 0 ? (
               <div className="text-center text-gray-400 mt-12">
-                <Book className="h-14 w-14 mx-auto mb-4 opacity-40" />
+                <Book className="h-14 w-14 mx-auto mb-4 opacity-40" strokeWidth={1.5} />
                 No notes yet
               </div>
             ) : (
@@ -186,7 +186,7 @@ export default function NotesPage() {
                   <li
                     key={note.id}
                     onClick={() => openEditor(note)}
-                    className="p-4 rounded-lg bg-gray-50 hover:bg-gray-100 cursor-pointer"
+                    className="p-4 rounded-lg bg-gray-50 hover:bg-gray-100 cursor-pointer active:bg-gray-200"
                   >
                     <h3 className="font-semibold truncate">{note.title}</h3>
                     <p className="text-sm text-gray-500 truncate">
@@ -204,14 +204,69 @@ export default function NotesPage() {
       {screen === 'editor' && selectedNote && (
         <main className="flex-1 flex flex-col bg-gray-50">
 
-          {/* MOBILE HEADER */}
+          {/* MOBILE HEADER - FIXED WITH ACTION BUTTONS */}
           <div className="md:hidden sticky top-0 z-10 bg-white border-b p-3 flex items-center gap-2">
-            <button onClick={() => setScreen('list')}>
-              <ChevronLeft className="h-5 w-5" />
+            <button 
+              onClick={() => setScreen('list')}
+              className="p-2 -ml-2 hover:bg-gray-100 rounded-lg active:bg-gray-200"
+              aria-label="Back to list"
+            >
+              <ChevronLeft className="h-5 w-5" strokeWidth={2} />
             </button>
-            <h2 className="font-semibold truncate flex-1">
-              {isEditing ? 'Editing Note' : selectedNote.title}
-            </h2>
+            
+            {isEditing ? (
+              <input
+                value={editedTitle}
+                onChange={e => setEditedTitle(e.target.value)}
+                className="text-base font-semibold flex-1 border-b outline-none px-2 py-1"
+                placeholder="Note title"
+              />
+            ) : (
+              <h2 className="font-semibold truncate flex-1 text-base">
+                {selectedNote.title}
+              </h2>
+            )}
+
+            {/* Action buttons in mobile header */}
+            {!isEditing ? (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="p-2 text-blue-600 rounded-lg hover:bg-blue-50 active:bg-blue-100"
+                  aria-label="Edit note"
+                >
+                  <Edit className="h-5 w-5" strokeWidth={2} />
+                </button>
+                <button
+                  onClick={handleDeleteNote}
+                  className="p-2 text-red-600 rounded-lg hover:bg-red-50 active:bg-red-100"
+                  aria-label="Delete note"
+                >
+                  <Trash className="h-5 w-5" strokeWidth={2} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditedTitle(selectedNote.title);
+                    setEditedContent(selectedNote.content);
+                  }}
+                  className="px-3 py-1.5 text-sm bg-gray-200 rounded-md hover:bg-gray-300 active:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveNote}
+                  disabled={isSaving}
+                  className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 active:bg-green-800 disabled:opacity-50 flex items-center gap-1"
+                >
+                  <Save className="h-4 w-4" strokeWidth={2} />
+                  {isSaving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* DESKTOP HEADER */}
@@ -221,6 +276,7 @@ export default function NotesPage() {
                 value={editedTitle}
                 onChange={e => setEditedTitle(e.target.value)}
                 className="text-xl font-bold border-b outline-none flex-1"
+                placeholder="Note title"
               />
             ) : (
               <h2 className="text-xl font-bold truncate">
@@ -233,31 +289,38 @@ export default function NotesPage() {
                 <>
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="px-3 py-2 bg-blue-600 text-white rounded-lg"
+                    className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
                   >
+                    <Edit className="h-4 w-4" strokeWidth={2} />
                     Edit
                   </button>
                   <button
                     onClick={handleDeleteNote}
-                    className="p-2 bg-red-600 text-white rounded-lg"
+                    className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center justify-center"
+                    aria-label="Delete note"
                   >
-                    <Trash className="h-4 w-4" />
+                    <Trash className="h-4 w-4" strokeWidth={2} />
                   </button>
                 </>
               ) : (
                 <>
                   <button
-                    onClick={() => setIsEditing(false)}
-                    className="px-3 py-2 bg-gray-200 rounded-lg"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditedTitle(selectedNote.title);
+                      setEditedContent(selectedNote.content);
+                    }}
+                    className="px-3 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSaveNote}
                     disabled={isSaving}
-                    className="px-3 py-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
+                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
                   >
-                    Save
+                    <Save className="h-4 w-4" strokeWidth={2} />
+                    {isSaving ? 'Saving...' : 'Save'}
                   </button>
                 </>
               )}
@@ -271,7 +334,7 @@ export default function NotesPage() {
                 ref={textareaRef}
                 value={editedContent}
                 onChange={e => setEditedContent(e.target.value)}
-                className="w-full min-h-[300px] p-4 border rounded-lg resize-none"
+                className="w-full min-h-[300px] p-4 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Write your note…"
               />
             ) : (
@@ -282,41 +345,6 @@ export default function NotesPage() {
                   </span>
                 )}
               </div>
-            )}
-          </div>
-
-          {/* MOBILE ACTION RAIL */}
-          <div className="md:hidden fixed right-3 bottom-24 z-40 flex flex-col gap-3">
-            {!isEditing ? (
-              <>
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="p-3 bg-blue-600 text-white rounded-full shadow-lg"
-                >
-                  <Edit className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={handleDeleteNote}
-                  className="p-3 bg-red-600 text-white rounded-full shadow-lg"
-                >
-                  <Trash className="h-5 w-5" />
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={handleSaveNote}
-                  className="p-3 bg-green-600 text-white rounded-full shadow-lg"
-                >
-                  <Save className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={() => setIsEditing(false)}
-                  className="p-3 bg-gray-400 text-white rounded-full shadow-lg"
-                >
-                  ✕
-                </button>
-              </>
             )}
           </div>
         </main>

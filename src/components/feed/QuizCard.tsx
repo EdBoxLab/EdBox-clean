@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { QuizFeedItem } from '@/types/feed';
 import { Confetti } from './Confetti';
 import { CardImage } from './CardImage';
-import { Brain, Zap, Trophy, Timer } from 'lucide-react';
+import { Brain, Zap, Trophy, Timer, BarChart3, CheckCircle2, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface QuizCardProps {
@@ -40,7 +40,9 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
         if (answered) return;
         setSelected(option);
         setAnswered(true);
-        const correct = option === item.answer;
+
+        // Check correctness: text match or index match
+        const correct = option === item.answer || item.options[item.correctIndex] === option;
         setIsCorrect(correct);
 
         if (correct) {
@@ -55,20 +57,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
 
         setTimeout(() => {
             onSwipe(item.id, 'answered');
-        }, 1200);
-    };
-
-    const getButtonClass = (option: string) => {
-        if (!answered) {
-            return 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-400/30 hover:border-purple-400/50 cursor-pointer';
-        }
-        if (option === item.answer) {
-            return 'bg-gradient-to-r from-green-500 to-emerald-500 ring-2 ring-green-300 shadow-lg shadow-green-500/50 cursor-default';
-        }
-        if (option === selected && option !== item.answer) {
-            return 'bg-gradient-to-r from-red-500 to-pink-500 ring-2 ring-red-300 shadow-lg shadow-red-500/50 cursor-default';
-        }
-        return 'bg-white/10 opacity-50 cursor-default';
+        }, 3000); // Give bit more time to see the results
     };
 
     const getTimerColor = () => {
@@ -78,37 +67,36 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
     };
 
     return (
-        <div className="w-full text-center flex flex-col justify-center items-center h-full relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-transparent to-pink-900/20" />
-            <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-purple-500/20 to-transparent" />
+        <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden">
+            {/* Background Effects */}
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 via-transparent to-pink-900/10" />
 
             <Confetti isFiring={isCorrect === true} />
 
+            {/* Premium Header (Poll Sync) */}
             <motion.div
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                className="flex items-center gap-3 mb-4"
+                className="flex items-center gap-3 mb-6 z-10"
             >
-                <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full">
-                    <Brain className="w-5 h-5 text-white" />
+                <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl shadow-lg shadow-purple-500/20">
+                    <Brain className="w-6 h-6 text-white" />
                 </div>
-                <div className="flex items-center gap-2">
-                    <Timer className={`w-4 h-4 ${getTimerColor()}`} />
-                    <span className={`font-bold ${getTimerColor()}`}>{timeLeft}s</span>
+                <div className="text-left">
+                    <span className="text-xs font-bold text-purple-400 uppercase tracking-widest block flex items-center gap-2">
+                        Pulse Check
+                        {timeLeft < 10 && <span className={`animate-pulse ${getTimerColor()}`}>• {timeLeft}s</span>}
+                    </span>
+                    <h3 className="text-lg font-bold text-white">Genie's Quiz</h3>
                 </div>
-                {item.streak_bonus && (
-                    <div className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 rounded-full">
-                        <Zap className="w-3 h-3 text-yellow-400" />
-                        <span className="text-xs text-yellow-400 font-bold">STREAK</span>
-                    </div>
-                )}
             </motion.div>
 
+            {/* Image (if any) */}
             {item.imageGenerationState && (
                 <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="w-full max-w-[90%] sm:max-w-sm mb-4 rounded-xl overflow-hidden shadow-2xl"
+                    className="w-full max-w-sm mb-4 rounded-xl overflow-hidden shadow-2xl z-10 border border-white/5"
                 >
                     <CardImage
                         generationState={item.imageGenerationState}
@@ -118,69 +106,120 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                 </motion.div>
             )}
 
-            <motion.h2
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                className="text-base sm:text-lg lg:text-xl font-bold mb-4 sm:mb-6 drop-shadow-lg px-2 sm:px-4 bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent leading-tight"
-            >
-                {item.question}
-            </motion.h2>
-
+            {/* Question (Poll Style) */}
             <motion.div
-                initial={{ y: 30, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="grid grid-cols-1 gap-2 sm:gap-3 w-full max-w-sm sm:max-w-lg px-2 sm:px-4"
+                className="w-full max-w-sm mb-6 z-10"
             >
-                {item.options?.map((option, index) => (
-                    <motion.button
-                        key={option}
-                        initial={{ x: index % 2 === 0 ? -50 : 50, opacity: 0 }}
-                        animate={{ x: 0, opacity: 1 }}
-                        transition={{ delay: 0.3 + index * 0.1 }}
-                        whileHover={{ scale: answered ? 1 : 1.02 }}
-                        whileTap={{ scale: answered ? 1 : 0.98 }}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleAnswer(option);
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        disabled={answered}
-                        className={`p-2 sm:p-3 lg:p-4 rounded-xl font-semibold text-xs sm:text-sm lg:text-base transition-all duration-300 transform select-none ${getButtonClass(option)}`}
-                    >
-                        {option}
-                    </motion.button>
-                ))}
+                <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight">
+                    {item.question}
+                </h2>
             </motion.div>
 
+            {/* Options (Poll Style: 1-column responsive list) */}
+            <div className="w-full max-w-sm space-y-3 z-10">
+                {item.options?.map((option, index) => {
+                    const isSelected = selected === option;
+                    const isCorrectOption = option === item.answer || item.options[item.correctIndex] === option;
 
+                    return (
+                        <motion.button
+                            key={option}
+                            initial={{ x: -20, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            transition={{ delay: 0.3 + index * 0.1 }}
+                            onClick={() => handleAnswer(option)}
+                            disabled={answered}
+                            className={`group relative w-full p-4 rounded-xl border transition-all duration-300 overflow-hidden ${answered
+                                    ? isCorrectOption
+                                        ? 'border-green-500/50 bg-green-500/10'
+                                        : isSelected
+                                            ? 'border-red-500/50 bg-red-500/10'
+                                            : 'border-white/5 bg-white/5 opacity-50'
+                                    : 'border-white/10 bg-white/5 hover:border-purple-500/30 hover:bg-white/10 active:scale-95'
+                                }`}
+                        >
+                            {/* Sliding Progress Bar (Matching Poll Style) */}
+                            <AnimatePresence>
+                                {answered && (isCorrectOption || isSelected) && (
+                                    <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: "100%" }}
+                                        transition={{ duration: 0.8, ease: "easeOut" }}
+                                        className={`absolute inset-0 h-full ${isCorrectOption ? 'bg-green-500/20' : 'bg-red-500/20'
+                                            }`}
+                                    />
+                                )}
+                            </AnimatePresence>
+
+                            <div className="relative flex items-center justify-between z-20">
+                                <span className={`font-medium transition-colors ${answered
+                                        ? isCorrectOption ? 'text-green-400' : isSelected ? 'text-red-400' : 'text-white/60'
+                                        : 'text-white'
+                                    }`}>
+                                    {option}
+                                </span>
+
+                                <div className="flex items-center gap-2">
+                                    {answered && isCorrectOption && <CheckCircle2 className="w-5 h-5 text-green-400" />}
+                                    {answered && isSelected && !isCorrectOption && <XCircle className="w-5 h-5 text-red-400" />}
+                                </div>
+                            </div>
+                        </motion.button>
+                    );
+                })}
+            </div>
+
+            {/* Explanation / Footer */}
             <AnimatePresence>
                 {answered && (
                     <motion.div
-                        initial={{ y: 50, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: -50, opacity: 0 }}
-                        className="mt-6 text-center"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-6 z-10"
                     >
                         <div className={`text-lg font-bold mb-2 ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
-                            {isCorrect ? '🎉 Correct!' : '❌ Incorrect'}
+                            {isCorrect ? '🎉 Correct!' : '❌ Almost!'}
                         </div>
 
                         {showExplanation && item.explanation && (
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
-                                className="text-sm text-gray-300 max-w-md mx-auto bg-black/30 p-3 rounded-lg"
+                                className="text-sm text-gray-300 max-w-sm mx-auto bg-black/30 p-4 rounded-xl border border-white/5"
                             >
                                 {item.explanation}
                             </motion.div>
                         )}
-
-                        <p className="mt-3 text-gray-400 text-xs animate-pulse">Next card coming up...</p>
+                        <p className="mt-4 text-gray-400 text-xs animate-pulse">Next card coming up...</p>
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Background Particles (Poll Style Sync) */}
+            <div className="absolute inset-0 pointer-events-none">
+                {[...Array(6)].map((_, i) => (
+                    <motion.div
+                        key={i}
+                        className="absolute w-1 h-1 bg-purple-500/20 rounded-full"
+                        style={{
+                            left: `${Math.random() * 100}%`,
+                            top: `${Math.random() * 100}%`,
+                        }}
+                        animate={{
+                            y: [-20, 20],
+                            opacity: [0, 0.5, 0],
+                        }}
+                        transition={{
+                            duration: 3 + Math.random() * 2,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                        }}
+                    />
+                ))}
+            </div>
         </div>
     );
 };

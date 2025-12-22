@@ -141,9 +141,17 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
         }
         console.log('✅ Initial feed loaded:', newItems.length, 'items');
       } else {
-        setItems(prev => [...prev, ...newItems]);
-        setCurrentBatch(prev => prev + 1);
-        console.log('✅ Loaded batch', currentBatch + 1, ':', newItems.length, 'new items');
+        // Prevent duplicates
+        const existingIds = new Set(items.map(i => i.id));
+        const uniqueNewItems = newItems.filter(i => !existingIds.has(i.id));
+
+        if (uniqueNewItems.length > 0) {
+          setItems(prev => [...prev, ...uniqueNewItems]);
+          setCurrentBatch(prev => prev + 1);
+          console.log('✅ Loaded batch', currentBatch + 1, ':', uniqueNewItems.length, 'new items');
+        } else {
+          console.log('ℹ️ No new unique items to add');
+        }
       }
     } catch (err) {
       console.error("❌ Failed to load feed items", err);
@@ -175,12 +183,11 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
               const index = items.findIndex(item => item.id === newActiveId);
               setActiveIndex(index);
 
-              // Load more when user reaches the last 2 items in current batch
-              const itemsPerBatch = 7;
-              const batchEndThreshold = (currentBatch * itemsPerBatch) - 2;
+              // Load more when user reaches the last 3 items
+              const loadThreshold = items.length - 3;
 
-              if (index !== -1 && index >= batchEndThreshold && !loading && !processingRef.current) {
-                console.log('📍 Near end of batch - loading more...', { index, threshold: batchEndThreshold });
+              if (index !== -1 && index >= loadThreshold && !loading && !processingRef.current) {
+                console.log('📍 Near end of feed - loading more...', { index, total: items.length });
                 loadMoreItems();
               }
               return newActiveId;
@@ -205,19 +212,24 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
   }, [items, loading, currentBatch, loadMoreItems]);
 
   const handleFeedback = async (id: string, feedback: Feedback) => {
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+
+    // Toggle: if same feedback clicked, set to null
+    const newFeedback = item.feedback === feedback ? null : feedback;
+
     // Optimistic update
-    setItems(prev => prev.map(item =>
-      item.id === id ? { ...item, feedback } : item
+    setItems(prev => prev.map(i =>
+      i.id === id ? { ...i, feedback: newFeedback } : i
     ));
 
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const ok = await trackInteraction(user.id, id, feedback);
-      if (!ok) console.warn('trackInteraction failed for', id, feedback);
+      const ok = await trackInteraction(user.id, id, newFeedback as Feedback);
+      if (!ok) console.warn('trackInteraction failed for', id, newFeedback);
     }
 
-    const item = items.find(i => i.id === id);
-    if (item && feedback === 'like') {
+    if (newFeedback === 'like') {
       setLikedTopics(prev => [...prev, item.topic]);
     }
   };

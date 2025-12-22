@@ -101,69 +101,45 @@ async function generateFeedWithGroq(interests: string[], likedTopics: string[], 
         focusTopics.push('science', 'technology', 'history');
     }
 
-    const prompt = `Create 7 *high-impact, * feed items  that makes the user smarter with every scroll.
+    const prompt = `Create exactly 7 highly engaging, educational feed items.
 TARGET TOPICS: ${focusTopics.join(', ')}
 USER'S ACTIVE COURSES: ${userCourses.join(', ')}
 
 STRATEGIC INSTRUCTIONS:
-1. PERSONALIZATION: Reference the user's courses explicitly in 3 items. Example: "Since you're mastering [Course Name], here's a deep cut..."
-2. RADICAL DIVERSITY: Vary personas (Genius Genie, Skeptic Researcher, Future Historian). Vary formats (surprising facts, hard challenges, interactive stories, controversial insights).
-3. THE "HOOK": Use click-worthy, question-based titles. Focus on "Mind-blowing" or "Hidden" knowledge.
-4. NO REPETITION: Every item must feel distinct. Avoid 7 similar "How-to" insights.
-5. COURSE LINKING: For items referencing a course, add a "courseReference" field with the EXACT course name.
+1. PERSONALIZATION: Reference the user's courses explicitly and naturally.
+2. HIGH QUALITY: Use deep insights, not generic facts. Avoid placeholders like "Option A".
+3. DIVERSITY: Mix types: quiz, insight, poll, fact, story.
+4. SCHEMA ADHERENCE: Follow these structures exactly.
 
-Return a JSON array with these exact structures:
-
-QUIZ example:
+QUIZ:
 {
-  "id": "quiz_1",
   "type": "quiz",
-  "topic": "Topic Name",
-  "title": "Wait, You Didn't Know This?",
-  "question": "Which of these actually [Surprising Fact]?",
-  "options": ["A", "B", "C", "D"],
+  "topic": "Specific Topic",
+  "title": "Engaging Question Title",
+  "question": "The actual question text?",
+  "options": ["Specific Option 1", "Specific Option 2", "Specific Option 3", "Specific Option 4"],
   "correctIndex": 0,
-  "explanation": "Brief, punchy explanation.",
-  "xp_reward": 100,
-  "courseReference": "[Optional Course Name]"
+  "explanation": "Why this is correct.",
+  "xp_reward": 100
 }
 
-INSIGHT example:
+STORY:
 {
-  "id": "insight_1",
-  "type": "insight",
-  "topic": "Topic Name",
-  "title": "The Lie They Told You About [Topic]",
-  "summary": "Everything you know about X is slightly wrong.",
-  "full_content": "Deep, engaging detail that hooks the reader...",
-  "xp_reward": 150,
-  "courseReference": "[Optional Course Name]"
+  "type": "story",
+  "topic": "Topic",
+  "title": "Story Title",
+  "slides": [{"text": "First part of the story..."}, {"text": "Conflict/Detail..."}, {"text": "Resolution/Insight..."}],
+  "xp_reward": 150
 }
 
-[Also generate POLL, FACT, and STORY with similar high-engagement styles and optional courseReference]
+[Also generate INSIGHT (summary, full_content), POLL (question, options[{id, text, votes}]), FACT (explanation), and STORY (slides)]
 
-POLL example:
-{
-  "id": "poll_1",
-  "type": "poll",
-  "topic": "Topic Name",
-  "title": "Genie's Pulse Check",
-  "question": "Which of these [Controversial/Interesting Topic] do you agree with most?",
-  "options": [
-    {"id": "opt_1", "text": "Option A", "votes": 45},
-    {"id": "opt_2", "text": "Option B", "votes": 30},
-    {"id": "opt_3", "text": "Option C", "votes": 25}
-  ],
-  "total_votes": 100,
-  "courseReference": "[Optional Course Name]"
-}
-
-Return ONLY the JSON array.`;
+CRITICAL: Return ONLY a valid JSON array. No conversational text. No generic options. Return 'quiz' for questions, NEVER return 'challenge'.`;
 
     try {
         const completion = await groq.chat.completions.create({
             messages: [{ role: 'user', content: prompt }],
-            model: 'Llama 3.3 70B Versatile',
+            model: 'llama-3.3-70b-versatile',
             temperature: 0.9, // Higher temp for more diversity
             max_tokens: 3000,
         });
@@ -186,8 +162,12 @@ Return ONLY the JSON array.`;
         // Normalize items with guaranteed unique IDs
         const timestamp = Date.now();
         const normalized: FeedItem[] = items.map((item, idx) => {
-            const validTypes = ['quiz', 'insight', 'fact', 'challenge', 'story', 'article'];
-            const type = validTypes.includes(item.type) ? item.type : 'insight';
+            const validTypes = ['quiz', 'insight', 'fact', 'poll', 'story', 'article'];
+            let type = item.type;
+
+            // Map legacy/AI-hallucinated types to supported frontend types
+            if (type === 'challenge') type = 'quiz';
+            if (!validTypes.includes(type)) type = 'insight';
 
             const uniqueId = `${type}_${timestamp}_${Math.random().toString(36).substr(2, 9)}_${idx}`;
 
@@ -207,12 +187,13 @@ Return ONLY the JSON array.`;
             };
 
             if (type === 'quiz') {
-                base.question = item.question || 'Quiz question';
+                base.question = item.question || item.content || 'Quiz question';
                 base.options = Array.isArray(item.options) && item.options.length === 4
                     ? item.options
-                    : ['Option 1', 'Option 2', 'Option 3', 'Option 4'];
+                    : ['True', 'False', 'Not enough info', 'Depends'];
                 base.correctIndex = typeof item.correctIndex === 'number' ? item.correctIndex : 0;
-                base.explanation = item.explanation || 'This is the correct answer.';
+                base.answer = base.options[base.correctIndex];
+                base.explanation = item.explanation || item.summary || 'This is the correct answer.';
             } else if (type === 'poll') {
                 base.question = item.question || 'What is your take on this?';
                 base.options = Array.isArray(item.options) ? item.options : [
@@ -223,19 +204,16 @@ Return ONLY the JSON array.`;
             } else if (type === 'insight' || type === 'article') {
                 base.type = 'insight';
                 base.summary = item.summary || item.title || 'Insight summary';
-                base.full_content = item.full_content || item.summary || 'Content not available.';
+                base.full_content = item.full_content || item.content || item.summary || 'Content not available.';
             } else if (type === 'fact') {
-                base.explanation = item.explanation || 'Interesting fact.';
-            } else if (type === 'challenge') {
-                base.question = item.question || 'Challenge question';
-                base.answer = item.answer || 'Challenge answer';
-                base.time_limit = item.time_limit || 60;
+                base.explanation = item.explanation || item.fact || item.content || item.summary || 'Interesting fact content not available.';
             } else if (type === 'story') {
-                base.slides = Array.isArray(item.slides) && item.slides.length > 0
-                    ? item.slides.map((slide: any) => ({
-                        text: slide.text || slide
+                const rawSlides = Array.isArray(item.slides) ? item.slides : (Array.isArray(item.content) ? item.content : []);
+                base.slides = rawSlides.length > 0
+                    ? rawSlides.map((slide: any) => ({
+                        text: typeof slide === 'string' ? slide : (slide.text || slide.content || 'Slide content')
                     }))
-                    : [{ text: item.title || 'Story content' }];
+                    : [{ text: item.summary || item.title || 'Story content' }];
             }
 
             return base as FeedItem;
@@ -253,28 +231,29 @@ Return ONLY the JSON array.`;
 // ============= FALLBACK GENERATOR =============
 
 function createFallbackFeed(interests: string[]): FeedItem[] {
-    const topics = interests.length > 0 ? interests.slice(0, 3) : ['science', 'technology', 'history'];
+    const topics = interests.length > 0 ? interests.slice(0, 3) : ['Quantum Physics', 'Modern History', 'Tech Innovation'];
     const timestamp = Date.now();
 
-    return [
-        {
-            id: `fallback_quiz_${timestamp}_${Math.random().toString(36).substr(2, 9)}`,
-            type: 'quiz',
-            topic: topics[0],
-            title: `Quick ${topics[0]} Quiz`,
-            question: `What is an important concept in ${topics[0]}?`,
-            options: ['Principle A', 'Principle B', 'Principle C', 'Principle D'],
-            correctIndex: 0,
-            explanation: 'Brief explanation.',
-            xp_reward: 100,
-            genie_reaction: 'wink',
-            theme: 'purple-gradient',
-            likedByUser: false,
-            likes: 120,
-            shares: 12,
-            comments: [],
-        } as any,
-    ];
+    return topics.map((topic, idx) => ({
+        id: `fallback_${idx}_${timestamp}_${Math.random().toString(36).substr(2, 9)}`,
+        type: idx % 2 === 0 ? 'quiz' : 'insight',
+        topic,
+        title: idx % 2 === 0 ? `Mastering ${topic}` : `The Hidden Power of ${topic}`,
+        question: idx % 2 === 0 ? `Which of these best defines the core principle of ${topic}?` : undefined,
+        options: idx % 2 === 0 ? ['The Fundamental Concept', 'The Second Derivative', 'Universal Constant', 'The Chaos Theory'] : undefined,
+        correctIndex: idx % 2 === 0 ? 0 : undefined,
+        answer: idx % 2 === 0 ? 'The Fundamental Concept' : undefined,
+        explanation: `This is a key concept in ${topic} that many learners overlook. Exploring it further can unlock deeper understanding.`,
+        summary: idx % 2 !== 0 ? `Why ${topic} is changing the way we see the world.` : undefined,
+        full_content: idx % 2 !== 0 ? `In this insight, we explore the nuances of ${topic} and its practical applications in modern society. Understanding this connection is essential for mastery.` : undefined,
+        xp_reward: 100,
+        genie_reaction: ['wink', 'cheer'][idx % 2],
+        theme: ['purple-gradient', 'blue-gradient', 'green-gradient'][idx % 3],
+        likedByUser: false,
+        likes: 420 + idx * 10,
+        shares: 24,
+        comments: [],
+    } as any));
 }
 
 // ============= MAIN HANDLER =============
@@ -336,10 +315,15 @@ export const POST = async (request: NextRequest) => {
         // 3. Combine and shuffle
         let finalFeed = [...textItems, ...videoItems]
             .filter(item => !excludeTypes.includes(item.type))
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 10);
+            .sort(() => Math.random() - 0.5);
 
-        return NextResponse.json(finalFeed);
+        // Ensure we always have at least 7 items for a good UX, but max 10
+        if (finalFeed.length < 7) {
+            const extra = createFallbackFeed(interests).slice(0, 7 - finalFeed.length);
+            finalFeed = [...finalFeed, ...extra];
+        }
+
+        return NextResponse.json(finalFeed.slice(0, 10));
 
     } catch (error: any) {
         console.error('❌ Feed Generation Failed:', error);

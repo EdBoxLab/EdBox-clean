@@ -55,29 +55,17 @@ export const FactCard: React.FC<FactCardProps> = ({ item, isActive }) => {
                 initial={{ y: 30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.4 }}
-                className="w-full max-w-sm sm:max-w-md"
+                className="w-full max-w-sm sm:max-w-md z-10"
             >
-                <div className="bg-gradient-to-r from-black/40 to-black/20 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-cyan-500/20">
-
+                <div className="bg-black/40 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-cyan-500/30 shadow-xl">
                     <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        transition={{ delay: 0.8, duration: 0.5 }}
-                        className="overflow-hidden"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.6 }}
                     >
-                        <p className="text-gray-300 text-xs sm:text-sm leading-relaxed mb-3 sm:mb-4">
-                            {item.explanation}
+                        <p className="text-gray-100 text-sm sm:text-base md:text-lg leading-relaxed font-medium">
+                            {item.explanation || (item as any).content || (item as any).fact || "Fascinating educational insight coming your way..."}
                         </p>
-                    </motion.div>
-
-                    {/* Interactive Elements */}
-                    <motion.div
-                        initial={{ y: 20, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        transition={{ delay: 1 }}
-                        className="flex items-center justify-between"
-                    >
-
                     </motion.div>
                 </div>
             </motion.div>

@@ -88,9 +88,9 @@ export default function SocialPage() {
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-cyan-500/10 to-blue-500/0 group-hover:via-cyan-500/20 transition-all duration-700"></div>
             
             {/* Badge */}
-            <div className="absolute top-6 right-6 bg-blue-400/30 backdrop-blur-sm px-4 py-1.5 rounded-full text-xs font-bold text-white flex items-center gap-1.5">
-              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-              ACTIVE NOW
+            <div className="absolute top-6 right-6 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 backdrop-blur-sm border border-blue-400/30 px-4 py-1.5 rounded-full text-xs font-bold text-blue-100 flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5" />
+              FEATURED
             </div>
 
             <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
@@ -187,7 +187,7 @@ export default function SocialPage() {
       >
         <h3 className="text-xl font-bold text-white mb-2">Building the Future of Social Learning</h3>
         <p className="text-gray-300 text-sm">
-          We're constantly improving your experience. Have feedback or feature requests? Let us know! You can contact us through support.
+          We're constantly improving your experience. Have feedback or feature requests? Let us know! Contact us through support. Thanks!
         </p>
       </motion.div>
     </div>

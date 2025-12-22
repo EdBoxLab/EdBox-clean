@@ -17,6 +17,11 @@ const Dashboard: React.FC = () => {
   const [notes, setNotes] = useState<any[]>([]);
   const [studyKits, setStudyKits] = useState<any[]>([]);
   const [recentCourse, setRecentCourse] = useState<any>(null);
+  
+  // Individual loading states for progressive rendering
+  const [coursesLoading, setCoursesLoading] = useState(true);
+  const [notesLoading, setNotesLoading] = useState(true);
+  const [kitsLoading, setKitsLoading] = useState(true);
 
   const tools = [
     { id: 't2', title: 'Note Taker', type: 'Tool', href: '/tools/notes', icon: <FileText className="w-8 h-8 text-green-300" /> },
@@ -26,6 +31,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Step 1: Get user and profile first (blocking)
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           router.push('/about');
@@ -50,57 +56,87 @@ const Dashboard: React.FC = () => {
           if (newProfile) setProfile(newProfile);
         }
 
-        const coursesRes = await fetch('/api/skill-graph/list');
-        const coursesJson = await coursesRes.json();
-        
-        if (coursesJson.success && coursesJson.courses) {
-          const mappedCourses = coursesJson.courses.map((c: any) => ({
-            id: c.id,
-            title: c.goal || c.topic || 'Untitled Course',
-            type: 'Course',
-            progress: Math.round((coursesJson.progress?.[c.id] || 0) * 100),
-            icon: <Book className="w-8 h-8 text-indigo-300" />,
-            href: `/learning-path/${c.id}`
-          }));
-          setCourses(mappedCourses);
+        // Show the page immediately after profile is loaded
+        setLoading(false);
 
-          if (mappedCourses.length > 0) {
-            setRecentCourse({
-              type: 'Course',
-              title: mappedCourses[0].title,
-              href: mappedCourses[0].href,
-              progress: mappedCourses[0].progress
-            });
+        // Step 2: Fetch all content in parallel (non-blocking)
+        const fetchCourses = async () => {
+          try {
+            const coursesRes = await fetch('/api/skill-graph/list');
+            const coursesJson = await coursesRes.json();
+            
+            if (coursesJson.success && coursesJson.courses) {
+              const mappedCourses = coursesJson.courses.map((c: any) => ({
+                id: c.id,
+                title: c.goal || c.topic || 'Untitled Course',
+                type: 'Course',
+                progress: Math.round((coursesJson.progress?.[c.id] || 0) * 100),
+                icon: <Book className="w-8 h-8 text-indigo-300" />,
+                href: `/learning-path/${c.id}`
+              }));
+              setCourses(mappedCourses);
+
+              if (mappedCourses.length > 0) {
+                setRecentCourse({
+                  type: 'Course',
+                  title: mappedCourses[0].title,
+                  href: mappedCourses[0].href,
+                  progress: mappedCourses[0].progress
+                });
+              }
+            }
+          } catch (error) {
+            console.error("Error fetching courses:", error);
+          } finally {
+            setCoursesLoading(false);
           }
-        }
+        };
 
-        const notesRes = await fetch('/api/notes');
-        const notesJson = await notesRes.json();
-        if (notesJson.notes) {
-          setNotes(notesJson.notes.map((n: any) => ({
-            id: n.id,
-            title: n.title || 'Untitled Note',
-            type: 'Note',
-            href: `/tools/notes?id=${n.id}`,
-            icon: <FileText className="w-8 h-8 text-green-300" />
-          })));
-        }
+        const fetchNotes = async () => {
+          try {
+            const notesRes = await fetch('/api/notes');
+            const notesJson = await notesRes.json();
+            if (notesJson.notes) {
+              setNotes(notesJson.notes.map((n: any) => ({
+                id: n.id,
+                title: n.title || 'Untitled Note',
+                type: 'Note',
+                href: `/tools/notes?id=${n.id}`,
+                icon: <FileText className="w-8 h-8 text-green-300" />
+              })));
+            }
+          } catch (error) {
+            console.error("Error fetching notes:", error);
+          } finally {
+            setNotesLoading(false);
+          }
+        };
 
-        const kitsRes = await fetch('/api/study-kit/list');
-        const kitsJson = await kitsRes.json();
-        if (kitsJson.studyKits) {
-          setStudyKits(kitsJson.studyKits.map((kit: any) => ({
-            id: kit.id,
-            title: kit.title || 'Untitled Study Kit',
-            type: 'Study Kit',
-            href: `/tools/study-kit?id=${kit.id}`,
-            icon: <Zap className="w-8 h-8 text-yellow-300" />
-          })));
-        }
+        const fetchStudyKits = async () => {
+          try {
+            const kitsRes = await fetch('/api/study-kit/list');
+            const kitsJson = await kitsRes.json();
+            if (kitsJson.studyKits) {
+              setStudyKits(kitsJson.studyKits.map((kit: any) => ({
+                id: kit.id,
+                title: kit.title || 'Untitled Study Kit',
+                type: 'Study Kit',
+                href: `/tools/study-kit?id=${kit.id}`,
+                icon: <Zap className="w-8 h-8 text-yellow-300" />
+              })));
+            }
+          } catch (error) {
+            console.error("Error fetching study kits:", error);
+          } finally {
+            setKitsLoading(false);
+          }
+        };
+
+        // Run all fetches in parallel - they don't wait for each other!
+        Promise.all([fetchCourses(), fetchNotes(), fetchStudyKits()]);
 
       } catch (error) {
         console.error("Error loading dashboard data:", error);
-      } finally {
         setLoading(false);
       }
     };
@@ -110,8 +146,9 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-[#09090b] text-white">
-        Loading...
+      <div className="flex flex-col justify-center items-center min-h-screen bg-[#09090b] text-white gap-4">
+        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-gray-400">Loading your dashboard...</p>
       </div>
     );
   }
@@ -129,13 +166,27 @@ const Dashboard: React.FC = () => {
     })
   };
 
+  const SkeletonCard = () => (
+    <div className="flex-shrink-0 w-64 h-40 border border-zinc-800 rounded-lg p-4 bg-zinc-900/50 animate-pulse">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-grow">
+          <div className="h-3 bg-zinc-700 rounded w-16 mb-2"></div>
+          <div className="h-4 bg-zinc-700 rounded w-40"></div>
+        </div>
+        <div className="w-8 h-8 bg-zinc-700 rounded"></div>
+      </div>
+      <div className="h-3 bg-zinc-700 rounded w-24 mt-6"></div>
+    </div>
+  );
+
   const ExploreRow = ({ 
     title, 
     items, 
     emptyMessage, 
     showProgress = false,
     createLink,
-    createText 
+    createText,
+    isLoading = false
   }: { 
     title: string;
     items: any[];
@@ -143,6 +194,7 @@ const Dashboard: React.FC = () => {
     showProgress?: boolean;
     createLink?: string;
     createText?: string;
+    isLoading?: boolean;
   }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showLeftArrow, setShowLeftArrow] = useState(false);
@@ -179,6 +231,20 @@ const Dashboard: React.FC = () => {
         });
       }
     };
+
+    // Show skeleton loader while loading
+    if (isLoading) {
+      return (
+        <div className="mb-12">
+          <h2 className="text-2xl font-bold text-white mb-4">{title}</h2>
+          <div className="flex gap-4 overflow-hidden pb-4">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        </div>
+      );
+    }
 
     if (!items || items.length === 0) {
       return (
@@ -327,16 +393,19 @@ const Dashboard: React.FC = () => {
           showProgress={true}
           createLink="/creator"
           createText="Create Your First Course"
+          isLoading={coursesLoading}
         />
         <ExploreRow 
           title="Your Notes" 
           items={notes} 
           emptyMessage="No notes created yet. Use the Note Taker to get started!"
+          isLoading={notesLoading}
         />
         <ExploreRow 
           title="Your Study Kits" 
           items={studyKits} 
           emptyMessage="No study kits generated yet. Use Study Kit to create one!"
+          isLoading={kitsLoading}
         />
         <ExploreRow title="Tools" items={tools} />
       </div>

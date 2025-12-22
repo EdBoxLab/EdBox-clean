@@ -163,7 +163,7 @@ Return ONLY the JSON array.`;
     try {
         const completion = await groq.chat.completions.create({
             messages: [{ role: 'user', content: prompt }],
-            model: 'Llama 3.1 8B Instant',
+            model: 'Llama 3.3 70B Versatile',
             temperature: 0.9, // Higher temp for more diversity
             max_tokens: 3000,
         });

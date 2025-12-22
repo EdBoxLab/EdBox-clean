@@ -11,11 +11,11 @@ interface NavigationTrackerProps {
   onBack?: () => void;
 }
 
-export function NavigationTracker({ 
-  children, 
-  title, 
+export function NavigationTracker({
+  children,
+  title,
   showBackButton = true,
-  onBack 
+  onBack
 }: NavigationTrackerProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -24,7 +24,7 @@ export function NavigationTracker({
     const navigationStack = JSON.parse(
       sessionStorage.getItem('navigationStack') || '[]'
     );
-    
+
     if (!navigationStack.includes(pathname)) {
       navigationStack.push(pathname);
       sessionStorage.setItem('navigationStack', JSON.stringify(navigationStack));
@@ -54,18 +54,20 @@ export function NavigationTracker({
   return (
     <div className="flex flex-col h-full w-full">
       {showBackButton && (
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-black/20 backdrop-blur-sm sticky top-0 z-50">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-black/40 backdrop-blur-md sticky top-0 z-50">
           <button
             onClick={handleBack}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all group"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all group"
           >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-            <span className="text-sm font-medium">Back</span>
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform text-indigo-400" />
+            <span className="text-sm font-medium text-gray-200">Back</span>
           </button>
           {title && (
             <>
-              <div className="w-px h-6 bg-white/10" />
-              <h1 className="text-lg font-semibold truncate">{title}</h1>
+              <div className="w-px h-5 bg-white/10 mx-1" />
+              <h1 className="text-base font-bold tracking-tight bg-gradient-to-r from-white via-gray-300 to-gray-500 bg-clip-text text-transparent truncate">
+                {title.toUpperCase()}
+              </h1>
             </>
           )}
         </div>

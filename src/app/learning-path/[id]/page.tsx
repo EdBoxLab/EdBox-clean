@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { SkillGraph, Challenge } from '@/lib/courseCreation/types';
 import SkillGraphWrapper from './SkillGraphWrapper';
+import { NavigationTracker } from '@/components/NavigationTracker';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -18,7 +19,7 @@ export default async function LearningPathPage({ params }: Props) {
 
     // Get the current user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
+
     if (userError || !user) {
       return (
         <div className="text-white p-8">
@@ -42,15 +43,15 @@ export default async function LearningPathPage({ params }: Props) {
         <div className="text-white p-8">
           <h1 className="text-2xl font-bold mb-4">Learning Path Not Found</h1>
           <p className="text-gray-400">
-            {graphError?.code === 'PGRST116' 
+            {graphError?.code === 'PGRST116'
               ? 'This learning path does not exist or you do not have access to it.'
               : `Error: ${graphError?.message || 'Unknown error'}`
             }
           </p>
           <p className="text-gray-500 mt-2">ID: {id}</p>
           <div className="mt-4">
-            <a 
-              href="/learning-path" 
+            <a
+              href="/learning-path"
               className="inline-block px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
             >
               Browse Learning Paths
@@ -72,7 +73,11 @@ export default async function LearningPathPage({ params }: Props) {
     const challengesMap: Record<string, Challenge> = {};
     challengesData.forEach((c) => (challengesMap[c.skillId] = c));
 
-    return <SkillGraphWrapper graph={graphData} challenges={challengesMap} />;
+    return (
+      <NavigationTracker title="Learning Path">
+        <SkillGraphWrapper graph={graphData} challenges={challengesMap} />
+      </NavigationTracker>
+    );
   } catch (error) {
     console.error('Unexpected error in LearningPathPage:', error);
     return (

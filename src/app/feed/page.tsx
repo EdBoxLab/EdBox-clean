@@ -8,6 +8,7 @@ import type { UserPreferences } from '@/types/feed';
 import { supabase } from '@/lib/supabase/client';
 import { getUserPreferences, saveUserPreferences } from '@/services/userPreferencesService';
 import { Loader2 } from 'lucide-react';
+import { NavigationTracker } from '@/components/NavigationTracker';
 
 export default function FeedPage() {
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
@@ -78,5 +79,9 @@ export default function FeedPage() {
     return <Onboarding onComplete={handleOnboardingComplete} />;
   }
 
-  return <Feed preferences={preferences} />;
+  return (
+    <NavigationTracker title="Daily Feed">
+      <Feed preferences={preferences} />
+    </NavigationTracker>
+  );
 }

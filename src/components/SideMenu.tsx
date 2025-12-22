@@ -10,8 +10,10 @@ import {
   Users,
   Menu,
   X,
-  MessageCircle
+  MessageCircle,
+  ArrowLeft
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
 import { ContactSupport } from './ContactSupport';
@@ -28,6 +30,7 @@ const SideMenu = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
 
   return (
     <>
@@ -119,13 +122,24 @@ const SideMenu = () => {
 
       {/* Mobile Header */}
       <header className="lg:hidden h-16 bg-card border-b border-border flex items-center px-4 shrink-0 sticky top-0 z-30">
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="text-muted-foreground hover:text-foreground mr-4"
-        >
-          <Menu size={24} />
-        </button>
-        <span className="font-semibold text-foreground">EdBox</span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="text-muted-foreground hover:text-foreground p-1"
+          >
+            <Menu size={24} />
+          </button>
+          {pathname !== '/' && (
+            <button
+              onClick={() => router.back()}
+              className="text-indigo-400 hover:text-indigo-300 p-1 flex items-center justify-center bg-white/5 rounded-lg border border-white/10"
+              aria-label="Go back"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          )}
+        </div>
+        <span className="font-semibold text-foreground ml-2">EdBox</span>
         <div className="ml-auto">
           <ThemeToggle />
         </div>

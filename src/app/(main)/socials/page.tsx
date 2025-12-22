@@ -2,78 +2,67 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Users, Star, ArrowRight, MessageCircle } from 'lucide-react';
+import { Users, ArrowRight, Trophy, Target, Sparkles, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-const cardVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0
-  }
-};
-
-const FeatureCard = ({ 
+const ComingSoonCard = ({ 
   title, 
   description, 
-  href, 
   icon: Icon,
   index,
   gradient
 }: { 
   title: string;
   description: string;
-  href: string;
   icon: React.ElementType;
   index: number;
   gradient: string;
 }) => {
   return (
-    <Link href={href}>
-      <motion.div
-        className={`${gradient} border border-opacity-30 rounded-xl p-8 group hover:border-opacity-50 transition-all cursor-pointer h-full flex flex-col justify-between`}
-        variants={cardVariants}
-        initial="hidden"
-        animate="visible"
-        transition={{ delay: index * 0.15, duration: 0.5 }}
-        whileHover={{ scale: 1.02 }}
-      >
-        <div>
-          <Icon className="w-12 h-12 text-white opacity-80 mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-3">{title}</h2>
-          <p className="text-gray-300 text-base leading-relaxed">{description}</p>
-        </div>
-        <div className="flex items-center gap-2 text-white opacity-80 group-hover:opacity-100 text-sm mt-6 group-hover:gap-3 transition-all">
-          Explore <ArrowRight className="w-4 h-4" />
-        </div>
-      </motion.div>
-    </Link>
+    <motion.div
+      className={`${gradient} border border-opacity-30 rounded-xl p-6 relative overflow-hidden h-full flex flex-col`}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4 + index * 0.1, duration: 0.5 }}
+    >
+      <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-white">
+        SOON
+      </div>
+      <div className="bg-white/10 w-12 h-12 rounded-lg flex items-center justify-center mb-3">
+        <Icon className="w-6 h-6 text-white opacity-80" />
+      </div>
+      <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
+      <p className="text-gray-200 text-sm leading-relaxed opacity-90">{description}</p>
+    </motion.div>
   );
 };
 
 export default function SocialPage() {
-  const features = [
+  const comingSoonFeatures = [
     {
-      title: 'Study Circles',
-      description: 'Join small, invite-only learning squads. Collaborate with peers, share resources, and achieve your goals together.',
-      href: '/socials/study-circles',
-      icon: Users,
-      gradient: 'bg-gradient-to-br from-blue-900/80 to-cyan-900/80 border-blue-500/30'
+      title: 'Leaderboards',
+      description: 'Compete with friends and climb the ranks. Track your progress and celebrate achievements.',
+      icon: Trophy,
+      gradient: 'bg-gradient-to-br from-yellow-900/60 to-orange-900/60 border-yellow-500/20'
     },
     {
-      title: 'Messages',
-      description: 'Connect directly with circle members and friends. Send messages, share content, and collaborate in real-time.',
-      href: '/socials/inbox',
-      icon: MessageCircle,
-      gradient: 'bg-gradient-to-br from-green-900/80 to-teal-900/80 border-green-500/30'
+      title: 'Study Challenges',
+      description: 'Join daily and weekly challenges. Push your limits and stay motivated with goals.',
+      icon: Target,
+      gradient: 'bg-gradient-to-br from-purple-900/60 to-pink-900/60 border-purple-500/20'
     },
-   
+    {
+      title: 'Community Feed',
+      description: 'Share your wins, discover insights, and get inspired by fellow learners every day.',
+      icon: TrendingUp,
+      gradient: 'bg-gradient-to-br from-green-900/60 to-emerald-900/60 border-green-500/20'
+    }
   ];
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
       <motion.div 
-        className="mb-12"
+        className="mb-8"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
@@ -82,25 +71,123 @@ export default function SocialPage() {
           Connect & Learn Together
         </h1>
         <p className="text-lg text-gray-400 max-w-3xl">
-          Join a vibrant community of learners. Collaborate in study circles, follow inspiring creators, and share your learning journey.
+          Join study circles, collaborate with peers, and achieve your learning goals as a community.
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-        {features.map((feature, index) => (
-          <FeatureCard key={feature.title} {...feature} index={index} />
-        ))}
+      {/* Main Study Circles Card - Prominent */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.2 }}
+        className="mb-10"
+      >
+        <Link href="/socials/study-circles">
+          <div className="bg-gradient-to-br from-blue-900/90 to-cyan-900/90 border-2 border-blue-500/40 rounded-2xl p-8 sm:p-10 group hover:border-blue-400/60 transition-all cursor-pointer relative overflow-hidden">
+            {/* Animated background effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-cyan-500/10 to-blue-500/0 group-hover:via-cyan-500/20 transition-all duration-700"></div>
+            
+            {/* Badge */}
+            <div className="absolute top-6 right-6 bg-blue-400/30 backdrop-blur-sm px-4 py-1.5 rounded-full text-xs font-bold text-white flex items-center gap-1.5">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+              ACTIVE NOW
+            </div>
+
+            <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+              <div className="flex-grow">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="bg-white/15 w-16 h-16 rounded-2xl flex items-center justify-center group-hover:bg-white/25 transition-colors">
+                    <Users className="w-9 h-9 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-1">
+                      Study Circles
+                    </h2>
+                    <p className="text-blue-200 text-sm font-medium">Your collaborative learning space</p>
+                  </div>
+                </div>
+                
+                <p className="text-gray-100 text-base sm:text-lg leading-relaxed mb-6 max-w-2xl">
+                  Join small, invite-only learning squads. Collaborate with peers, share resources, track progress together, and achieve your goals as a team.
+                </p>
+
+                {/* Stats */}
+                <div className="flex flex-wrap gap-6 mb-6">
+                  <div>
+                    <div className="text-2xl font-bold text-white">12+</div>
+                    <div className="text-xs text-blue-200 uppercase tracking-wide">Active Circles</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-white">150+</div>
+                    <div className="text-xs text-blue-200 uppercase tracking-wide">Members</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-white">500+</div>
+                    <div className="text-xs text-blue-200 uppercase tracking-wide">Study Sessions</div>
+                  </div>
+                </div>
+
+                {/* CTA Button */}
+                <motion.button
+                  className="bg-white text-blue-900 px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl group-hover:scale-105"
+                  whileHover={{ x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Open Study Circles
+                  <ArrowRight className="w-5 h-5" />
+                </motion.button>
+              </div>
+
+              {/* Decorative icon */}
+              <div className="hidden lg:block">
+                <motion.div
+                  animate={{ 
+                    rotate: [0, 5, 0, -5, 0],
+                    scale: [1, 1.05, 1]
+                  }}
+                  transition={{ 
+                    duration: 4, 
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                >
+                  <Sparkles className="w-24 h-24 text-cyan-300/40" />
+                </motion.div>
+              </div>
+            </div>
+          </div>
+        </Link>
+      </motion.div>
+
+      {/* Coming Soon Features */}
+      <div className="mb-8">
+        <motion.h2 
+          className="text-2xl sm:text-3xl font-bold text-white mb-6 flex items-center gap-3"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+        >
+          <Sparkles className="w-7 h-7 text-indigo-400" />
+          Coming Soon
+        </motion.h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {comingSoonFeatures.map((feature, index) => (
+            <ComingSoonCard key={feature.title} {...feature} index={index} />
+          ))}
+        </div>
       </div>
 
+      {/* Bottom CTA */}
       <motion.div 
-        className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-8 text-center"
+        className="bg-gradient-to-r from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 rounded-xl p-6 text-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.4, duration: 0.5 }}
+        transition={{ delay: 0.8, duration: 0.5 }}
       >
-        <h3 className="text-xl font-bold text-white mb-2">More Features Coming Soon</h3>
-        <p className="text-gray-400">
-          We're building an amazing social learning experience. Stay tuned for leaderboards, challenges, and more!
+        <h3 className="text-xl font-bold text-white mb-2">Building the Future of Social Learning</h3>
+        <p className="text-gray-300 text-sm">
+          We're constantly improving your experience. Have feedback or feature requests? Let us know! You can contact us through support.
         </p>
       </motion.div>
     </div>

@@ -5,6 +5,23 @@ import { generateWithRetry } from '@/lib/ai-providers';
 // ============================================
 // TYPES
 // ============================================
+interface SkillNode {
+    id: string;
+    name: string;
+    type: string;
+    engine?: string;
+    xpReward?: number;
+    estimatedMinutes?: number;
+    description?: string;
+    resources?: string[];
+    level?: string;
+}
+
+interface SkillEdge {
+    to: string;
+    from: string;
+}
+
 interface UnderstandingAnalysis {
     comprehensionLevel: 'high' | 'medium' | 'low' | 'confused';
     confidence: number;
@@ -78,7 +95,7 @@ function detectBehavioralPatterns(userMessage: string, conversationHistory: any[
 // SIMPLE READINESS CALCULATOR (Fallback)
 // ============================================
 function calculateSimpleReadiness(patterns: BehavioralPatterns): number {
-    let score = 50; // Start neutral
+    let score = 50;
 
     if (patterns.showsUnderstanding) score += 30;
     if (patterns.showsConfusion) score -= 30;
@@ -91,7 +108,7 @@ function calculateSimpleReadiness(patterns: BehavioralPatterns): number {
 }
 
 // ============================================
-// AI UNDERSTANDING ANALYZER (With Fallback)
+// AI UNDERSTANDING ANALYZER
 // ============================================
 async function analyzeUnderstanding(
     userMessage: string, 
@@ -133,13 +150,11 @@ Return JSON:
             )
         ]);
 
-        // Extract JSON from response
         const text = result.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
-            // Validate required fields
             if (parsed.comprehensionLevel && typeof parsed.confidence === 'number') {
                 return parsed as UnderstandingAnalysis;
             }
@@ -180,7 +195,7 @@ function getFallbackAnalysis(patterns: BehavioralPatterns): UnderstandingAnalysi
 }
 
 // ============================================
-// SMART DECISION ENGINE (With Fallback)
+// SMART DECISION ENGINE
 // ============================================
 async function makeSmartDecision(
     userMessage: string,
@@ -192,7 +207,6 @@ async function makeSmartDecision(
         lastQuizScore?: number;
     }
 ): Promise<DecisionResult> {
-    // Fast decision for obvious cases (no AI needed)
     if (patterns.showsConfusion || analysis.comprehensionLevel === 'confused') {
         return {
             action: 'continue_explaining',
@@ -207,7 +221,7 @@ async function makeSmartDecision(
             action: 'send_challenge',
             confidence: 0.95,
             reasoning: 'Quiz passed successfully',
-            naturalTransition: "Great work! Now let's apply this knowledge..."
+            naturalTransition: "Excellent! Now let's apply this..."
         };
     }
 
@@ -285,7 +299,7 @@ function getFallbackDecision(
         return {
             action: 'send_quiz',
             confidence: 0.8,
-            reasoning: 'High readiness score and sufficient exchanges',
+            reasoning: 'High readiness score',
             naturalTransition: "Let's test your understanding! 🎯"
         };
     }
@@ -316,23 +330,16 @@ function calculateReadinessScore(
 ): number {
     let score = 0;
 
-    // AI comprehension (30 points)
     const comprehensionMap = { high: 30, medium: 15, low: 5, confused: 0 };
     score += comprehensionMap[analysis.comprehensionLevel] || 0;
     
-    // Explicit signals (25 points)
     if (patterns.showsUnderstanding) score += 25;
     if (patterns.showsConfusion) score -= 25;
-
-    // Engagement (20 points)
     if (analysis.isParaphrasing) score += 10;
     if (patterns.isEngaged) score += 10;
-
-    // Exchange threshold (15 points)
     if (patterns.exchangeCount >= 2 && patterns.exchangeCount <= 5) score += 15;
     else if (patterns.exchangeCount > 5) score += 10;
     
-    // Confidence (10 points)
     score += Math.round(analysis.confidence * 10);
 
     return Math.max(0, Math.min(100, score));
@@ -342,7 +349,7 @@ function calculateReadinessScore(
 // HUMAN-LIKE STREAMING
 // ============================================
 function getHumanDelay(word: string, isStartOfSentence: boolean): number {
-    const base = 35 + Math.random() * 35; // 35-70ms
+    const base = 35 + Math.random() * 35;
     
     if (word.endsWith('.')) return base + 140;
     if (word.endsWith('!')) return base + 120;
@@ -392,6 +399,7 @@ export async function POST(request: NextRequest) {
             userMessage,
             sessionId,
             courseId,
+            currentSkillId, // ID of current skill node (e.g., "react_basics", "javascript_basics")
             learningStage,
             conversationHistory,
             chatSummary,
@@ -413,44 +421,140 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Get course context
+        // Get skill graph context
         const { data: { session: authSession } } = await supabase.auth.getSession();
         let courseContext = '';
         let currentTopic = 'the current concept';
+        let skillContext = '';
 
         if (authSession && courseId) {
-            const { data: course } = await supabase
-                .from('courses')
-                .select('title, description, category')
+            const { data: skillGraph, error } = await supabase
+                .from('skill_graphs')
+                .select('goal, nodes, edges')
                 .eq('id', courseId)
+                .eq('user_id', authSession.user.id)
                 .single();
 
-            if (course) {
-                courseContext = `Course: "${course.title}" (${course.category})`;
-                currentTopic = course.title || 'the topic';
+            if (skillGraph && !error) {
+                const goal = skillGraph.goal || 'Unknown Goal';
+                const nodes: SkillNode[] = Array.isArray(skillGraph.nodes) ? skillGraph.nodes : [];
+                const edges: SkillEdge[] = Array.isArray(skillGraph.edges) ? skillGraph.edges : [];
+                
+                // Find current skill node by ID
+                let currentSkill = nodes.find(node => node.id === currentSkillId);
+                
+                // Fallback: extract from chatSummary or use first node
+                if (!currentSkill) {
+                    if (chatSummary) {
+                        const skillMatch = chatSummary.match(/skill[:\s]+([^\s,}]+)/i);
+                        if (skillMatch) {
+                            currentSkill = nodes.find(n => n.id === skillMatch[1]);
+                        }
+                    }
+                    
+                    if (!currentSkill && nodes.length > 0) {
+                        currentSkill = nodes[0];
+                        console.warn('⚠️ No skillId provided, using first node:', currentSkill.id);
+                    }
+                }
+                
+                if (currentSkill) {
+                    const skillName = currentSkill.name || currentSkill.id;
+                    const skillType = currentSkill.type || 'skill';
+                    const engine = currentSkill.engine || 'codestudio';
+                    const xpReward = currentSkill.xpReward || 0;
+                    const estimatedMinutes = currentSkill.estimatedMinutes || 30;
+                    const description = currentSkill.description || '';
+                    const resources = currentSkill.resources || [];
+                    const level = currentSkill.level || 'intermediate';
+                    
+                    currentTopic = skillName;
+                    
+                    // Find prerequisites (edges pointing TO current skill)
+                    const prerequisiteIds = edges
+                        .filter(edge => edge.to === currentSkill.id)
+                        .map(edge => edge.from);
+                    
+                    const prerequisites = nodes
+                        .filter(node => prerequisiteIds.includes(node.id))
+                        .map(node => node.name || node.id)
+                        .slice(0, 3);
+                    
+                    // Find next skills (edges pointing FROM current skill)
+                    const nextSkillIds = edges
+                        .filter(edge => edge.from === currentSkill.id)
+                        .map(edge => edge.to);
+                    
+                    const nextSkills = nodes
+                        .filter(node => nextSkillIds.includes(node.id))
+                        .map(node => node.name || node.id)
+                        .slice(0, 3);
+                    
+                    // Build comprehensive skill context
+                    skillContext = `
+═══════════════════════════════════════════════════
+🎯 CURRENT SKILL: "${skillName}"
+═══════════════════════════════════════════════════
+
+Skill ID: ${currentSkill.id}
+Type: ${skillType}
+Learning Engine: ${engine}
+Level: ${level}
+Estimated Time: ${estimatedMinutes} minutes
+XP Reward: ${xpReward} points
+${description ? `\nSkill Description:\n${description}\n` : ''}
+${resources.length > 0 ? `\nLearning Resources:\n${resources.slice(0, 3).map((r: string) => `- ${r}`).join('\n')}\n` : ''}
+
+🎓 TEACHING MANDATE:
+1. ONLY teach "${skillName}" - stay 100% focused on this skill
+2. Your explanations must cover EXACTLY what's needed for "${skillName}"
+3. DO NOT teach prerequisites: ${prerequisites.length > 0 ? prerequisites.join(', ') : 'none - start from basics'}
+4. DO NOT preview future content: ${nextSkills.length > 0 ? nextSkills.join(', ') : 'none - this is the final skill'}
+
+📝 QUIZ REQUIREMENTS:
+- Questions must test ONLY "${skillName}" concepts
+- Difficulty: ${level}
+- Must be answerable based on what you've taught about "${skillName}"
+- No questions about ${prerequisites.length > 0 ? prerequisites.join(' or ') : 'prerequisites'}
+
+💪 CHALLENGE REQUIREMENTS:
+- Hands-on task that applies "${skillName}" skills
+- Appropriate for ${level} level
+- Should take ~${Math.round(estimatedMinutes / 3)} minutes
+- Must be practical and achievable
+- Focus on ${engine} environment if coding-related
+
+${prerequisites.length > 0 ? `✅ Student has completed: ${prerequisites.join(', ')}` : '✅ This is a foundational skill'}
+${nextSkills.length > 0 ? `⏭️  After this, student learns: ${nextSkills.join(', ')}` : '🎉 This is the final skill!'}
+
+CRITICAL: Stay laser-focused on "${skillName}". Every explanation, quiz, and challenge must directly relate to this skill.
+═══════════════════════════════════════════════════`;
+
+                    courseContext = `LEARNING PATH: "${goal}"\n${skillContext}`;
+                    
+                } else {
+                    console.error('❌ No skill node found');
+                    courseContext = `LEARNING PATH: "${goal}"\nTeaching course content.`;
+                    currentTopic = goal;
+                }
+            } else {
+                console.error('❌ Skill graph fetch error:', error);
             }
         }
 
         // ============================================
-        // INTELLIGENT ANALYSIS PIPELINE (Parallel)
+        // INTELLIGENT ANALYSIS PIPELINE
         // ============================================
         
-        // Step 1: Fast behavioral detection (no AI)
-        const patterns = detectBehavioralPatterns(
-            userMessage, 
-            conversationHistory || []
-        );
-
-        // Step 2 & 3: Parallel AI calls with fallbacks
+        const patterns = detectBehavioralPatterns(userMessage, conversationHistory || []);
+        
         const [understanding, simpleReadiness] = await Promise.all([
             analyzeUnderstanding(userMessage, conversationHistory || [], currentTopic, patterns),
             Promise.resolve(calculateSimpleReadiness(patterns))
         ]);
 
-        // Step 4: Calculate comprehensive readiness
         const readinessScore = calculateReadinessScore(understanding, patterns);
 
-        // Step 5: Smart decision
         const decision = await makeSmartDecision(userMessage, understanding, patterns, {
             currentStage: learningStage || 'EXPLAIN',
             exchangeCount: patterns.exchangeCount,
@@ -460,12 +564,12 @@ export async function POST(request: NextRequest) {
         const analysisTime = Date.now() - startTime;
         
         console.log('🧠 Genie Analysis:', {
+            skill: currentTopic,
             comprehension: understanding.comprehensionLevel,
             readinessScore,
             action: decision.action,
             confidence: Math.round(decision.confidence * 100) + '%',
-            analysisTime: analysisTime + 'ms',
-            fallbackUsed: understanding.reasoning.includes('Fallback')
+            analysisTime: analysisTime + 'ms'
         });
 
         // ============================================
@@ -474,7 +578,6 @@ export async function POST(request: NextRequest) {
         
         let effectiveStage = learningStage || 'EXPLAIN';
         
-        // Override based on smart decision with high confidence
         if (decision.action === 'send_quiz' && decision.confidence > 0.65 && readinessScore >= 65) {
             effectiveStage = 'QUIZ';
         } else if (decision.action === 'send_challenge' && decision.confidence > 0.7) {
@@ -495,34 +598,33 @@ Analysis: ${understanding.reasoning}
 
 YOUR TASK:
 1. Say: "${decision.naturalTransition}"
-2. Then provide a multiple-choice quiz
-3. Format: Transition phrase, then new line with [QUIZ] followed by valid JSON
+2. Then provide a multiple-choice quiz ON THIS EXACT SKILL
+3. Format: Transition, then [QUIZ] with JSON
 
 JSON: {"question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correctAnswer": "A", "explanation": "..."}
 
-Keep question clear and concise. Options should test real understanding.`;
+CRITICAL: Question must ONLY test the current skill. No other topics.`;
 
         } else if (effectiveStage === 'CHALLENGE') {
-            systemPrompt = `You are Genie. The learner passed the quiz - time for hands-on practice!
+            systemPrompt = `You are Genie. The learner passed - time for hands-on practice!
 
 ${courseContext}
 
 YOUR TASK:
-1. Briefly explain why their answer was correct (1 sentence)
-2. Introduce a practical coding/application challenge
-3. Format: Brief praise, then [CHALLENGE] with valid JSON
+1. Brief praise (1 sentence)
+2. Introduce practical challenge FOR THIS SKILL ONLY
+3. Format: Praise, then [CHALLENGE] with JSON
 
-JSON: {"description": "Clear task with specific instructions", "challengeId": "challenge_${Date.now()}"}
+JSON: {"description": "Clear task instructions for THIS skill", "challengeId": "challenge_${Date.now()}"}
 
-Make challenge practical and achievable.`;
+Make it practical and focused on the current skill.`;
 
         } else {
-            // EXPLAIN stage
             const actionGuidance = {
-                'provide_example': '- Give a clear, concrete example',
-                'ask_clarifying_question': '- Ask a thoughtful question to check understanding',
-                'continue_explaining': '- Continue teaching with clarity',
-            }[decision.action] || '- Teach clearly and concisely';
+                'provide_example': '- Give a clear, concrete example of THIS skill',
+                'ask_clarifying_question': '- Ask about understanding of THIS skill',
+                'continue_explaining': '- Continue teaching THIS skill clearly',
+            }[decision.action] || '- Teach THIS skill clearly';
 
             systemPrompt = `You are Genie, a world-class AI tutor. Professional, encouraging, clear.
 
@@ -533,18 +635,18 @@ Summary: ${chatSummary || 'New session'}
 STUDENT STATE:
 - Comprehension: ${understanding.comprehensionLevel}
 - Signals: ${understanding.detectedSignals.join(', ') || 'engaged'}
-- ${patterns.showsConfusion ? 'SHOWS CONFUSION - explain simpler' : ''}
-- ${patterns.askingDeeperQuestion ? 'ASKING DEEPER QUESTION - answer with enthusiasm' : ''}
+${patterns.showsConfusion ? '- SHOWS CONFUSION - simplify explanation' : ''}
+${patterns.askingDeeperQuestion ? '- ASKING DEEPER QUESTION - answer enthusiastically' : ''}
 
 YOUR INSTRUCTIONS:
 ${actionGuidance}
 
 RULES:
-- Be concise (2-4 sentences for explanations)
-- Use 1-2 emojis max, sparingly
-- NEVER say "I'll quiz you next" or "I'll check your understanding"
-- Let conversation flow naturally
-- If explaining, make it crystal clear
+- Stay 100% focused on the CURRENT SKILL ONLY
+- Be concise (2-4 sentences)
+- Use 1-2 emojis max
+- NEVER say "I'll quiz you" - flow naturally
+- Don't mention other skills or drift off-topic
 
 RECENT CONVERSATION:
 ${conversationHistory?.slice(-3).map((msg: any) => `${msg.role}: ${msg.content.substring(0, 150)}`).join('\n') || 'Starting fresh'}
@@ -571,7 +673,6 @@ GENIE:`;
 
                     const genieResponse = result.text || "Let's keep learning! What's on your mind?";
 
-                    // Handle quiz
                     if (genieResponse.includes('[QUIZ]')) {
                         const [intro, quizPart] = genieResponse.split('[QUIZ]');
                         
@@ -588,7 +689,6 @@ GENIE:`;
                             await streamText("Let me ask you about this...", controller, encoder);
                         }
                     }
-                    // Handle challenge
                     else if (genieResponse.includes('[CHALLENGE]')) {
                         const [intro, challengePart] = genieResponse.split('[CHALLENGE]');
                         
@@ -604,7 +704,6 @@ GENIE:`;
                             console.error('Challenge parse error:', e);
                         }
                     }
-                    // Regular explanation
                     else {
                         await streamText(genieResponse, controller, encoder);
                     }
@@ -617,7 +716,8 @@ GENIE:`;
                             analysisTime,
                             totalTime,
                             readinessScore,
-                            action: decision.action
+                            action: decision.action,
+                            skillId: currentSkillId
                         }
                     })}\n\n`));
                     

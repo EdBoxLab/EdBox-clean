@@ -14,7 +14,6 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
 import { ContactSupport } from './ContactSupport';
 
@@ -53,13 +52,11 @@ const SideMenu = () => {
         {/* Header/Logo */}
         <div className="h-16 flex items-center px-6 border-b border-border bg-card">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-purple-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-purple-900/50">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-purple-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20">
               E
             </div>
-            <span className="text-xl font-bold tracking-tight">
-              <span className="bg-gradient-to-r from-white via-purple-400 to-blue-400 bg-clip-text text-transparent">
-                EdBox
-              </span>
+            <span className="text-xl font-bold tracking-tight text-foreground">
+              EdBox
             </span>
           </div>
           <button
@@ -82,11 +79,11 @@ const SideMenu = () => {
                 className={`
                   flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
                   ${isActive
-                    ? "bg-indigo-600/10 text-indigo-400 border border-indigo-600/20"
-                    : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 border border-transparent"}
+                    ? "bg-primary/10 text-primary border border-primary/20"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground border border-transparent"}
                 `}
               >
-                <item.icon size={20} className={isActive ? "text-indigo-400" : "text-zinc-500"} />
+                <item.icon size={20} className={isActive ? "text-primary" : "text-muted-foreground"} />
                 <span>{item.label}</span>
               </Link>
             );
@@ -94,24 +91,19 @@ const SideMenu = () => {
         </nav>
 
         {/* Contact Support Button */}
-        <div className="p-4 border-t border-zinc-800">
+        <div className="p-4 border-t border-border">
           <button
             onClick={() => setShowSupport(true)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 border border-zinc-700 hover:border-zinc-600 transition-all duration-200"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground border border-border transition-all duration-200"
           >
             <MessageCircle size={18} />
             <span>Contact Support</span>
           </button>
         </div>
 
-        {/* Theme and User Menu */}
-        <div className="p-4 border-t border-border mt-auto flex items-center gap-3 min-w-0 bg-card/50">
-          <div className="shrink-0">
-            <ThemeToggle />
-          </div>
-          <div className="flex-1 min-w-0">
-            <UserMenu />
-          </div>
+        {/* User Menu */}
+        <div className="p-4 border-t border-border mt-auto bg-card/50">
+          <UserMenu />
         </div>
 
         {/* Footer */}
@@ -132,7 +124,7 @@ const SideMenu = () => {
           {pathname !== '/' && (
             <button
               onClick={() => router.back()}
-              className="text-indigo-400 hover:text-indigo-300 p-1 flex items-center justify-center bg-white/5 rounded-lg border border-white/10"
+              className="text-primary hover:text-primary/80 p-1 flex items-center justify-center bg-accent rounded-lg border border-border"
               aria-label="Go back"
             >
               <ArrowLeft size={20} />
@@ -140,9 +132,6 @@ const SideMenu = () => {
           )}
         </div>
         <span className="font-semibold text-foreground ml-2">EdBox</span>
-        <div className="ml-auto">
-          <ThemeToggle />
-        </div>
       </header>
 
       {/* Mobile Bottom Navigation - Icons Only */}
@@ -155,7 +144,7 @@ const SideMenu = () => {
                 <Link
                   href={item.href}
                   aria-label={item.label}
-                  className={`flex flex-col items-center justify-center px-3 py-2 rounded-md transition-colors ${isActive ? 'text-indigo-400' : 'text-zinc-400 hover:text-white'
+                  className={`flex flex-col items-center justify-center px-3 py-2 rounded-md transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
                     }`}
                 >
                   <item.icon size={24} strokeWidth={isActive ? 2.5 : 2} />

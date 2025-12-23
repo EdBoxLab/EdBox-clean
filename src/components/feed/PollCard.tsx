@@ -21,9 +21,9 @@ export const PollCard: React.FC<PollCardProps> = ({ item, isActive }) => {
     const totalVotes = item.total_votes + (hasVoted ? 1 : 0);
 
     return (
-        <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden">
+        <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden bg-background">
             {/* Background Effects */}
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 via-transparent to-pink-900/10" />
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
 
             {/* Poll Icon Header */}
             <motion.div
@@ -35,8 +35,8 @@ export const PollCard: React.FC<PollCardProps> = ({ item, isActive }) => {
                     <BarChart3 className="w-6 h-6 text-white" />
                 </div>
                 <div className="text-left">
-                    <span className="text-xs font-bold text-purple-400 uppercase tracking-widest block">Pulse Check</span>
-                    <h3 className="text-lg font-bold text-white">Genie's Poll</h3>
+                    <span className="text-xs font-bold text-primary uppercase tracking-widest block">Pulse Check</span>
+                    <h3 className="text-lg font-bold text-foreground">Genie's Poll</h3>
                 </div>
             </motion.div>
 
@@ -47,7 +47,7 @@ export const PollCard: React.FC<PollCardProps> = ({ item, isActive }) => {
                 transition={{ delay: 0.2 }}
                 className="w-full max-w-sm mb-8 z-10"
             >
-                <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground leading-tight">
                     {item.question}
                 </h2>
             </motion.div>
@@ -68,10 +68,10 @@ export const PollCard: React.FC<PollCardProps> = ({ item, isActive }) => {
                             onClick={() => handleVote(option.id)}
                             disabled={hasVoted}
                             className={`group relative w-full p-4 rounded-xl border transition-all duration-300 overflow-hidden ${hasVoted
-                                    ? isSelected
-                                        ? 'border-purple-500/50 bg-purple-500/10'
-                                        : 'border-white/5 bg-white/5'
-                                    : 'border-white/10 bg-white/5 hover:border-purple-500/30 hover:bg-white/10 active:scale-95'
+                                ? isSelected
+                                    ? 'border-primary/50 bg-primary/10'
+                                    : 'border-border/50 bg-secondary/50'
+                                : 'border-border bg-secondary/30 hover:border-primary/30 hover:bg-secondary/50 active:scale-95'
                                 }`}
                         >
                             {/* Progress bar background on vote */}
@@ -81,14 +81,14 @@ export const PollCard: React.FC<PollCardProps> = ({ item, isActive }) => {
                                         initial={{ width: 0 }}
                                         animate={{ width: `${percentage}%` }}
                                         transition={{ duration: 0.8, ease: "easeOut" }}
-                                        className={`absolute inset-0 h-full ${isSelected ? 'bg-purple-500/20' : 'bg-white/5'
+                                        className={`absolute inset-0 h-full ${isSelected ? 'bg-primary/20' : 'bg-secondary/50'
                                             }`}
                                     />
                                 )}
                             </AnimatePresence>
 
                             <div className="relative flex items-center justify-between z-20">
-                                <span className={`font-medium transition-colors ${isSelected ? 'text-purple-400' : 'text-white'
+                                <span className={`font-medium transition-colors ${isSelected ? 'text-primary' : 'text-foreground'
                                     }`}>
                                     {option.text}
                                 </span>
@@ -103,7 +103,7 @@ export const PollCard: React.FC<PollCardProps> = ({ item, isActive }) => {
                                             {percentage}%
                                         </motion.span>
                                     )}
-                                    {isSelected && <CheckCircle2 className="w-5 h-5 text-purple-400" />}
+                                    {isSelected && <CheckCircle2 className="w-5 h-5 text-primary" />}
                                 </div>
                             </div>
                         </motion.button>
@@ -118,11 +118,11 @@ export const PollCard: React.FC<PollCardProps> = ({ item, isActive }) => {
                 transition={{ delay: 0.8 }}
                 className="mt-8 flex items-center gap-6 z-10"
             >
-                <div className="flex items-center gap-2 text-white/40">
+                <div className="flex items-center gap-2 text-muted-foreground/60">
                     <Users className="w-4 h-4" />
                     <span className="text-xs font-medium">{totalVotes.toLocaleString()} votes</span>
                 </div>
-                <div className="flex items-center gap-2 text-purple-400/60">
+                <div className="flex items-center gap-2 text-primary/60">
                     <TrendingUp className="w-4 h-4" />
                     <span className="text-xs font-bold uppercase tracking-wider">Live Results</span>
                 </div>

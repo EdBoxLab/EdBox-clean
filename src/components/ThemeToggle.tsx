@@ -7,11 +7,25 @@ import { useTheme } from '@/lib/contexts/ThemeContext';
 
 export const ThemeToggle = () => {
     const { theme, toggleTheme } = useTheme();
+    const [mounted, setMounted] = React.useState(false);
+
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted) {
+        return (
+            <div className="p-2 w-9 h-9 rounded-xl bg-secondary animate-pulse" />
+        );
+    }
 
     return (
         <button
-            onClick={toggleTheme}
-            className="relative p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors duration-200 group"
+            onClick={() => {
+                console.log('ThemeToggle: Button clicked. Calling toggleTheme...');
+                toggleTheme();
+            }}
+            className="relative p-2 rounded-xl bg-secondary hover:bg-accent transition-colors duration-200 group"
             aria-label="Toggle theme"
         >
             <AnimatePresence mode="wait" initial={false}>

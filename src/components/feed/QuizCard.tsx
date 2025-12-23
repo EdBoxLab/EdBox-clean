@@ -67,9 +67,9 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
     };
 
     return (
-        <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden">
+        <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden bg-background">
             {/* Background Effects */}
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 via-transparent to-pink-900/10" />
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
 
             <Confetti isFiring={isCorrect === true} />
 
@@ -83,11 +83,11 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                     <Brain className="w-6 h-6 text-white" />
                 </div>
                 <div className="text-left">
-                    <span className="text-xs font-bold text-purple-400 uppercase tracking-widest block flex items-center gap-2">
+                    <span className="text-xs font-bold text-primary uppercase tracking-widest block flex items-center gap-2">
                         Pulse Check
                         {timeLeft < 10 && <span className={`animate-pulse ${getTimerColor()}`}>• {timeLeft}s</span>}
                     </span>
-                    <h3 className="text-lg font-bold text-white">Genie's Quiz</h3>
+                    <h3 className="text-lg font-bold text-foreground">Genie's Quiz</h3>
                 </div>
             </motion.div>
 
@@ -113,7 +113,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                 transition={{ delay: 0.2 }}
                 className="w-full max-w-sm mb-6 z-10"
             >
-                <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground leading-tight">
                     {item.question}
                 </h2>
             </motion.div>
@@ -133,12 +133,12 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                             onClick={() => handleAnswer(option)}
                             disabled={answered}
                             className={`group relative w-full p-4 rounded-xl border transition-all duration-300 overflow-hidden ${answered
-                                    ? isCorrectOption
-                                        ? 'border-green-500/50 bg-green-500/10'
-                                        : isSelected
-                                            ? 'border-red-500/50 bg-red-500/10'
-                                            : 'border-white/5 bg-white/5 opacity-50'
-                                    : 'border-white/10 bg-white/5 hover:border-purple-500/30 hover:bg-white/10 active:scale-95'
+                                ? isCorrectOption
+                                    ? 'border-green-500/50 bg-green-500/10'
+                                    : isSelected
+                                        ? 'border-red-500/50 bg-red-500/10'
+                                        : 'border-border/50 bg-secondary/50 opacity-50'
+                                : 'border-border bg-secondary/30 hover:border-primary/30 hover:bg-secondary/50 active:scale-95'
                                 }`}
                         >
                             {/* Sliding Progress Bar (Matching Poll Style) */}
@@ -156,15 +156,15 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
 
                             <div className="relative flex items-center justify-between z-20">
                                 <span className={`font-medium transition-colors ${answered
-                                        ? isCorrectOption ? 'text-green-400' : isSelected ? 'text-red-400' : 'text-white/60'
-                                        : 'text-white'
+                                    ? isCorrectOption ? 'text-green-500' : isSelected ? 'text-red-500' : 'text-muted-foreground'
+                                    : 'text-foreground'
                                     }`}>
                                     {option}
                                 </span>
 
                                 <div className="flex items-center gap-2">
-                                    {answered && isCorrectOption && <CheckCircle2 className="w-5 h-5 text-green-400" />}
-                                    {answered && isSelected && !isCorrectOption && <XCircle className="w-5 h-5 text-red-400" />}
+                                    {answered && isCorrectOption && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                                    {answered && isSelected && !isCorrectOption && <XCircle className="w-5 h-5 text-red-500" />}
                                 </div>
                             </div>
                         </motion.button>
@@ -180,7 +180,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                         animate={{ opacity: 1, y: 0 }}
                         className="mt-6 z-10"
                     >
-                        <div className={`text-lg font-bold mb-2 ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
+                        <div className={`text-lg font-bold mb-2 ${isCorrect ? 'text-green-500' : 'text-red-500'}`}>
                             {isCorrect ? '🎉 Correct!' : '❌ Almost!'}
                         </div>
 
@@ -188,12 +188,12 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
-                                className="text-sm text-gray-300 max-w-sm mx-auto bg-black/30 p-4 rounded-xl border border-white/5"
+                                className="text-sm text-muted-foreground max-w-sm mx-auto bg-secondary/50 p-4 rounded-xl border border-border"
                             >
                                 {item.explanation}
                             </motion.div>
                         )}
-                        <p className="mt-4 text-gray-400 text-xs animate-pulse">Next card coming up...</p>
+                        <p className="mt-4 text-muted-foreground text-xs animate-pulse">Next card coming up...</p>
                     </motion.div>
                 )}
             </AnimatePresence>

@@ -375,7 +375,8 @@ async function streamText(
     
     for (let i = 0; i < words.length; i++) {
         const word = words[i];
-        const isStartOfSentence = i === 0 || words[i - 1]?.match(/[.!?]$/);
+        const previousWord = i > 0 ? words[i - 1] : '';
+        const isStartOfSentence = i === 0 || /[.!?]$/.test(previousWord);
         
         const chunk = {
             type: 'content',

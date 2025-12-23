@@ -29,7 +29,13 @@ export default function QuizBubble({
     const handleSelect = (option: string) => {
         if (selected) return;
 
-        const isCorrect = option === correctAnswer;
+        // Robust check: Compare full string OR check if option starts with "A) " where A is correct
+        const optionLetter = option.split(')')[0].trim();
+        const isCorrect = option === correctAnswer ||
+            option.startsWith(correctAnswer + ')') ||
+            option.startsWith(correctAnswer + '.') ||
+            optionLetter === correctAnswer;
+
         setSelected(option);
         setShowExplanation(true);
         onAnswer(option, isCorrect);
@@ -52,7 +58,13 @@ export default function QuizBubble({
                 <div className="space-y-2">
                     {options.map((option) => {
                         const isSelected = selected === option;
-                        const isCorrectOption = option === correctAnswer;
+                        // Robust check for correct option visual state
+                        const optionLetter = option.split(')')[0].trim();
+                        const isCorrectOption = option === correctAnswer ||
+                            option.startsWith(correctAnswer + ')') ||
+                            option.startsWith(correctAnswer + '.') ||
+                            optionLetter === correctAnswer;
+
                         const showCorrect = selected && isCorrectOption;
                         const showWrong = selected && isSelected && !isCorrectOption;
 

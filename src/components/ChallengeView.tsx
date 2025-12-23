@@ -17,17 +17,22 @@ import {
 import { GeneratedChallenge } from '@/types/skill-progression';
 
 interface ChallengeViewProps {
-    challenge: GeneratedChallenge;
+    challenge: GeneratedChallenge & {
+        hint?: string;
+        expectedOutcome?: string;
+    };
     onSuccess: (xp: number) => void;
     onFail: (feedback: string) => void;
     onClose: () => void;
+    onSendToChat?: (message: string) => void;  // Send answer to chat for Genie review
 }
 
 export default function ChallengeView({
     challenge,
     onSuccess,
     onFail,
-    onClose
+    onClose,
+    onSendToChat
 }: ChallengeViewProps) {
     const [answer, setAnswer] = useState('');
     const [showHints, setShowHints] = useState(false);
@@ -74,9 +79,13 @@ export default function ChallengeView({
                 body: JSON.stringify({ challenge, answer })
             });
 
-            if (!response.ok) throw new Error('Evaluation failed');
-
             const result = await response.json();
+
+            // Send answer to chat for Genie to see - Format cleanly
+            if (onSendToChat) {
+                // Just send the answer text contextually
+                onSendToChat(`I've completed the challenge! Here is my submission:\n\n${answer}`);
+            }
 
             if (result.passed) {
                 setStatus('success');
@@ -163,17 +172,36 @@ export default function ChallengeView({
                                     </span>
                                 </div>
                             </div>
-                            <div className="p-4 bg-gray-800/30 rounded-2xl border border-gray-700/50">
-                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Learning Targets</h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {challenge.learningObjectives.map((obj, i) => (
-                                        <span key={i} className="text-xs text-gray-400 flex items-center gap-1">
-                                            <CheckCircle2 className="w-3 h-3 text-purple-500" />
-                                            {obj}
-                                        </span>
-                                    ))}
+
+                            {/* Expected Outcome - NEW */}
+                            {(challenge as any).expectedOutcome && (
+                                <div className="p-4 bg-green-500/5 rounded-2xl border border-green-500/20">
+                                    <h4 className="text-xs font-bold text-green-400 uppercase mb-2">✅ Expected Outcome</h4>
+                                    <p className="text-sm text-gray-300">{(challenge as any).expectedOutcome}</p>
                                 </div>
-                            </div>
+                            )}
+
+                            {/* Hint - NEW */}
+                            {(challenge as any).hint && (
+                                <div className="p-4 bg-purple-500/5 rounded-2xl border border-purple-500/20">
+                                    <h4 className="text-xs font-bold text-purple-400 uppercase mb-2">💡 Hint</h4>
+                                    <p className="text-sm text-gray-300">{(challenge as any).hint}</p>
+                                </div>
+                            )}
+
+                            {challenge.learningObjectives?.length > 0 && (
+                                <div className="p-4 bg-gray-800/30 rounded-2xl border border-gray-700/50">
+                                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Learning Targets</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {challenge.learningObjectives.map((obj, i) => (
+                                            <span key={i} className="text-xs text-gray-400 flex items-center gap-1">
+                                                <CheckCircle2 className="w-3 h-3 text-purple-500" />
+                                                {obj}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </section>
 

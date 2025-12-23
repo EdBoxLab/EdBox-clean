@@ -106,7 +106,7 @@ async function makeSmartDecision(
     console.log('[DECISION_DEBUG] turnCount:', turnCount);
 
     // Turn 0-1: Send goals first
-    if (turnCount <= 1) {
+    if (turnCount <= 1 && !context.goalsGiven) {
         console.log('[DECISION_DEBUG] -> Choosing GOALS (turn 0-1)');
         return {
             action: 'continue_explaining',
@@ -116,24 +116,44 @@ async function makeSmartDecision(
         };
     }
 
-    // Turn 2+: If user acknowledged, send challenge
-    if (turnCount >= 2 && hasAcknowledged) {
-        console.log('[DECISION_DEBUG] -> Choosing CHALLENGE (turn 2+, user acknowledged)');
-        return {
-            action: 'send_challenge',
-            confidence: 1.0,
-            transition: "Perfect! Now let's put that knowledge into action with a hands-on challenge! 🚀"
-        };
-    }
+    // Turn 2-3: Challenge (if not just finished one and user acknowledged goals)
+    const justFinishedChallenge = userMsg.includes('challenge answer') || userMsg.includes('my submission') || userMsg.includes('verify');
 
-    // Turn 2+: Even without acknowledgment, after goals we go to challenge
-    if (turnCount >= 2) {
-        console.log('[DECISION_DEBUG] -> Choosing CHALLENGE (turn 2+, continuing flow)');
+    if (turnCount >= 2 && turnCount <= 3 && !justFinishedChallenge) {
+        console.log('[DECISION_DEBUG] -> Choosing CHALLENGE (turn 2-3)');
         return {
             action: 'send_challenge',
             confidence: 1.0,
             transition: "Now that we have our goals, let's jump into a practical challenge! 🚀"
         };
+    }
+
+    // Turn 4+: After challenge, verify with a Quiz
+    // Turn 4+: After challenge, verify with a Quiz
+    if (justFinishedChallenge) {
+        console.log('[DECISION_DEBUG] -> Switching to QUIZ after challenge');
+        return {
+            action: 'send_quiz',
+            confidence: 0.9,
+            transition: "Great work on the challenge! Let's do a quick pulse check to confirm your mastery. 🎯"
+        };
+    }
+
+    // If we passed the challenge stage and user just answered a quiz (or we're deep in conversation)
+    // Don't loop back to Challenge/Quiz. Go to Deep Explanation.
+    if (turnCount >= 4) {
+        // Check if user just answered a quiz (e.g. "I chose...")
+        const justFinishedQuiz = userMsg.includes('i chose') || userMsg.includes("that's exactly right");
+
+        if (justFinishedQuiz) {
+            console.log('[DECISION_DEBUG] -> Switching to EXPLAIN after quiz');
+            return {
+                action: 'continue_explaining',
+                // Low confidence lets the AI decide the specific topic, but action forces explanation
+                confidence: 0.8,
+                transition: "You've got this down! Let's dive deeper into some advanced nuances. 🧠"
+            };
+        }
     }
 
     // Calculate readiness score
@@ -509,20 +529,35 @@ JSON Schema:
 CRITICAL: If the learner just answered a quiz, provide a NEW question or move to a more advanced concept within the same skill.`;
 
         } else if (effectiveStage === 'CHALLENGE') {
-            systemPrompt = `You are Genie, a world-class subject matter expert in "${currentTopic}". 
+            systemPrompt = `You are Genie, a friendly tutor helping a beginner learn "${currentTopic}".
 
 ${courseContext}
 
 YOUR MISSION:
-1. Praise the learner's progress in mastering "${currentTopic}".
-2. Deliver a specialized hands-on challenge for "${currentTopic}".
-3. Ensure the challenge is deeply rooted in this specific field.
-4. Format: Praise, then [CHALLENGE] with valid JSON.
+1. Give a SHORT, encouraging message (1-2 sentences max).
+2. Present ONE simple, beginner-friendly challenge that DIRECTLY tests "${currentTopic}".
 
-JSON Format:
-{"description": "Clear instructions for hands-on task", "challengeId": "challenge_${Date.now()}"}
+CRITICAL REQUIREMENTS:
+- The challenge MUST be about "${currentTopic}" specifically
+- The title MUST include "${currentTopic}" or a key concept from it
+- The description MUST ask the learner to DO something related to "${currentTopic}"
+- Keep it achievable in 2-5 minutes
+- Be SPECIFIC, not vague
 
-Focus 100% on practical application and mastery of "${currentTopic}".`;
+FORMAT:
+Write a brief intro, then output [CHALLENGE] followed by this JSON:
+{"title": "Skill-specific title that mentions ${currentTopic}", "description": "Clear task directly related to ${currentTopic}", "hint": "Helpful tip", "expectedOutcome": "What success looks like", "difficulty": "beginner"}
+
+GOOD EXAMPLE for "Python Variables":
+"Ready to practice Python Variables? Try this challenge! 🎯
+
+[CHALLENGE]
+{"title": "Create Your First Python Variable", "description": "1. Open a Python file or terminal\\n2. Create a variable called 'greeting' and assign it the value 'Hello World'\\n3. Print the variable using print(greeting)", "hint": "Variables are created with: variable_name = value", "expectedOutcome": "You should see 'Hello World' printed", "difficulty": "beginner"}"
+
+BAD EXAMPLE (too generic):
+{"title": "Apply Your Knowledge", "description": "Practice what you learned"} <- DON'T DO THIS!
+
+The challenge title and description must clearly reference "${currentTopic}".`;
 
         } else {
             // EXPLAIN stage - Aggressively transition to Quiz

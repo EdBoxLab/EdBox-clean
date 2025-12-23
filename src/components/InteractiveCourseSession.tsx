@@ -225,19 +225,24 @@ export default function InteractiveCourseSession({
     handleSendMessage(resultMessage, true, nextStage);
   };
 
-  const handleChallengeTrigger = (challengeId: string) => {
-    const mockChallenge: GeneratedChallenge = {
+  const handleChallengeTrigger = (challengeId: string, challengeData: Partial<GeneratedChallenge> = {}) => {
+    // Merge provided data with defaults if needed, but prioritize the AI's data
+    const activeChallenge: GeneratedChallenge = {
       id: challengeId,
       skillId: courseId,
-      title: "Hands-on Mastery",
-      description: `Apply your knowledge of ${courseTitle} by solving this practical scenario.`,
-      difficultyLevel: 'Medium',
-      estimatedTime: 5,
-      validationCriteria: ["Correct logic", "Comprehensive answer"],
-      hints: ["Try looking at it from another perspective.", "Remember the core principle we discussed."],
-      learningObjectives: ["Synthesis", "Application"]
-    };
-    setActiveChallenge(mockChallenge);
+      title: challengeData.title || `Challenge: ${courseTitle}`,
+      description: challengeData.description || `Apply your knowledge of ${courseTitle} by solving this practical scenario.`,
+      difficultyLevel: challengeData.difficultyLevel || 'Medium',
+      estimatedTime: challengeData.estimatedTime || 5,
+      validationCriteria: challengeData.validationCriteria || ["Correct logic", "Comprehensive answer"],
+      hints: challengeData.hints || ["Try looking at it from another perspective.", "Remember the core principle we discussed."],
+      learningObjectives: challengeData.learningObjectives || ["Synthesis", "Application"],
+      // Keep extra fields if present
+      expectedOutcome: (challengeData as any).expectedOutcome,
+      hint: (challengeData as any).hint
+    } as GeneratedChallenge;
+
+    setActiveChallenge(activeChallenge);
   };
 
   const onChallengeSuccess = async (xpValue: number) => {
@@ -248,7 +253,7 @@ export default function InteractiveCourseSession({
       if (!prev) return prev;
       const updatedContext = {
         ...prev.learningContext,
-        masteredConcepts: Array.from(new Set([...prev.learningContext.masteredConcepts, currentTopic])),
+        masteredConcepts: Array.from(new Set([...(prev.learningContext.masteredConcepts || []), currentTopic])),
         comprehensionLevel: Math.min(1, (prev.learningContext.comprehensionLevel || 0.5) + 0.1)
       };
 
@@ -480,6 +485,19 @@ export default function InteractiveCourseSession({
         onSuccess={onChallengeSuccess}
         onFail={onChallengeFail}
         onClose={handleCloseChallenge}
+        onSendToChat={(answerText) => {
+          // Add user's answer to chat for Genie to review
+          const answerMessage: ChatMessage = {
+            id: 'answer-' + Date.now(),
+            role: 'learner',
+            content: answerText,
+            timestamp: new Date(),
+            type: 'message'
+          };
+          setMessages(prev => [...prev, answerMessage]);
+          // Optionally trigger Genie to review the answer
+          handleSendMessage(answerText, false);
+        }}
       />
     );
   }
@@ -680,15 +698,15 @@ export default function InteractiveCourseSession({
                           <Trophy className="w-6 h-6 text-yellow-300" />
                         </div>
                         <div>
-                          <h3 className="text-xl font-bold text-white">Practical Challenge</h3>
-                          <p className="text-xs text-white/60 uppercase tracking-wider">Apply Your Knowledge</p>
+                          <h3 className="text-xl font-bold text-white">{message.challengeData.title || 'Practical Challenge'}</h3>
+                          <p className="text-xs text-white/60 uppercase tracking-wider">{courseTitle}</p>
                         </div>
                       </div>
                       <p className="text-white/90 mb-6 leading-relaxed">
                         {message.challengeData.description}
                       </p>
                       <button
-                        onClick={() => handleChallengeTrigger(message.challengeData!.challengeId)}
+                        onClick={() => handleChallengeTrigger(message.challengeData!.challengeId, message.challengeData!)}
                         className="w-full py-3 bg-white text-indigo-700 rounded-xl font-bold hover:bg-gray-100 transition-colors flex items-center justify-center gap-3"
                       >
                         <Brain className="w-5 h-5" />

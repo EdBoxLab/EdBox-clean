@@ -98,7 +98,7 @@ export const PollCard: React.FC<PollCardProps> = ({ item, isActive }) => {
                                         <motion.span
                                             initial={{ opacity: 0, scale: 0.5 }}
                                             animate={{ opacity: 1, scale: 1 }}
-                                            className="text-sm font-bold text-white/60"
+                                            className="text-sm font-bold text-muted-foreground"
                                         >
                                             {percentage}%
                                         </motion.span>

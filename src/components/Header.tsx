@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
-import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useState, useEffect } from 'react';
@@ -46,7 +45,6 @@ export const Header = () => {
               <Link href="/contact" className="text-sm lg:text-base font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white whitespace-nowrap">Contact</Link>
             </nav>
             <div className="flex items-center gap-2 sm:gap-4 ml-2 sm:ml-4 md:ml-8">
-              <ThemeToggle />
               {user ? <UserMenu /> : <Link href="/login" className="text-sm lg:text-base font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white whitespace-nowrap">Login</Link>}
             </div>
           </div>

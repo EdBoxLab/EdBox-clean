@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createSupabaseServerClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { generateWithRetry } from '@/lib/ai-providers';
 
 // ============================================
@@ -18,7 +18,7 @@ function detectBehavioralPatterns(userMessage: string, conversationHistory: any[
     ];
 
     const msg = userMessage.toLowerCase();
-    
+
     return {
         showsUnderstanding: explicitUnderstanding.some(phrase => msg.includes(phrase)),
         showsConfusion: explicitConfusion.some(phrase => msg.includes(phrase)),
@@ -32,8 +32,8 @@ function detectBehavioralPatterns(userMessage: string, conversationHistory: any[
 // AI UNDERSTANDING ANALYZER (WITH TIMEOUT)
 // ============================================
 async function analyzeUnderstanding(
-    userMessage: string, 
-    conversationHistory: any[], 
+    userMessage: string,
+    conversationHistory: any[],
     currentTopic: string
 ) {
     const analysisPrompt = `Analyze student comprehension. Return ONLY valid JSON.
@@ -58,21 +58,21 @@ Return:
                 temperature: 0.2,
                 maxTokens: 200,
             }),
-            new Promise((_, reject) => 
+            new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('timeout')), 3000)
             )
         ]) as any;
 
         const text = result.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
-        
+
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
             if (parsed.comprehensionLevel && typeof parsed.confidence === 'number') {
                 return parsed;
             }
         }
-        
+
         throw new Error('Invalid response');
     } catch (error) {
         return null; // Fallback to keyword detection
@@ -88,38 +88,61 @@ async function makeSmartDecision(
     patterns: any,
     context: any
 ) {
-    // Fast decisions without AI
-    if (patterns.showsConfusion) {
+    // Fast decisions for explicit stages
+    const userMsg = userMessage.toLowerCase();
+    const hasAcknowledged = userMsg.includes('ok') || userMsg.includes('ready') ||
+        userMsg.includes('let\'s') || userMsg.includes('got it') ||
+        userMsg.includes('sounds good') || userMsg.includes('yes') ||
+        userMsg.includes('sure') || userMsg.includes('alright') || userMsg.includes('cool') ||
+        userMsg.includes('send') || userMsg.includes('start') || userMsg.includes('go');
+
+    // Use turnCount from context (passed from frontend) - much more reliable
+    const turnCount = context.turnCount || 0;
+
+    // DEBUG: Log all decision variables
+    console.log('[DECISION_DEBUG] userMessage:', userMessage.substring(0, 50));
+    console.log('[DECISION_DEBUG] hasAcknowledged:', hasAcknowledged);
+    console.log('[DECISION_DEBUG] context.currentStage:', context.currentStage);
+    console.log('[DECISION_DEBUG] turnCount:', turnCount);
+
+    // Turn 0-1: Send goals first
+    if (turnCount <= 1) {
+        console.log('[DECISION_DEBUG] -> Choosing GOALS (turn 0-1)');
         return {
             action: 'continue_explaining',
-            confidence: 0.9,
-            transition: "Let me clarify that."
+            confidence: 1.0,
+            transition: "Welcome! Let me share our learning goals for this skill. 🎯",
+            forcedStage: 'GOALS'
         };
     }
 
-    if (context.currentStage === 'QUIZ_COMPLETE' && context.lastQuizScore >= 0.7) {
+    // Turn 2+: If user acknowledged, send challenge
+    if (turnCount >= 2 && hasAcknowledged) {
+        console.log('[DECISION_DEBUG] -> Choosing CHALLENGE (turn 2+, user acknowledged)');
         return {
             action: 'send_challenge',
-            confidence: 0.95,
-            transition: "Great work! Now let's apply this..."
+            confidence: 1.0,
+            transition: "Perfect! Now let's put that knowledge into action with a hands-on challenge! 🚀"
         };
     }
 
-    if (patterns.exchangeCount < 2) {
+    // Turn 2+: Even without acknowledgment, after goals we go to challenge
+    if (turnCount >= 2) {
+        console.log('[DECISION_DEBUG] -> Choosing CHALLENGE (turn 2+, continuing flow)');
         return {
-            action: 'continue_explaining',
-            confidence: 0.85,
-            transition: "Let me explain further."
+            action: 'send_challenge',
+            confidence: 1.0,
+            transition: "Now that we have our goals, let's jump into a practical challenge! 🚀"
         };
     }
 
     // Calculate readiness score
     let readinessScore = 50;
-    
+
     if (patterns.showsUnderstanding) readinessScore += 30;
     if (patterns.isEngaged) readinessScore += 10;
     if (patterns.exchangeCount >= 2 && patterns.exchangeCount <= 5) readinessScore += 20;
-    
+
     if (aiAnalysis) {
         const levelScores: any = { high: 30, medium: 15, low: 5, confused: 0 };
         readinessScore += levelScores[aiAnalysis.comprehensionLevel] || 0;
@@ -128,16 +151,18 @@ async function makeSmartDecision(
 
     readinessScore = Math.max(0, Math.min(100, readinessScore));
 
-    // Decide action
-    if (readinessScore >= 70 && patterns.exchangeCount >= 2 && !patterns.showsConfusion) {
+    // Decide action - HIGHER AGGRESSION
+    if (readinessScore >= 45 && patterns.exchangeCount >= 2 && !patterns.showsConfusion) {
+        console.log('[DECISION] Choosing QUIZ. Score:', readinessScore, 'Turns:', patterns.exchangeCount);
         return {
             action: 'send_quiz',
-            confidence: 0.85,
-            transition: "Let's test your understanding! 🎯",
+            confidence: 0.9,
+            transition: "Let's test your understanding with a quick pulse check! 🎯",
             readinessScore
         };
     }
 
+    console.log('[DECISION] Defaulting to EXPLAIN. Score:', readinessScore, 'Turns:', patterns.exchangeCount);
     return {
         action: 'continue_explaining',
         confidence: 0.75,
@@ -151,36 +176,36 @@ async function makeSmartDecision(
 // ============================================
 function getHumanDelay(word: string, isStartOfSentence: boolean): number {
     const base = 35 + Math.random() * 35;
-    
+
     if (word.endsWith('.')) return base + 140;
     if (word.endsWith('!')) return base + 120;
     if (word.endsWith('?')) return base + 130;
     if (word.endsWith(',')) return base + 60;
     if (word.length > 12) return base + 35;
     if (isStartOfSentence) return base + 40;
-    
+
     return base;
 }
 
 async function streamText(
-    text: string, 
-    controller: ReadableStreamDefaultController, 
+    text: string,
+    controller: ReadableStreamDefaultController,
     encoder: TextEncoder
 ): Promise<void> {
     if (!text || !text.trim()) return;
-    
+
     const words = text.split(' ');
-    
+
     for (let i = 0; i < words.length; i++) {
         const word = words[i];
         const previousWord = i > 0 ? words[i - 1] : '';
         const isStartOfSentence = i === 0 || /[.!?]$/.test(previousWord);
-        
+
         const chunk = {
             type: 'content',
             content: word + (i < words.length - 1 ? ' ' : '')
         };
-        
+
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
         await new Promise(r => setTimeout(r, getHumanDelay(word, isStartOfSentence)));
     }
@@ -191,21 +216,31 @@ async function streamText(
 // ============================================
 export async function POST(request: NextRequest) {
     const startTime = Date.now();
-    
+
     try {
         const supabase = await createSupabaseServerClient();
         const body = await request.json();
-        
+
         const {
             userMessage,
             sessionId,
             courseId,
             currentSkillId,
+            skillTitle: requestSkillTitle,  // Frontend can send skill title directly
             learningStage,
             conversationHistory,
             chatSummary,
-            lastQuizScore
+            lastQuizScore,
+            turnCount  // Explicit turn counter from frontend
         } = body;
+
+        console.log('[API_REQUEST] Incoming:', {
+            courseId,
+            currentSkillId,
+            learningStage,
+            turns: conversationHistory?.length,
+            message: userMessage.substring(0, 50) + '...'
+        });
 
         // Validation
         if (!userMessage || !sessionId) {
@@ -224,9 +259,12 @@ export async function POST(request: NextRequest) {
 
         // Get skill graph context
         const { data: { session: authSession } } = await supabase.auth.getSession();
-        
+
+        console.log('[AUTH_DEBUG] authSession exists:', !!authSession, 'courseId:', courseId);
+
         let courseContext = '';
-        let currentTopic = 'the current concept';
+        // Use skill title from request if provided, otherwise default
+        let currentTopic = requestSkillTitle || currentSkillId || 'the current concept';
 
         if (authSession && courseId) {
             try {
@@ -241,45 +279,62 @@ export async function POST(request: NextRequest) {
                     const goal = skillGraph.goal || 'Unknown Goal';
                     const nodes = Array.isArray(skillGraph.nodes) ? skillGraph.nodes : [];
                     const edges = Array.isArray(skillGraph.edges) ? skillGraph.edges : [];
-                    
-                    // Find current skill node
-                    let currentSkill = currentSkillId ? nodes.find((node: any) => node.id === currentSkillId) : null;
-                    
+
+                    // DEBUG: Log the node structure
+                    console.log('[SKILL_DEBUG] courseId:', courseId);
+                    console.log('[SKILL_DEBUG] currentSkillId:', currentSkillId);
+                    console.log('[SKILL_DEBUG] All nodes:', nodes.map((n: any) => ({ id: n.id, name: n.name, title: n.title })));
+
+                    // Find current skill node - check multiple ID patterns
+                    let currentSkill = null;
+                    if (currentSkillId) {
+                        currentSkill = nodes.find((node: any) =>
+                            node.id === currentSkillId ||
+                            node.id === currentSkillId.toLowerCase() ||
+                            node.name === currentSkillId
+                        );
+                    }
+
                     // Fallback to first node
                     if (!currentSkill && nodes.length > 0) {
                         currentSkill = nodes[0];
+                        console.log('[SKILL_DEBUG] Using fallback (first node):', currentSkill);
                     }
-                    
+
+                    console.log('[SKILL_DEBUG] Found currentSkill:', currentSkill);
+
                     if (currentSkill) {
-                        const skillName = currentSkill.name || currentSkill.id || 'Current Skill';
+                        // Extract human-readable name - try multiple properties
+                        const skillName = currentSkill.title || currentSkill.name || currentSkill.id || 'Current Skill';
                         const skillType = currentSkill.type || 'skill';
                         const xpReward = currentSkill.xpReward || 0;
                         const estimatedMinutes = currentSkill.estimatedMinutes || 30;
-                        const description = currentSkill.description || '';
+                        const description = currentSkill.description || currentSkill.name || '';
                         const level = currentSkill.level || 'intermediate';
-                        
+
                         currentTopic = skillName;
-                        
+                        console.log('[SKILL_DEBUG] Extracted skillName:', skillName, '-> currentTopic:', currentTopic);
+
                         // Find prerequisites (edges pointing TO current skill)
                         const prerequisiteIds = edges
                             .filter((edge: any) => edge.to === currentSkill.id)
                             .map((edge: any) => edge.from);
-                        
+
                         const prerequisites = nodes
                             .filter((node: any) => prerequisiteIds.includes(node.id))
                             .map((node: any) => node.name || node.id)
                             .slice(0, 3);
-                        
+
                         // Find next skills (edges pointing FROM current skill)
                         const nextSkillIds = edges
                             .filter((edge: any) => edge.from === currentSkill.id)
                             .map((edge: any) => edge.to);
-                        
+
                         const nextSkills = nodes
                             .filter((node: any) => nextSkillIds.includes(node.id))
                             .map((node: any) => node.name || node.id)
                             .slice(0, 3);
-                        
+
                         // Build skill context
                         courseContext = `
 LEARNING PATH: "${goal}"
@@ -316,7 +371,13 @@ ${nextSkills.length > 0 ? `⏭️ Next skills: ${nextSkills.join(', ')}` : '🎉
 CRITICAL: Stay 100% focused on "${skillName}". Every explanation, quiz, and challenge must relate ONLY to this skill.
 ═══════════════════════════════════════════════════`;
                     } else {
-                        courseContext = `LEARNING PATH: "${goal}"\nTeaching course content.`;
+                        courseContext = `
+LEARNING PATH: "${goal}"
+🎯 PRIMARY TOPIC: "${goal}"
+═══════════════════════════════════════════════════
+You are a world-class expert and dedicated tutor for "${goal}". 
+Your expertise is focused exclusively on this field.
+═══════════════════════════════════════════════════`;
                         currentTopic = goal;
                     }
                 }
@@ -328,100 +389,166 @@ CRITICAL: Stay 100% focused on "${skillName}". Every explanation, quiz, and chal
         // ============================================
         // ANALYSIS PIPELINE
         // ============================================
-        
+
+        console.log('[AI_DEBUG] Topic:', currentTopic, 'Stage:', learningStage);
+
         const patterns = detectBehavioralPatterns(userMessage, conversationHistory || []);
-        
+
+        // Create a separate service client for persistence to avoid stream conflicts
+        const persistenceClient = await createServerSupabaseClient();
+
+        // Save learner's message to database
+        if (sessionId) {
+            try {
+                await persistenceClient.rpc('add_conversation_message', {
+                    p_session_id: sessionId,
+                    p_role: 'learner',
+                    p_content: userMessage,
+                    p_message_type: 'question', // Default for learner
+                    p_metadata: { stage: learningStage }
+                });
+            } catch (err: any) {
+                console.error('[DB_ERROR] Failed to save learner message:', err);
+            }
+        }
+
         // Run AI analysis in parallel with decision-making prep
         const aiAnalysis = await analyzeUnderstanding(
-            userMessage, 
-            conversationHistory || [], 
+            userMessage,
+            conversationHistory || [],
             currentTopic
         );
 
         const decision = await makeSmartDecision(
-            userMessage, 
-            aiAnalysis, 
-            patterns, 
+            userMessage,
+            aiAnalysis,
+            patterns,
             {
                 currentStage: learningStage || 'EXPLAIN',
                 exchangeCount: patterns.exchangeCount,
-                lastQuizScore: lastQuizScore || 0
+                lastQuizScore: lastQuizScore || 0,
+                turnCount: turnCount || conversationHistory?.length || 0  // Use frontend turn count
             }
         );
+
+        console.log('[AI_DEBUG] Decision:', decision.action, 'Confidence:', decision.confidence);
 
         const analysisTime = Date.now() - startTime;
 
         // ============================================
         // DETERMINE STAGE
         // ============================================
-        
+
         let effectiveStage = learningStage || 'EXPLAIN';
-        
-        if (decision.action === 'send_quiz' && decision.confidence > 0.65) {
+
+        // Use turnCount from frontend (much more reliable than patterns.exchangeCount)
+        const actualTurnCount = turnCount || conversationHistory?.length || 0;
+
+        console.log('[STAGE_DEBUG] actualTurnCount:', actualTurnCount, 'decision.action:', decision.action);
+
+        // Simple logic: Decision from makeSmartDecision takes priority
+        if (decision.action === 'send_challenge' && decision.confidence >= 0.9) {
+            effectiveStage = 'CHALLENGE';
+        } else if (decision.action === 'send_quiz' && decision.confidence > 0.65) {
             effectiveStage = 'QUIZ';
-        } else if (decision.action === 'send_challenge' && decision.confidence > 0.7) {
+        } else if (decision.forcedStage) {
+            effectiveStage = decision.forcedStage;
+        } else if (actualTurnCount >= 2) {
+            // After turn 2, default to challenge
             effectiveStage = 'CHALLENGE';
         }
+
+        console.log('[AI_DEBUG] Effective Stage:', effectiveStage);
 
         // ============================================
         // BUILD SYSTEM PROMPT
         // ============================================
-        
+
         let systemPrompt = '';
-        
-        if (effectiveStage === 'QUIZ') {
-            systemPrompt = `You are Genie, an expert AI tutor. The learner is ready for assessment.
+
+        if (effectiveStage === 'GOALS') {
+            systemPrompt = `You are Genie, a world-class subject matter expert in "${currentTopic}".
 
 ${courseContext}
 
-YOUR TASK:
-1. Say: "${decision.transition}"
-2. Provide a multiple-choice quiz testing THIS SKILL ONLY
-3. Format: Transition phrase, then new line with [QUIZ] followed by valid JSON
+MISSION: 
+1. Think hard and draft 3-4 comprehensive, accurate learning goals for "${currentTopic}". 
+2. Ensure they are up-to-date and not overwhelming.
+3. State them clearly to the student as a roadmap.
+4. After stating them, tell the student you're sending a practical challenge to start.
 
-JSON Format:
-{"question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correctAnswer": "A", "explanation": "..."}
+STRICT DOMAIN: Only talk about "${currentTopic}". Stay strictly within this field.
 
-CRITICAL: Question must test ONLY the current skill. No other topics.`;
+FORMAT:
+Clear, encouraging intro, then:
+**Learning Goals:**
+1. [Goal 1]
+2. [Goal 2]
+3. [Goal 3]
+
+Then a transition sentence about the upcoming challenge.`;
+
+        } else if (effectiveStage === 'QUIZ') {
+            systemPrompt = `You are Genie, an expert AI tutor. 
+
+${courseContext}
+
+YOUR MISSION:
+1. Deliver a pulse-check quiz for THIS SKILL ONLY: "${currentTopic}".
+2. DO NOT ask about yourself (Genie), AI, or general personality.
+3. Every question must be educational and based on the course content.
+
+INSTRUCTIONS:
+- Say: "${decision.transition}"
+- Provide a multiple-choice quiz (A-D) testing "${currentTopic}".
+- Format: Transition phrase, then a new line with [QUIZ] followed by valid JSON.
+
+JSON Schema:
+{"question": "string", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correctAnswer": "A|B|C|D", "explanation": "string"}
+
+CRITICAL: If the learner just answered a quiz, provide a NEW question or move to a more advanced concept within the same skill.`;
 
         } else if (effectiveStage === 'CHALLENGE') {
-            systemPrompt = `You are Genie. The learner passed the quiz!
+            systemPrompt = `You are Genie, a world-class subject matter expert in "${currentTopic}". 
 
 ${courseContext}
 
-YOUR TASK:
-1. Brief praise (1 sentence)
-2. Give a practical hands-on challenge for THIS SKILL ONLY
-3. Format: Praise, then [CHALLENGE] with valid JSON
+YOUR MISSION:
+1. Praise the learner's progress in mastering "${currentTopic}".
+2. Deliver a specialized hands-on challenge for "${currentTopic}".
+3. Ensure the challenge is deeply rooted in this specific field.
+4. Format: Praise, then [CHALLENGE] with valid JSON.
 
 JSON Format:
 {"description": "Clear instructions for hands-on task", "challengeId": "challenge_${Date.now()}"}
 
-Challenge must be practical, achievable, and focused ONLY on the current skill.`;
+Focus 100% on practical application and mastery of "${currentTopic}".`;
 
         } else {
-            // EXPLAIN stage
-            systemPrompt = `You are Genie, a world-class AI tutor. Professional, encouraging, and clear.
+            // EXPLAIN stage - Aggressively transition to Quiz
+            const isPostChallenge = userMessage.toLowerCase().includes('goals') || userMessage.toLowerCase().includes('success');
+
+            systemPrompt = `You are Genie, a world-class subject matter expert in "${currentTopic}". 
 
 ${courseContext}
 
-STUDENT STATE:
-- Shows understanding: ${patterns.showsUnderstanding ? 'Yes' : 'No'}
-- Shows confusion: ${patterns.showsConfusion ? 'Yes' : 'No'}
-- Engagement: ${patterns.isEngaged ? 'High' : 'Low'}
-- Exchange count: ${patterns.exchangeCount}
-${aiAnalysis ? `- AI Analysis: ${aiAnalysis.comprehensionLevel} comprehension (${Math.round(aiAnalysis.confidence * 100)}% confident)` : ''}
+IMPORTANT:
+- Focus: "${currentTopic}".
+- ROLE: You are the ultimate authority on this subject. Use your expertise to guide the learner through advanced concepts.
+- SCOPE: Stay strictly within the field of "${currentTopic}". 
+- Aggressive Interactivity: Every 1-2 turns, you MUST use [QUIZ] or [CHALLENGE] to test comprehension.
 
-YOUR INSTRUCTIONS:
-${patterns.showsConfusion ? '- Student is confused - explain more simply' : '- Continue teaching clearly'}
-${patterns.exchangeCount < 2 ? '- Early in conversation - build foundation' : '- Building on previous explanations'}
+${isPostChallenge ? `MISSION: The student just finished their initial challenge. Clearly state the 3 main Learning Goals for mastering "${currentTopic}". Once goals are stated, immediately follow up with a quiz question to begin the learning loop.` : `GOAL: Teach "${currentTopic}" with high-impact interaction.`}
 
 RULES:
-- Focus 100% on CURRENT SKILL ONLY
-- Be concise (2-4 sentences)
-- Use 1-2 emojis max, sparingly
-- NEVER say "I'll quiz you next" - let conversation flow naturally
-- Don't drift to other topics
+- Focus 100% on the subject of "${currentTopic}".
+- Be concise (2-4 sentences).
+- If the student shows even slight understanding, transition to [QUIZ] or [CHALLENGE] immediately.
+- Use 1-2 emojis max.
+
+STUDENT STATE:
+- Turns: ${patterns.exchangeCount}
+- Readiness: ${decision.readinessScore || 'N/A'}/100
 
 RECENT CONVERSATION:
 ${conversationHistory && conversationHistory.length > 0 ? conversationHistory.slice(-3).map((msg: any) => `${msg.role}: ${msg.content.substring(0, 150)}`).join('\n') : 'New conversation'}
@@ -431,10 +558,12 @@ STUDENT: "${userMessage}"
 GENIE:`;
         }
 
+        console.log('[AI_DEBUG] System Prompt Preview:', systemPrompt.substring(0, 300) + '...');
+
         // ============================================
         // STREAM RESPONSE
         // ============================================
-        
+
         const encoder = new TextEncoder();
         const stream = new ReadableStream({
             async start(controller) {
@@ -453,7 +582,7 @@ GENIE:`;
                         const parts = genieResponse.split('[QUIZ]');
                         const intro = parts[0] ? parts[0].trim() : '';
                         const quizPart = parts[1] ? parts[1].trim() : '';
-                        
+
                         if (intro) {
                             await streamText(intro, controller, encoder);
                         }
@@ -471,7 +600,7 @@ GENIE:`;
                         const parts = genieResponse.split('[CHALLENGE]');
                         const intro = parts[0] ? parts[0].trim() : '';
                         const challengePart = parts[1] ? parts[1].trim() : '';
-                        
+
                         if (intro) {
                             await streamText(intro, controller, encoder);
                         }
@@ -488,9 +617,53 @@ GENIE:`;
                         await streamText(genieResponse, controller, encoder);
                     }
 
+                    // Save Genie's response to database
+                    if (sessionId) {
+                        try {
+                            await persistenceClient.rpc('add_conversation_message', {
+                                p_session_id: sessionId,
+                                p_role: 'genie',
+                                p_content: genieResponse,
+                                p_message_type: effectiveStage.toLowerCase().includes('quiz') ? 'assessment'
+                                    : effectiveStage.toLowerCase().includes('challenge') ? 'challenge'
+                                        : 'explanation',
+                                p_metadata: {
+                                    stage: effectiveStage,
+                                    readinessScore: decision.readinessScore || 0,
+                                    action: decision.action
+                                }
+                            });
+
+                            // Implementation of Context Summarization (every 10 messages)
+                            const currentTurns = (conversationHistory?.length || 0) + 2;
+                            if (currentTurns % 10 === 0) {
+                                console.log('[AI_DEBUG] Triggering Context Summarization. Turns:', currentTurns);
+
+                                const summaryResult = await generateWithRetry({
+                                    prompt: "Summarize our progress so far in 2-3 sentences. Focus on what we learned and what's next.",
+                                    systemPrompt: `You are Genie's memory processor. Analyze this history: ${JSON.stringify(conversationHistory)}`,
+                                    temperature: 0.3,
+                                    maxTokens: 150
+                                });
+
+                                if (summaryResult.text) {
+                                    await persistenceClient.rpc('add_conversation_message', {
+                                        p_session_id: sessionId,
+                                        p_role: 'genie',
+                                        p_content: `[SUMMARY] ${summaryResult.text}`,
+                                        p_message_type: 'summary',
+                                        p_metadata: { turnsAtSummary: currentTurns }
+                                    });
+                                }
+                            }
+                        } catch (err: any) {
+                            console.error('[DB_ERROR] Failed during persistence/summarization:', err);
+                        }
+                    }
+
                     const totalTime = Date.now() - startTime;
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
-                        type: 'complete', 
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                        type: 'complete',
                         content: genieResponse,
                         metadata: {
                             analysisTime,
@@ -499,13 +672,13 @@ GENIE:`;
                             action: decision.action
                         }
                     })}\n\n`));
-                    
+
                     controller.close();
                 } catch (error) {
                     console.error('Stream error:', error);
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
-                        type: 'error', 
-                        message: 'Response failed' 
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                        type: 'error',
+                        message: 'Response failed'
                     })}\n\n`));
                     controller.close();
                 }
@@ -524,11 +697,11 @@ GENIE:`;
     } catch (error: any) {
         console.error('API Error:', error);
         return new Response(
-            JSON.stringify({ 
+            JSON.stringify({
                 error: error.message || 'Internal error',
                 timestamp: new Date().toISOString()
-            }), 
-            { 
+            }),
+            {
                 status: 500,
                 headers: { 'Content-Type': 'application/json' }
             }

@@ -91,7 +91,14 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
   }, []);
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => setMousePosition({ x: e.clientX, y: e.clientY });
+    let lastMove = 0;
+    const handleMouseMove = (e: MouseEvent) => {
+      const now = Date.now();
+      if (now - lastMove > 50) { // Throttle to 20fps
+        setMousePosition({ x: e.clientX, y: e.clientY });
+        lastMove = now;
+      }
+    };
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
@@ -217,19 +224,11 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
         setConceptExplanation(existing.explanation || "Let's dive in!");
         setActiveChallengeIndex(0);
       } else {
-        setIsGenerating(true);
-        try {
-          const { generateChallengeBatch } = await import('@/app/actions/generate-challenges');
-          const batch = await generateChallengeBatch(skill.id, skill.title, skill.engine || 'default');
-          if (batch.challenges?.length > 0) {
-            setSessionChallenges(batch.challenges);
-            setConceptExplanation(batch.explanation || `Learn about ${skill.title}.`);
-          }
-        } catch (e) {
-          addNotification('error', 'Failed to generate challenges.');
-        } finally {
-          setIsGenerating(false);
-        }
+        // No pre-generated challenges, just start interactive session
+        const skillTitle = skill.title || (skill as any).name || skill.id;
+        setConceptExplanation(`Let's learn about ${skillTitle}!`);
+        setSessionChallenges([]);
+        setActiveChallengeIndex(-1);
       }
     }
   };
@@ -243,8 +242,8 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
     if (!selectedSkill || activeChallengeIndex === -1) return;
     const currentChal = sessionChallenges[activeChallengeIndex];
     if (currentChal) {
-      await recordChallengeAttempt(currentChal.id, success, progressionGraph, { 
-        difficultyLevel: (selectedSkill.level as DifficultyLevel) || 'Medium' 
+      await recordChallengeAttempt(currentChal.id, success, progressionGraph, {
+        difficultyLevel: (selectedSkill.level as DifficultyLevel) || 'Medium'
       });
     }
     await refreshGraphProgress();
@@ -258,9 +257,9 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
     }
   };
 
-  // Stats calculation
-  const totalMinutes = useMemo(() => graph.nodes.reduce((sum, n) => sum + (n.estimatedMinutes || 0), 0), [graph.id]);
-  const totalXP = useMemo(() => graph.nodes.reduce((sum, n) => sum + (n.xpReward || 0), 0), [graph.id]);
+  // Stats calculation with defensive checks
+  const totalMinutes = useMemo(() => (graph?.nodes || []).reduce((sum, n) => sum + (n.estimatedMinutes || 0), 0), [graph?.id]);
+  const totalXP = useMemo(() => (graph?.nodes || []).reduce((sum, n) => sum + (n.xpReward || 0), 0), [graph?.id]);
   const earnedXP = progressData.reduce((sum, p) => sum + (p.progressData.xpEarned || 0), 0);
   const masteredSkills = progressData.filter(p => p.progressData.masteryAchieved).length;
   const unlockedSkills = progressData.filter(p => p.progressData.state !== 'locked').length;
@@ -284,7 +283,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
   return (
     <div className="min-h-screen bg-gray-900 text-white overflow-hidden pb-20 md:pb-0">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
-        <HeroSection 
+        <HeroSection
           graph={graph} mousePosition={mousePosition} totalMinutes={totalMinutes}
           totalXP={totalXP} earnedXP={earnedXP} masteredSkills={masteredSkills} unlockedSkills={unlockedSkills}
         />
@@ -312,7 +311,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
         </motion.div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-          {graph.nodes.map((skill, index) => (
+          {(graph?.nodes || []).map((skill, index) => (
             <SkillCard
               key={skill.id} skill={skill} index={index}
               skillState={getSkillState(skill.id)}
@@ -325,8 +324,8 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
       </div>
 
       <NotificationSystem notifications={notifications} onRemoveNotification={removeNotification} />
-      <PrerequisitesModal 
-        showPrerequisites={showPrerequisites} graph={graph} 
+      <PrerequisitesModal
+        showPrerequisites={showPrerequisites} graph={graph}
         getSkillState={getSkillState} getSkillProgress={getSkillProgress}
         getUnmetPrerequisites={getUnmetPrerequisites}
         onClose={() => setShowPrerequisites(null)} onSkillClick={handleSkillClick}

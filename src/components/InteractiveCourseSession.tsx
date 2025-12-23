@@ -11,7 +11,7 @@ import {
   InteractiveCourseSession as SessionType,
   QuickCheckQuestion
 } from '@/types/interactive-course';
-import { chatStorage, ChatMessage } from '@/lib/services/chat-storage';
+import { ChatMessage } from '@/lib/services/chat-storage';
 import { sessionManager } from '@/lib/services/interactive-course-session-manager';
 import QuizBubble from './QuizBubble';
 import ChallengeView from './ChallengeView';
@@ -34,6 +34,9 @@ export default function InteractiveCourseSession({
   skillGraph,
   onStartChallenge
 }: InteractiveCourseSessionProps) {
+  // Initialize skillGraph with safe defaults
+  const safeSkillGraph = skillGraph || { id: courseId, goal: courseTitle, nodes: [], edges: [] };
+
   // State management
   const [session, setSession] = useState<SessionType | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -45,22 +48,30 @@ export default function InteractiveCourseSession({
   const [isSaving, setIsSaving] = useState(false);
   const [showActionButtons, setShowActionButtons] = useState(false);
   const [activeChallenge, setActiveChallenge] = useState<GeneratedChallenge | null>(null);
-  const [learningStage, setLearningStage] = useState<'EXPLAIN' | 'QUIZ' | 'CHALLENGE'>('EXPLAIN');
+  const [learningStage, setLearningStage] = useState<'EXPLAIN' | 'QUIZ' | 'CHALLENGE'>('QUIZ');
+
+  // Diagnostic render tracking
+  const renderRef = useRef(0);
+  renderRef.current++;
+  if (renderRef.current % 50 === 0) {
+    console.warn(`[DIAGNOSTIC] InteractiveCourseSession render count: ${renderRef.current}`);
+  }
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const initializingRef = useRef(false);
 
   // Monitor online/offline status
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
@@ -87,8 +98,11 @@ export default function InteractiveCourseSession({
   // Save session when component unmounts
   useEffect(() => {
     return () => {
-      if (session && messages.length > 0) {
-        chatStorage.saveSession(session, messages).catch(err =>
+      if (session && Array.isArray(messages) && messages.length > 0) {
+        sessionManager.persistSession({
+          ...session,
+          updatedAt: new Date()
+        }).catch(err =>
           console.error('Failed to save session on unmount:', err)
         );
       }
@@ -100,81 +114,71 @@ export default function InteractiveCourseSession({
   };
 
   const initializeSessionWithIntro = async () => {
+    if (initializingRef.current) return;
+    initializingRef.current = true;
+
     try {
-      const existingSession = await chatStorage.loadSession(userId, courseId);
-
-      if (existingSession && existingSession.messages.length > 0) {
-        setSession(existingSession.session);
-        setMessages(existingSession.messages);
-        setIsInitializing(false);
-
-        setTimeout(() => {
-          const welcomeBackMessage: ChatMessage = {
-            id: 'welcome-back-' + Date.now(),
-            role: 'genie',
-            content: "Welcome back! I remember our conversation. Feel free to continue where we left off or ask me anything new!",
-            timestamp: new Date(),
-            type: 'message'
-          };
-          addMessageAndSave(welcomeBackMessage);
-        }, 1000);
-
+      if (!userId || !courseId) {
+        initializingRef.current = false;
         return;
       }
 
-      const newSession: SessionType = {
-        id: `session_${userId}_${courseId}_${Date.now()}`,
-        courseId,
-        userId,
-        currentTopic: courseTitle,
-        learningContext: {
-          currentConcepts: [skillGraph?.nodes?.[0]?.title || courseTitle || 'Main Concepts'],
-          masteredConcepts: [],
-          strugglingAreas: [],
-          comprehensionLevel: 0.5,
-          preferredLearningStyle: 'interactive',
-          sessionGoals: [`Learn ${courseTitle}`]
-        },
-        progressState: {
-          completedTopics: [],
-          currentTopicProgress: 0.1,
-          overallCourseProgress: 0.1,
-          masteredSkills: [],
-          strugglingSkills: [],
-          totalTimeSpent: 0,
-          challengesCompleted: 0,
-          assessmentsCompleted: 0
-        },
-        sessionStartTime: new Date(),
-        lastInteraction: new Date(),
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
+      const existingSessionData = await sessionManager.resumeSession(userId, courseId);
 
+      if (existingSessionData) {
+        setSession(existingSessionData);
+
+        // Load messages from Supabase
+        const history = await sessionManager.getSessionHistory(existingSessionData.id);
+        if (history && Array.isArray(history) && history.length > 0) {
+          const mappedMessages: ChatMessage[] = history.map(m => ({
+            id: m.id || `msg-${Math.random()}`,
+            role: m.role,
+            content: m.content,
+            timestamp: new Date(m.timestamp),
+            type: m.messageType as any
+          }));
+          setMessages(mappedMessages);
+          setIsInitializing(false);
+          return;
+        }
+      }
+
+      // If no session or no history, create one
+      const newSession = await sessionManager.createSession(courseId, userId);
       setSession(newSession);
 
       const getIntroMessage = () => {
-        const title = skillGraph?.goal || courseTitle;
-        const allSkills = skillGraph?.nodes || [];
-        const firstSkill = allSkills[0]?.title || 'the fundamentals';
+        const title = safeSkillGraph?.goal || courseTitle;
+        const allSkills = safeSkillGraph?.nodes || [];
+        const firstSkill = allSkills[0]?.name || 'the fundamentals';
 
         return `Hey there! Welcome to your interactive learning journey! I'm Genie, and I'm excited to help you master ${title}. Today we'll start with ${firstSkill}. What would you like to know about it?`;
       };
 
+      const introContent = getIntroMessage();
+
+      // Save intro message to Supabase
+      await sessionManager.addMessage(
+        newSession.id,
+        'genie',
+        introContent,
+        'explanation'
+      );
+
       const introMessage: ChatMessage = {
-        id: 'intro-1',
+        id: 'intro-' + Date.now(),
         role: 'genie',
-        content: getIntroMessage(),
+        content: introContent,
         timestamp: new Date(),
         type: 'message'
       };
 
-      const initialMessages = [introMessage];
-      setMessages(initialMessages);
+      setMessages([introMessage]);
       setIsInitializing(false);
 
-      await chatStorage.saveSession(newSession, initialMessages);
+      // Automatically trigger the first goal interaction
+      handleSendMessage("I'm ready to learn! Let's start with the goals.", true);
 
     } catch (error) {
       console.error('Failed to initialize session:', error);
@@ -186,7 +190,9 @@ export default function InteractiveCourseSession({
         type: 'message'
       };
       setMessages([errorMessage]);
+    } finally {
       setIsInitializing(false);
+      initializingRef.current = false;
     }
   };
 
@@ -197,19 +203,26 @@ export default function InteractiveCourseSession({
         : msg
     ));
 
+    const nextStage = isCorrect ? 'CHALLENGE' : 'EXPLAIN';
+
+    if (isCorrect) {
+      setLearningStage('CHALLENGE');
+    } else {
+      setLearningStage('EXPLAIN');
+    }
+
     if (session) {
-      chatStorage.saveSession(session, messages).catch(console.error);
+      sessionManager.persistSession({
+        ...session,
+        updatedAt: new Date()
+      }).catch(console.error);
     }
 
     const resultMessage = isCorrect
       ? "That's exactly right! I'm ready for the next part."
       : `I chose "${answer}", but I'm not sure why it's wrong. Can you explain?`;
 
-    handleSendMessage(resultMessage, true);
-
-    if (isCorrect) {
-      setLearningStage('CHALLENGE');
-    }
+    handleSendMessage(resultMessage, true, nextStage);
   };
 
   const handleChallengeTrigger = (challengeId: string) => {
@@ -249,7 +262,7 @@ export default function InteractiveCourseSession({
       return updatedSession;
     });
 
-    handleSendMessage(`Success! I nailed the challenge and earned ${xpValue} XP!`, true);
+    handleSendMessage(`Success! I nailed the challenge and earned ${xpValue} XP! What are the learning goals for this skill?`, true, 'EXPLAIN');
     setLearningStage('EXPLAIN');
   };
 
@@ -267,18 +280,26 @@ export default function InteractiveCourseSession({
 
   const addMessageAndSave = async (message: ChatMessage) => {
     setMessages(prev => {
-      const newMessages = [...prev, message];
-      if (session) {
-        setIsSaving(true);
-        chatStorage.saveSession(session, newMessages)
-          .then(() => setIsSaving(false))
-          .catch(err => {
-            console.error('Failed to save message:', err);
-            setIsSaving(false);
-          });
-      }
-      return newMessages;
+      // Avoid duplicate messages
+      if (prev.some(m => m.id === message.id)) return prev;
+      return [...prev, message];
     });
+
+    if (session && message.role === 'learner') {
+      setIsSaving(true);
+      try {
+        await sessionManager.addMessage(
+          session.id,
+          'learner',
+          message.content,
+          message.type === 'message' ? 'explanation' : (message.type as any) || 'explanation'
+        );
+      } catch (err) {
+        console.error('Failed to save message to Supabase:', err);
+      } finally {
+        setIsSaving(false);
+      }
+    }
   };
 
   const generateChatSummary = (messages: ChatMessage[]): string => {
@@ -289,8 +310,16 @@ export default function InteractiveCourseSession({
     return messages.filter(msg => msg.type === 'message').slice(-5);
   };
 
-  const handleSendMessage = async (text: string, isAuto = false) => {
+  const handleSendMessage = async (text: string, isAuto = false, stageOverride?: 'EXPLAIN' | 'QUIZ' | 'CHALLENGE') => {
     if (!text.trim() || isLoading) return;
+
+    // Determine current skill ID with defensive check
+    const currentSkillId = safeSkillGraph?.nodes?.[0]?.id || courseId;
+
+    if (!currentSkillId) {
+      console.warn('Cannot send message: currentSkillId is undefined');
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: 'user-' + Date.now(),
@@ -327,13 +356,20 @@ export default function InteractiveCourseSession({
           userMessage: userMessage.content,
           sessionId: session?.id,
           courseId,
-          learningStage,
+          currentSkillId,
+          skillTitle: courseTitle,  // Send human-readable title
+          learningStage: stageOverride || learningStage,
           conversationHistory: recentMessages,
+          turnCount: messages.length,  // Explicit turn counter
           chatSummary
         })
       });
 
-      if (!response.ok) throw new Error('Response error');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Stream Error:', response.status, errorText);
+        throw new Error(`API error (${response.status}): ${errorText || 'Response error'}`);
+      }
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
@@ -370,7 +406,10 @@ export default function InteractiveCourseSession({
                   const updated = prev.map(msg =>
                     msg.id === genieMessageId ? { ...msg, content: data.content || fullContent } : msg
                   );
-                  if (session) chatStorage.saveSession(session, updated).catch(console.error);
+                  if (session) sessionManager.persistSession({
+                    ...session,
+                    updatedAt: new Date()
+                  }).catch(console.error);
                   return updated;
                 });
                 if (!data.type || data.type === 'content') {
@@ -436,9 +475,9 @@ export default function InteractiveCourseSession({
   // Render challenge view as overlay
   if (activeChallenge) {
     return (
-      <ChallengeView 
-        challenge={activeChallenge} 
-        onSuccess={onChallengeSuccess} 
+      <ChallengeView
+        challenge={activeChallenge}
+        onSuccess={onChallengeSuccess}
         onFail={onChallengeFail}
         onClose={handleCloseChallenge}
       />
@@ -447,7 +486,7 @@ export default function InteractiveCourseSession({
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-gray-950 text-white font-sans selection:bg-purple-500/30 overflow-hidden">
-      
+
       {/* Sidebar */}
       <motion.aside
         initial={false}
@@ -495,16 +534,16 @@ export default function InteractiveCourseSession({
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-bold text-white">
-                    {Math.round(session.learningContext.comprehensionLevel * 100)}%
+                    {Math.round((session.learningContext?.comprehensionLevel || 0) * 100)}%
                   </span>
                   <span className="text-xs text-gray-500">
-                    {session.learningContext.masteredConcepts.length}/{session.learningContext.currentConcepts.length} concepts
+                    {(session.learningContext?.masteredConcepts?.length || 0)}/{(session.learningContext?.currentConcepts?.length || 0)} concepts
                   </span>
                 </div>
                 <div className="h-2 bg-gray-900 rounded-full overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
-                    animate={{ width: `${session.learningContext.comprehensionLevel * 100}%` }}
+                    animate={{ width: `${(session.learningContext?.comprehensionLevel || 0) * 100}%` }}
                     transition={{ duration: 1, ease: "easeOut" }}
                     className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
                   />
@@ -513,23 +552,22 @@ export default function InteractiveCourseSession({
             </div>
 
             {/* Current Concepts */}
-            {session.learningContext.currentConcepts.length > 0 && (
+            {(session.learningContext?.currentConcepts?.length || 0) > 0 && (
               <div>
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">
                   Learning Now
                 </h4>
                 <div className="flex flex-wrap gap-2">
-                  {session.learningContext.currentConcepts.map((concept, i) => (
+                  {(session.learningContext?.currentConcepts || []).map((concept, i) => (
                     <motion.span
                       key={i}
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: i * 0.1 }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${
-                        session.learningContext.masteredConcepts.includes(concept)
-                          ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                          : 'bg-purple-500/10 border-purple-500/30 text-purple-300'
-                      }`}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${(session.learningContext?.masteredConcepts || []).includes(concept)
+                        ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                        : 'bg-purple-500/10 border-purple-500/30 text-purple-300'
+                        }`}
                     >
                       {concept}
                     </motion.span>
@@ -543,8 +581,8 @@ export default function InteractiveCourseSession({
 
       {/* Backdrop for mobile sidebar */}
       {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden" 
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -589,7 +627,7 @@ export default function InteractiveCourseSession({
                 <span className="text-xs font-semibold text-purple-400">Saving</span>
               </div>
             )}
-            <button 
+            <button
               className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
               aria-label="View achievements"
             >
@@ -609,7 +647,7 @@ export default function InteractiveCourseSession({
           )}
 
           {/* Empty State */}
-          {!isInitializing && messages.length === 0 && (
+          {!isInitializing && (!messages || messages.length === 0) && (
             <div className="text-center py-20">
               <BookOpen className="w-16 h-16 mx-auto mb-4 text-gray-600" />
               <h3 className="text-xl font-bold mb-2 text-white">Start Your Learning Journey</h3>
@@ -619,21 +657,20 @@ export default function InteractiveCourseSession({
 
           {/* Messages */}
           <AnimatePresence initial={false}>
-            {messages.map((message, index) => (
+            {(messages || []).map((message, index) => (
               <motion.div
                 key={message.id}
-                initial={index >= messages.length - 1 ? { opacity: 0, y: 20 } : false}
+                initial={index >= (messages?.length || 0) - 1 ? { opacity: 0, y: 20 } : false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
                 className={`flex ${message.role === 'learner' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`max-w-[85%] lg:max-w-[75%] ${
-                  message.role === 'learner'
-                    ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white px-4 py-3 rounded-2xl rounded-tr-md'
-                    : message.type === 'quiz' || message.type === 'challenge_trigger'
-                      ? 'w-full'
-                      : 'bg-gray-800/50 border border-gray-700 px-4 py-3 rounded-2xl rounded-tl-md'
-                }`}>
+                <div className={`max-w-[85%] lg:max-w-[75%] ${message.role === 'learner'
+                  ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white px-4 py-3 rounded-2xl rounded-tr-md'
+                  : message.type === 'quiz' || message.type === 'challenge_trigger'
+                    ? 'w-full'
+                    : 'bg-gray-800/50 border border-gray-700 px-4 py-3 rounded-2xl rounded-tl-md'
+                  }`}>
                   {message.type === 'quiz' && message.quizData ? (
                     <QuizBubble {...message.quizData} onAnswer={(ans, corr) => handleQuizAnswer(message.id, ans, corr)} />
                   ) : message.type === 'challenge_trigger' && message.challengeData ? (
@@ -663,7 +700,7 @@ export default function InteractiveCourseSession({
                       <div className="prose prose-invert max-w-none text-white leading-relaxed">
                         <ReactMarkdown
                           components={{
-                            code({ node, inline, className, children, ...props }: { node?: any; inline?: boolean; className?: string; children?: React.ReactNode; [key: string]: any }) {
+                            code({ node, inline, className, children, ...props }: { node?: any; inline?: boolean; className?: string; children?: React.ReactNode;[key: string]: any }) {
                               const match = /language-(\w+)/.exec(className || '');
                               return !inline && match ? (
                                 <SyntaxHighlighter
@@ -769,11 +806,10 @@ export default function InteractiveCourseSession({
             <button
               onClick={sendMessage}
               disabled={!inputMessage.trim() || isLoading || !isOnline}
-              className={`p-3 rounded-xl transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${
-                !inputMessage.trim() || isLoading || !isOnline
-                  ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                  : 'bg-gradient-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white'
-              }`}
+              className={`p-3 rounded-xl transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${!inputMessage.trim() || isLoading || !isOnline
+                ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                : 'bg-gradient-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white'
+                }`}
               aria-label="Send message"
             >
               <Send className="w-5 h-5" />

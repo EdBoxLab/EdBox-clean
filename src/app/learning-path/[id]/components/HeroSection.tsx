@@ -109,7 +109,7 @@ export default function HeroSection({
                 Engine-Native Learning
               </p>
               <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-white">
-                {graph.goal}
+                {graph?.goal || 'Learning Path'}
               </h1>
             </div>
           </div>
@@ -119,23 +119,23 @@ export default function HeroSection({
           </p>
 
           {/* Overall Progress Bar */}
-          {graph.nodes.length > 0 && (
+          {(graph?.nodes?.length || 0) > 0 && (
             <div className="mb-4 md:mb-6">
               <div className="flex items-center justify-between text-sm text-white/90 mb-2">
                 <span>Overall Progress</span>
-                <span>{Math.round((masteredSkills / graph.nodes.length) * 100)}% Complete</span>
+                <span>{Math.round((masteredSkills / (graph?.nodes?.length || 1)) * 100)}% Complete</span>
               </div>
               <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden">
                 <motion.div
                   className="h-2 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full"
                   initial={{ width: 0 }}
-                  animate={{ width: `${(masteredSkills / graph.nodes.length) * 100}%` }}
+                  animate={{ width: `${(masteredSkills / (graph?.nodes?.length || 1)) * 100}%` }}
                   transition={{ duration: 2, delay: 1, ease: "easeOut" }}
                 />
               </div>
               <div className="flex justify-between text-xs text-white/70 mt-1">
                 <span>{masteredSkills} mastered</span>
-                <span>{graph.nodes.length - masteredSkills} remaining</span>
+                <span>{(graph?.nodes?.length || 0) - masteredSkills} remaining</span>
               </div>
             </div>
           )}
@@ -143,7 +143,7 @@ export default function HeroSection({
           {/* Stats */}
           <div className="flex flex-wrap gap-2 md:gap-4">
             {[
-              { icon: Target, label: `${masteredSkills}/${graph.nodes.length} Mastered`, color: '#00ff00' },
+              { icon: Target, label: `${masteredSkills}/${graph?.nodes?.length || 0} Mastered`, color: '#00ff00' },
               { icon: Zap, label: `${unlockedSkills} Unlocked`, color: '#00ffff' },
               { icon: Trophy, label: `${earnedXP}/${totalXP} XP`, color: '#ffff00' },
               { icon: Clock, label: `${totalMinutes} min total`, color: '#ff00ff' }

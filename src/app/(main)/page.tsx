@@ -18,7 +18,6 @@ const Dashboard: React.FC = () => {
   const [studyKits, setStudyKits] = useState<any[]>([]);
   const [recentCourse, setRecentCourse] = useState<any>(null);
   
-  // Individual loading states for progressive rendering
   const [coursesLoading, setCoursesLoading] = useState(true);
   const [notesLoading, setNotesLoading] = useState(true);
   const [kitsLoading, setKitsLoading] = useState(true);
@@ -31,7 +30,6 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Step 1: Get user and profile first (blocking)
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           router.push('/about');
@@ -56,10 +54,8 @@ const Dashboard: React.FC = () => {
           if (newProfile) setProfile(newProfile);
         }
 
-        // Show the page immediately after profile is loaded
         setLoading(false);
 
-        // Step 2: Fetch all content in parallel (non-blocking)
         const fetchCourses = async () => {
           try {
             const coursesRes = await fetch('/api/skill-graph/list');
@@ -132,7 +128,6 @@ const Dashboard: React.FC = () => {
           }
         };
 
-        // Run all fetches in parallel - they don't wait for each other!
         Promise.all([fetchCourses(), fetchNotes(), fetchStudyKits()]);
 
       } catch (error) {
@@ -146,7 +141,7 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col justify-center items-center min-h-screen bg-[#09090b] text-white gap-4">
+      <div className="flex flex-col justify-center items-center min-h-screen bg-zinc-950 text-white gap-4">
         <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
         <p className="text-gray-400">Loading your dashboard...</p>
       </div>
@@ -232,7 +227,6 @@ const Dashboard: React.FC = () => {
       }
     };
 
-    // Show skeleton loader while loading
     if (isLoading) {
       return (
         <div className="mb-12">
@@ -270,8 +264,10 @@ const Dashboard: React.FC = () => {
             <div className="flex gap-2">
               <button 
                 onClick={() => scroll('left')} 
-                className={`p-1.5 border border-zinc-700 rounded-md hover:border-zinc-500 transition ${
-                  showLeftArrow ? 'text-zinc-400 hover:text-zinc-200' : 'text-zinc-700 cursor-not-allowed'
+                className={`p-1.5 border rounded-md transition ${
+                  showLeftArrow 
+                    ? 'border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-zinc-200' 
+                    : 'border-zinc-800 text-zinc-700 cursor-not-allowed'
                 }`}
                 disabled={!showLeftArrow}
                 aria-label="Scroll left"
@@ -280,8 +276,10 @@ const Dashboard: React.FC = () => {
               </button>
               <button 
                 onClick={() => scroll('right')} 
-                className={`p-1.5 border border-zinc-700 rounded-md hover:border-zinc-500 transition ${
-                  showRightArrow ? 'text-zinc-400 hover:text-zinc-200' : 'text-zinc-700 cursor-not-allowed'
+                className={`p-1.5 border rounded-md transition ${
+                  showRightArrow 
+                    ? 'border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-zinc-200' 
+                    : 'border-zinc-800 text-zinc-700 cursor-not-allowed'
                 }`}
                 disabled={!showRightArrow}
                 aria-label="Scroll right"
@@ -293,13 +291,13 @@ const Dashboard: React.FC = () => {
         </div>
         <div 
           ref={scrollRef} 
-          className="flex gap-4 overflow-x-auto pb-4 scroll-smooth scrollbar-hide"
+          className="flex gap-4 overflow-x-auto pb-4 scroll-smooth"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {items.map((item, i) => (
             <Link href={item.href || '#'} key={item.id} className="block">
               <motion.div
-                className="flex-shrink-0 w-64 border border-zinc-800 hover:border-zinc-700 rounded-lg p-4 flex flex-col justify-between transition-colors bg-zinc-900/50 group"
+                className="flex-shrink-0 w-64 border border-zinc-800 hover:border-zinc-600 rounded-lg p-4 flex flex-col justify-between transition-colors bg-zinc-900/50 group"
                 style={{ minHeight: showProgress ? '180px' : '160px' }}
                 variants={cardVariants}
                 initial="hidden"
@@ -342,72 +340,74 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
-      <div className="mb-12">
-        <h1 className="text-4xl font-extrabold text-white mb-2">
-          Welcome, {profile?.username || user?.email?.split('@')[0]}!
-        </h1>
-        <p className="text-lg text-gray-400">Let's continue your learning journey.</p>
-      </div>
-
-      {recentCourse && (
+    <div className="min-h-screen bg-zinc-950">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
         <div className="mb-12">
-          <h2 className="text-2xl font-bold text-white mb-4">Continue Learning</h2>
-          <Link href={recentCourse.href}>
-            <motion.div 
-              className="bg-gradient-to-r from-indigo-900/80 to-purple-900/80 border border-indigo-500/30 rounded-xl p-6 sm:p-8 flex justify-between items-center group hover:border-indigo-500/50 transition-all cursor-pointer" 
-              whileHover={{ scale: 1.01 }} 
-              transition={{ duration: 0.2 }}
-            >
-              <div className="flex-grow">
-                <p className="text-sm uppercase tracking-wider text-indigo-200 font-semibold mb-1">
-                  {recentCourse.type}
-                </p>
-                <h3 className="text-2xl sm:text-3xl font-bold text-white mb-3">
-                  {recentCourse.title}
-                </h3>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-indigo-200 font-medium">
-                    {recentCourse.progress}% Complete
-                  </span>
-                  <div className="w-24 sm:w-32 bg-indigo-950 rounded-full h-2">
-                    <div 
-                      className="bg-indigo-400 h-2 rounded-full transition-all duration-300" 
-                      style={{ width: `${recentCourse.progress}%` }}
-                    />
+          <h1 className="text-4xl font-extrabold text-white mb-2">
+            Welcome, {profile?.username || user?.email?.split('@')[0]}!
+          </h1>
+          <p className="text-lg text-gray-400">Let's continue your learning journey.</p>
+        </div>
+
+        {recentCourse && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-white mb-4">Continue Learning</h2>
+            <Link href={recentCourse.href}>
+              <motion.div 
+                className="bg-gradient-to-r from-indigo-900/80 to-purple-900/80 border border-indigo-500/30 rounded-xl p-6 sm:p-8 flex justify-between items-center group hover:border-indigo-500/50 transition-all cursor-pointer" 
+                whileHover={{ scale: 1.01 }} 
+                transition={{ duration: 0.2 }}
+              >
+                <div className="flex-grow">
+                  <p className="text-sm uppercase tracking-wider text-indigo-200 font-semibold mb-1">
+                    {recentCourse.type}
+                  </p>
+                  <h3 className="text-2xl sm:text-3xl font-bold text-white mb-3">
+                    {recentCourse.title}
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-indigo-200 font-medium">
+                      {recentCourse.progress}% Complete
+                    </span>
+                    <div className="w-24 sm:w-32 bg-indigo-950 rounded-full h-2">
+                      <div 
+                        className="bg-indigo-400 h-2 rounded-full transition-all duration-300" 
+                        style={{ width: `${recentCourse.progress}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-              <PlayCircle className="w-12 h-12 sm:w-16 sm:h-16 text-white opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all flex-shrink-0 ml-4" />
-            </motion.div>
-          </Link>
-        </div>
-      )}
+                <PlayCircle className="w-12 h-12 sm:w-16 sm:h-16 text-white opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all flex-shrink-0 ml-4" />
+              </motion.div>
+            </Link>
+          </div>
+        )}
 
-      <div>
-        <h2 className="text-3xl font-bold text-white mb-6">Explore</h2>
-        <ExploreRow 
-          title="Your Courses" 
-          items={courses} 
-          emptyMessage="You haven't enrolled in any courses yet."
-          showProgress={true}
-          createLink="/creator"
-          createText="Create Your First Course"
-          isLoading={coursesLoading}
-        />
-        <ExploreRow 
-          title="Your Notes" 
-          items={notes} 
-          emptyMessage="No notes created yet. Use the Note Taker to get started!"
-          isLoading={notesLoading}
-        />
-        <ExploreRow 
-          title="Your Study Kits" 
-          items={studyKits} 
-          emptyMessage="No study kits generated yet. Use Study Kit to create one!"
-          isLoading={kitsLoading}
-        />
-        <ExploreRow title="Tools" items={tools} />
+        <div>
+          <h2 className="text-3xl font-bold text-white mb-6">Explore</h2>
+          <ExploreRow 
+            title="Your Courses" 
+            items={courses} 
+            emptyMessage="You haven't enrolled in any courses yet."
+            showProgress={true}
+            createLink="/creator"
+            createText="Create Your First Course"
+            isLoading={coursesLoading}
+          />
+          <ExploreRow 
+            title="Your Notes" 
+            items={notes} 
+            emptyMessage="No notes created yet. Use the Note Taker to get started!"
+            isLoading={notesLoading}
+          />
+          <ExploreRow 
+            title="Your Study Kits" 
+            items={studyKits} 
+            emptyMessage="No study kits generated yet. Use Study Kit to create one!"
+            isLoading={kitsLoading}
+          />
+          <ExploreRow title="Tools" items={tools} />
+        </div>
       </div>
     </div>
   );

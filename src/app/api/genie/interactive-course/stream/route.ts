@@ -308,6 +308,15 @@ FORMATS:
         const stream = new ReadableStream({
             async start(controller) {
                 try {
+                    // 6a. Persist Learner Message (to ensure history is complete)
+                    await persistenceClient.rpc('add_conversation_message', {
+                        p_session_id: sessionId,
+                        p_role: 'learner',
+                        p_content: userMessage,
+                        p_message_type: 'explanation',
+                        p_metadata: {}
+                    });
+
                     // Send Goal Updates First
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
                         type: 'goals_updated', 
@@ -348,7 +357,16 @@ FORMATS:
                                 
                                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'goals_updated', goals: newGoals })}\n\n`));
 
-                                // 3. IMMEDIATELY TRIGGER CHALLENGE (As requested: "send a challenge imediately")
+                                // 3. Persist Roadmap Message
+                                await persistenceClient.rpc('add_conversation_message', {
+                                    p_session_id: sessionId,
+                                    p_role: 'genie',
+                                    p_content: intro.trim() || 'Here is our roadmap:',
+                                    p_message_type: 'summary',
+                                    p_metadata: { roadmapData }
+                                });
+
+                                // 4. IMMEDIATELY TRIGGER CHALLENGE (As requested: "send a challenge imediately")
                                 const challengeResult = await generateWithRetry({
                                     prompt: `Create a first practical challenge for these goals: ${JSON.stringify(newGoals)}`,
                                     systemPrompt: `Return ONLY valid JSON: [CHALLENGE] {"title": "...", "description": "...", "hint": "...", "expectedOutcome": "...", "difficulty": "Easy"}`,
@@ -360,6 +378,15 @@ FORMATS:
                                     const cData = extractJSON(challengeText.split('[CHALLENGE]')[1]);
                                     if (cData) {
                                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData: cData })}\n\n`));
+                                        
+                                        // Persist Challenge Message
+                                        await persistenceClient.rpc('add_conversation_message', {
+                                            p_session_id: sessionId,
+                                            p_role: 'genie',
+                                            p_content: cData.description,
+                                            p_message_type: 'challenge',
+                                            p_metadata: cData
+                                        });
                                     }
                                 }
                             }
@@ -371,6 +398,15 @@ FORMATS:
                             const quizData = extractJSON(quiz);
                             if (quizData) {
                                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'quiz', quizData })}\n\n`));
+                                
+                                // Persist Quiz Message
+                                await persistenceClient.rpc('add_conversation_message', {
+                                    p_session_id: sessionId,
+                                    p_role: 'genie',
+                                    p_content: quizData.question,
+                                    p_message_type: 'assessment',
+                                    p_metadata: quizData
+                                });
                             } else {
                                 await streamText('[QUIZ] ' + quiz, controller, encoder);
                             }
@@ -382,12 +418,30 @@ FORMATS:
                             const challengeData = extractJSON(challenge);
                             if (challengeData) {
                                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData })}\n\n`));
+                                
+                                // Persist Challenge Message
+                                await persistenceClient.rpc('add_conversation_message', {
+                                    p_session_id: sessionId,
+                                    p_role: 'genie',
+                                    p_content: challengeData.description,
+                                    p_message_type: 'challenge',
+                                    p_metadata: challengeData
+                                });
                             } else {
                                 await streamText('[CHALLENGE] ' + challenge, controller, encoder);
                             }
                         } catch (e) { await streamText('[CHALLENGE] ' + challenge, controller, encoder); }
                     } else {
                         await streamText(genieResponse, controller, encoder);
+                        
+                        // Persist Regular Explanation Message
+                        await persistenceClient.rpc('add_conversation_message', {
+                            p_session_id: sessionId,
+                            p_role: 'genie',
+                            p_content: genieResponse,
+                            p_message_type: 'explanation',
+                            p_metadata: {}
+                        });
                     }
 
                     controller.close();

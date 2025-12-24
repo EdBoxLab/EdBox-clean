@@ -370,21 +370,7 @@ export default function InteractiveCourseSession({
       return [...prev, message];
     });
 
-    if (session && message.role === 'learner') {
-      setIsSaving(true);
-      try {
-        await sessionManager.addMessage(
-          session.id,
-          'learner',
-          message.content,
-          message.type === 'message' ? 'explanation' : (message.type as any) || 'explanation'
-        );
-      } catch (err) {
-        console.error('Failed to save message to Supabase:', err);
-      } finally {
-        setIsSaving(false);
-      }
-    }
+    // Persistent storage is now handled by the API in /stream to ensure sync
   };
 
   const generateChatSummary = (messages: ChatMessage[]): string => {

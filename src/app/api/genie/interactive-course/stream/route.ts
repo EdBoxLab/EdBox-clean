@@ -30,6 +30,27 @@ function detectBehavioralPatterns(userMessage: string, conversationHistory: any[
 }
 
 // ============================================
+// HELPER: ROBUST JSON EXTRACTION
+// ============================================
+function extractJSON(text: string): any {
+    try {
+        // Find the first '{' and the last '}'
+        const firstBrace = text.indexOf('{');
+        const lastBrace = text.lastIndexOf('}');
+        
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            let jsonStr = text.substring(firstBrace, lastBrace + 1).trim();
+            // Remove markdown code blocks if present
+            jsonStr = jsonStr.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+            return JSON.parse(jsonStr);
+        }
+    } catch (e) {
+        console.warn('Failed to parse JSON from text:', e);
+    }
+    return null;
+}
+
+// ============================================
 // AI UNDERSTANDING ANALYZER
 // ============================================
 async function analyzeUnderstanding(
@@ -75,12 +96,7 @@ Return:
         ]) as any;
 
         const text = result.text || '';
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-
-        if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]);
-        }
-        return null;
+        return extractJSON(text);
     } catch (error) {
         return null;
     }
@@ -111,7 +127,9 @@ async function makeSmartDecision(
     // 2. Initial Challenge Stage (Placement)
     // If goals exist but we haven't done a challenge yet (first few turns)
     const hasDoneChallenge = goals.some((g: any) => g.status === 'mastered' || (g.confidence > 50));
-    if (turnCount >= 1 && turnCount <= 3 && !hasDoneChallenge && !userMsg.includes('challenge')) {
+    const challengeRelated = userMsg.includes('challenge') || userMsg.includes('task') || userMsg.includes('approach');
+    
+    if (turnCount >= 1 && turnCount <= 3 && !hasDoneChallenge && !challengeRelated) {
          return {
             action: 'send_challenge',
             forcedStage: 'CHALLENGE',
@@ -120,7 +138,7 @@ async function makeSmartDecision(
     }
 
     // 3. Handle Completion of Challenge/Quiz
-    if (userMsg.includes('challenge answer') || userMsg.includes('my submission')) {
+    if (userMsg.includes('challenge answer') || userMsg.includes('my submission') || (challengeRelated && patterns.showsUnderstanding)) {
         return {
             action: 'send_quiz',
             forcedStage: 'QUIZ',
@@ -288,7 +306,11 @@ FORMATS:
             async start(controller) {
                 try {
                     // Send Goal Updates First
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'goals_updated', goals })}\n\n`));
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                        type: 'goals_updated', 
+                        goals,
+                        comprehensionLevel: aiAnalysis?.confidence || currentContext.comprehensionLevel || 0.5
+                    })}\n\n`));
 
                     const result = await generateWithRetry({
                         prompt: userMessage,
@@ -303,14 +325,24 @@ FORMATS:
                         const [intro, quiz] = genieResponse.split('[QUIZ]');
                         if (intro) await streamText(intro.trim(), controller, encoder);
                         try {
-                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'quiz', quizData: JSON.parse(quiz.trim()) })}\n\n`));
-                        } catch (e) { await streamText(genieResponse, controller, encoder); }
+                            const quizData = extractJSON(quiz);
+                            if (quizData) {
+                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'quiz', quizData })}\n\n`));
+                            } else {
+                                await streamText('[QUIZ] ' + quiz, controller, encoder);
+                            }
+                        } catch (e) { await streamText('[QUIZ] ' + quiz, controller, encoder); }
                     } else if (genieResponse.includes('[CHALLENGE]')) {
                         const [intro, challenge] = genieResponse.split('[CHALLENGE]');
                         if (intro) await streamText(intro.trim(), controller, encoder);
                         try {
-                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData: JSON.parse(challenge.trim()) })}\n\n`));
-                        } catch (e) { await streamText(genieResponse, controller, encoder); }
+                            const challengeData = extractJSON(challenge);
+                            if (challengeData) {
+                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData })}\n\n`));
+                            } else {
+                                await streamText('[CHALLENGE] ' + challenge, controller, encoder);
+                            }
+                        } catch (e) { await streamText('[CHALLENGE] ' + challenge, controller, encoder); }
                     } else {
                         await streamText(genieResponse, controller, encoder);
                     }

@@ -410,20 +410,24 @@ export default function InteractiveCourseSession({
                 if (!data.type || data.type === 'content') {
                   setTimeout(() => setShowActionButtons(true), 1000);
                 }
-              } else if (data.type === 'goals_updated') {
-                // Real-time Goal Update!
-                const newGoals = data.goals;
-                setSession(prev => {
-                  if (!prev) return prev;
-                  return {
-                    ...prev,
-                    learningContext: {
-                      ...prev.learningContext,
-                      goals: newGoals
-                    }
-                  };
-                });
-              }
+                } else if (data.type === 'goals_updated') {
+                  // Real-time Goal & Progress Update!
+                  const newGoals = data.goals;
+                  const newComprehension = data.comprehensionLevel;
+                  
+                  setSession(prev => {
+                    if (!prev) return prev;
+                    return {
+                      ...prev,
+                      learningContext: {
+                        ...prev.learningContext,
+                        goals: newGoals,
+                        comprehensionLevel: newComprehension !== undefined ? newComprehension : prev.learningContext.comprehensionLevel
+                      }
+                    };
+                  });
+                }
+
             } catch (e) { }
           }
         }
@@ -635,12 +639,29 @@ export default function InteractiveCourseSession({
                 </div>
                 <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 ${isOnline ? 'bg-green-500' : 'bg-red-500'} border-2 border-gray-900 rounded-full`} />
               </div>
-              <div>
-                <h1 className="font-bold text-sm text-white">AI Learning Companion</h1>
-                <p className="text-xs text-gray-400">{getStageLabel()}</p>
+                <div>
+                  <h1 className="font-bold text-sm text-white">AI Learning Companion</h1>
+                  <p className="text-xs text-gray-400">{getStageLabel()}</p>
+                </div>
               </div>
+
+              {/* Mini Progress Bar (for quick view) */}
+              {session && (
+                <div className="hidden md:flex flex-col items-center gap-1 mx-4 min-w-[120px]">
+                  <div className="flex justify-between w-full text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    <span>Progress</span>
+                    <span>{Math.round((session.learningContext?.comprehensionLevel || 0) * 100)}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
+                    <motion.div
+                      animate={{ width: `${(session.learningContext?.comprehensionLevel || 0) * 100}%` }}
+                      className="h-full bg-gradient-to-r from-blue-500 to-purple-500"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+
 
           <div className="flex items-center gap-4">
             {!isOnline && (

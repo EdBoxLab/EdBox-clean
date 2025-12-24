@@ -448,7 +448,7 @@ export default function InteractiveCourseSession({
 
         {/* Message List */}
         <div className="flex-1 overflow-y-auto scroll-smooth">
-          <div className="max-w-4xl mx-auto px-4 lg:px-6 py-8 space-y-8">
+          <div className="w-full px-4 lg:px-6 py-8 space-y-8">
             <AnimatePresence>
               {messages.map((message) => (
                 <motion.div
@@ -501,7 +501,7 @@ export default function InteractiveCourseSession({
 
       {/* Input Footer */}
       <footer className="p-4 border-t border-gray-800 bg-gray-900/80 backdrop-blur-md">
-          <div className="max-w-4xl mx-auto flex gap-3">
+            <div className="w-full flex gap-3">
             <input
               ref={inputRef}
               type="text"

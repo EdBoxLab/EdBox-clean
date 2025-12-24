@@ -88,19 +88,35 @@ export default function LearnPage() {
     const currentTerm = useMemo(() => shuffledTerms[currentIndex], [shuffledTerms, currentIndex]);
 
     if (isLoading) {
-        return <div className="flex justify-center items-center h-screen bg-gray-900"><Loader2 className="h-16 w-16 animate-spin text-purple-400" /></div>;
+        return (
+            <div className="flex justify-center items-center h-screen bg-gray-900">
+                <Loader2 className="h-16 w-16 animate-spin text-indigo-400" />
+            </div>
+        );
     }
 
     if (error || !studySet || !currentTerm) {
-        return <div className="flex justify-center items-center h-screen bg-gray-900 text-red-400">Error: {error || 'Could not load study set.'}</div>;
+        return (
+            <div className="flex justify-center items-center h-screen bg-gray-900 text-red-400">
+                Error: {error || 'Could not load study set.'}
+            </div>
+        );
     }
 
     const progress = ((currentIndex + 1) / shuffledTerms.length) * 100;
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white flex flex-col p-4 md:p-8">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4 w-full max-w-4xl mx-auto">
+        <div className="min-h-screen bg-gray-900 text-white flex flex-col p-4 md:p-8 relative overflow-hidden">
+            {/* Background Decorative Elements */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
+                <div className="absolute top-[20%] right-[10%] w-[30%] h-[30%] bg-indigo-500/5 rounded-full blur-[100px]" />
+            </div>
+
+            <div className="relative z-10 flex flex-col h-full w-full">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4 w-full max-w-4xl mx-auto">
                  <div className="flex items-center gap-4">
                     <h1 className="text-xl md:text-2xl font-bold truncate">Learn: {studySet.title}</h1>
                 </div>

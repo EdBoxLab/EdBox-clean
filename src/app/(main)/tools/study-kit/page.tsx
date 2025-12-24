@@ -367,8 +367,13 @@ function StudyKitContent() {
     // Loading state when fetching a specific kit
     if (id && isLoadingKit) {
         return (
-            <div className="min-h-screen bg-[#09090b] text-white flex items-center justify-center">
-                <div className="text-center">
+            <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center relative overflow-hidden">
+                {/* Background Decorative Elements */}
+                <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+                    <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px]" />
+                    <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
+                </div>
+                <div className="text-center relative z-10">
                     <Loader2 className="w-12 h-12 animate-spin text-indigo-400 mx-auto mb-4" />
                     <p className="text-zinc-400">Loading study kit...</p>
                 </div>
@@ -379,8 +384,13 @@ function StudyKitContent() {
     // Error state
     if (id && error && !studyKit) {
         return (
-            <div className="min-h-screen bg-[#09090b] text-white flex items-center justify-center">
-                <div className="text-center max-w-md">
+            <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center relative overflow-hidden">
+                {/* Background Decorative Elements */}
+                <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+                    <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px]" />
+                    <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
+                </div>
+                <div className="text-center max-w-md relative z-10">
                     <X className="w-16 h-16 text-red-400 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold mb-2">Study Kit Not Found</h2>
                     <p className="text-zinc-400 mb-6">{error}</p>
@@ -397,8 +407,15 @@ function StudyKitContent() {
     }
 
     return (
-        <div className="min-h-screen bg-[#09090b] text-white p-4 sm:p-6 md:p-8">
-            <div className="max-w-7xl mx-auto">
+        <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-6 md:p-8 relative overflow-hidden">
+            {/* Background Decorative Elements */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
+                <div className="absolute top-[20%] right-[10%] w-[30%] h-[30%] bg-indigo-500/5 rounded-full blur-[100px]" />
+            </div>
+
+            <div className="max-w-7xl mx-auto relative z-10">
                 {/* Header */}
                 <div className="mb-8">
                     {id && studyKit ? (
@@ -800,7 +817,7 @@ function StudyKitContent() {
                                     )}
 
                                     {activeTab === 'notes' && generatedContent.notes && (
-                                        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl p-8 lg:p-12 shadow-2xl">
+                                        <div className="bg-gray-800 border border-zinc-700 rounded-2xl p-8 lg:p-12 shadow-2xl">
                                             <div className="prose prose-invert prose-indigo max-w-none">
                                                 {(() => {
                                                     let notesContent = generatedContent.notes;
@@ -831,7 +848,7 @@ function StudyKitContent() {
                                     )}
 
                                     {activeTab === 'mindmaps' && generatedContent.mindmaps && (
-                                        <div className="bg-zinc-950 border border-zinc-900 rounded-2xl h-[600px] flex flex-col items-center shadow-2xl overflow-hidden relative touch-none">
+                                        <div className="bg-gray-800 border border-zinc-700 rounded-2xl h-[600px] flex flex-col items-center shadow-2xl overflow-hidden relative touch-none">
                                             <div className="absolute top-4 left-4 flex items-center gap-2 z-50">
                                                 <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
                                                 <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500">Interactive Map • Drag to Pan</span>
@@ -880,7 +897,7 @@ function StudyKitContent() {
                                                                         transition={{ delay: i * 0.1, duration: 0.8, type: 'spring' }}
                                                                         className="absolute flex flex-col items-center z-10 pointer-events-auto"
                                                                     >
-                                                                        <div className="bg-zinc-900 border border-zinc-800 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xl w-40 sm:w-56 hover:border-indigo-500 transition-colors group">
+                                                                        <div className="bg-gray-900 border border-zinc-700 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xl w-40 sm:w-56 hover:border-indigo-500 transition-colors group">
                                                                             <h5 className="font-bold text-[11px] sm:text-sm text-white mb-2 group-hover:text-indigo-300 transition-colors line-clamp-2">{branchTopic}</h5>
                                                                             {subtopics.length > 0 && (
                                                                                 <div className="space-y-1">
@@ -931,7 +948,7 @@ function StudyKitContent() {
 export default function StudyKitPage() {
     return (
         <Suspense fallback={
-            <div className="min-h-screen bg-[#09090b] text-white flex items-center justify-center">
+            <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
                 <div className="text-center">
                     <Loader2 className="w-12 h-12 animate-spin text-indigo-400 mx-auto mb-4" />
                     <p className="text-zinc-400">Loading...</p>

@@ -97,17 +97,29 @@ export default function CoursePlayerPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white">
-                <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-gray-400">Loading course experience...</p>
+            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white relative overflow-hidden">
+                {/* Background Decorative Elements */}
+                <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+                    <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px]" />
+                    <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
+                </div>
+                <div className="relative z-10 flex flex-col items-center">
+                    <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <p className="text-gray-400">Loading course experience...</p>
+                </div>
             </div>
         );
     }
 
     if (error || !course) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4 text-center">
-                <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl max-w-md">
+            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-4 text-center relative overflow-hidden">
+                {/* Background Decorative Elements */}
+                <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+                    <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px]" />
+                    <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
+                </div>
+                <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl max-w-md relative z-10 backdrop-blur-md">
                     <h2 className="text-2xl font-bold text-red-400 mb-2">Oops!</h2>
                     <p className="text-gray-300 mb-6">{error || 'Course not found.'}</p>
                     <button
@@ -122,18 +134,29 @@ export default function CoursePlayerPage() {
     }
 
     if (!user) {
-        return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">Please log in to access courses.</div>;
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white relative overflow-hidden">
+                {/* Background Decorative Elements */}
+                <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+                    <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px]" />
+                    <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
+                </div>
+                <div className="relative z-10">
+                    Please log in to access courses.
+                </div>
+            </div>
+        );
     }
 
     // Use interactive mode by default
     if (useInteractiveMode) {
         return (
-            <div className="relative">
+            <div className="relative bg-slate-900 min-h-screen">
                 {/* Mode Toggle */}
-                <div className="absolute top-4 right-4 z-10">
+                <div className="absolute top-4 right-4 z-20">
                     <button
                         onClick={() => setUseInteractiveMode(false)}
-                        className="bg-gray-700/50 hover:bg-gray-600/50 border border-gray-600/30 backdrop-blur-sm text-white px-4 py-2 rounded-xl text-sm font-medium transition-all"
+                        className="bg-slate-900/50 hover:bg-slate-800/50 border border-white/10 backdrop-blur-md text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-xl"
                     >
                         Switch to Classic View
                     </button>
@@ -151,9 +174,16 @@ export default function CoursePlayerPage() {
     }
 
     return (
-        <div className="flex min-h-screen bg-gray-900 text-white relative">
+        <div className="flex min-h-screen bg-slate-900 text-white relative overflow-hidden">
+            {/* Background Decorative Elements */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
+                <div className="absolute top-[20%] right-[10%] w-[30%] h-[30%] bg-pink-500/5 rounded-full blur-[100px]" />
+            </div>
+
             {/* Mode Toggle */}
-            <div className="absolute top-4 right-4 z-10">
+            <div className="absolute top-4 right-4 z-20">
                 <button
                     onClick={() => setUseInteractiveMode(true)}
                     className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-lg shadow-purple-900/20"
@@ -163,7 +193,7 @@ export default function CoursePlayerPage() {
             </div>
 
             {/* Sidebar */}
-            <aside className="w-1/4 bg-gray-800/50 backdrop-blur-sm p-6 border-r border-gray-700/50">
+            <aside className="w-1/4 bg-white/5 backdrop-blur-xl p-6 border-r border-white/10 relative z-10">
                 <div className="flex items-start justify-between mb-6">
                     <div className="flex-1">
                         <h2 className="text-2xl font-bold mb-1 leading-tight">{course.title}</h2>

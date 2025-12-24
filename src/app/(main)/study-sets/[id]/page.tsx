@@ -56,11 +56,19 @@ export default function StudySetViewPage() {
     }, [setId]);
 
     if (isLoading) {
-        return <div className="flex justify-center items-center h-screen bg-gray-900"><Loader2 className="h-16 w-16 animate-spin text-purple-400" /></div>;
+        return (
+            <div className="flex justify-center items-center h-screen bg-gray-900">
+                <Loader2 className="h-16 w-16 animate-spin text-indigo-400" />
+            </div>
+        );
     }
 
     if (error) {
-        return <div className="flex justify-center items-center h-screen bg-gray-900 text-red-400">Error: {error}</div>;
+        return (
+            <div className="flex justify-center items-center h-screen bg-gray-900 text-red-400">
+                Error: {error}
+            </div>
+        );
     }
 
     if (!studySet) {
@@ -68,8 +76,15 @@ export default function StudySetViewPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white p-8">
-            <div className="max-w-5xl mx-auto">
+        <div className="min-h-screen bg-gray-900 text-white p-8 relative overflow-hidden">
+            {/* Background Decorative Elements */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
+                <div className="absolute top-[20%] right-[10%] w-[30%] h-[30%] bg-indigo-500/5 rounded-full blur-[100px]" />
+            </div>
+
+            <div className="max-w-5xl mx-auto relative z-10">
                 {/* Header */}
                 <div className="mb-8">
                      <button type="button" onClick={() => router.back()} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-4">

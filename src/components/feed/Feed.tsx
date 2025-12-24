@@ -217,7 +217,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
 
   if (loading && items.length === 0) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#050505] text-white relative overflow-hidden">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(139,92,246,0.1),transparent_70%)]" />
         <motion.div 
             initial={{ scale: 0.8, opacity: 0 }}
@@ -240,7 +240,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505]">
+    <div className="min-h-screen bg-slate-900">
       <FeedAnimations />
 
       <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50">

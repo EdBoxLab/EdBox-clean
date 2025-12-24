@@ -102,8 +102,15 @@ export default function MyStudySetsPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white p-8">
-            <div className="max-w-7xl mx-auto">
+        <div className="min-h-screen bg-gray-900 text-white p-8 relative overflow-hidden">
+            {/* Background Decorative Elements */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
+                <div className="absolute top-[20%] right-[10%] w-[30%] h-[30%] bg-indigo-500/5 rounded-full blur-[100px]" />
+            </div>
+
+            <div className="max-w-7xl mx-auto relative z-10">
                 <div className="flex justify-between items-center mb-8">
                     <h1 className="text-4xl font-bold">My Study Sets</h1>
                     <button onClick={() => router.push('/study-sets/new/edit')} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg flex items-center transition-colors shadow-lg">

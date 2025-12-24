@@ -55,6 +55,24 @@ export async function POST(request: NextRequest) {
 
     // Persist updated session
     session.learningContext = updatedContext;
+    
+    // Update progress state counters
+    if (session.progressState) {
+      session.progressState.assessmentsCompleted = (session.progressState.assessmentsCompleted || 0) + 1;
+      // Update mastered/struggling skills in progress state too
+      const concept = session.currentTopic || 'Current Concept';
+      if (comprehensionResult.correct) {
+        if (!session.progressState.masteredSkills.includes(concept)) {
+          session.progressState.masteredSkills.push(concept);
+        }
+        session.progressState.strugglingSkills = session.progressState.strugglingSkills.filter(s => s !== concept);
+      } else {
+        if (!session.progressState.strugglingSkills.includes(concept)) {
+          session.progressState.strugglingSkills.push(concept);
+        }
+      }
+    }
+
     await sessionManager.persistSession(session);
 
     return NextResponse.json({

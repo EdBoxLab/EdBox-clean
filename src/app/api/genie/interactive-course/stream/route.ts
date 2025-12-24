@@ -277,15 +277,43 @@ export async function POST(request: NextRequest) {
 
         const { data: sessionData } = await persistenceClient
             .from('interactive_course_sessions')
-            .select('learning_context')
+            .select('learning_context, progress_state')
             .eq('id', sessionId)
             .single();
 
         const currentContext = sessionData?.learning_context || learningContext;
+        const currentProgress = sessionData?.progress_state || {
+            completedTopics: [],
+            currentTopicProgress: 0,
+            overallCourseProgress: 0,
+            masteredSkills: [],
+            strugglingSkills: [],
+            totalTimeSpent: 0,
+            challengesCompleted: 0,
+            assessmentsCompleted: 0
+        };
         let goals: LearningGoal[] = currentContext.goals || [];
 
         const aiAnalysis = await analyzeUnderstanding(userMessage, conversationHistory, skillTitle || currentSkillId, goals);
         
+        // Update progress state based on goals and confidence
+        const updatedProgress = { ...currentProgress };
+        if (aiAnalysis?.confidence) {
+            // Update overall course progress based on average goal confidence
+            const totalConfidence = goals.reduce((acc, g) => acc + (g.confidence || 0), 0);
+            updatedProgress.overallCourseProgress = goals.length > 0 ? Math.round(totalConfidence / goals.length) : 0;
+            
+            // Sync mastered and struggling skills from context
+            updatedProgress.masteredSkills = Array.from(new Set([
+                ...(updatedProgress.masteredSkills || []),
+                ...(currentContext.masteredConcepts || [])
+            ]));
+            updatedProgress.strugglingSkills = Array.from(new Set([
+                ...(updatedProgress.strugglingSkills || []),
+                ...(currentContext.strugglingAreas || [])
+            ]));
+        }
+
         // Robust Fallback for Goal Updates (if AI analysis is vague but message is explicit)
         if (userMessage.includes('correctly answered the quiz') || userMessage.includes('mastered the challenge')) {
             const lastGoalInProgress = [...goals].reverse().find(g => g.status === 'in_progress') || goals.find(g => g.status === 'pending');
@@ -331,6 +359,7 @@ export async function POST(request: NextRequest) {
                     goals,
                     comprehensionLevel: aiAnalysis?.confidence || currentContext.comprehensionLevel || 0.5
                 },
+                progress_state: updatedProgress,
                 last_interaction: new Date().toISOString()
             })
             .eq('id', sessionId);

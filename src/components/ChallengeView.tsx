@@ -21,6 +21,7 @@ interface ChallengeViewProps {
         hint?: string;
         expectedOutcome?: string;
     };
+    sessionId?: string;
     onSuccess: (xp: number) => void;
     onFail: (feedback: string) => void;
     onClose: () => void;
@@ -29,6 +30,7 @@ interface ChallengeViewProps {
 
 export default function ChallengeView({
     challenge,
+    sessionId,
     onSuccess,
     onFail,
     onClose,
@@ -76,7 +78,7 @@ export default function ChallengeView({
             const response = await fetch('/api/genie/interactive-course/evaluate-challenge', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ challenge, answer })
+                body: JSON.stringify({ challenge, answer, sessionId })
             });
 
             const result = await response.json();

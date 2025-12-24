@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateWithRetry } from '@/lib/ai-providers';
+import { sessionManager } from '@/lib/services/interactive-course-session-manager';
 
 export async function POST(request: NextRequest) {
     try {
-        const { challenge, answer } = await request.json();
+        const { challenge, answer, sessionId } = await request.json();
 
         if (!challenge || !answer) {
             return NextResponse.json(
@@ -43,6 +44,28 @@ Format: Return ONLY the JSON object. DO NOT include any explanatory text or mark
         });
 
         const evaluation = JSON.parse(result.text || '{}');
+
+        // Persist session update if sessionId is provided
+        if (sessionId && evaluation.passed) {
+            try {
+                const resumeData = await sessionManager.getSessionResumeData(sessionId);
+                const session = resumeData.session;
+                
+                if (session.progressState) {
+                    session.progressState.challengesCompleted = (session.progressState.challengesCompleted || 0) + 1;
+                    
+                    // Update mastered skills
+                    const concept = challenge.title || session.currentTopic;
+                    if (concept && !session.progressState.masteredSkills.includes(concept)) {
+                        session.progressState.masteredSkills.push(concept);
+                    }
+                    
+                    await sessionManager.persistSession(session);
+                }
+            } catch (persistError) {
+                console.error('Failed to persist challenge progress:', persistError);
+            }
+        }
 
         return NextResponse.json({
             success: true,

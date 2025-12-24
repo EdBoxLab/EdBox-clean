@@ -353,6 +353,7 @@ export default function InteractiveCourseSession({
     return (
       <ChallengeView
         challenge={activeChallenge}
+        sessionId={session?.id}
         onSuccess={() => { 
           const title = activeChallenge.title;
           setActiveChallenge(null); 

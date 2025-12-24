@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { Upload, FileText, Brain, Zap, Map, CheckCircle2, Loader2, X, ArrowLeft } from 'lucide-react';
+import { Upload, FileText, Brain, Zap, Map, CheckCircle2, Loader2, X, ArrowLeft, Trash2, Library } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams } from 'next/navigation';
 import ShareButton from '@/components/ShareButton';
@@ -72,6 +72,8 @@ function StudyKitContent() {
     const [error, setError] = useState<string>('');
     const [isLoadingKit, setIsLoadingKit] = useState(false);
     const [studyKit, setStudyKit] = useState<any>(null);
+    const [studyKits, setStudyKits] = useState<any[]>([]);
+    const [isLoadingKits, setIsLoadingKits] = useState(false);
     const [user, setUser] = useState<any>(null);
 
     // Quiz State moved to top level
@@ -84,6 +86,8 @@ function StudyKitContent() {
     useEffect(() => {
         if (id) {
             fetchStudyKit(id);
+        } else {
+            fetchAllStudyKits();
         }
         getUser();
     }, [id]);
@@ -91,6 +95,45 @@ function StudyKitContent() {
     const getUser = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         setUser(user);
+    };
+
+    const fetchAllStudyKits = async () => {
+        setIsLoadingKits(true);
+        try {
+            const response = await fetch('/api/study-kit/list');
+            const data = await response.json();
+            if (data.studyKits) {
+                setStudyKits(data.studyKits);
+            }
+        } catch (err) {
+            console.error('Error fetching study kits:', err);
+        } finally {
+            setIsLoadingKits(false);
+        }
+    };
+
+    const handleDeleteStudyKit = async (e: React.MouseEvent, kitId: string) => {
+        e.stopPropagation();
+        if (!confirm('Are you sure you want to delete this study kit?')) return;
+
+        try {
+            const response = await fetch(`/api/study-kit/${kitId}`, {
+                method: 'DELETE',
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                setStudyKits(studyKits.filter(k => k.id !== kitId));
+                if (id === kitId) {
+                    window.location.href = '/tools/study-kit';
+                }
+            } else {
+                alert(data.error || 'Failed to delete study kit');
+            }
+        } catch (err) {
+            console.error('Error deleting study kit:', err);
+            alert('Failed to delete study kit');
+        }
     };
 
     const normalizeContent = (content: any) => {
@@ -597,6 +640,48 @@ function StudyKitContent() {
                             {selectedTypes.length === 0 && (
                                 <p className="text-sm text-center text-zinc-500">Select at least one content type to continue</p>
                             )}
+
+                            {/* My Study Kits List */}
+                            <div className="border-2 border-zinc-700 bg-zinc-900/30 rounded-2xl p-6">
+                                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                    <Library className="w-5 h-5 text-indigo-400" />
+                                    My Study Kits
+                                </h2>
+                                
+                                {isLoadingKits ? (
+                                    <div className="flex justify-center py-8">
+                                        <Loader2 className="w-6 h-6 animate-spin text-zinc-500" />
+                                    </div>
+                                ) : studyKits.length === 0 ? (
+                                    <p className="text-sm text-zinc-500 text-center py-8 bg-zinc-800/30 rounded-lg border border-dashed border-zinc-700">
+                                        You haven't generated any study kits yet.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                        {studyKits.map((kit) => (
+                                            <div 
+                                                key={kit.id}
+                                                className="group relative p-4 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl border border-zinc-700 hover:border-indigo-500 transition-all cursor-pointer"
+                                                onClick={() => window.location.href = `/tools/study-kit?id=${kit.id}`}
+                                            >
+                                                <div className="pr-10">
+                                                    <h3 className="font-semibold text-white truncate">{kit.title}</h3>
+                                                    <p className="text-xs text-zinc-400 mt-1">
+                                                        {new Date(kit.created_at).toLocaleDateString()} • {kit.content_types?.length || 0} types
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => handleDeleteStudyKit(e, kit.id)}
+                                                    className="absolute bottom-2 right-2 p-2 bg-zinc-900/90 hover:bg-red-500 text-zinc-400 hover:text-white rounded-full border border-zinc-700 hover:border-red-500 transition-all shadow-lg z-10"
+                                                    title="Delete Kit"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 ) : generatedContent ? (

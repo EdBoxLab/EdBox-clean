@@ -49,16 +49,10 @@ const ResearchHub: React.FC<{
                             onClick={() => onSelect(pkg.id)}
                             className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 group hover:border-blue-500/50 hover:bg-zinc-900 transition-all cursor-pointer relative"
                         >
-                            <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-start mb-4">
                                 <div className="p-3 bg-blue-500/10 rounded-lg">
                                     <BookOpen className="w-6 h-6 text-blue-400" />
                                 </div>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onDelete(pkg.id); }}
-                                    className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                                >
-                                    <Trash2 className="h-5 w-5" />
-                                </button>
                             </div>
 
                             <h3 className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors mb-2 line-clamp-2">
@@ -71,6 +65,13 @@ const ResearchHub: React.FC<{
                                 <span className="mx-2">•</span>
                                 <span>{pkg.sources.length} Sources</span>
                             </div>
+
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onDelete(pkg.id); }}
+                                className="absolute bottom-2 right-2 p-2.5 bg-zinc-900/90 hover:bg-red-500 text-zinc-500 hover:text-white rounded-full border border-zinc-800 hover:border-red-500 transition-all shadow-lg z-10"
+                            >
+                                <Trash2 className="h-5 w-5" />
+                            </button>
                         </div>
                     ))}
                 </div>

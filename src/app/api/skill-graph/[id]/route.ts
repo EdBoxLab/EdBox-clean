@@ -64,3 +64,38 @@ export async function GET(
     );
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await context.params;
+    const supabase = await createSupabaseServerClient();
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Delete the skill graph (user_progress and interactive_course_sessions should cascade if configured, 
+    // but we'll do it explicitly if needed. The schema suggests cascade is often used.)
+    const { error: deleteError } = await supabase
+      .from('skill_graphs')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (deleteError) {
+      throw deleteError;
+    }
+
+    return NextResponse.json({ success: true, message: 'Course deleted successfully' });
+  } catch (error: any) {
+    console.error('Skill Graph Deletion Error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to delete skill graph' },
+      { status: 500 }
+    );
+  }
+}

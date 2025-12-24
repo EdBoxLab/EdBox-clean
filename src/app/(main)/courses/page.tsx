@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { BookOpen, Clock, Trophy, Plus, Loader2, TrendingUp } from 'lucide-react';
+import { BookOpen, Clock, Trophy, Plus, Loader2, TrendingUp, Trash2 } from 'lucide-react';
 import ShareButton from '@/components/ShareButton';
 import ShareModal, { useShareModal } from '@/components/ShareModal';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
@@ -50,6 +50,27 @@ export default function CoursesPage() {
       console.error('Failed to fetch courses:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteCourse = async (e: React.MouseEvent, courseId: string) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to delete this course? This action cannot be undone.')) return;
+
+    try {
+      const response = await fetch(`/api/skill-graph/${courseId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setCourses(courses.filter(c => c.id !== courseId));
+      } else {
+        alert(data.error || 'Failed to delete course');
+      }
+    } catch (err) {
+      console.error('Error deleting course:', err);
+      alert('Failed to delete course');
     }
   };
 
@@ -125,27 +146,35 @@ export default function CoursesPage() {
                       </div>
                     )}
 
-                    {/* Share Button */}
-                    <div 
-                      className="absolute bottom-4 right-4 z-10"
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                      }}
-                    >
-                      <ShareButton
-                        content={{
-                          type: 'learning-path',
-                          id: course.id,
-                          title: course.goal,
-                          description: `Master ${course.goal} with this personalized learning path containing ${course.nodes.length} skills`,
-                          creatorName: user?.user_metadata?.full_name || user?.email || 'EdBox User'
-                        }}
-                        userId={user?.id}
-                        variant="icon"
-                        size="sm"
-                        className="bg-gray-900/90 hover:bg-gray-800 text-white border border-gray-600 shadow-lg"
-                      />
-                    </div>
+                        {/* Share & Delete Buttons */}
+                          <div 
+                            className="absolute bottom-2 right-2 z-10 flex items-center gap-3"
+                            onClick={(e: React.MouseEvent) => {
+                              e.stopPropagation();
+                            }}
+                          >
+                            <button
+                              onClick={(e) => handleDeleteCourse(e, course.id)}
+                              className="p-2.5 bg-zinc-900/90 hover:bg-red-500 text-zinc-400 hover:text-white rounded-xl border border-zinc-700 hover:border-red-500 transition-all active:scale-95 shadow-lg"
+                              title="Delete Course"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          <ShareButton
+                            content={{
+                              type: 'learning-path',
+                              id: course.id,
+                              title: course.goal,
+                              description: `Master ${course.goal} with this personalized learning path containing ${course.nodes.length} skills`,
+                              creatorName: user?.user_metadata?.full_name || user?.email || 'EdBox User'
+                            }}
+                            userId={user?.id}
+                            variant="icon"
+                            size="md"
+                            className="bg-zinc-900/90 hover:bg-zinc-800 text-white border border-zinc-700 shadow-xl rounded-xl p-2.5"
+                          />
+                        </div>
+
 
                     {/* Icon */}
                     <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">

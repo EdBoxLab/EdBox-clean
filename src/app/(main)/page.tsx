@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import OnboardingForm from '@/components/OnboardingForm';
 import { motion, Variants } from 'framer-motion';
-import { ArrowRight, Book, FileText, Zap, PlayCircle, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight, Book, FileText, Zap, PlayCircle, Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const supabase = createSupabaseBrowserClient();
@@ -128,7 +128,9 @@ const Dashboard: React.FC = () => {
           }
         };
 
-        Promise.all([fetchCourses(), fetchNotes(), fetchStudyKits()]);
+        fetchCourses();
+        fetchNotes();
+        fetchStudyKits();
 
       } catch (error) {
         console.error("Error loading dashboard data:", error);
@@ -138,6 +140,36 @@ const Dashboard: React.FC = () => {
 
     fetchData();
   }, [supabase, router]);
+
+  const handleDelete = async (id: string, type: string) => {
+    if (!confirm(`Are you sure you want to delete this ${type}?`)) return;
+
+    let endpoint = '';
+    if (type === 'Course') endpoint = `/api/skill-graph/${id}`;
+    else if (type === 'Note') endpoint = `/api/notes/${id}`;
+    else if (type === 'Study Kit') endpoint = `/api/study-kit/${id}`;
+
+    if (!endpoint) return;
+
+    try {
+      const res = await fetch(endpoint, { method: 'DELETE' });
+      if (res.ok || res.status === 204) {
+        if (type === 'Course') {
+          setCourses(prev => prev.filter(c => c.id !== id));
+          if (recentCourse?.href.includes(id)) setRecentCourse(null);
+        } else if (type === 'Note') {
+          setNotes(prev => prev.filter(n => n.id !== id));
+        } else if (type === 'Study Kit') {
+          setStudyKits(prev => prev.filter(k => k.id !== id));
+        }
+      } else {
+        alert(`Failed to delete ${type}`);
+      }
+    } catch (error) {
+      console.error(`Error deleting ${type}:`, error);
+      alert(`Error deleting ${type}`);
+    }
+  };
 
   if (loading) {
     return (
@@ -181,7 +213,8 @@ const Dashboard: React.FC = () => {
     showProgress = false,
     createLink,
     createText,
-    isLoading = false
+    isLoading = false,
+    onDelete
   }: { 
     title: string;
     items: any[];
@@ -190,6 +223,7 @@ const Dashboard: React.FC = () => {
     createLink?: string;
     createText?: string;
     isLoading?: boolean;
+    onDelete?: (id: string, type: string) => void;
   }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showLeftArrow, setShowLeftArrow] = useState(false);
@@ -295,44 +329,60 @@ const Dashboard: React.FC = () => {
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {items.map((item, i) => (
-            <Link href={item.href || '#'} key={item.id} className="block">
-              <motion.div
-                className="flex-shrink-0 w-64 border border-zinc-800 hover:border-zinc-600 rounded-lg p-4 flex flex-col justify-between transition-colors bg-zinc-900/50 group"
-                style={{ minHeight: showProgress ? '180px' : '160px' }}
-                variants={cardVariants}
-                initial="hidden"
-                animate="visible"
-                custom={i}
-                whileHover={{ scale: 1.02 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-grow min-w-0 pr-2">
-                    <p className="text-sm text-gray-400 uppercase tracking-wide font-medium">{item.type}</p>
-                    <h3 className="font-bold text-lg text-white mt-1 line-clamp-2 break-words">{item.title}</h3>
-                  </div>
-                  {item.icon && <div className="flex-shrink-0 ml-2">{item.icon}</div>}
-                </div>
-                
-                {showProgress && typeof item.progress === 'number' && (
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-gray-400">{item.progress}% complete</span>
+            <div key={item.id} className="relative group/card">
+              <Link href={item.href || '#'} className="block">
+                <motion.div
+                  className="flex-shrink-0 w-64 border border-zinc-800 hover:border-zinc-600 rounded-lg p-4 flex flex-col justify-between transition-colors bg-zinc-900/50 group"
+                  style={{ minHeight: showProgress ? '180px' : '160px' }}
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate="visible"
+                  custom={i}
+                  whileHover={{ scale: 1.02 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-grow min-w-0 pr-2">
+                      <p className="text-sm text-gray-400 uppercase tracking-wide font-medium">{item.type}</p>
+                      <h3 className="font-bold text-lg text-white mt-1 line-clamp-2 break-words">{item.title}</h3>
                     </div>
-                    <div className="w-full bg-zinc-800 rounded-full h-2">
-                      <div 
-                        className="bg-indigo-500 h-2 rounded-full transition-all duration-300" 
-                        style={{ width: `${item.progress}%` }}
-                      />
-                    </div>
+                    {item.icon && <div className="flex-shrink-0 ml-2">{item.icon}</div>}
                   </div>
+                  
+                  {showProgress && typeof item.progress === 'number' && (
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-400">{item.progress}% complete</span>
+                      </div>
+                      <div className="w-full bg-zinc-800 rounded-full h-2">
+                        <div 
+                          className="bg-indigo-500 h-2 rounded-full transition-all duration-300" 
+                          style={{ width: `${item.progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-2 text-indigo-400 group-hover:text-indigo-300 text-sm mt-3 transition-colors">
+                    Open <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </motion.div>
+              </Link>
+              
+                {onDelete && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onDelete(item.id, item.type);
+                    }}
+                      className="absolute bottom-2 right-2 p-2.5 bg-zinc-900/90 hover:bg-red-500 text-zinc-400 hover:text-white rounded-full border border-zinc-800 hover:border-red-500 transition-all z-20 shadow-xl"
+                    title={`Delete ${item.type}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 )}
-                
-                <div className="flex items-center gap-2 text-indigo-400 group-hover:text-indigo-300 text-sm mt-3 transition-colors">
-                  Open <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </motion.div>
-            </Link>
+            </div>
           ))}
         </div>
       </div>
@@ -393,18 +443,21 @@ const Dashboard: React.FC = () => {
             createLink="/creator"
             createText="Create Your First Course"
             isLoading={coursesLoading}
+            onDelete={handleDelete}
           />
           <ExploreRow 
             title="Your Notes" 
             items={notes} 
             emptyMessage="No notes created yet. Use the Note Taker to get started!"
             isLoading={notesLoading}
+            onDelete={handleDelete}
           />
           <ExploreRow 
             title="Your Study Kits" 
             items={studyKits} 
             emptyMessage="No study kits generated yet. Use Study Kit to create one!"
             isLoading={kitsLoading}
+            onDelete={handleDelete}
           />
           <ExploreRow title="Tools" items={tools} />
         </div>

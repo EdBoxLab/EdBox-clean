@@ -20,11 +20,7 @@ export async function callAI<T>(
     if (key.provider === 'groq') {
       const groq = new Groq({ apiKey: key.key });
       const res = await groq.chat.completions.create({
-<<<<<<< HEAD
         model: "llama-3.3-70b-versatile",
-=======
-        model: "groq/compound",
->>>>>>> 508416c7389a58844d96c7ac055d66b9f8905acc
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }

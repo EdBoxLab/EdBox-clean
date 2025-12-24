@@ -5,7 +5,7 @@
 
 // ============= API KEYS =============
 
-  const GEMINI_API_KEYS = [
+const GEMINI_API_KEYS = [
   process.env.GEMINI_API_KEY_1,
   process.env.GEMINI_API_KEY_2,
   process.env.GEMINI_API_KEY_3,
@@ -161,7 +161,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
     };
   } catch (groqError: any) {
     console.warn('⚠️ Groq failed:', groqError.message);
-    
+
     // Fallback to Gemini only as a last resort if Groq fails
     try {
       console.log('🔵 Falling back to Gemini as last resort...');
@@ -213,9 +213,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
     }
   }
 }
-    }
-  }
-}
+
 
 /**
  * Retry generation with exponential backoff

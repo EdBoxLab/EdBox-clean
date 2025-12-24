@@ -88,31 +88,28 @@ export interface MessageMetadata {
   learnerEngagement?: number; // 0-1 scale
   responseTime?: number; // seconds
   hintsUsed?: number;
-  relatedChallenges?: string[];
-<<<<<<< HEAD
-  roadmapData?: {
-    title: string;
-    description: string;
-    items: any[];
-  };
-  quizData?: {
-    question: string;
-    options: string[];
-    correctAnswer: string;
-    explanation: string;
-    answered?: string;
-    isCorrect?: boolean;
-  };
-  challengeData?: {
-    challengeId: string;
-    title: string;
-    description: string;
-    difficulty: DifficultyLevel;
-    status: 'pending' | 'started' | 'completed' | 'failed';
-  };
-=======
->>>>>>> 508416c7389a58844d96c7ac055d66b9f8905acc
-}
+    relatedChallenges?: string[];
+    roadmapData?: {
+      title: string;
+      description: string;
+      items: any[];
+    };
+    quizData?: {
+      question: string;
+      options: string[];
+      correctAnswer: string;
+      explanation: string;
+      answered?: string;
+      isCorrect?: boolean;
+    };
+    challengeData?: {
+      challengeId: string;
+      title: string;
+      description: string;
+      difficulty: DifficultyLevel;
+      status: 'pending' | 'started' | 'completed' | 'failed';
+    };
+  }
 
 /**
  * Understanding assessment question and response

@@ -99,15 +99,11 @@ async function makeSmartDecision(
     // Use turnCount from context (passed from frontend) - much more reliable
     const turnCount = context.turnCount || 0;
 
-    // DEBUG: Log all decision variables (VERBOSE)
-    console.log('----------------------------------------------------');
-    console.log('[DECISION_DEBUG] Analysis Start');
-    console.log('[DECISION_DEBUG] userMessage:', userMessage.substring(0, 100));
+    // DEBUG: Log all decision variables
+    console.log('[DECISION_DEBUG] userMessage:', userMessage.substring(0, 50));
     console.log('[DECISION_DEBUG] hasAcknowledged:', hasAcknowledged);
     console.log('[DECISION_DEBUG] context.currentStage:', context.currentStage);
     console.log('[DECISION_DEBUG] turnCount:', turnCount);
-    console.log('[DECISION_DEBUG] goalsGiven:', context.goalsGiven);
-    console.log('----------------------------------------------------');
 
     // Turn 0-1: Send goals first
     if (turnCount <= 1 && !context.goalsGiven) {
@@ -134,63 +130,33 @@ async function makeSmartDecision(
 
     // Turn 4+: After challenge, verify with a Quiz
     // Turn 4+: After challenge, verify with a Quiz
-    // Turn 4+: After challenge, verify with a Quiz
     if (justFinishedChallenge) {
         console.log('[DECISION_DEBUG] -> Switching to QUIZ after challenge');
-
-        // Check for mastery of pending goals (Transactional Update)
-        if (context.goals && context.goals.length > 0) {
-            const supabase = await createSupabaseServerClient();
-
-            // Find first pending goal
-            const pendingGoal = context.goals.find((g: any) => g.status === 'pending');
-
-            if (pendingGoal && context.sessionId) {
-                // Mark as mastered
-                const updatedGoals = context.goals.map((g: any) =>
-                    g.id === pendingGoal.id
-                        ? { ...g, status: 'mastered', evidence: 'Completed challenge successfully' }
-                        : g
-                );
-
-                // Update DB
-                await supabase
-                    .from('interactive_course_sessions')
-                    .update({
-                        learning_context: {
-                            ...context,
-                            goals: updatedGoals
-                        }
-                    })
-                    .eq('id', context.sessionId);
-            }
-        }
-
         return {
             action: 'send_quiz',
             confidence: 0.9,
-            transition: "Great work on the challenge! Let's do a quick pulse check to confirm your mastery of that goal. 🎯"
+            transition: "Great work on the challenge! Let's do a quick pulse check to confirm your mastery. 🎯"
         };
     }
 
-    // ==========================================
-    // LOGIC BLOCK: BREAK THE LOOP & DECIDE
-    // ==========================================
+    // If we passed the challenge stage and user just answered a quiz (or we're deep in conversation)
+    // Don't loop back to Challenge/Quiz. Go to Deep Explanation.
+    if (turnCount >= 4) {
+        // Check if user just answered a quiz (e.g. "I chose...")
+        const justFinishedQuiz = userMsg.includes('i chose') || userMsg.includes("that's exactly right");
 
-    // 1. Check if user just answered a quiz (e.g. "I chose..." or "That's exactly right")
-    const justFinishedQuiz = userMsg.includes('i chose') || userMsg.includes("exactly right") || userMsg.includes('quiz result');
-
-    // Explicitly transition to explanation if we just finished a quiz OR if we are deep in conversation
-    if (justFinishedQuiz || (turnCount >= 4 && !justFinishedChallenge)) {
-        console.log('[DECISION_DEBUG] -> Switching to EXPLAIN after quiz/deep conversation');
-        return {
-            action: 'continue_explaining',
-            confidence: 0.95,
-            transition: "You've got this down! Let's dive deeper into some advanced nuances. 🧠"
-        };
+        if (justFinishedQuiz) {
+            console.log('[DECISION_DEBUG] -> Switching to EXPLAIN after quiz');
+            return {
+                action: 'continue_explaining',
+                // Low confidence lets the AI decide the specific topic, but action forces explanation
+                confidence: 0.8,
+                transition: "You've got this down! Let's dive deeper into some advanced nuances. 🧠"
+            };
+        }
     }
 
-    // 2. Calculate readiness score
+    // Calculate readiness score
     let readinessScore = 50;
 
     if (patterns.showsUnderstanding) readinessScore += 30;
@@ -205,17 +171,14 @@ async function makeSmartDecision(
 
     readinessScore = Math.max(0, Math.min(100, readinessScore));
 
-    console.log(`[DECISION_DEBUG] Readiness Score: ${readinessScore}, Turns: ${turnCount}`);
-
-    // 3. High Readiness Check (Avoiding Loop)
-    // If readiness is VERY high and we haven't just done a challenge, maybe suggest one
-    // But default to explanation to avoid loops
-    if (readinessScore > 90 && turnCount > 8 && !justFinishedChallenge && !justFinishedQuiz) {
-        console.log('[DECISION_DEBUG] -> Very high readiness. Suggesting challenge/quiz.');
+    // Decide action - HIGHER AGGRESSION
+    if (readinessScore >= 45 && patterns.exchangeCount >= 2 && !patterns.showsConfusion) {
+        console.log('[DECISION] Choosing QUIZ. Score:', readinessScore, 'Turns:', patterns.exchangeCount);
         return {
             action: 'send_quiz',
-            confidence: 0.8,
-            transition: "You're clearly mastering this! Quick check? ⚡"
+            confidence: 0.9,
+            transition: "Let's test your understanding with a quick pulse check! 🎯",
+            readinessScore
         };
     }
 
@@ -504,19 +467,15 @@ Your expertise is focused exclusively on this field.
         console.log('[STAGE_DEBUG] actualTurnCount:', actualTurnCount, 'decision.action:', decision.action);
 
         // Simple logic: Decision from makeSmartDecision takes priority
-        if (decision.forcedStage) {
-            effectiveStage = decision.forcedStage;
-        } else if (decision.action === 'send_challenge') {
+        if (decision.action === 'send_challenge' && decision.confidence >= 0.9) {
             effectiveStage = 'CHALLENGE';
-        } else if (decision.action === 'send_quiz') {
+        } else if (decision.action === 'send_quiz' && decision.confidence > 0.65) {
             effectiveStage = 'QUIZ';
-        } else if (decision.action === 'continue_explaining') {
-            effectiveStage = 'EXPLAIN';
-        }
-
-        // Fallback only if no decision made (rare)
-        if (!effectiveStage) {
-            effectiveStage = 'EXPLAIN';
+        } else if (decision.forcedStage) {
+            effectiveStage = decision.forcedStage;
+        } else if (actualTurnCount >= 2) {
+            // After turn 2, default to challenge
+            effectiveStage = 'CHALLENGE';
         }
 
         console.log('[AI_DEBUG] Effective Stage:', effectiveStage);
@@ -566,12 +525,6 @@ INSTRUCTIONS:
 
 JSON Schema:
 {"question": "string", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correctAnswer": "A|B|C|D", "explanation": "string"}
-
-CRITICAL FORMATTING RULE: 
-Immediately after [QUIZ], you must output the JSON object. 
-Example:
-[QUIZ]
-{"question": "...", ...}
 
 CRITICAL: If the learner just answered a quiz, provide a NEW question or move to a more advanced concept within the same skill.`;
 
@@ -670,23 +623,11 @@ GENIE:`;
                         }
 
                         try {
-                            let cleanQuizPart = quizPart.trim();
-                            // Attempt to find JSON object if there's surrounding text
-                            const jsonStartIndex = cleanQuizPart.indexOf('{');
-                            const jsonEndIndex = cleanQuizPart.lastIndexOf('}');
-
-                            if (jsonStartIndex !== -1 && jsonEndIndex !== -1) {
-                                cleanQuizPart = cleanQuizPart.substring(jsonStartIndex, jsonEndIndex + 1);
-                                const quizData = JSON.parse(cleanQuizPart);
-                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'quiz', quizData })}\n\n`));
-                            } else {
-                                throw new Error('No JSON braces found in response');
-                            }
+                            const quizData = JSON.parse(quizPart);
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'quiz', quizData })}\n\n`));
                         } catch (e) {
                             console.error('Quiz parse error:', e);
-                            console.error('Failed content:', quizPart);
-                            // Fallback: Stream as text so user at least sees the question
-                            await streamText(quizPart || "Let me ask you a question...", controller, encoder);
+                            await streamText("Let me ask you about this...", controller, encoder);
                         }
                     }
                     // Handle challenge
@@ -704,56 +645,6 @@ GENIE:`;
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData })}\n\n`));
                         } catch (e) {
                             console.error('Challenge parse error:', e);
-                        }
-                    }
-                    // Handle GOALS generation
-                    else if (genieResponse.includes('[GOALS]')) {
-                        const parts = genieResponse.split('[GOALS]');
-                        const intro = parts[0] ? parts[0].trim() : '';
-                        const goalsPart = parts[1] ? parts[1].trim() : '';
-
-                        if (intro) {
-                            await streamText(intro, controller, encoder);
-                        }
-
-                        try {
-                            const goalsList = JSON.parse(goalsPart);
-                            // Persist goals to Supabase immediately (Transactional)
-                            if (Array.isArray(goalsList) && sessionId) {
-                                // Correct usage of Supabase server client
-                                const supabase = await createSupabaseServerClient();
-
-                                // Fetch current context first to preserve other fields
-                                const { data: currentSession } = await supabase
-                                    .from('interactive_course_sessions')
-                                    .select('learning_context')
-                                    .eq('id', sessionId)
-                                    .single();
-
-                                if (currentSession) {
-                                    const newGoals = goalsList.map((text, idx) => ({
-                                        id: `goal-${Date.now()}-${idx}`,
-                                        text,
-                                        status: 'pending',
-                                        timestamp: new Date().toISOString()
-                                    }));
-
-                                    const updatedContext = {
-                                        ...currentSession.learning_context,
-                                        goals: newGoals
-                                    };
-
-                                    await supabase
-                                        .from('interactive_course_sessions')
-                                        .update({ learning_context: updatedContext })
-                                        .eq('id', sessionId);
-
-                                    // Stream special event to frontend to trigger UI update
-                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'goals_updated', goals: newGoals })}\n\n`));
-                                }
-                            }
-                        } catch (e) {
-                            console.error('Goals parse/save error:', e);
                         }
                     }
                     // Regular text

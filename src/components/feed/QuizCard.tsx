@@ -66,27 +66,31 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
     };
 
     return (
-        <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden bg-zinc-950">
-            {/* Background Effects */}
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 via-transparent to-pink-900/10" />
-
+        <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden bg-slate-950">
+            {/* Stunning Background Effects */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(168,85,247,0.15),transparent_80%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(236,72,153,0.1),transparent_70%)]" />
+            
             <Confetti isFiring={isCorrect === true} />
 
             {/* Premium Header */}
             <motion.div
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                className="flex items-center gap-3 mb-6 z-10"
+                className="flex items-center gap-4 mb-6 z-10"
             >
-                <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl shadow-lg shadow-purple-500/20">
-                    <Brain className="w-6 h-6 text-white" />
+                <div className="relative group">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                    <div className="relative p-3.5 bg-slate-900 rounded-2xl border border-white/10 shadow-xl">
+                        <Brain className="w-6 h-6 text-purple-400" />
+                    </div>
                 </div>
                 <div className="text-left">
-                    <span className="text-xs font-bold text-purple-400 uppercase tracking-widest block flex items-center gap-2">
+                    <span className="text-[10px] font-black text-purple-400 uppercase tracking-[0.2em] block mb-0.5 flex items-center gap-2">
                         Pulse Check
                         {timeLeft < 10 && <span className={`animate-pulse ${getTimerColor()}`}>• {timeLeft}s</span>}
                     </span>
-                    <h3 className="text-lg font-bold text-white">Genie's Quiz</h3>
+                    <h3 className="text-xl font-bold text-white tracking-tight">Genie's Quiz</h3>
                 </div>
             </motion.div>
 
@@ -95,8 +99,9 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                 <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="w-full max-w-sm mb-4 rounded-xl overflow-hidden shadow-2xl z-10 border border-zinc-800"
+                    className="w-full max-w-sm mb-6 rounded-2xl overflow-hidden shadow-2xl z-10 border border-white/10 relative group"
                 >
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 to-transparent z-10" />
                     <CardImage
                         generationState={item.imageGenerationState}
                         imageUrl={item.imageUrl}
@@ -110,15 +115,15 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="w-full max-w-sm mb-6 z-10"
+                className="w-full max-w-sm mb-8 z-10 px-2"
             >
-                <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight">
+                <h2 className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70 leading-[1.2] tracking-tight">
                     {item.question}
                 </h2>
             </motion.div>
 
             {/* Options */}
-            <div className="w-full max-w-sm space-y-3 z-10">
+            <div className="w-full max-w-sm space-y-3.5 z-10">
                 {item.options?.map((option, index) => {
                     const isSelected = selected === option;
                     const isCorrectOption = option === item.answer || item.options[item.correctIndex] === option;
@@ -131,23 +136,23 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                             transition={{ delay: 0.3 + index * 0.1 }}
                             onClick={() => handleAnswer(option)}
                             disabled={answered}
-                            className={`group relative w-full p-4 rounded-xl border transition-all duration-300 overflow-hidden ${
+                            className={`group relative w-full p-4.5 rounded-2xl border transition-all duration-500 overflow-hidden ${
                                 answered
                                     ? isCorrectOption
-                                        ? 'border-green-500/50 bg-green-500/10'
+                                        ? 'border-green-500/50 bg-green-500/10 shadow-[0_0_20px_rgba(34,197,94,0.15)]'
                                         : isSelected
-                                            ? 'border-red-500/50 bg-red-500/10'
-                                            : 'border-zinc-800 bg-zinc-900/30 opacity-50'
-                                    : 'border-zinc-800 bg-zinc-900/50 hover:border-purple-500/30 hover:bg-zinc-800/50 active:scale-95'
+                                            ? 'border-red-500/50 bg-red-500/10 shadow-[0_0_20px_rgba(239,68,68,0.15)]'
+                                            : 'border-white/5 bg-white/5 opacity-40'
+                                    : 'border-white/10 bg-white/5 hover:border-purple-500/30 hover:bg-white/10 active:scale-[0.98]'
                             }`}
                         >
                             {/* Sliding Progress Bar */}
-                            <AnimatePresence>
+                            <AnimatePresence mode="wait">
                                 {answered && (isCorrectOption || isSelected) && (
                                     <motion.div
                                         initial={{ width: 0 }}
                                         animate={{ width: "100%" }}
-                                        transition={{ duration: 0.8, ease: "easeOut" }}
+                                        transition={{ duration: 1, ease: [0.32, 0.72, 0, 1] }}
                                         className={`absolute inset-0 h-full ${
                                             isCorrectOption ? 'bg-green-500/20' : 'bg-red-500/20'
                                         }`}
@@ -156,21 +161,37 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                             </AnimatePresence>
 
                             <div className="relative flex items-center justify-between z-20">
-                                <span className={`font-medium transition-colors ${
+                                <span className={`font-semibold text-base transition-colors duration-300 ${
                                     answered
                                         ? isCorrectOption 
-                                            ? 'text-green-400' 
+                                            ? 'text-green-300' 
                                             : isSelected 
-                                                ? 'text-red-400' 
-                                                : 'text-gray-500'
-                                        : 'text-white'
+                                                ? 'text-red-300' 
+                                                : 'text-white/40'
+                                        : 'text-white/90'
                                 }`}>
                                     {option}
                                 </span>
 
-                                <div className="flex items-center gap-2">
-                                    {answered && isCorrectOption && <CheckCircle2 className="w-5 h-5 text-green-400" />}
-                                    {answered && isSelected && !isCorrectOption && <XCircle className="w-5 h-5 text-red-400" />}
+                                <div className="flex items-center gap-3">
+                                    {answered && isCorrectOption && (
+                                        <motion.div
+                                            initial={{ scale: 0 }}
+                                            animate={{ scale: 1 }}
+                                            className="bg-green-500/20 p-1 rounded-full border border-green-500/50"
+                                        >
+                                            <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                        </motion.div>
+                                    )}
+                                    {answered && isSelected && !isCorrectOption && (
+                                        <motion.div
+                                            initial={{ scale: 0 }}
+                                            animate={{ scale: 1 }}
+                                            className="bg-red-500/20 p-1 rounded-full border border-red-500/50"
+                                        >
+                                            <XCircle className="w-4 h-4 text-red-400" />
+                                        </motion.div>
+                                    )}
                                 </div>
                             </div>
                         </motion.button>
@@ -184,42 +205,43 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="mt-6 z-10"
+                        className="mt-8 z-10 w-full max-w-sm"
                     >
-                        <div className={`text-lg font-bold mb-2 ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
-                            {isCorrect ? '🎉 Correct!' : '❌ Almost!'}
+                        <div className={`text-xl font-black uppercase tracking-[0.2em] mb-4 ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
+                            {isCorrect ? 'Stunning!' : 'Nice try!'}
                         </div>
 
                         {showExplanation && item.explanation && (
                             <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="text-sm text-gray-400 max-w-sm mx-auto bg-zinc-900/50 p-4 rounded-xl border border-zinc-800"
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="text-sm font-medium text-white/70 bg-white/5 p-5 rounded-2xl border border-white/10 backdrop-blur-sm leading-relaxed"
                             >
                                 {item.explanation}
                             </motion.div>
                         )}
-                        <p className="mt-4 text-gray-500 text-xs animate-pulse">Next card coming up...</p>
+                        <p className="mt-6 text-white/30 text-[10px] font-black uppercase tracking-[0.3em] animate-pulse">Next card incoming</p>
                     </motion.div>
                 )}
             </AnimatePresence>
 
             {/* Background Particles */}
             <div className="absolute inset-0 pointer-events-none">
-                {[...Array(6)].map((_, i) => (
+                {[...Array(10)].map((_, i) => (
                     <motion.div
                         key={i}
-                        className="absolute w-1 h-1 bg-purple-500/20 rounded-full"
+                        className="absolute w-[2px] h-[2px] bg-purple-500/30 rounded-full"
                         style={{
                             left: `${Math.random() * 100}%`,
                             top: `${Math.random() * 100}%`,
                         }}
                         animate={{
                             y: [-20, 20],
-                            opacity: [0, 0.5, 0],
+                            opacity: [0, 0.4, 0],
+                            scale: [1, 1.5, 1],
                         }}
                         transition={{
-                            duration: 3 + Math.random() * 2,
+                            duration: 4 + Math.random() * 3,
                             repeat: Infinity,
                             ease: "easeInOut",
                         }}

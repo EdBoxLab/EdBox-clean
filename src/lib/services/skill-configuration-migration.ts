@@ -64,7 +64,7 @@ export class SkillConfigurationMigration {
       }
 
       const affectedUsers = progressData?.length || 0;
-      const masteredUsers = progressData?.filter(p => p.mastery_achieved).length || 0;
+      const masteredUsers = progressData?.filter((p: any) => p.mastery_achieved).length || 0;
       const inProgressUsers = affectedUsers - masteredUsers;
 
       // Analyze configuration changes

@@ -11,6 +11,7 @@ import {
 import { UserAvatar } from './user-avatar';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase/client';
+import { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { Button } from './ui/button';
 import { useRouter } from 'next/navigation';
 import { Share2, Copy, Check } from 'lucide-react';
@@ -23,12 +24,13 @@ export function UserMenu() {
   const [copied, setCopied] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
-      }
-    );
+    useEffect(() => {
+      const { data: authListener } = supabase.auth.onAuthStateChange(
+        (event: AuthChangeEvent, session: Session | null) => {
+          setUser(session?.user ?? null);
+        }
+      );
+
 
     const fetchUser = async () => {
       const { data } = await supabase.auth.getUser();

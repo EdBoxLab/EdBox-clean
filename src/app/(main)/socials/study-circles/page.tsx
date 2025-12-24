@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { Session, AuthChangeEvent } from '@supabase/supabase-js';
 import { Users, Plus, MessageCircle, Video, Phone, Search, Send, Sparkles, ArrowLeft, MoreVertical, Share2, UserPlus, Clock } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -312,7 +313,7 @@ const CircleChat = ({ circle, onBack, session }: {
         schema: 'public', 
         table: 'messages', 
         filter: `circle_id=eq.${circle.id}` 
-      }, (payload) => {
+      }, (payload: any) => {
         setMessages(messages => [...messages, payload.new]);
       })
       .subscribe();
@@ -615,19 +616,20 @@ function StudyCirclesContent() {
   const [selectedCircle, setSelectedCircle] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [session, setSession] = useState<any>(null);
+    const [session, setSession] = useState<Session | null>(null);
 
-  const searchParams = useSearchParams();
+    const searchParams = useSearchParams();
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+      useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => setSession(session));
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+          setSession(session);
+        });
 
-    return () => subscription.unsubscribe();
-  }, []);
+
+      return () => subscription.unsubscribe();
+    }, []);
 
   const fetchCircles = async () => {
     setIsLoading(true);

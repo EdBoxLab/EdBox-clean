@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import type { FeedItem, InsightFeedItem, StoryFeedItem, QuizFeedItem, FactFeedItem, PollFeedItem, Feedback, UserPreferences, AudioGenerationState } from '@/types/feed';
 import { generateFeedBatch, persistFeedItems, trackInteraction } from '@/services/feedService';
 import { CardWrapper } from './CardWrapper';
@@ -11,9 +11,11 @@ import { InsightCard } from './InsightCard';
 import { FactCard } from './FactCard';
 import { StoryCard } from './StoryCard';
 import { PollCard } from './PollCard';
+import { MemeCard } from './MemeCard';
 import { SkeletonCard } from './SkeletonCard';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { XPStreakDisplay } from '@/components/XPStreakDisplay';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface FeedProps {
   preferences: UserPreferences;
@@ -24,11 +26,11 @@ const FeedAnimations = () => (
     @keyframes fadeInUpBounce {
       0% {
         opacity: 0;
-        transform: translateY(20px) scale(0.98);
+        transform: translateY(30px) scale(0.95);
       }
       70% {
         opacity: 1;
-        transform: translateY(-5px) scale(1.01);
+        transform: translateY(-5px) scale(1.02);
       }
       100% {
         opacity: 1;
@@ -36,10 +38,7 @@ const FeedAnimations = () => (
       }
     }
     .animate-card-enter {
-      animation: fadeInUpBounce 0.6s cubic-bezier(0.215, 0.610, 0.355, 1.000) forwards;
-    }
-    .active-card-indicator {
-      box-shadow: 0 0 25px 5px rgba(168, 85, 247, 0.4);
+      animation: fadeInUpBounce 0.8s cubic-bezier(0.23, 1, 0.32, 1) forwards;
     }
     .no-scrollbar::-webkit-scrollbar {
       display: none;
@@ -61,96 +60,51 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
   const [currentBatch, setCurrentBatch] = useState(0);
   const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
 
-  // Audio State for Articles
-  const [summaryAudio, setSummaryAudio] = useState<Record<string, { state: AudioGenerationState, buffer?: AudioBuffer }>>({});
-
   const feedRef = useRef<HTMLDivElement>(null);
   const observer = useRef<IntersectionObserver | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
   const processingRef = useRef(false);
   const lastLoadRef = useRef<number>(0);
   const supabase = createSupabaseBrowserClient();
 
-  const initAudio = () => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
-    }
-    return audioContextRef.current;
-  };
-
   const loadMoreItems = useCallback(async (initial = false) => {
-    // Prevent rapid repeated calls
     const now = Date.now();
-    if (now - lastLoadRef.current < 5000) {
-      console.log('⏳ Throttling feed load - too soon since last load');
-      return;
-    }
+    if (now - lastLoadRef.current < 5000) return;
+    if (processingRef.current) return;
 
-    if (processingRef.current) {
-      console.log('⏳ Already processing feed request - skipping');
-      return;
-    }
-
-    console.log('📥 Starting feed load...', { initial, currentBatch });
     lastLoadRef.current = now;
     processingRef.current = true;
-
     if (initial) setLoading(true);
 
     try {
       const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: undefined } }));
-      if (!user) {
-        console.info('No user found; generating anonymous feed');
-      }
-
-      // For new batches, exclude previously viewed content types
-      const allContentTypes = ['quiz', 'article', 'fact', 'poll', 'story'];
+      
+      const allContentTypes = ['quiz', 'article', 'fact', 'poll', 'story', 'meme'];
       const shouldReset = viewedTypes.size >= allContentTypes.length;
       const excludeTypes = initial || shouldReset ? [] : Array.from(viewedTypes);
 
-      if (shouldReset) {
-        console.log('🔄 Resetting content types - all types viewed');
-        setViewedTypes(new Set());
-      }
+      if (shouldReset) setViewedTypes(new Set());
 
       const itemBatch = await generateFeedBatch(preferences.interests, likedTopics, excludeTypes);
-      console.log('✅ Received', itemBatch.length, 'items from API');
-
-      // Persist generated items
       await persistFeedItems(itemBatch, user?.id);
 
-      // Process items
-      const processedItems = itemBatch.filter(item => item.type !== 'meme');
-
-      // Track content types in this batch
-      const newTypes = new Set(processedItems.map(item => item.type));
+      const newTypes = new Set(itemBatch.map(item => item.type));
       setViewedTypes(prev => shouldReset ? newTypes : new Set([...prev, ...newTypes]));
 
-      const newItems = processedItems;
-
       if (initial) {
-        setItems(newItems);
+        setItems(itemBatch);
         setCurrentBatch(1);
         setHasLoadedInitial(true);
-        if (newItems.length > 0) {
-          setActiveCardId(newItems[0].id);
+        if (itemBatch.length > 0) {
+          setActiveCardId(itemBatch[0].id);
           setActiveIndex(0);
         }
-        console.log('✅ Initial feed loaded:', newItems.length, 'items');
       } else {
-        // Prevent duplicates
         const existingIds = new Set(items.map(i => i.id));
-        const uniqueNewItems = newItems.filter(i => !existingIds.has(i.id));
+        const uniqueNewItems = itemBatch.filter(i => !existingIds.has(i.id));
 
         if (uniqueNewItems.length > 0) {
           setItems(prev => [...prev, ...uniqueNewItems]);
           setCurrentBatch(prev => prev + 1);
-          console.log('✅ Loaded batch', currentBatch + 1, ':', uniqueNewItems.length, 'new items');
-        } else {
-          console.log('ℹ️ No new unique items to add');
         }
       }
     } catch (err) {
@@ -161,15 +115,10 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     }
   }, [preferences.interests, likedTopics, viewedTypes, currentBatch, supabase]);
 
-  // Initial Load - ONLY ONCE
   useEffect(() => {
-    if (!hasLoadedInitial) {
-      console.log('🚀 Initial feed load triggered');
-      loadMoreItems(true);
-    }
+    if (!hasLoadedInitial) loadMoreItems(true);
   }, [hasLoadedInitial, loadMoreItems]);
 
-  // Infinite Scroll Observer
   useEffect(() => {
     if (observer.current) observer.current.disconnect();
 
@@ -182,12 +131,8 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
             if (prevId !== newActiveId) {
               const index = items.findIndex(item => item.id === newActiveId);
               setActiveIndex(index);
-
-              // Load more when user reaches the last 3 items
               const loadThreshold = items.length - 3;
-
               if (index !== -1 && index >= loadThreshold && !loading && !processingRef.current) {
-                console.log('📍 Near end of feed - loading more...', { index, total: items.length });
                 loadMoreItems();
               }
               return newActiveId;
@@ -196,10 +141,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
           });
         }
       },
-      {
-        threshold: 0.6,
-        root: feedRef.current
-      }
+      { threshold: 0.6, root: feedRef.current }
     );
 
     const currentFeedRef = feedRef.current;
@@ -215,34 +157,21 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     const item = items.find(i => i.id === id);
     if (!item) return;
 
-    // Toggle: if same feedback clicked, set to null
     const newFeedback = item.feedback === feedback ? null : feedback;
-
-    // Optimistic update
-    setItems(prev => prev.map(i =>
-      i.id === id ? { ...i, feedback: newFeedback } : i
-    ));
+    setItems(prev => prev.map(i => i.id === id ? { ...i, feedback: newFeedback } : i));
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const ok = await trackInteraction(user.id, id, newFeedback as Feedback);
-      if (!ok) console.warn('trackInteraction failed for', id, newFeedback);
-    }
-
-    if (newFeedback === 'like') {
-      setLikedTopics(prev => [...prev, item.topic]);
-    }
+    if (user) await trackInteraction(user.id, id, newFeedback as Feedback);
+    if (newFeedback === 'like') setLikedTopics(prev => [...prev, item.topic]);
   };
 
   const handleSwipe = async (id: string, action: 'skip' | 'got_it' | 'answered', xp?: number) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const ok = await trackInteraction(user.id, id, action);
-      if (!ok) console.warn('trackInteraction failed for', id, action);
-
+      await trackInteraction(user.id, id, action);
       if ((action === 'got_it' || action === 'answered') && xp) {
         try {
-          const response = await fetch('/api/xp/update', {
+          await fetch('/api/xp/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -251,22 +180,12 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
               skillGraphId: 'default'
             })
           });
-
-          if (response.ok) {
-            const result = await response.json();
-            console.log(`✨ +${xp} XP! Level ${result.xp.level} | ${result.streak} day streak`);
-
-            if (result.xp.leveledUp) {
-              console.log('🎉 LEVEL UP!');
-            }
-          }
         } catch (error) {
           console.error('Failed to update XP:', error);
         }
       }
     }
 
-    // Scroll to next
     const currentIndex = items.findIndex(i => i.id === id);
     if (currentIndex !== -1 && currentIndex < items.length - 1) {
       const nextCard = document.getElementById(items[currentIndex + 1].id);
@@ -274,34 +193,23 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     }
   };
 
-  const handleCorrectAnswer = (xp: number, isStreak: boolean) => {
-    console.log("Correct answer!", xp, isStreak);
-  };
-
-  const handleIncorrectAnswer = () => {
-    console.log("Incorrect");
-  };
-
   const renderCardContent = (item: FeedItem, isActive: boolean) => {
     switch (item.type) {
       case 'quiz':
-        return <QuizCard item={item as QuizFeedItem} isActive={isActive} onCorrect={handleCorrectAnswer} onIncorrect={handleIncorrectAnswer} onSwipe={handleSwipe} />;
+        return <QuizCard item={item as QuizFeedItem} isActive={isActive} onCorrect={() => {}} onIncorrect={() => {}} onSwipe={handleSwipe} />;
       case 'video':
         return <VideoCard item={item as any} isActive={isActive} />;
       case 'insight':
       case 'article':
-        return (
-          <InsightCard
-            item={item as InsightFeedItem}
-            isActive={isActive}
-          />
-        );
+        return <InsightCard item={item as InsightFeedItem} isActive={isActive} />;
       case 'poll':
         return <PollCard item={item as PollFeedItem} isActive={isActive} />;
       case 'fact':
         return <FactCard item={item as FactFeedItem} isActive={isActive} />;
       case 'story':
         return <StoryCard item={item as StoryFeedItem} isActive={isActive} onSwipe={handleSwipe} />;
+      case 'meme':
+        return <MemeCard item={item as any} />;
       default:
         return null;
     }
@@ -309,18 +217,33 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
 
   if (loading && items.length === 0) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#09090b] text-white">
-        <Loader2 className="w-12 h-12 animate-spin text-indigo-500 mb-4" />
-        <h2 className="text-xl font-light text-gray-400">Curating your feed...</h2>
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#050505] text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(139,92,246,0.1),transparent_70%)]" />
+        <motion.div 
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="z-10 flex flex-col items-center"
+        >
+            <div className="relative mb-8">
+                <Loader2 className="w-16 h-16 animate-spin text-purple-500" />
+                <div className="absolute inset-0 blur-xl bg-purple-500/20 animate-pulse" />
+            </div>
+            <h2 className="text-2xl font-black tracking-tight mb-2">Curating Your Mind</h2>
+            <div className="flex items-center gap-2 text-white/30 text-xs font-black uppercase tracking-[0.3em]">
+                <Sparkles className="w-3 h-3" />
+                <span>Syncing with Genie</span>
+                <Sparkles className="w-3 h-3" />
+            </div>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#09090b]">
+    <div className="min-h-screen bg-[#050505]">
       <FeedAnimations />
 
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-40">
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
         <XPStreakDisplay showCompact={true} />
       </div>
 
@@ -329,8 +252,8 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
           <div
             key={item.id}
             id={item.id}
-            className="feed-card opacity-0 animate-card-enter h-screen w-full snap-start snap-always flex items-center justify-center px-4 py-20"
-            style={{ animationDelay: `${(index % 5) * 100}ms` }}
+            className="feed-card opacity-0 animate-card-enter h-screen w-full snap-start snap-always flex items-center justify-center px-4 py-16 sm:py-20"
+            style={{ animationDelay: `${(index % 5) * 150}ms` }}
           >
             <div className="w-full max-w-2xl h-full flex items-center justify-center">
               <CardWrapper
@@ -345,19 +268,11 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
           </div>
         ))}
 
-        {(loading || items.length === 0) && (
-          <div className="h-screen snap-start flex items-center justify-center px-4 py-20">
-            <div className="w-full max-w-2xl">
-              <SkeletonCard />
-            </div>
-          </div>
-        )}
-
-        {loading && items.length > 0 && (
+        {loading && (
           <div className="h-screen snap-start flex items-center justify-center px-4">
-            <div className="flex items-center gap-3 text-gray-400">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Loading fresh content...</span>
+            <div className="flex flex-col items-center gap-4">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-500/50" />
+                <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">Fetching Wisdom</span>
             </div>
           </div>
         )}

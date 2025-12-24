@@ -294,15 +294,16 @@ export class SkillProgressionDatabase {
         .eq('user_id', userId)
         .eq('mastery_achieved', true);
 
-      if (error) {
-        throw new ProgressTrackingError(
-          `Failed to get mastered skills: ${error.message}`,
-          'all',
-          userId
-        );
-      }
+        if (error) {
+          throw new ProgressTrackingError(
+            `Failed to get mastered skills: ${error.message}`,
+            'all',
+            userId
+          );
+        }
 
-      return data.map(row => row.skill_id);
+        return data.map((row: any) => row.skill_id);
+
     } catch (error) {
       if (error instanceof ProgressTrackingError) {
         throw error;

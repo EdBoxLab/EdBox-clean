@@ -49,7 +49,7 @@ export default function InteractiveCourseSession({
   const [isSaving, setIsSaving] = useState(false);
   const [showActionButtons, setShowActionButtons] = useState(false);
   const [activeChallenge, setActiveChallenge] = useState<GeneratedChallenge | null>(null);
-  const [learningStage, setLearningStage] = useState<'EXPLAIN' | 'QUIZ' | 'CHALLENGE'>('QUIZ');
+  const [learningStage, setLearningStage] = useState<'EXPLAIN' | 'QUIZ' | 'CHALLENGE'>('EXPLAIN');
 
   // Diagnostic render tracking
   const renderRef = useRef(0);

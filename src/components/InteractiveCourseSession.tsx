@@ -349,9 +349,62 @@ export default function InteractiveCourseSession({
   }
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-gray-950 text-white font-sans overflow-hidden">
-      {/* Sidebar with Sticky Goal Tracker */}
-      <aside className="hidden lg:flex w-[320px] bg-gray-900 border-r border-gray-800 flex-col p-6 gap-6 overflow-y-auto">
+    <div className="flex flex-col lg:flex-row h-screen bg-gray-950 text-white font-sans overflow-hidden">
+      {/* Mobile Sidebar Overlay */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 lg:hidden"
+          >
+            <motion.div
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-[85%] max-w-[320px] h-full bg-gray-900 border-r border-gray-800 p-6 flex flex-col gap-6 shadow-2xl"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-purple-600/20 rounded-xl border border-purple-500/20">
+                    <Brain className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-sm tracking-tight">Roadmap</h2>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest">Interactive Session</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="p-2 text-gray-500 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                {session?.learningContext?.goals && (
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest">Mastery Tracking</h3>
+                    <GoalTracker goals={session.learningContext.goals} />
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-6 border-t border-gray-800">
+                <XPStreakDisplay showCompact={true} skillGraphId={courseId} />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar with Sticky Goal Tracker (Desktop) */}
+      <aside className="hidden lg:flex w-[320px] bg-gray-900 border-r border-gray-800 flex-col p-6 gap-6 overflow-y-auto shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-purple-600/20 rounded-xl border border-purple-500/20">
             <Brain className="w-5 h-5 text-purple-400" />
@@ -394,22 +447,23 @@ export default function InteractiveCourseSession({
         </header>
 
         {/* Message List */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 scroll-smooth">
-          <AnimatePresence>
-            {messages.map((message) => (
-              <motion.div
-                key={message.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex ${message.role === 'learner' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`max-w-[85%] lg:max-w-[70%] ${
-                  message.role === 'learner'
-                    ? 'bg-purple-600 text-white px-4 py-3 rounded-2xl rounded-tr-sm'
-                    : message.type === 'roadmap' || message.type === 'quiz' || message.type === 'challenge_trigger'
-                      ? 'w-full'
-                      : 'bg-gray-800/50 border border-gray-700 px-4 py-3 rounded-2xl rounded-tl-sm'
-                }`}>
+        <div className="flex-1 overflow-y-auto scroll-smooth">
+          <div className="max-w-4xl mx-auto px-4 lg:px-6 py-8 space-y-8">
+            <AnimatePresence>
+              {messages.map((message) => (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex ${message.role === 'learner' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`max-w-[90%] lg:max-w-[85%] ${
+                    message.role === 'learner'
+                      ? 'bg-purple-600 text-white px-5 py-3.5 rounded-2xl rounded-tr-sm shadow-lg shadow-purple-500/10'
+                      : message.type === 'roadmap' || message.type === 'quiz' || message.type === 'challenge_trigger'
+                        ? 'w-full'
+                        : 'bg-gray-800/80 border border-gray-700/50 px-5 py-3.5 rounded-2xl rounded-tl-sm backdrop-blur-sm'
+                  }`}>
                   {message.type === 'roadmap' && message.roadmapData ? (
                     <RoadmapWelcome 
                       {...message.roadmapData} 

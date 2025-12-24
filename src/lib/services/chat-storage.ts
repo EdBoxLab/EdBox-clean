@@ -10,8 +10,13 @@ interface ChatMessage {
   role: 'genie' | 'learner';
   content: string;
   timestamp: Date;
-  type?: 'message' | 'assessment' | 'challenge' | 'quiz' | 'challenge_trigger';
+  type?: 'message' | 'assessment' | 'challenge' | 'quiz' | 'challenge_trigger' | 'roadmap';
   assessmentData?: any;
+  roadmapData?: {
+    title: string;
+    description: string;
+    items: any[];
+  };
   quizData?: {
     question: string;
     options: string[];

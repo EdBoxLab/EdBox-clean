@@ -21,7 +21,9 @@ import {
  * Session manager implementation for interactive course experience
  */
 export class InteractiveCourseSessionManager implements SessionManager {
-  private supabase = createSupabaseBrowserClient();
+  private supabase = (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    ? createSupabaseBrowserClient()
+    : null as any;
 
   /**
    * Create a new interactive course session

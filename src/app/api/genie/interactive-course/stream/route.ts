@@ -10,7 +10,7 @@ function detectBehavioralPatterns(userMessage: string, conversationHistory: any[
     const explicitUnderstanding = [
         'i understand', 'got it', 'makes sense', 'i see', 'clear now',
         'i get it', 'okay', 'alright', 'cool', 'thanks', 'that helps',
-        "i'm ready", "let's do this", 'quiz me', 'test me', 'perfect'
+        'perfect'
     ];
 
     const explicitConfusion = [
@@ -18,11 +18,22 @@ function detectBehavioralPatterns(userMessage: string, conversationHistory: any[
         'lost', 'not sure', 'unclear', 'wait', 'can you explain', 'help'
     ];
 
+    const challengeRequest = [
+        "i'm ready for a challenge", "ready for a challenge", "give me a challenge",
+        "let's do a challenge", "challenge me", "practical task", "ready to build"
+    ];
+
+    const quizRequest = [
+        "quiz me", "test me", "give me a quiz", "ready for a quiz"
+    ];
+
     const msg = userMessage.toLowerCase();
 
     return {
         showsUnderstanding: explicitUnderstanding.some(phrase => msg.includes(phrase)),
         showsConfusion: explicitConfusion.some(phrase => msg.includes(phrase)),
+        wantsChallenge: challengeRequest.some(phrase => msg.includes(phrase)),
+        wantsQuiz: quizRequest.some(phrase => msg.includes(phrase)),
         isEngaged: userMessage.split(' ').length > 8 || msg.includes('?'),
         responseLength: userMessage.split(' ').length,
         exchangeCount: conversationHistory ? conversationHistory.filter((m: any) => m.role === 'assistant').length : 0
@@ -122,11 +133,29 @@ async function makeSmartDecision(
         };
     }
 
-    // 2. Initial Challenge Stage (Placement)
+    // 2. Explicit Challenge Request
+    if (patterns.wantsChallenge || aiAnalysis?.readyForChallenge) {
+        return {
+            action: 'send_challenge',
+            forcedStage: 'CHALLENGE',
+            transition: "Alright, let's jump into a practical challenge! 🚀"
+        };
+    }
+
+    // 3. Explicit Quiz Request
+    if (patterns.wantsQuiz || aiAnalysis?.readyForQuiz) {
+        return {
+            action: 'send_quiz',
+            forcedStage: 'QUIZ',
+            transition: "Let's see what you've got! 🧠"
+        };
+    }
+
+    // 4. Initial Challenge Stage (Placement)
     const hasDoneChallenge = goals.some((g: any) => g.status === 'mastered' || (g.confidence > 50));
     const challengeRelated = userMsg.includes('challenge') || userMsg.includes('task') || userMsg.includes('approach');
     
-    if (turnCount >= 1 && turnCount <= 3 && !hasDoneChallenge && !challengeRelated) {
+    if (turnCount >= 1 && turnCount <= 4 && !hasDoneChallenge && !challengeRelated) {
          return {
             action: 'send_challenge',
             forcedStage: 'CHALLENGE',
@@ -134,8 +163,8 @@ async function makeSmartDecision(
         };
     }
 
-    // 3. Handle Completion of Challenge/Quiz
-    if (userMsg.includes('challenge answer') || userMsg.includes('my submission') || (challengeRelated && patterns.showsUnderstanding)) {
+    // 5. Handle Completion of Challenge/Quiz
+    if (userMsg.includes('challenge answer') || userMsg.includes('my submission')) {
         return {
             action: 'send_quiz',
             forcedStage: 'QUIZ',
@@ -143,7 +172,7 @@ async function makeSmartDecision(
         };
     }
 
-    // 4. Competency-Based Transition
+    // 6. Competency-Based Transition
     const avgConfidence = goals.length > 0 
         ? goals.reduce((acc: number, g: any) => acc + (g.confidence || 0), 0) / goals.length 
         : 0;
@@ -158,8 +187,8 @@ async function makeSmartDecision(
         };
     }
 
-    // 5. Default: Intelligent Tutoring (EXPLAIN)
-    if (aiAnalysis?.readyForQuiz || (avgConfidence > 40 && turnCount % 3 === 0)) {
+    // 7. Default: Intelligent Tutoring (EXPLAIN)
+    if (avgConfidence > 40 && turnCount % 3 === 0) {
         return {
             action: 'send_quiz',
             forcedStage: 'QUIZ',
@@ -271,15 +300,15 @@ export async function POST(request: NextRequest) {
             })
             .eq('id', sessionId);
 
-        let systemPrompt = `### GENIE PROTOCOL: ${effectiveStage} ###
-You are Genie, a world-class mentor for "${skillTitle || currentSkillId}".
+        let systemPrompt = `You are Genie, a world-class mentor for "${skillTitle || currentSkillId}".
+Your goal is to guide the student through the "${effectiveStage}" stage.
 
-CRITICAL OUTPUT RULES:
-1. STAGE IS "${effectiveStage}". 
-2. IF STAGE IS "GOALS": You MUST ONLY output a [ROADMAP] JSON block. NO PREAMBLE. NO CONVERSATION.
-3. IF STAGE IS "QUIZ": You MUST ONLY output a [QUIZ] JSON block.
-4. IF STAGE IS "CHALLENGE": You MUST ONLY output a [CHALLENGE] JSON block.
-5. IF STAGE IS "EXPLAIN": Provide conversational insights. Focus strictly on the subject. Use markdown for better readability.
+CRITICAL RULES:
+1. NEVER mention the internal stage name (e.g., "STAGE IS QUIZ") in your response.
+2. IF STAGE IS "GOALS": Output ONLY a [ROADMAP] JSON block. No conversation.
+3. IF STAGE IS "QUIZ": Output ONLY a [QUIZ] JSON block.
+4. IF STAGE IS "CHALLENGE": Output ONLY a [CHALLENGE] JSON block.
+5. IF STAGE IS "EXPLAIN": Provide conversational insights. Use markdown.
 
 GOALS TO MASTER:
 ${goals.map(g => `- ${g.text} (Current: ${g.confidence}%)`).join('\n')}

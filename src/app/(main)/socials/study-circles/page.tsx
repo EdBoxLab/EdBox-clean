@@ -372,16 +372,11 @@ const CircleChat = ({ circle, onBack, session }: {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <button className="w-10 h-10 rounded-full hover:bg-white/10 text-purple-400 transition-colors flex items-center justify-center">
-            <Video className="w-6 h-6" />
+          <button
+            onClick={() => setShowInviteModal(true)}
+            className="w-10 h-10 rounded-full hover:bg-white/10 text-purple-400 transition-colors flex items-center justify-center">
+            <Share2 className="w-6 h-6" />
           </button>
-          {circle.is_admin && (
-            <button
-              onClick={() => setShowInviteModal(true)}
-              className="w-10 h-10 rounded-full hover:bg-white/10 transition-colors flex items-center justify-center">
-              <Share2 className="w-5 h-5" />
-            </button>
-          )}
         </div>
       </header>
 

@@ -37,7 +37,7 @@ export interface ConversationMessage {
 /**
  * Types of messages in conversational learning
  */
-export type MessageType = 'explanation' | 'question' | 'assessment' | 'quiz' | 'challenge_trigger' | 'challenge' | 'feedback' | 'encouragement' | 'summary';
+export type MessageType = 'explanation' | 'question' | 'assessment' | 'quiz' | 'challenge_trigger' | 'challenge' | 'feedback' | 'encouragement' | 'summary' | 'roadmap';
 
 /**
  * Specific learning goal for mastery tracking
@@ -89,6 +89,26 @@ export interface MessageMetadata {
   responseTime?: number; // seconds
   hintsUsed?: number;
   relatedChallenges?: string[];
+  roadmapData?: {
+    title: string;
+    description: string;
+    items: any[];
+  };
+  quizData?: {
+    question: string;
+    options: string[];
+    correctAnswer: string;
+    explanation: string;
+    answered?: string;
+    isCorrect?: boolean;
+  };
+  challengeData?: {
+    challengeId: string;
+    title: string;
+    description: string;
+    difficulty: DifficultyLevel;
+    status: 'pending' | 'started' | 'completed' | 'failed';
+  };
 }
 
 /**

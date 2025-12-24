@@ -171,27 +171,29 @@ export default function InteractiveCourseSession({
         setSession(existingSessionData);
         const history = await sessionManager.getSessionHistory(existingSessionData.id);
         if (history && history.length > 0) {
-          const mappedMessages: ChatMessage[] = history.map(m => {
-            const typeMap: Record<string, string> = {
-              'summary': 'roadmap',
-              'assessment': 'quiz',
-              'challenge': 'challenge_trigger',
-              'roadmap': 'roadmap',
-              'quiz': 'quiz',
-              'challenge_trigger': 'challenge_trigger'
-            };
+            const mappedMessages: ChatMessage[] = history.map(m => {
+              const typeMap: Record<string, string> = {
+                'summary': 'roadmap',
+                'assessment': 'quiz',
+                'challenge': 'challenge_trigger',
+                'roadmap': 'roadmap',
+                'quiz': 'quiz',
+                'challenge_trigger': 'challenge_trigger'
+              };
 
-            return {
-              id: m.id || `msg-${Math.random()}`,
-              role: m.role,
-              content: m.content,
-              timestamp: new Date(m.timestamp),
-              type: (typeMap[m.messageType] || m.messageType) as any,
-              roadmapData: m.metadata?.roadmapData || (m.messageType === 'summary' || m.messageType === 'roadmap' ? m.metadata : undefined),
-              quizData: m.metadata?.quizData || (m.messageType === 'assessment' || m.messageType === 'quiz' ? m.metadata : undefined),
-              challengeData: m.metadata?.challengeData || (m.messageType === 'challenge' || m.messageType === 'challenge_trigger' ? m.metadata : undefined)
-            };
-          });
+              const chatMessageType = (typeMap[m.messageType] || m.messageType) as ChatMessage['type'];
+
+              return {
+                id: m.id || `msg-${Math.random()}`,
+                role: m.role,
+                content: m.content,
+                timestamp: new Date(m.timestamp),
+                type: chatMessageType,
+                roadmapData: m.metadata?.roadmapData,
+                quizData: m.metadata?.quizData,
+                challengeData: m.metadata?.challengeData
+              };
+            });
           setMessages(mappedMessages);
           setIsInitializing(false);
           return;

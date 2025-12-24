@@ -497,9 +497,10 @@ export default function InteractiveCourseSession({
           {isLoading && <div className="text-xs text-gray-500 animate-pulse">Genie is thinking...</div>}
           <div ref={messagesEndRef} />
         </div>
+      </div>
 
-        {/* Input Footer */}
-        <footer className="p-4 border-t border-gray-800 bg-gray-900/80 backdrop-blur-md">
+      {/* Input Footer */}
+      <footer className="p-4 border-t border-gray-800 bg-gray-900/80 backdrop-blur-md">
           <div className="max-w-4xl mx-auto flex gap-3">
             <input
               ref={inputRef}

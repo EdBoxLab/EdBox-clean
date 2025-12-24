@@ -190,7 +190,7 @@ Return: {Valid JSON object with keys: actual_goal, domain, target_proficiency, t
 
   const parsed = JSON.parse(result.text);
   const category = detectCourseCategory(parsed.parsedGoal, parsed.domain);
-  
+
   return { ...parsed, category };
 }
 
@@ -396,7 +396,7 @@ export async function POST(request: NextRequest) {
 
     if (cached && cached.responseData) {
       console.log('📦 Returning cached course');
-      
+
       const cachedGraph = {
         ...cached.responseData.skillGraph,
         id: `sg_${Date.now()}_${user.id.substring(0, 8)}`,
@@ -602,13 +602,13 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
 
-    if (action === 'test') {
-      // Health check endpoint
-      return NextResponse.json({
-        success: true,
-        message: `AI provider initialized`
-      });
-    }
+  if (action === 'test') {
+    // Health check endpoint
+    return NextResponse.json({
+      success: true,
+      message: `AI provider initialized`
+    });
+  }
 
   return NextResponse.json({
     error: 'Invalid action. Use POST to generate learning paths.'

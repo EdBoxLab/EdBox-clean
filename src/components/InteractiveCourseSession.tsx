@@ -25,19 +25,19 @@ interface RoadmapItem {
   confidence: number;
 }
 
-function RoadmapWelcome({ 
-  title, 
-  description, 
-  items, 
-  onStart 
-}: { 
-  title: string; 
-  description: string; 
-  items: RoadmapItem[]; 
-  onStart: () => void 
+function RoadmapWelcome({
+  title,
+  description,
+  items,
+  onStart
+}: {
+  title: string;
+  description: string;
+  items: RoadmapItem[];
+  onStart: () => void
 }) {
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="w-full max-w-4xl mx-auto bg-gray-900 border border-gray-800 rounded-3xl overflow-hidden shadow-2xl my-4"
@@ -171,29 +171,29 @@ export default function InteractiveCourseSession({
         setSession(existingSessionData);
         const history = await sessionManager.getSessionHistory(existingSessionData.id);
         if (history && history.length > 0) {
-            const mappedMessages: ChatMessage[] = history.map(m => {
-              const typeMap: Record<string, string> = {
-                'summary': 'roadmap',
-                'assessment': 'quiz',
-                'challenge': 'challenge_trigger',
-                'roadmap': 'roadmap',
-                'quiz': 'quiz',
-                'challenge_trigger': 'challenge_trigger'
-              };
+          const mappedMessages: ChatMessage[] = history.map(m => {
+            const typeMap: Record<string, string> = {
+              'summary': 'roadmap',
+              'assessment': 'quiz',
+              'challenge': 'challenge_trigger',
+              'roadmap': 'roadmap',
+              'quiz': 'quiz',
+              'challenge_trigger': 'challenge_trigger'
+            };
 
-              const chatMessageType = (typeMap[m.messageType] || m.messageType) as ChatMessage['type'];
+            const chatMessageType = (typeMap[m.messageType] || m.messageType) as ChatMessage['type'];
 
-              return {
-                id: m.id || `msg-${Math.random()}`,
-                role: m.role,
-                content: m.content,
-                timestamp: new Date(m.timestamp),
-                type: chatMessageType,
-                roadmapData: m.metadata?.roadmapData,
-                quizData: m.metadata?.quizData,
-                challengeData: m.metadata?.challengeData
-              };
-            });
+            return {
+              id: m.id || `msg-${Math.random()}`,
+              role: m.role,
+              content: m.content,
+              timestamp: new Date(m.timestamp),
+              type: chatMessageType,
+              roadmapData: m.metadata?.roadmapData,
+              quizData: m.metadata?.quizData,
+              challengeData: m.metadata?.challengeData
+            };
+          });
           setMessages(mappedMessages);
           setIsInitializing(false);
           return;
@@ -356,15 +356,15 @@ export default function InteractiveCourseSession({
       <ChallengeView
         challenge={activeChallenge}
         sessionId={session?.id}
-        onSuccess={() => { 
+        onSuccess={() => {
           const title = activeChallenge.title;
-          setActiveChallenge(null); 
-          handleSendMessage(`I've successfully mastered the challenge: "${title}"!`, true); 
+          setActiveChallenge(null);
+          handleSendMessage(`I've successfully mastered the challenge: "${title}"!`, true);
         }}
-        onFail={() => { 
+        onFail={() => {
           const title = activeChallenge.title;
-          setActiveChallenge(null); 
-          handleSendMessage(`I struggled with the challenge: "${title}". I need more practice.`, true); 
+          setActiveChallenge(null);
+          handleSendMessage(`I struggled with the challenge: "${title}". I need more practice.`, true);
         }}
         onClose={() => setActiveChallenge(null)}
       />
@@ -401,7 +401,7 @@ export default function InteractiveCourseSession({
                     <p className="text-[10px] text-gray-500 uppercase tracking-widest">Interactive Session</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setIsSidebarOpen(false)}
                   className="p-2 text-gray-500 hover:text-white transition-colors"
                 >
@@ -460,9 +460,9 @@ export default function InteractiveCourseSession({
           </div>
           <div className="flex items-center gap-2">
             <div className="h-1.5 w-24 bg-gray-800 rounded-full overflow-hidden">
-              <motion.div 
+              <motion.div
                 animate={{ width: `${(session?.learningContext?.comprehensionLevel || 0) * 100}%` }}
-                className="h-full bg-purple-500" 
+                className="h-full bg-purple-500"
               />
             </div>
             <span className="text-[10px] font-bold text-gray-500">{Math.round((session?.learningContext?.comprehensionLevel || 0) * 100)}%</span>
@@ -480,63 +480,62 @@ export default function InteractiveCourseSession({
                   animate={{ opacity: 1, y: 0 }}
                   className={`flex ${message.role === 'learner' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`max-w-[95%] lg:max-w-[90%] ${
-                    message.role === 'learner'
+                  <div className={`max-w-[95%] lg:max-w-[90%] ${message.role === 'learner'
                       ? 'bg-purple-600 text-white px-5 py-3.5 rounded-2xl rounded-tr-sm shadow-lg shadow-purple-500/10'
                       : message.type === 'roadmap' || message.type === 'quiz' || message.type === 'challenge_trigger'
                         ? 'w-full'
                         : 'bg-gray-800/80 border border-gray-700/50 px-5 py-3.5 rounded-2xl rounded-tl-sm backdrop-blur-sm'
-                  }`}>
-                  {message.type === 'roadmap' && message.roadmapData ? (
-                    <RoadmapWelcome 
-                      {...message.roadmapData} 
-                      onStart={() => handleSendMessage("Let's tackle the first goal!", true)} 
-                    />
+                    }`}>
+                    {message.type === 'roadmap' && message.roadmapData ? (
+                      <RoadmapWelcome
+                        {...message.roadmapData}
+                        onStart={() => handleSendMessage("Let's tackle the first goal!", true)}
+                      />
                     ) : message.type === 'quiz' && message.quizData ? (
-                      <QuizBubble 
-                        {...message.quizData} 
+                      <QuizBubble
+                        {...message.quizData}
                         onAnswer={(ans, corr) => {
                           const question = message.quizData?.question;
                           handleSendMessage(
-                            corr 
-                              ? `I correctly answered the quiz: "${question}"` 
-                              : `I struggled with the quiz: "${question}"`, 
+                            corr
+                              ? `I correctly answered the quiz: "${question}"`
+                              : `I struggled with the quiz: "${question}"`,
                             true
                           );
-                        }} 
+                        }}
                       />
                     ) : message.type === 'challenge_trigger' && message.challengeData ? (
 
-                    <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-6 rounded-2xl shadow-xl border border-white/10">
-                      <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
-                        <Trophy className="w-5 h-5 text-yellow-300" />
-                        {message.challengeData.title}
-                      </h3>
-                      <p className="text-white/80 mb-4 text-sm leading-relaxed">{message.challengeData.description}</p>
-                      <button 
-                        onClick={() => handleChallengeTrigger(message.id, message.challengeData)}
-                        className="w-full py-3 bg-white text-purple-700 font-bold rounded-xl hover:bg-gray-100 transition-all active:scale-95"
-                      >
-                        Accept Challenge
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="prose prose-invert max-w-none text-sm leading-relaxed">
-                      <ReactMarkdown>{message.content}</ReactMarkdown>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-          {isLoading && <div className="text-xs text-gray-500 animate-pulse">Genie is thinking...</div>}
-          <div ref={messagesEndRef} />
+                      <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-6 rounded-2xl shadow-xl border border-white/10">
+                        <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+                          <Trophy className="w-5 h-5 text-yellow-300" />
+                          {message.challengeData.title}
+                        </h3>
+                        <p className="text-white/80 mb-4 text-sm leading-relaxed">{message.challengeData.description}</p>
+                        <button
+                          onClick={() => handleChallengeTrigger(message.id, message.challengeData)}
+                          className="w-full py-3 bg-white text-purple-700 font-bold rounded-xl hover:bg-gray-100 transition-all active:scale-95"
+                        >
+                          Accept Challenge
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="prose prose-invert max-w-none text-sm leading-relaxed">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+            {isLoading && <div className="text-xs text-gray-500 animate-pulse">Genie is thinking...</div>}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
-      </div>
 
-      {/* Input Footer */}
-      <footer className="p-4 border-t border-gray-800 bg-gray-900/80 backdrop-blur-md">
-            <div className="w-full flex gap-3">
+        {/* Input Footer */}
+        <footer className="p-4 border-t border-gray-800 bg-gray-900/80 backdrop-blur-md">
+          <div className="w-full flex gap-3">
             <input
               ref={inputRef}
               type="text"
@@ -546,7 +545,7 @@ export default function InteractiveCourseSession({
               placeholder="Ask anything..."
               className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
-            <button 
+            <button
               onClick={() => handleSendMessage(inputMessage)}
               className="p-3 bg-purple-600 rounded-xl hover:bg-purple-500 transition-colors"
             >

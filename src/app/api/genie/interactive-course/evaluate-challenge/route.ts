@@ -50,16 +50,16 @@ Format: Return ONLY the JSON object. DO NOT include any explanatory text or mark
             try {
                 const resumeData = await sessionManager.getSessionResumeData(sessionId);
                 const session = resumeData.session;
-                
+
                 if (session.progressState) {
                     session.progressState.challengesCompleted = (session.progressState.challengesCompleted || 0) + 1;
-                    
+
                     // Update mastered skills
                     const concept = challenge.title || session.currentTopic;
                     if (concept && !session.progressState.masteredSkills.includes(concept)) {
                         session.progressState.masteredSkills.push(concept);
                     }
-                    
+
                     await sessionManager.persistSession(session);
                 }
             } catch (persistError) {

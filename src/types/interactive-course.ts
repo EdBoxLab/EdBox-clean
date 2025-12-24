@@ -89,6 +89,7 @@ export interface MessageMetadata {
   responseTime?: number; // seconds
   hintsUsed?: number;
   relatedChallenges?: string[];
+<<<<<<< HEAD
   roadmapData?: {
     title: string;
     description: string;
@@ -109,6 +110,8 @@ export interface MessageMetadata {
     difficulty: DifficultyLevel;
     status: 'pending' | 'started' | 'completed' | 'failed';
   };
+=======
+>>>>>>> 508416c7389a58844d96c7ac055d66b9f8905acc
 }
 
 /**

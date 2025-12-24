@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     // Evaluate the response
     const comprehensionResult = await understandingAssessment.evaluateResponse(questionId, answer);
-    
+
     // Get session data for adaptive response
     const resumeData = await sessionManager.getSessionResumeData(sessionId);
     const session = resumeData.session;
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     // Persist updated session
     session.learningContext = updatedContext;
-    
+
     // Update progress state counters
     if (session.progressState) {
       session.progressState.assessmentsCompleted = (session.progressState.assessmentsCompleted || 0) + 1;

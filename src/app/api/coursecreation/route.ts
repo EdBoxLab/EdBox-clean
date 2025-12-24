@@ -1,7 +1,6 @@
 // app/api/learning-path/generate/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI, Type } from "@google/genai";
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { generateWithRetry } from '@/lib/ai-providers';
 import { detectCourseCategory, injectTemplateIntoPrompt, type CourseCategory } from './templates';
@@ -95,27 +94,6 @@ interface LearnerState {
   startedAt: string;
 }
 
-// ============= API KEY MANAGEMENT =============
-
-const API_KEYS = [
-  process.env.GEMINI_API_KEY_1,
-  process.env.GEMINI_API_KEY_2,
-  process.env.GEMINI_API_KEY_3,
-  process.env.GEMINI_API_KEY_4,
-  process.env.GEMINI_API_KEY_5,
-].filter(Boolean) as string[];
-
-let currentKeyIndex = 0;
-
-const getNextApiKey = (): string => {
-  if (API_KEYS.length === 0) throw new Error('No API keys configured');
-  const key = API_KEYS[currentKeyIndex];
-  currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
-  return key;
-};
-
-const createAI = () => new GoogleGenAI({ apiKey: getNextApiKey() });
-
 // ============= RETRY WITH EXPONENTIAL BACKOFF =============
 
 async function retryWithBackoff<T>(
@@ -191,13 +169,13 @@ Return: {Valid JSON object with keys: actual_goal, domain, target_proficiency, t
     : '';
 
   const schema = {
-    type: Type.OBJECT,
+    type: "object",
     properties: {
-      parsedGoal: { type: Type.STRING },
-      domain: { type: Type.STRING },
-      targetProficiency: { type: Type.STRING },
-      estimatedTotalHours: { type: Type.NUMBER },
-      recommendedEngine: { type: Type.STRING },
+      parsedGoal: { type: "string" },
+      domain: { type: "string" },
+      targetProficiency: { type: "string" },
+      estimatedTotalHours: { type: "number" },
+      recommendedEngine: { type: "string" },
     },
     required: ['parsedGoal', 'domain', 'targetProficiency', 'estimatedTotalHours', 'recommendedEngine']
   };
@@ -292,38 +270,38 @@ Respond ONLY with valid JSON.`;
   const systemPrompt = injectTemplateIntoPrompt(basePrompt, category);
 
   const schema = {
-    type: Type.OBJECT,
+    type: "object",
     properties: {
       skillPaths: {
-        type: Type.ARRAY,
+        type: "array",
         items: {
-          type: Type.OBJECT,
+          type: "object",
           properties: {
-            id: { type: Type.STRING },
-            name: { type: Type.STRING },
-            description: { type: Type.STRING },
+            id: { type: "string" },
+            name: { type: "string" },
+            description: { type: "string" },
             skills: {
-              type: Type.ARRAY,
+              type: "array",
               items: {
-                type: Type.OBJECT,
+                type: "object",
                 properties: {
-                  id: { type: Type.STRING },
-                  name: { type: Type.STRING },
-                  description: { type: Type.STRING },
-                  engine: { type: Type.STRING },
-                  estimatedMinutes: { type: Type.NUMBER },
-                  prerequisites: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  id: { type: "string" },
+                  name: { type: "string" },
+                  description: { type: "string" },
+                  engine: { type: "string" },
+                  estimatedMinutes: { type: "number" },
+                  prerequisites: { type: "array", items: { type: "string" } },
                   masteryThreshold: {
-                    type: Type.OBJECT,
+                    type: "object",
                     properties: {
-                      minChallenges: { type: Type.NUMBER },
-                      minConfidence: { type: Type.NUMBER },
-                      minSuccessRate: { type: Type.NUMBER }
+                      minChallenges: { type: "number" },
+                      minConfidence: { type: "number" },
+                      minSuccessRate: { type: "number" }
                     },
                     required: ['minChallenges', 'minConfidence', 'minSuccessRate']
                   },
-                  challengeTypes: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  xpReward: { type: Type.NUMBER }
+                  challengeTypes: { type: "array", items: { type: "string" } },
+                  xpReward: { type: "number" }
                 },
                 required: ['id', 'name', 'description', 'engine', 'estimatedMinutes', 'prerequisites', 'masteryThreshold', 'challengeTypes', 'xpReward']
               }
@@ -333,33 +311,33 @@ Respond ONLY with valid JSON.`;
         }
       },
       miniProjects: {
-        type: Type.ARRAY,
+        type: "array",
         items: {
-          type: Type.OBJECT,
+          type: "object",
           properties: {
-            id: { type: Type.STRING },
-            name: { type: Type.STRING },
-            description: { type: Type.STRING },
-            unlocksAfter: { type: Type.ARRAY, items: { type: Type.STRING } },
-            engine: { type: Type.STRING },
-            estimatedMinutes: { type: Type.NUMBER },
-            xpReward: { type: Type.NUMBER },
-            shareTemplate: { type: Type.STRING }
+            id: { type: "string" },
+            name: { type: "string" },
+            description: { type: "string" },
+            unlocksAfter: { type: "array", items: { type: "string" } },
+            engine: { type: "string" },
+            estimatedMinutes: { type: "number" },
+            xpReward: { type: "number" },
+            shareTemplate: { type: "string" }
           },
           required: ['id', 'name', 'description', 'unlocksAfter', 'engine', 'estimatedMinutes', 'xpReward', 'shareTemplate']
         }
       },
       capstoneProject: {
-        type: Type.OBJECT,
+        type: "object",
         properties: {
-          id: { type: Type.STRING },
-          name: { type: Type.STRING },
-          description: { type: Type.STRING },
-          unlocksAfter: { type: Type.ARRAY, items: { type: Type.STRING } },
-          engine: { type: Type.STRING },
-          estimatedMinutes: { type: Type.NUMBER },
-          xpReward: { type: Type.NUMBER },
-          shareTemplate: { type: Type.STRING }
+          id: { type: "string" },
+          name: { type: "string" },
+          description: { type: "string" },
+          unlocksAfter: { type: "array", items: { type: "string" } },
+          engine: { type: "string" },
+          estimatedMinutes: { type: "number" },
+          xpReward: { type: "number" },
+          shareTemplate: { type: "string" }
         },
         required: ['id', 'name', 'description', 'unlocksAfter', 'engine', 'estimatedMinutes', 'xpReward', 'shareTemplate']
       }
@@ -624,22 +602,13 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
 
-  if (action === 'test') {
-    // Health check endpoint
-    try {
-      const keysAvailable = API_KEYS.length;
+    if (action === 'test') {
+      // Health check endpoint
       return NextResponse.json({
         success: true,
-        keysAvailable,
-        message: `${keysAvailable} API key(s) configured`
+        message: `AI provider initialized`
       });
-    } catch (error) {
-      return NextResponse.json({
-        success: false,
-        error: 'No API keys configured'
-      }, { status: 500 });
     }
-  }
 
   return NextResponse.json({
     error: 'Invalid action. Use POST to generate learning paths.'

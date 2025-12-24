@@ -129,6 +129,10 @@ async function makeSmartDecision(
     }
 
     // 4. Competency-Based Transition
+    const avgConfidence = goals.length > 0 
+        ? goals.reduce((acc: number, g: any) => acc + (g.confidence || 0), 0) / goals.length 
+        : 0;
+
     const allGoalsMastered = goals.length > 0 && goals.every((g: any) => (g.confidence || 0) >= 70);
 
     if (allGoalsMastered) {

@@ -86,22 +86,89 @@ export const generateResearchPackage = async (
     **Source Documents:**\n    ---\n    ${sourceContent}\n    ---\n    
     Generate all text-based components of the research package in the required JSON format now.\n    `;
 
-  try {
-    // 1. Generate all text-based content
-    setLoadingStatus("Synthesizing text-based content (summary, quiz, flashcards, script)...");
-    const textResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-pro',
-      contents: textGenerationPrompt,
-      config: {
-        systemInstruction: getSystemInstruction(citationStyle),
-        responseMimeType: "application/json",
-        responseSchema: textSchema,
-      },
-    });
-    if (!textResponse.text) {
-        throw new Error("The response from the AI did not contain any text.")
-    }
-    const textData = JSON.parse(textResponse.text.trim());
+    try {
+      // 1. Generate all text-based content
+      setLoadingStatus("Synthesizing text-based content (summary, quiz, flashcards, script)...");
+      const { generateWithRetry } = await import('@/lib/ai-providers');
+      
+      const textResponse = await generateWithRetry({
+        prompt: textGenerationPrompt,
+        systemPrompt: getSystemInstruction(citationStyle),
+        maxTokens: 4000,
+        // Using a plain object schema for Groq as it doesn't use the Google Type enum
+        schema: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            summary: {
+              type: "object",
+              properties: {
+                one_sentence: { type: "string" },
+                one_paragraph: { type: "string" },
+                one_page: { type: "string" }
+              },
+              required: ["one_sentence", "one_paragraph", "one_page"]
+            },
+            flashcards: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  question: { type: "string" },
+                  answer: { type: "string" },
+                  citations: { 
+                    type: "array", 
+                    items: {
+                      type: "object",
+                      properties: {
+                        source_id: { type: "string" },
+                        quote: { type: "string" }
+                      }
+                    }
+                  }
+                },
+                required: ["question", "answer", "citations"]
+              }
+            },
+            quiz: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  question: { type: "string" },
+                  answer: { type: "string" },
+                  citations: { 
+                    type: "array", 
+                    items: {
+                      type: "object",
+                      properties: {
+                        source_id: { type: "string" },
+                        quote: { type: "string" }
+                      }
+                    }
+                  }
+                },
+                required: ["question", "answer", "citations"]
+              }
+            },
+            audio_dialogue: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                script: { type: "string" }
+              },
+              required: ["title", "script"]
+            }
+          },
+          required: ["title", "summary", "flashcards", "quiz", "audio_dialogue"]
+        }
+      });
+
+      if (!textResponse.text) {
+          throw new Error("The response from the AI did not contain any text.")
+      }
+      const textData = JSON.parse(textResponse.text.trim());
+
 
     // 2. Generate image
     setLoadingStatus("Generating visual diagram...");

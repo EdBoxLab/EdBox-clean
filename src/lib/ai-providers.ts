@@ -104,31 +104,30 @@ export interface GenerateResult {
 }
 
 /**
- * Generate AI content with automatic Gemini -> Groq fallback
+ * Generate AI content with prioritized Groq (as requested by user)
  */
 export async function generateWithFallback(options: GenerateOptions): Promise<GenerateResult> {
   const { prompt, systemPrompt, schema, temperature = 1.0, maxTokens = 4000, attachments = [] } = options;
 
   const hasImages = attachments.some(a => a.mimeType.startsWith('image/'));
 
-  // If there are images, try Groq Vision first (as requested)
-  if (hasImages) {
-    try {
-      console.log('🟢 Attempting Groq Vision generation...');
-      const Groq = (await import('groq-sdk')).default;
-      const groq = new Groq({ apiKey: getNextGroqKey() });
+  // Try Groq FIRST (User preference: "let's not use gemini for now just groq")
+  try {
+    console.log('🟢 Attempting Groq generation...');
+    const Groq = (await import('groq-sdk')).default;
+    const groq = new Groq({ apiKey: getNextGroqKey() });
 
-      const messages: any[] = [];
+    const messages: any[] = [];
 
-      if (systemPrompt) {
-        messages.push({
-          role: 'system',
-          content: systemPrompt,
-        });
-      }
+    if (systemPrompt) {
+      messages.push({
+        role: 'system',
+        content: systemPrompt,
+      });
+    }
 
+    if (hasImages) {
       const userContent: any[] = [{ type: 'text', text: prompt }];
-
       attachments.forEach(attachment => {
         if (attachment.mimeType.startsWith('image/')) {
           userContent.push({
@@ -139,121 +138,78 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
           });
         }
       });
-
-      messages.push({
-        role: 'user',
-        content: userContent,
-      });
-
-      const response = await groq.chat.completions.create({
-        model: 'llama-3.2-11b-vision-preview',
-        messages,
-        temperature,
-        max_tokens: maxTokens,
-        response_format: schema ? { type: 'json_object' } : undefined,
-      });
-
-      const text = response.choices[0]?.message?.content || '';
-      console.log('✅ Groq Vision successful');
-
-      return {
-        text,
-        provider: 'groq',
-        success: true,
-      };
-    } catch (groqError: any) {
-      console.warn('⚠️ Groq Vision failed:', groqError.message);
-      // Fallback to Gemini if Groq fails even with images
+      messages.push({ role: 'user', content: userContent });
+    } else {
+      messages.push({ role: 'user', content: prompt });
     }
-  }
 
-  // Normal flow: Try Gemini first (or fallback from Groq Vision)
-  try {
-    console.log('🔵 Attempting Gemini generation...');
-    const { GoogleGenAI, Type } = await import("@google/genai");
-    const ai = new GoogleGenAI({ apiKey: getNextGeminiKey() });
-
-    const config: any = {
+    const response = await groq.chat.completions.create({
+      model: hasImages ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile',
+      messages,
       temperature,
-      maxOutputTokens: maxTokens,
-    };
-
-    if (systemPrompt) {
-      config.systemInstruction = systemPrompt;
-    }
-
-    if (schema) {
-      config.responseMimeType = "application/json";
-      config.responseSchema = schema;
-    }
-
-    const contents: any[] = [{ role: 'user', parts: [{ text: prompt }] }];
-
-    if (attachments.length > 0) {
-      attachments.forEach(attachment => {
-        contents[0].parts.push({
-          inlineData: {
-            mimeType: attachment.mimeType,
-            data: attachment.data,
-          }
-        });
-      });
-    }
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
-      contents,
-      config,
+      max_tokens: maxTokens,
+      response_format: schema ? { type: 'json_object' } : undefined,
     });
 
-    console.log('✅ Gemini generation successful');
+    const text = response.choices[0]?.message?.content || '';
+    console.log('✅ Groq successful');
+
     return {
-      text: response.text,
-      provider: 'gemini',
+      text,
+      provider: 'groq',
       success: true,
     };
-  } catch (geminiError: any) {
-    console.warn('⚠️ Gemini failed:', geminiError.message);
-    console.log('🟢 Falling back to Groq...');
-
-    // Fallback to Groq
+  } catch (groqError: any) {
+    console.warn('⚠️ Groq failed:', groqError.message);
+    
+    // Fallback to Gemini only as a last resort if Groq fails
     try {
-      const Groq = (await import('groq-sdk')).default;
-      const groq = new Groq({ apiKey: getNextGroqKey() });
+      console.log('🔵 Falling back to Gemini as last resort...');
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey: getNextGeminiKey() });
 
-      const messages: any[] = [];
+      const config: any = {
+        temperature,
+        maxOutputTokens: maxTokens,
+      };
 
       if (systemPrompt) {
-        messages.push({
-          role: 'system',
-          content: systemPrompt,
+        config.systemInstruction = systemPrompt;
+      }
+
+      if (schema) {
+        config.responseMimeType = "application/json";
+        config.responseSchema = schema;
+      }
+
+      const contents: any[] = [{ role: 'user', parts: [{ text: prompt }] }];
+
+      if (attachments.length > 0) {
+        attachments.forEach(attachment => {
+          contents[0].parts.push({
+            inlineData: {
+              mimeType: attachment.mimeType,
+              data: attachment.data,
+            }
+          });
         });
       }
 
-      messages.push({
-        role: 'user',
-        content: prompt,
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.0-flash-exp',
+        contents,
+        config,
       });
 
-      const response = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        temperature,
-        max_tokens: maxTokens,
-        response_format: schema ? { type: 'json_object' } : undefined,
-      });
-
-      const text = response.choices[0]?.message?.content || '';
-      console.log('✅ Groq generation successful');
-
+      console.log('✅ Gemini fallback successful');
       return {
-        text,
-        provider: 'groq',
+        text: response.text,
+        provider: 'gemini',
         success: true,
       };
-    } catch (groqError: any) {
-      console.error('❌ Both Gemini and Groq failed');
-      throw new Error(`AI generation failed: ${groqError.message}`);
+    } catch (geminiError: any) {
+      console.error('❌ Both Groq and Gemini failed');
+      throw new Error(`AI generation failed: ${geminiError.message}`);
     }
   }
 }

@@ -40,7 +40,7 @@ function RoadmapWelcome({
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-2xl mx-auto bg-gray-900 border border-gray-800 rounded-3xl overflow-hidden shadow-2xl my-4"
+      className="w-full max-w-4xl mx-auto bg-gray-900 border border-gray-800 rounded-3xl overflow-hidden shadow-2xl my-4"
     >
       <div className="p-8 bg-gradient-to-br from-purple-900/40 to-indigo-900/40 border-b border-gray-800">
         <div className="flex items-center gap-4 mb-4">
@@ -457,7 +457,7 @@ export default function InteractiveCourseSession({
                   animate={{ opacity: 1, y: 0 }}
                   className={`flex ${message.role === 'learner' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`max-w-[90%] lg:max-w-[85%] ${
+                  <div className={`max-w-[95%] lg:max-w-[90%] ${
                     message.role === 'learner'
                       ? 'bg-purple-600 text-white px-5 py-3.5 rounded-2xl rounded-tr-sm shadow-lg shadow-purple-500/10'
                       : message.type === 'roadmap' || message.type === 'quiz' || message.type === 'challenge_trigger'

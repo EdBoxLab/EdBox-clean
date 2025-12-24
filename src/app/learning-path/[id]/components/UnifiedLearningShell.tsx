@@ -66,7 +66,7 @@ export default function UnifiedLearningShell({
 
             {/* Main Content Area */}
             <main className="flex-1 overflow-y-auto relative flex flex-col h-full">
-                <div className="max-w-4xl mx-auto w-full h-full p-4 md:p-8 flex flex-col">
+                <div className="w-full h-full p-4 md:p-8 flex flex-col">
                     {children}
                 </div>
             </main>

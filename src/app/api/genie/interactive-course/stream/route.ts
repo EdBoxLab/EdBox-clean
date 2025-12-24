@@ -34,13 +34,11 @@ function detectBehavioralPatterns(userMessage: string, conversationHistory: any[
 // ============================================
 function extractJSON(text: string): any {
     try {
-        // Find the first '{' and the last '}'
         const firstBrace = text.indexOf('{');
         const lastBrace = text.lastIndexOf('}');
         
         if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
             let jsonStr = text.substring(firstBrace, lastBrace + 1).trim();
-            // Remove markdown code blocks if present
             jsonStr = jsonStr.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
             return JSON.parse(jsonStr);
         }
@@ -125,7 +123,6 @@ async function makeSmartDecision(
     }
 
     // 2. Initial Challenge Stage (Placement)
-    // If goals exist but we haven't done a challenge yet (first few turns)
     const hasDoneChallenge = goals.some((g: any) => g.status === 'mastered' || (g.confidence > 50));
     const challengeRelated = userMsg.includes('challenge') || userMsg.includes('task') || userMsg.includes('approach');
     
@@ -162,7 +159,6 @@ async function makeSmartDecision(
     }
 
     // 5. Default: Intelligent Tutoring (EXPLAIN)
-    // Transition to QUIZ if confidence is high but not mastered
     if (aiAnalysis?.readyForQuiz || (avgConfidence > 40 && turnCount % 3 === 0)) {
         return {
             action: 'send_quiz',
@@ -207,7 +203,6 @@ async function streamText(
 // MAIN API ROUTE
 // ============================================
 export async function POST(request: NextRequest) {
-    const startTime = Date.now();
     try {
         const supabase = await createSupabaseServerClient();
         const body = await request.json();
@@ -227,10 +222,8 @@ export async function POST(request: NextRequest) {
             return new Response(JSON.stringify({ error: 'Missing params' }), { status: 400 });
         }
 
-        const { data: { session: authSession } } = await supabase.auth.getSession();
         const persistenceClient = await createServerSupabaseClient();
 
-        // 1. Fetch Session State
         const { data: sessionData } = await persistenceClient
             .from('interactive_course_sessions')
             .select('learning_context')
@@ -240,7 +233,6 @@ export async function POST(request: NextRequest) {
         const currentContext = sessionData?.learning_context || learningContext;
         let goals: LearningGoal[] = currentContext.goals || [];
 
-        // 2. AI Analysis & Goal Updates
         const aiAnalysis = await analyzeUnderstanding(userMessage, conversationHistory, skillTitle || currentSkillId, goals);
         
         if (aiAnalysis?.updatedGoals) {
@@ -260,7 +252,6 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // 3. Make Decision
         const decision = await makeSmartDecision(userMessage, aiAnalysis, detectBehavioralPatterns(userMessage, conversationHistory), {
             turnCount,
             learningContext: { ...currentContext, goals }
@@ -268,7 +259,6 @@ export async function POST(request: NextRequest) {
 
         const effectiveStage = decision.forcedStage;
 
-        // 4. Update Database Session
         await persistenceClient
             .from('interactive_course_sessions')
             .update({
@@ -281,34 +271,32 @@ export async function POST(request: NextRequest) {
             })
             .eq('id', sessionId);
 
-    // 5. Build System Prompt
-    let systemPrompt = `You are Genie, a world-class mentor for "${skillTitle || currentSkillId}".
-Your goal is to help the learner achieve 100% confidence in these goals:
+        let systemPrompt = `### GENIE PROTOCOL: ${effectiveStage} ###
+You are Genie, a world-class mentor for "${skillTitle || currentSkillId}".
+
+CRITICAL OUTPUT RULES:
+1. STAGE IS "${effectiveStage}". 
+2. IF STAGE IS "GOALS": You MUST ONLY output a [ROADMAP] JSON block. NO PREAMBLE. NO CONVERSATION.
+3. IF STAGE IS "QUIZ": You MUST ONLY output a [QUIZ] JSON block.
+4. IF STAGE IS "CHALLENGE": You MUST ONLY output a [CHALLENGE] JSON block.
+5. IF STAGE IS "EXPLAIN": Provide conversational insights. Focus strictly on the subject. Use markdown for better readability.
+
+GOALS TO MASTER:
 ${goals.map(g => `- ${g.text} (Current: ${g.confidence}%)`).join('\n')}
 
-CURRENT STAGE: ${effectiveStage}
-DECISION: ${decision.action}
+[ROADMAP] STRUCTURE:
+{"title": "...", "description": "...", "items": [{"id": "g1", "text": "Goal Title", "description": "Goal Details", "confidence": 0}, ...]}
 
-RULES:
-- Be direct, conversational, and focus strictly on the subject.
-- If effectiveStage is GOALS and action is generate_roadmap: 
-  Return a [ROADMAP] JSON. 
-  Example: [ROADMAP] {"title": "Mastering Market Analysis", "description": "...", "items": [{"id": "g1", "text": "Identify Target Audience", "description": "...", "confidence": 0}, ...]}
-- If effectiveStage is QUIZ: Send a [QUIZ] JSON.
-- If effectiveStage is CHALLENGE: Send a [CHALLENGE] JSON.
-- If effectiveStage is EXPLAIN: Provide deep insights and check progress.
+[QUIZ] STRUCTURE:
+{"question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correctAnswer": "...", "explanation": "..."}
 
-FORMATS:
-[QUIZ] {"question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correctAnswer": "...", "explanation": "..."}
-[CHALLENGE] {"title": "...", "description": "...", "hint": "...", "expectedOutcome": "...", "difficulty": "..."}`;
+[CHALLENGE] STRUCTURE:
+{"title": "...", "description": "...", "hint": "...", "expectedOutcome": "...", "difficulty": "..."}`;
 
-
-        // 6. Stream Response
         const encoder = new TextEncoder();
         const stream = new ReadableStream({
             async start(controller) {
                 try {
-                    // 6a. Persist Learner Message (to ensure history is complete)
                     await persistenceClient.rpc('add_conversation_message', {
                         p_session_id: sessionId,
                         p_role: 'learner',
@@ -317,18 +305,21 @@ FORMATS:
                         p_metadata: {}
                     });
 
-                    // Send Goal Updates First
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
                         type: 'goals_updated', 
                         goals,
                         comprehensionLevel: aiAnalysis?.confidence || currentContext.comprehensionLevel || 0.5
                     })}\n\n`));
 
+                    const finalPrompt = effectiveStage === 'GOALS' 
+                        ? `Generate the learning roadmap for ${skillTitle || currentSkillId} based on: ${userMessage}. Return ONLY the [ROADMAP] JSON block.`
+                        : userMessage;
+
                     const result = await generateWithRetry({
-                        prompt: userMessage,
+                        prompt: finalPrompt,
                         systemPrompt,
-                        temperature: 0.7,
-                        maxTokens: 600,
+                        temperature: effectiveStage === 'EXPLAIN' ? 0.7 : 0.05,
+                        maxTokens: 1200,
                     });
 
                     const genieResponse = result.text || "Let's keep going!";
@@ -339,10 +330,7 @@ FORMATS:
                         try {
                             const roadmapData = extractJSON(roadmap);
                             if (roadmapData) {
-                                // 1. Send Roadmap UI
                                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'roadmap', roadmapData })}\n\n`));
-                                
-                                // 2. Persist Goals
                                 const newGoals = roadmapData.items.map((it: any) => ({
                                     id: it.id,
                                     text: it.text,
@@ -350,14 +338,10 @@ FORMATS:
                                     status: 'pending',
                                     confidence: it.confidence || 0
                                 }));
-                                
                                 await persistenceClient.from('interactive_course_sessions').update({
                                     learning_context: { ...currentContext, goals: newGoals }
                                 }).eq('id', sessionId);
-                                
                                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'goals_updated', goals: newGoals })}\n\n`));
-
-                                // 3. Persist Roadmap Message
                                 await persistenceClient.rpc('add_conversation_message', {
                                     p_session_id: sessionId,
                                     p_role: 'genie',
@@ -366,20 +350,16 @@ FORMATS:
                                     p_metadata: { roadmapData }
                                 });
 
-                                // 4. IMMEDIATELY TRIGGER CHALLENGE (As requested: "send a challenge imediately")
                                 const challengeResult = await generateWithRetry({
                                     prompt: `Create a first practical challenge for these goals: ${JSON.stringify(newGoals)}`,
                                     systemPrompt: `Return ONLY valid JSON: [CHALLENGE] {"title": "...", "description": "...", "hint": "...", "expectedOutcome": "...", "difficulty": "Easy"}`,
                                     temperature: 0.7
                                 });
-                                
                                 const challengeText = challengeResult.text || '';
                                 if (challengeText.includes('[CHALLENGE]')) {
                                     const cData = extractJSON(challengeText.split('[CHALLENGE]')[1]);
                                     if (cData) {
                                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData: cData })}\n\n`));
-                                        
-                                        // Persist Challenge Message
                                         await persistenceClient.rpc('add_conversation_message', {
                                             p_session_id: sessionId,
                                             p_role: 'genie',
@@ -394,47 +374,33 @@ FORMATS:
                     } else if (genieResponse.includes('[QUIZ]')) {
                         const [intro, quiz] = genieResponse.split('[QUIZ]');
                         if (intro) await streamText(intro.trim(), controller, encoder);
-                        try {
-                            const quizData = extractJSON(quiz);
-                            if (quizData) {
-                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'quiz', quizData })}\n\n`));
-                                
-                                // Persist Quiz Message
-                                await persistenceClient.rpc('add_conversation_message', {
-                                    p_session_id: sessionId,
-                                    p_role: 'genie',
-                                    p_content: quizData.question,
-                                    p_message_type: 'assessment',
-                                    p_metadata: quizData
-                                });
-                            } else {
-                                await streamText('[QUIZ] ' + quiz, controller, encoder);
-                            }
-                        } catch (e) { await streamText('[QUIZ] ' + quiz, controller, encoder); }
+                        const quizData = extractJSON(quiz);
+                        if (quizData) {
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'quiz', quizData })}\n\n`));
+                            await persistenceClient.rpc('add_conversation_message', {
+                                p_session_id: sessionId,
+                                p_role: 'genie',
+                                p_content: quizData.question,
+                                p_message_type: 'assessment',
+                                p_metadata: quizData
+                            });
+                        }
                     } else if (genieResponse.includes('[CHALLENGE]')) {
                         const [intro, challenge] = genieResponse.split('[CHALLENGE]');
                         if (intro) await streamText(intro.trim(), controller, encoder);
-                        try {
-                            const challengeData = extractJSON(challenge);
-                            if (challengeData) {
-                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData })}\n\n`));
-                                
-                                // Persist Challenge Message
-                                await persistenceClient.rpc('add_conversation_message', {
-                                    p_session_id: sessionId,
-                                    p_role: 'genie',
-                                    p_content: challengeData.description,
-                                    p_message_type: 'challenge',
-                                    p_metadata: challengeData
-                                });
-                            } else {
-                                await streamText('[CHALLENGE] ' + challenge, controller, encoder);
-                            }
-                        } catch (e) { await streamText('[CHALLENGE] ' + challenge, controller, encoder); }
+                        const challengeData = extractJSON(challenge);
+                        if (challengeData) {
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData })}\n\n`));
+                            await persistenceClient.rpc('add_conversation_message', {
+                                p_session_id: sessionId,
+                                p_role: 'genie',
+                                p_content: challengeData.description,
+                                p_message_type: 'challenge',
+                                p_metadata: challengeData
+                            });
+                        }
                     } else {
                         await streamText(genieResponse, controller, encoder);
-                        
-                        // Persist Regular Explanation Message
                         await persistenceClient.rpc('add_conversation_message', {
                             p_session_id: sessionId,
                             p_role: 'genie',
@@ -443,7 +409,6 @@ FORMATS:
                             p_metadata: {}
                         });
                     }
-
                     controller.close();
                 } catch (e) { controller.close(); }
             }
@@ -456,7 +421,6 @@ FORMATS:
                 'Connection': 'keep-alive',
             },
         });
-
     } catch (error: any) {
         return new Response(JSON.stringify({ error: error.message }), { status: 500 });
     }

@@ -337,10 +337,13 @@ export function useMultipleSkillsProgress(skillGraph?: SkillGraph) {
   });
 
   // Memoize the skill graph to prevent unnecessary re-renders
-  const memoizedSkillGraph = useMemo(() => skillGraph, [
+  const memoizedSkillGraph = useMemo(() => {
+    if (!skillGraph) return null;
+    return skillGraph;
+  }, [
     skillGraph?.nodes?.length,
     skillGraph?.edges?.length,
-    JSON.stringify(skillGraph?.nodes?.map(n => n.id))
+    skillGraph?.nodes?.map(n => n.id).join(',')
   ]);
 
   const loadProgressData = useCallback(async () => {
@@ -385,7 +388,7 @@ export function useMultipleSkillsProgress(skillGraph?: SkillGraph) {
     if (memoizedSkillGraph) {
       loadProgressData();
     }
-  }, [loadProgressData, memoizedSkillGraph]);
+  }, [memoizedSkillGraph]); // Removed loadProgressData from dependencies
 
   return {
     loading: state.loading,

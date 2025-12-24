@@ -17,10 +17,19 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }: {
   const [searchQuery, setSearchQuery] = useState('');
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
-  const [joinError, setJoinError] = useState('');
-  const [isJoining, setIsJoining] = useState(false);
+    const [joinError, setJoinError] = useState('');
+    const [isJoining, setIsJoining] = useState(false);
+    const [showInviteModal, setShowInviteModal] = useState(false);
+    const [selectedCircleForInvite, setSelectedCircleForInvite] = useState<any>(null);
 
-  const filteredCircles = circles.filter((c: any) =>
+    const copyInviteCode = (code: string) => {
+      if (!code) return;
+      navigator.clipboard.writeText(code);
+      alert(`Invite code ${code} copied! Share with others to let them join.`);
+    };
+
+    const filteredCircles = circles.filter((c: any) =>
+
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -177,8 +186,14 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }: {
                         </p>
                       </div>
                     </div>
-                    <button className="mb-2 w-9 h-9 flex items-center justify-center rounded-full bg-white/5 text-slate-200/70 hover:bg-white/10 transition-colors">
-                      <MoreVertical className="w-5 h-5" />
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCircleForInvite(circle);
+                        setShowInviteModal(true);
+                      }}
+                      className="mb-2 w-9 h-9 flex items-center justify-center rounded-full bg-white/5 text-slate-200/70 hover:bg-white/10 transition-colors">
+                      <Share2 className="w-5 h-5" />
                     </button>
                   </div>
 
@@ -194,10 +209,6 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }: {
                         className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-slate-200 h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-500/30">
                         <MessageCircle className="w-4 h-4" />
                         Chat
-                      </button>
-                      <button className="flex-1 bg-white/5 hover:bg-white/10 text-slate-200 h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors border border-white/10">
-                        <Video className="w-4 h-4" />
-                        Join Call
                       </button>
                     </div>
                   ) : (
@@ -259,11 +270,35 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }: {
                   {isJoining ? 'Joining...' : 'Join Circle'}
                 </button>
               </div>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* Invite Modal */}
+        {showInviteModal && selectedCircleForInvite && (
+          <div className="fixed inset-0 bg-[#1a0b2e]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-gradient-to-br from-[#1a0b2e] to-purple-900/20 border border-purple-500/20 p-6 rounded-2xl max-w-md w-full shadow-2xl">
+              <h2 className="text-2xl font-bold mb-4 text-slate-200">Share Circle</h2>
+              <p className="text-gray-300 mb-4">Share this invite code with others to let them join "{selectedCircleForInvite.name}":</p>
+              <div className="bg-white/10 border border-white/20 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
+                <span className="text-2xl font-bold text-purple-400 tracking-widest">{selectedCircleForInvite.invite_code}</span>
+                <button
+                  onClick={() => copyInviteCode(selectedCircleForInvite.invite_code)}
+                  className="bg-purple-600 hover:bg-purple-700 text-slate-200 px-4 py-2 rounded-lg text-sm font-bold transition-colors">
+                  Copy
+                </button>
+              </div>
+              <button
+                onClick={() => setShowInviteModal(false)}
+                className="w-full bg-white/5 hover:bg-white/10 text-slate-200 py-3 rounded-xl font-bold transition-colors">
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
   );
 };
 

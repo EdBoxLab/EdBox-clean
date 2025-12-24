@@ -40,6 +40,17 @@ export interface ConversationMessage {
 export type MessageType = 'explanation' | 'question' | 'assessment' | 'quiz' | 'challenge_trigger' | 'challenge' | 'feedback' | 'encouragement' | 'summary';
 
 /**
+ * Specific learning goal for mastery tracking
+ */
+export interface LearningGoal {
+  id: string;
+  text: string;
+  status: 'pending' | 'in_progress' | 'mastered';
+  evidence?: string; // e.g., "Passed Quiz 1 with 100%"
+  timestamp: string;
+}
+
+/**
  * Learning context maintained throughout the session
  */
 export interface LearningContext {
@@ -48,7 +59,8 @@ export interface LearningContext {
   strugglingAreas: string[];
   comprehensionLevel: number; // 0-1 scale
   preferredLearningStyle?: string;
-  sessionGoals?: string[];
+  goals?: LearningGoal[]; // Replaced string[] with strict schema
+  masteryScore?: number; // 0-100 overall mastery
 }
 
 /**

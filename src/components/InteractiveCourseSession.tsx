@@ -16,6 +16,7 @@ import { sessionManager } from '@/lib/services/interactive-course-session-manage
 import QuizBubble from './QuizBubble';
 import ChallengeView from './ChallengeView';
 import { GeneratedChallenge } from '@/types/skill-progression';
+import GoalTracker from './GoalTracker';
 
 interface InteractiveCourseSessionProps {
   courseId: string;
@@ -406,20 +407,22 @@ export default function InteractiveCourseSession({
                 setMessages(prev => prev.map(msg =>
                   msg.id === genieMessageId ? { ...msg, type: 'challenge_trigger', challengeData: data.challengeData, content: data.challengeData.description } : msg
                 ));
-              } else if (data.type === 'complete') {
-                setMessages(prev => {
-                  const updated = prev.map(msg =>
-                    msg.id === genieMessageId ? { ...msg, content: data.content || fullContent } : msg
-                  );
-                  if (session) sessionManager.persistSession({
-                    ...session,
-                    updatedAt: new Date()
-                  }).catch(console.error);
-                  return updated;
-                });
                 if (!data.type || data.type === 'content') {
                   setTimeout(() => setShowActionButtons(true), 1000);
                 }
+              } else if (data.type === 'goals_updated') {
+                // Real-time Goal Update!
+                const newGoals = data.goals;
+                setSession(prev => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    learningContext: {
+                      ...prev.learningContext,
+                      goals: newGoals
+                    }
+                  };
+                });
               }
             } catch (e) { }
           }
@@ -537,6 +540,13 @@ export default function InteractiveCourseSession({
         <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
           <XPStreakDisplay showCompact={true} skillGraphId={courseId} />
         </div>
+
+        {/* Real-Time Goal Tracker */}
+        {session?.learningContext?.goals && session.learningContext.goals.length > 0 && (
+          <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+            <GoalTracker goals={session.learningContext.goals} />
+          </div>
+        )}
 
         {/* Progress Section */}
         {session && (

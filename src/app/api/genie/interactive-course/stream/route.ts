@@ -303,12 +303,13 @@ export async function POST(request: NextRequest) {
         let systemPrompt = `You are Genie, a world-class mentor for "${skillTitle || currentSkillId}".
 Your goal is to guide the student through the "${effectiveStage}" stage.
 
-CRITICAL RULES:
-1. NEVER mention the internal stage name (e.g., "STAGE IS QUIZ") in your response.
-2. IF STAGE IS "GOALS": Output ONLY a [ROADMAP] JSON block. No conversation.
-3. IF STAGE IS "QUIZ": Output ONLY a [QUIZ] JSON block.
-4. IF STAGE IS "CHALLENGE": Output ONLY a [CHALLENGE] JSON block.
-5. IF STAGE IS "EXPLAIN": Provide conversational insights. Use markdown.
+CRITICAL INSTRUCTIONS:
+1. INTERNAL STAGE PROTECTION: Never reveal the current stage (e.g., "STAGE IS QUIZ") or any technical labels to the student. Speak naturally.
+2. CONCISE CONVERSATION: If STAGE is "QUIZ" or "CHALLENGE", minimize conversational filler. Provide the JSON block immediately.
+3. IF STAGE IS "GOALS": Output ONLY a [ROADMAP] JSON block.
+4. IF STAGE IS "QUIZ": Output ONLY a [QUIZ] JSON block.
+5. IF STAGE IS "CHALLENGE": Output ONLY a [CHALLENGE] JSON block.
+6. IF STAGE IS "EXPLAIN": Engage in deep, conversational Socratic tutoring.
 
 GOALS TO MASTER:
 ${goals.map(g => `- ${g.text} (Current: ${g.confidence}%)`).join('\n')}
@@ -353,57 +354,50 @@ ${goals.map(g => `- ${g.text} (Current: ${g.confidence}%)`).join('\n')}
 
                     const genieResponse = result.text || "Let's keep going!";
 
-                    if (genieResponse.includes('[ROADMAP]')) {
-                        const [intro, roadmap] = genieResponse.split('[ROADMAP]');
-                        if (intro) await streamText(intro.trim(), controller, encoder);
-                        try {
-                            const roadmapData = extractJSON(roadmap);
-                            if (roadmapData) {
-                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'roadmap', roadmapData })}\n\n`));
-                                const newGoals = roadmapData.items.map((it: any) => ({
-                                    id: it.id,
-                                    text: it.text,
-                                    description: it.description,
-                                    status: 'pending',
-                                    confidence: it.confidence || 0
-                                }));
-                                await persistenceClient.from('interactive_course_sessions').update({
-                                    learning_context: { ...currentContext, goals: newGoals }
-                                }).eq('id', sessionId);
-                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'goals_updated', goals: newGoals })}\n\n`));
-                                await persistenceClient.rpc('add_conversation_message', {
-                                    p_session_id: sessionId,
-                                    p_role: 'genie',
-                                    p_content: intro.trim() || 'Here is our roadmap:',
-                                    p_message_type: 'summary',
-                                    p_metadata: { roadmapData }
-                                });
+                    // ROBUST COMPONENT DETECTION
+                    const extractedData = extractJSON(genieResponse);
+                    const hasRoadmap = genieResponse.includes('[ROADMAP]') || (extractedData && extractedData.items && extractedData.title);
+                    const hasQuiz = genieResponse.includes('[QUIZ]') || (extractedData && extractedData.question && extractedData.options);
+                    const hasChallenge = genieResponse.includes('[CHALLENGE]') || (extractedData && extractedData.title && extractedData.description && !extractedData.items);
 
-                                const challengeResult = await generateWithRetry({
-                                    prompt: `Create a first practical challenge for these goals: ${JSON.stringify(newGoals)}`,
-                                    systemPrompt: `Return ONLY valid JSON: [CHALLENGE] {"title": "...", "description": "...", "hint": "...", "expectedOutcome": "...", "difficulty": "Easy"}`,
-                                    temperature: 0.7
-                                });
-                                const challengeText = challengeResult.text || '';
-                                if (challengeText.includes('[CHALLENGE]')) {
-                                    const cData = extractJSON(challengeText.split('[CHALLENGE]')[1]);
-                                    if (cData) {
-                                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData: cData })}\n\n`));
-                                        await persistenceClient.rpc('add_conversation_message', {
-                                            p_session_id: sessionId,
-                                            p_role: 'genie',
-                                            p_content: cData.description,
-                                            p_message_type: 'challenge',
-                                            p_metadata: cData
-                                        });
-                                    }
-                                }
-                            }
-                        } catch (e) { }
-                    } else if (genieResponse.includes('[QUIZ]')) {
-                        const [intro, quiz] = genieResponse.split('[QUIZ]');
-                        if (intro) await streamText(intro.trim(), controller, encoder);
-                        const quizData = extractJSON(quiz);
+                    if (hasRoadmap) {
+                        const [intro] = genieResponse.split('[ROADMAP]');
+                        const roadmapData = extractedData || extractJSON(genieResponse.split('[ROADMAP]')[1]);
+                        
+                        if (intro && !genieResponse.startsWith('[ROADMAP]')) {
+                            await streamText(intro.trim(), controller, encoder);
+                        }
+
+                        if (roadmapData) {
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'roadmap', roadmapData })}\n\n`));
+                            const newGoals = roadmapData.items.map((it: any) => ({
+                                id: it.id,
+                                text: it.text,
+                                description: it.description,
+                                status: 'pending',
+                                confidence: it.confidence || 0
+                            }));
+                            await persistenceClient.from('interactive_course_sessions').update({
+                                learning_context: { ...currentContext, goals: newGoals }
+                            }).eq('id', sessionId);
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'goals_updated', goals: newGoals })}\n\n`));
+                            
+                            await persistenceClient.rpc('add_conversation_message', {
+                                p_session_id: sessionId,
+                                p_role: 'genie',
+                                p_content: intro?.trim() || 'Here is our roadmap:',
+                                p_message_type: 'summary',
+                                p_metadata: { roadmapData }
+                            });
+                        }
+                    } else if (hasQuiz) {
+                        const [intro] = genieResponse.split('[QUIZ]');
+                        const quizData = extractedData || extractJSON(genieResponse.split('[QUIZ]')[1]);
+
+                        if (intro && !genieResponse.startsWith('[QUIZ]')) {
+                            await streamText(intro.trim(), controller, encoder);
+                        }
+
                         if (quizData) {
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'quiz', quizData })}\n\n`));
                             await persistenceClient.rpc('add_conversation_message', {
@@ -414,10 +408,14 @@ ${goals.map(g => `- ${g.text} (Current: ${g.confidence}%)`).join('\n')}
                                 p_metadata: quizData
                             });
                         }
-                    } else if (genieResponse.includes('[CHALLENGE]')) {
-                        const [intro, challenge] = genieResponse.split('[CHALLENGE]');
-                        if (intro) await streamText(intro.trim(), controller, encoder);
-                        const challengeData = extractJSON(challenge);
+                    } else if (hasChallenge) {
+                        const [intro] = genieResponse.split('[CHALLENGE]');
+                        const challengeData = extractedData || extractJSON(genieResponse.split('[CHALLENGE]')[1]);
+
+                        if (intro && !genieResponse.startsWith('[CHALLENGE]')) {
+                            await streamText(intro.trim(), controller, encoder);
+                        }
+
                         if (challengeData) {
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData })}\n\n`));
                             await persistenceClient.rpc('add_conversation_message', {

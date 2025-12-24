@@ -265,7 +265,8 @@ export default function InteractiveCourseSession({
           skillTitle: courseTitle,
           learningStage: stageOverride || learningStage,
           conversationHistory: messages.slice(-5),
-          turnCount: messages.length
+          turnCount: messages.length,
+          learningContext: session?.learningContext
         })
       });
 

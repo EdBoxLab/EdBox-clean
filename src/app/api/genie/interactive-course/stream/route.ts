@@ -286,6 +286,19 @@ export async function POST(request: NextRequest) {
 
         const aiAnalysis = await analyzeUnderstanding(userMessage, conversationHistory, skillTitle || currentSkillId, goals);
         
+        // Robust Fallback for Goal Updates (if AI analysis is vague but message is explicit)
+        if (userMessage.includes('correctly answered the quiz') || userMessage.includes('mastered the challenge')) {
+            const lastGoalInProgress = [...goals].reverse().find(g => g.status === 'in_progress') || goals.find(g => g.status === 'pending');
+            if (lastGoalInProgress) {
+                goals = goals.map(g => g.id === lastGoalInProgress.id ? {
+                    ...g,
+                    confidence: Math.min(100, (g.confidence || 0) + 20),
+                    status: (g.confidence + 20) >= 80 ? 'mastered' : 'in_progress',
+                    timestamp: new Date().toISOString()
+                } : g);
+            }
+        }
+
         if (aiAnalysis?.updatedGoals) {
             goals = goals.map(goal => {
                 const update = aiAnalysis.updatedGoals.find((u: any) => u.id === goal.id);

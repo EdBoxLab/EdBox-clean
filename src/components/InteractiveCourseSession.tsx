@@ -352,8 +352,16 @@ export default function InteractiveCourseSession({
     return (
       <ChallengeView
         challenge={activeChallenge}
-        onSuccess={() => { setActiveChallenge(null); handleSendMessage("Challenge mastered! Let's continue.", true); }}
-        onFail={() => { setActiveChallenge(null); handleSendMessage("That was hard, let's review.", true); }}
+        onSuccess={() => { 
+          const title = activeChallenge.title;
+          setActiveChallenge(null); 
+          handleSendMessage(`I've successfully mastered the challenge: "${title}"!`, true); 
+        }}
+        onFail={() => { 
+          const title = activeChallenge.title;
+          setActiveChallenge(null); 
+          handleSendMessage(`I struggled with the challenge: "${title}". I need more practice.`, true); 
+        }}
         onClose={() => setActiveChallenge(null)}
       />
     );
@@ -480,9 +488,21 @@ export default function InteractiveCourseSession({
                       {...message.roadmapData} 
                       onStart={() => handleSendMessage("Let's tackle the first goal!", true)} 
                     />
-                  ) : message.type === 'quiz' && message.quizData ? (
-                    <QuizBubble {...message.quizData} onAnswer={(ans, corr) => handleSendMessage(corr ? "Got it right!" : "I missed that one.", true)} />
-                  ) : message.type === 'challenge_trigger' && message.challengeData ? (
+                    ) : message.type === 'quiz' && message.quizData ? (
+                      <QuizBubble 
+                        {...message.quizData} 
+                        onAnswer={(ans, corr) => {
+                          const question = message.quizData?.question;
+                          handleSendMessage(
+                            corr 
+                              ? `I correctly answered the quiz: "${question}"` 
+                              : `I struggled with the quiz: "${question}"`, 
+                            true
+                          );
+                        }} 
+                      />
+                    ) : message.type === 'challenge_trigger' && message.challengeData ? (
+
                     <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-6 rounded-2xl shadow-xl border border-white/10">
                       <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
                         <Trophy className="w-5 h-5 text-yellow-300" />

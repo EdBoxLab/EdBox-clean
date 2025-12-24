@@ -68,21 +68,33 @@ async function analyzeUnderstanding(
     currentTopic: string,
     goals: LearningGoal[] = []
 ) {
-    const analysisPrompt = `Analyze student comprehension and progress toward learning goals.
+    // Extract recent history for context
+    const recentHistory = conversationHistory?.slice(-3).map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n') || 'None';
+
+    const analysisPrompt = `Analyze student comprehension and progress toward learning goals based on their message and the recent conversation.
 Return ONLY valid JSON.
 
 TOPIC: ${currentTopic}
-STUDENT: "${userMessage}"
+RECENT HISTORY:
+${recentHistory}
+
+STUDENT MESSAGE: "${userMessage}"
 CURRENT GOALS: ${JSON.stringify(goals)}
 
-Return:
+YOUR TASK:
+1. Identify if the student successfully completed a quiz or challenge.
+2. If they did, increase the confidence adjustment (+15 to +30) for the MOST RELEVANT goal(s).
+3. If they show confusion, decrease confidence adjustment (-10 to -20).
+4. Provide evidence for each adjustment.
+
+Return format:
 {
   "comprehensionLevel": "high"|"medium"|"low"|"confused",
   "confidence": 0.0-1.0,
   "updatedGoals": [
     {
       "id": "string",
-      "confidenceAdjustment": number (-20 to +30),
+      "confidenceAdjustment": number,
       "evidence": "brief string"
     }
   ],
@@ -95,18 +107,19 @@ Return:
         const result = await Promise.race([
             generateWithRetry({
                 prompt: analysisPrompt,
-                systemPrompt: 'Return only valid JSON. Be critical but fair.',
+                systemPrompt: 'You are an educational psychologist and tracking engine. Be critical, fair, and context-aware. Return only valid JSON.',
                 temperature: 0.2,
-                maxTokens: 300,
+                maxTokens: 500,
             }),
             new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('timeout')), 4000)
+                setTimeout(() => reject(new Error('timeout')), 5000)
             )
         ]) as any;
 
         const text = result.text || '';
         return extractJSON(text);
     } catch (error) {
+        console.error('Analysis Error:', error);
         return null;
     }
 }
@@ -164,11 +177,20 @@ async function makeSmartDecision(
     }
 
     // 5. Handle Completion of Challenge/Quiz
-    if (userMsg.includes('challenge answer') || userMsg.includes('my submission')) {
+    if (userMsg.includes('challenge answer') || userMsg.includes('my submission') || userMsg.includes('mastered the challenge') || userMsg.includes('correctly answered')) {
+        // If they just finished a challenge, maybe give them a quiz or move to EXPLAIN
+        if (userMsg.includes('challenge')) {
+            return {
+                action: 'send_quiz',
+                forcedStage: 'QUIZ',
+                transition: "Excellent mastery of that challenge! Let's do a quick knowledge check to solidify it. 🎯"
+            };
+        }
+        
         return {
-            action: 'send_quiz',
-            forcedStage: 'QUIZ',
-            transition: "Solid effort! Let's double-check that with a quick pulse check. 🎯"
+            action: 'continue_explaining',
+            forcedStage: 'EXPLAIN',
+            transition: "Great job on that check! Let's move forward."
         };
     }
 

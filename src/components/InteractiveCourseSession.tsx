@@ -18,6 +18,85 @@ import ChallengeView from './ChallengeView';
 import { GeneratedChallenge } from '@/types/skill-progression';
 import GoalTracker from './GoalTracker';
 
+interface RoadmapItem {
+  id: string;
+  text: string;
+  description: string;
+  confidence: number;
+}
+
+function RoadmapWelcome({ 
+  title, 
+  description, 
+  items, 
+  onStart 
+}: { 
+  title: string; 
+  description: string; 
+  items: RoadmapItem[]; 
+  onStart: () => void 
+}) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-2xl mx-auto bg-gray-900 border border-gray-800 rounded-3xl overflow-hidden shadow-2xl"
+    >
+      <div className="p-8 bg-gradient-to-br from-purple-900/40 to-indigo-900/40 border-b border-gray-800">
+        <div className="flex items-center gap-4 mb-4">
+          <div className="p-3 bg-purple-500/20 rounded-2xl border border-purple-500/30">
+            <BookOpen className="w-8 h-8 text-purple-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-white tracking-tight">{title}</h2>
+            <p className="text-purple-300/60 font-medium uppercase tracking-widest text-[10px]">Course Roadmap</p>
+          </div>
+        </div>
+        <p className="text-gray-300 leading-relaxed text-sm lg:text-base font-medium">
+          {description}
+        </p>
+      </div>
+
+      <div className="p-6 space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-2">Core Learning Objectives</h3>
+        <div className="grid gap-3">
+          {items.map((item, idx) => (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 * idx }}
+              className="flex items-center gap-4 p-4 bg-gray-800/40 rounded-2xl border border-gray-700/50 hover:border-purple-500/30 transition-all group"
+            >
+              <div className="flex-shrink-0 w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center border border-gray-700 font-bold text-purple-400 text-sm group-hover:border-purple-500/50 transition-colors">
+                {idx + 1}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-bold text-white group-hover:text-purple-300 transition-colors">{item.text}</h4>
+                <p className="text-xs text-gray-500 line-clamp-1">{item.description}</p>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-bold text-gray-500 uppercase mb-1">Confidence</div>
+                <div className="text-sm font-black text-white">{item.confidence}%</div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-6 bg-gray-900/50 border-t border-gray-800">
+        <button
+          onClick={onStart}
+          className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-2xl font-black text-lg shadow-xl shadow-purple-500/20 transition-all active:scale-95 flex items-center justify-center gap-3"
+        >
+          <Trophy className="w-6 h-6" />
+          Start Learning Journey
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
 interface InteractiveCourseSessionProps {
   courseId: string;
   userId: string;
@@ -394,12 +473,17 @@ export default function InteractiveCourseSession({
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
-              if (data.type === 'content') {
-                fullContent += data.content;
-                setMessages(prev => prev.map(msg =>
-                  msg.id === genieMessageId ? { ...msg, content: fullContent } : msg
-                ));
-              } else if (data.type === 'quiz') {
+                if (data.type === 'content') {
+                  fullContent += data.content;
+                  setMessages(prev => prev.map(msg =>
+                    msg.id === genieMessageId ? { ...msg, content: fullContent } : msg
+                  ));
+                } else if (data.type === 'roadmap') {
+                  setMessages(prev => prev.map(msg =>
+                    msg.id === genieMessageId ? { ...msg, type: 'roadmap' as any, roadmapData: data.roadmapData } : msg
+                  ));
+                } else if (data.type === 'quiz') {
+
                 setMessages(prev => prev.map(msg =>
                   msg.id === genieMessageId ? { ...msg, type: 'quiz', quizData: data.quizData, content: data.quizData.question } : msg
                 ));
@@ -716,11 +800,19 @@ export default function InteractiveCourseSession({
               >
                 <div className={`max-w-[85%] lg:max-w-[75%] ${message.role === 'learner'
                   ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white px-4 py-3 rounded-2xl rounded-tr-md'
-                  : message.type === 'quiz' || message.type === 'challenge_trigger'
-                    ? 'w-full'
-                    : 'bg-gray-800/50 border border-gray-700 px-4 py-3 rounded-2xl rounded-tl-md'
-                  }`}>
-                  {message.type === 'quiz' && message.quizData ? (
+                  : message.type === 'quiz' || message.type === 'challenge_trigger' || (message as any).type === 'roadmap'
+                      ? 'w-full'
+                      : 'bg-gray-800/50 border border-gray-700 px-4 py-3 rounded-2xl rounded-tl-md'
+                    }`}>
+                    {(message as any).type === 'roadmap' ? (
+                      <RoadmapWelcome 
+                        title={(message as any).roadmapData.title}
+                        description={(message as any).roadmapData.description}
+                        items={(message as any).roadmapData.items}
+                        onStart={() => handleSendMessage("Let's begin with the first topic!")}
+                      />
+                    ) : message.type === 'quiz' && message.quizData ? (
+
                     <QuizBubble {...message.quizData} onAnswer={(ans, corr) => handleQuizAnswer(message.id, ans, corr)} />
                   ) : message.type === 'challenge_trigger' && message.challengeData ? (
                     <div className="p-6 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl border border-white/10">

@@ -118,7 +118,7 @@ async function makeSmartDecision(
     // 1. Force GOALS stage if no goals exist
     if (goals.length === 0) {
         return {
-            action: 'generate_goals',
+            action: 'generate_roadmap',
             forcedStage: 'GOALS',
             transition: "Let's set our roadmap for today! 🎯"
         };
@@ -281,8 +281,8 @@ export async function POST(request: NextRequest) {
             })
             .eq('id', sessionId);
 
-        // 5. Build System Prompt
-        let systemPrompt = `You are Genie, a world-class mentor for "${skillTitle || currentSkillId}".
+    // 5. Build System Prompt
+    let systemPrompt = `You are Genie, a world-class mentor for "${skillTitle || currentSkillId}".
 Your goal is to help the learner achieve 100% confidence in these goals:
 ${goals.map(g => `- ${g.text} (Current: ${g.confidence}%)`).join('\n')}
 
@@ -291,7 +291,9 @@ DECISION: ${decision.action}
 
 RULES:
 - Be direct, conversational, and focus strictly on the subject.
-- If effectiveStage is GOALS: Think of 3-4 specific goals for "${skillTitle}".
+- If effectiveStage is GOALS and action is generate_roadmap: 
+  Return a [ROADMAP] JSON. 
+  Example: [ROADMAP] {"title": "Mastering Market Analysis", "description": "...", "items": [{"id": "g1", "text": "Identify Target Audience", "description": "...", "confidence": 0}, ...]}
 - If effectiveStage is QUIZ: Send a [QUIZ] JSON.
 - If effectiveStage is CHALLENGE: Send a [CHALLENGE] JSON.
 - If effectiveStage is EXPLAIN: Provide deep insights and check progress.
@@ -299,6 +301,7 @@ RULES:
 FORMATS:
 [QUIZ] {"question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correctAnswer": "...", "explanation": "..."}
 [CHALLENGE] {"title": "...", "description": "...", "hint": "...", "expectedOutcome": "...", "difficulty": "..."}`;
+
 
         // 6. Stream Response
         const encoder = new TextEncoder();
@@ -321,7 +324,47 @@ FORMATS:
 
                     const genieResponse = result.text || "Let's keep going!";
 
-                    if (genieResponse.includes('[QUIZ]')) {
+                    if (genieResponse.includes('[ROADMAP]')) {
+                        const [intro, roadmap] = genieResponse.split('[ROADMAP]');
+                        if (intro) await streamText(intro.trim(), controller, encoder);
+                        try {
+                            const roadmapData = extractJSON(roadmap);
+                            if (roadmapData) {
+                                // 1. Send Roadmap UI
+                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'roadmap', roadmapData })}\n\n`));
+                                
+                                // 2. Persist Goals
+                                const newGoals = roadmapData.items.map((it: any) => ({
+                                    id: it.id,
+                                    text: it.text,
+                                    description: it.description,
+                                    status: 'pending',
+                                    confidence: it.confidence || 0
+                                }));
+                                
+                                await persistenceClient.from('interactive_course_sessions').update({
+                                    learning_context: { ...currentContext, goals: newGoals }
+                                }).eq('id', sessionId);
+                                
+                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'goals_updated', goals: newGoals })}\n\n`));
+
+                                // 3. IMMEDIATELY TRIGGER CHALLENGE (As requested: "send a challenge imediately")
+                                const challengeResult = await generateWithRetry({
+                                    prompt: `Create a first practical challenge for these goals: ${JSON.stringify(newGoals)}`,
+                                    systemPrompt: `Return ONLY valid JSON: [CHALLENGE] {"title": "...", "description": "...", "hint": "...", "expectedOutcome": "...", "difficulty": "Easy"}`,
+                                    temperature: 0.7
+                                });
+                                
+                                const challengeText = challengeResult.text || '';
+                                if (challengeText.includes('[CHALLENGE]')) {
+                                    const cData = extractJSON(challengeText.split('[CHALLENGE]')[1]);
+                                    if (cData) {
+                                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData: cData })}\n\n`));
+                                    }
+                                }
+                            }
+                        } catch (e) { }
+                    } else if (genieResponse.includes('[QUIZ]')) {
                         const [intro, quiz] = genieResponse.split('[QUIZ]');
                         if (intro) await streamText(intro.trim(), controller, encoder);
                         try {
@@ -345,24 +388,6 @@ FORMATS:
                         } catch (e) { await streamText('[CHALLENGE] ' + challenge, controller, encoder); }
                     } else {
                         await streamText(genieResponse, controller, encoder);
-                    }
-
-                    // Extract goals if in GOALS stage and updated
-                    if (effectiveStage === 'GOALS' && !goals.length) {
-                         const goalExtract = await generateWithRetry({
-                            prompt: `Extract 3-4 goals from this text: "${genieResponse}". Return as JSON array: [{"id": "g1", "text": "...", "status": "pending", "confidence": 0}]`,
-                            systemPrompt: "Return ONLY valid JSON.",
-                            temperature: 0.1
-                        });
-                        try {
-                            const newGoals = JSON.parse(goalExtract.text || '[]');
-                            if (newGoals.length) {
-                                await persistenceClient.from('interactive_course_sessions').update({
-                                    learning_context: { ...currentContext, goals: newGoals }
-                                }).eq('id', sessionId);
-                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'goals_updated', goals: newGoals })}\n\n`));
-                            }
-                        } catch (e) {}
                     }
 
                     controller.close();

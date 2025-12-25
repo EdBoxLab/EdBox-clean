@@ -7,17 +7,28 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { User, GraduationCap, MapPin, Calendar, Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
+// Define types for strict type safety
+interface FormData {
+  country: string;
+  education: string;
+  age: string;
+  interests: string[];
+  goal: string;
+}
+
 export default function OnboardingForm() {
   const supabase = createSupabaseBrowserClient();
   const router = useRouter();
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
+  
+  // Initialize with typed state
+  const [formData, setFormData] = useState<FormData>({
     country: '',
     education: '',
     age: '',
-    interests: [] as string[],
+    interests: [],
     goal: ''
   });
 
@@ -56,6 +67,7 @@ export default function OnboardingForm() {
     fetchUser();
   }, [supabase]);
 
+  // ✅ FIXED: Safe functional update
   const handleInterestToggle = (interest: string) => {
     setFormData(prev => ({
       ...prev,
@@ -65,15 +77,16 @@ export default function OnboardingForm() {
     }));
   };
 
+  // ✅ FIXED: Safe functional update + Preserves other state
   const handleEducationSelect = (level: string) => {
-    setFormData({ ...formData, education: level });
+    setFormData(prev => ({ ...prev, education: level }));
     setTimeout(() => {
       setStep(3);
     }, 300);
   };
 
+  // ✅ FIXED: Safe functional update
   const handleGoalSelect = (selectedGoal: string) => {
-    // ✅ FIXED: Just update the state, don't auto-submit
     setFormData(prev => ({ ...prev, goal: selectedGoal }));
   };
 
@@ -155,22 +168,20 @@ export default function OnboardingForm() {
   };
 
   return (
-    // ✅ FIXED: Removed overflow-hidden from parent
     <div className="fixed inset-0 bg-gradient-to-br from-zinc-950 via-indigo-950 to-zinc-950 flex items-center justify-center p-4">
-      {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-indigo-500/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
 
-      {/* ✅ FIXED: Proper scroll container structure */}
+      {/* ✅ FIXED: Use 'dvh' (dynamic viewport height) to prevent mobile browser bar issues */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative w-full max-w-2xl max-h-[90vh] bg-zinc-900/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-zinc-800/50 flex flex-col"
+        className="relative w-full max-w-2xl h-auto max-h-[85dvh] bg-zinc-900/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-zinc-800/50 flex flex-col"
       >
-        {/* Progress bar - Fixed position */}
-        <div className="h-1.5 bg-zinc-800 flex-shrink-0">
+        {/* Progress bar */}
+        <div className="h-1.5 bg-zinc-800 flex-shrink-0 rounded-t-3xl overflow-hidden">
           <motion.div
             className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
             initial={{ width: '25%' }}
@@ -179,9 +190,8 @@ export default function OnboardingForm() {
           />
         </div>
 
-        {/* ✅ FIXED: Scrollable content area */}
-        <div className="overflow-y-auto flex-1 overscroll-contain">
-          <div className="p-6 sm:p-8 md:p-12">
+        {/* Scrollable content area */}
+        <div className="overflow-y-auto flex-1 overscroll-contain p-6 sm:p-8 md:p-12">
             {/* Header */}
             <div className="text-center mb-8">
               <motion.div
@@ -233,7 +243,8 @@ export default function OnboardingForm() {
                       <input
                         type="text"
                         value={formData.country}
-                        onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                        // ✅ FIXED: Safer state update
+                        onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
                         placeholder="e.g., United States, Nigeria, India"
                         className="w-full bg-zinc-800/50 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition"
                         onKeyDown={(e) => {
@@ -251,7 +262,8 @@ export default function OnboardingForm() {
                       <input
                         type="number"
                         value={formData.age}
-                        onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                        // ✅ FIXED: Safer state update
+                        onChange={(e) => setFormData(prev => ({ ...prev, age: e.target.value }))}
                         placeholder="Your age"
                         min="10"
                         max="100"
@@ -299,10 +311,15 @@ export default function OnboardingForm() {
 
                 {step === 3 && (
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-4">
-                      <Sparkles className="w-4 h-4 text-indigo-400" />
-                      What interests you? (Select at least one)
-                    </label>
+                    <div className="flex justify-between items-center mb-4">
+                      <label className="flex items-center gap-2 text-sm font-medium text-zinc-300">
+                        <Sparkles className="w-4 h-4 text-indigo-400" />
+                        What interests you?
+                      </label>
+                      <span className="text-xs text-indigo-400 font-medium">
+                        Select multiple
+                      </span>
+                    </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {interestOptions.map((interest) => (
                         <motion.button
@@ -320,9 +337,17 @@ export default function OnboardingForm() {
                         </motion.button>
                       ))}
                     </div>
-                    <p className="text-zinc-500 text-xs mt-3 text-center">
-                      Selected: {formData.interests.length} {formData.interests.length === 1 ? 'interest' : 'interests'}
-                    </p>
+                    {/* ✅ FIXED: Visual feedback for current state */}
+                    <div className="mt-4 flex justify-between items-center">
+                      <p className="text-zinc-500 text-xs">
+                        {formData.interests.length} selected
+                      </p>
+                      {formData.interests.length === 0 && (
+                        <span className="text-xs text-red-400 animate-pulse">
+                          Please select at least one
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -359,11 +384,10 @@ export default function OnboardingForm() {
                 )}
               </motion.div>
             </AnimatePresence>
-          </div>
         </div>
 
-        {/* ✅ FIXED: Navigation buttons - Fixed at bottom */}
-        <div className="border-t border-zinc-800 p-4 sm:p-6 bg-zinc-900/50 flex-shrink-0">
+        {/* Navigation buttons - Fixed at bottom */}
+        <div className="border-t border-zinc-800 p-4 sm:p-6 bg-zinc-900/50 flex-shrink-0 backdrop-blur-sm rounded-b-3xl">
           <div className="flex gap-3">
             {step > 1 && (
               <button
@@ -378,7 +402,10 @@ export default function OnboardingForm() {
               <button
                 onClick={handleNext}
                 disabled={!isStepValid()}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-zinc-700 disabled:to-zinc-700 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition shadow-lg shadow-indigo-500/30"
+                className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition shadow-lg 
+                  ${isStepValid() 
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-indigo-500/30 text-white' 
+                    : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}`}
               >
                 Next
                 <ArrowRight className="w-5 h-5" />

@@ -81,32 +81,12 @@ export default function SignUpPage() {
         return;
       }
 
-      if (data.user) {
-        // Insert into profiles
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([{ id: data.user.id }]);
-
-        if (profileError) {
-          setError(profileError.message);
-          setLoading(false);
-          return;
+        if (data.user) {
+          // Show success message
+          setMessage(
+            'Signup successful! Please check your email inbox and confirm your account before signing in.'
+          );
         }
-
-        // Track beta signup
-        const { error: betaError } = await supabase
-          .from('beta_signups')
-          .insert([{ user_id: data.user.id }]);
-
-        if (betaError) {
-          console.error('Beta tracking error:', betaError);
-        }
-
-        // Show success message
-        setMessage(
-          'Signup successful! Please check your email inbox and confirm your account before signing in.'
-        );
-      }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
       console.error(err);

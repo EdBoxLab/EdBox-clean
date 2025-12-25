@@ -29,7 +29,8 @@ export const getUserPreferences = async (userId: string): Promise<UserPreference
     return {
       interests: data.interests,
       learningStyle: data.learning_style,
-      onboarded: data.onboarded
+      onboarded: data.onboarded,
+      tour_completed: data.tour_completed
     };
   } catch (error) {
     console.error('Error fetching user preferences:', error);
@@ -49,6 +50,7 @@ export const saveUserPreferences = async (
         interests: preferences.interests,
         learning_style: preferences.learningStyle,
         onboarded: preferences.onboarded,
+        tour_completed: preferences.tour_completed,
         updated_at: new Date().toISOString()
       }, {
         onConflict: 'id'

@@ -334,6 +334,7 @@ export default function AIGenie() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
+          data-tour="step-genie"
           className="group fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-50 flex items-center gap-2 px-4 py-3 sm:px-5 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-full shadow-lg shadow-indigo-900/30 transition-all hover:scale-105"
         >
           <Sparkles className="w-5 h-5 text-white animate-pulse" />

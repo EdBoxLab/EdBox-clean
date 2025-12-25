@@ -16,10 +16,18 @@ describe('UnderstandingAssessment', () => {
       currentConcepts: ['Functions', 'Variables'],
       masteredConcepts: ['Basic Syntax'],
       strugglingAreas: ['Loops'],
-      comprehensionLevel: 0.6,
-      preferredLearningStyle: 'visual',
-      sessionGoals: ['Learn programming fundamentals']
-    };
+        comprehensionLevel: 0.6,
+        preferredLearningStyle: 'visual',
+        goals: [
+          {
+            id: 'goal-1',
+            text: 'Learn programming fundamentals',
+            status: 'pending',
+            confidence: 0,
+            timestamp: new Date().toISOString()
+          }
+        ]
+      };
   });
 
   describe('createQuickCheck', () => {

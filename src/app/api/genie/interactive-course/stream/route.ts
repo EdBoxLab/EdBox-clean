@@ -36,7 +36,9 @@ function detectBehavioralPatterns(userMessage: string, conversationHistory: any[
         wantsQuiz: quizRequest.some(phrase => msg.includes(phrase)),
         isEngaged: userMessage.split(' ').length > 8 || msg.includes('?'),
         responseLength: userMessage.split(' ').length,
-        exchangeCount: conversationHistory ? conversationHistory.filter((m: any) => m.role === 'assistant').length : 0
+        exchangeCount: conversationHistory ? conversationHistory.filter((m: any) => m.role === 'assistant').length : 0,
+        justFinishedChallenge: msg.includes('challenge completed') || msg.includes('mastered the challenge'),
+        justFinishedQuiz: msg.includes('i chose') || msg.includes("exactly right") || msg.includes('quiz result')
     };
 }
 
@@ -68,7 +70,6 @@ async function analyzeUnderstanding(
     currentTopic: string,
     goals: LearningGoal[] = []
 ) {
-    // Extract recent history for context
     const recentHistory = conversationHistory?.slice(-3).map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n') || 'None';
 
     const analysisPrompt = `Analyze student comprehension and progress toward learning goals based on their message and the recent conversation.
@@ -133,12 +134,16 @@ async function makeSmartDecision(
     patterns: any,
     context: any
 ) {
-    const userMsg = userMessage.toLowerCase();
     const goals = context.learningContext?.goals || [];
     const turnCount = context.turnCount || 0;
 
-    // 1. Force GOALS stage if no goals exist
-    if (goals.length === 0) {
+    console.log('[DECISION_DEBUG] Analysis Start');
+    console.log('[DECISION_DEBUG] context.currentStage:', context.currentStage);
+    console.log('[DECISION_DEBUG] turnCount:', turnCount);
+    console.log('[DECISION_DEBUG] patterns.justFinishedChallenge:', patterns.justFinishedChallenge);
+
+    // Turn 0-1: Send goals first
+    if (turnCount <= 1 && !context.goalsGiven) {
         return {
             action: 'generate_roadmap',
             forcedStage: 'GOALS',
@@ -146,7 +151,7 @@ async function makeSmartDecision(
         };
     }
 
-    // 2. Explicit Challenge Request
+    // 2. Explicit Challenge/Quiz Requests
     if (patterns.wantsChallenge || aiAnalysis?.readyForChallenge) {
         return {
             action: 'send_challenge',
@@ -154,67 +159,48 @@ async function makeSmartDecision(
             transition: "Alright, let's jump into a practical challenge! 🚀"
         };
     }
-
-    // 3. Explicit Quiz Request
     if (patterns.wantsQuiz || aiAnalysis?.readyForQuiz) {
         return {
             action: 'send_quiz',
             forcedStage: 'QUIZ',
-            transition: "Let's see what you've got! 🧠"
+            transition: "Let's test your knowledge with a quick quiz! ⚡"
         };
     }
 
-    // 4. Initial Challenge Stage (Placement)
-    const hasDoneChallenge = goals.some((g: any) => g.status === 'mastered' || (g.confidence > 50));
-    const challengeRelated = userMsg.includes('challenge') || userMsg.includes('task') || userMsg.includes('approach');
-    
-    if (turnCount >= 1 && turnCount <= 4 && !hasDoneChallenge && !challengeRelated) {
-         return {
-            action: 'send_challenge',
-            forcedStage: 'CHALLENGE',
-            transition: "To kick things off, let's see where you stand with a practical challenge! 🚀"
-        };
-    }
-
-    // 5. Handle Completion of Challenge/Quiz
-    if (userMsg.includes('challenge answer') || userMsg.includes('my submission') || userMsg.includes('mastered the challenge') || userMsg.includes('correctly answered')) {
-        // If they just finished a challenge, maybe give them a quiz or move to EXPLAIN
-        if (userMsg.includes('challenge')) {
-            return {
-                action: 'send_quiz',
-                forcedStage: 'QUIZ',
-                transition: "Excellent mastery of that challenge! Let's do a quick knowledge check to solidify it. 🎯"
-            };
-        }
-        
-        return {
-            action: 'continue_explaining',
-            forcedStage: 'EXPLAIN',
-            transition: "Great job on that check! Let's move forward."
-        };
-    }
-
-    // 6. Competency-Based Transition
-    const avgConfidence = goals.length > 0 
-        ? goals.reduce((acc: number, g: any) => acc + (g.confidence || 0), 0) / goals.length 
-        : 0;
-
-    const allGoalsMastered = goals.length > 0 && goals.every((g: any) => (g.confidence || 0) >= 70);
-
-    if (allGoalsMastered) {
-        return {
-            action: 'complete_session',
-            forcedStage: 'EXPLAIN',
-            transition: "You've absolutely crushed all your learning goals (70%+ confidence)! You're ready for the next skill. 🏆"
-        };
-    }
-
-    // 7. Default: Intelligent Tutoring (EXPLAIN)
-    if (avgConfidence > 40 && turnCount % 3 === 0) {
+    // After challenge, verify with a Quiz
+    if (patterns.justFinishedChallenge) {
         return {
             action: 'send_quiz',
             forcedStage: 'QUIZ',
-            transition: "You're getting the hang of this. Let's test it! 🧠"
+            transition: "Great work on the challenge! Let's do a quick pulse check to confirm your mastery. 🎯"
+        };
+    }
+
+    // After quiz or deep conversation, continue explaining
+    if (patterns.justFinishedQuiz || (turnCount >= 4 && !patterns.justFinishedChallenge)) {
+        return {
+            action: 'continue_explaining',
+            forcedStage: 'EXPLAIN',
+            transition: "You've got this down! Let's dive deeper into some advanced nuances. 🧠"
+        };
+    }
+
+    // Calculate readiness score for automatic transitions
+    let readinessScore = 50;
+    if (patterns.showsUnderstanding) readinessScore += 30;
+    if (patterns.isEngaged) readinessScore += 10;
+    if (aiAnalysis) {
+        const levelScores: any = { high: 30, medium: 15, low: 5, confused: 0 };
+        readinessScore += levelScores[aiAnalysis.comprehensionLevel] || 0;
+        readinessScore += Math.round((aiAnalysis.confidence || 0) * 10);
+    }
+    readinessScore = Math.max(0, Math.min(100, readinessScore));
+
+    if (readinessScore > 85 && turnCount > 3) {
+        return {
+            action: 'send_quiz',
+            forcedStage: 'QUIZ',
+            transition: "You're showing great understanding! Ready for a quick check? ⚡"
         };
     }
 
@@ -229,9 +215,9 @@ async function makeSmartDecision(
 // HUMAN-LIKE STREAMING
 // ============================================
 function getHumanDelay(word: string, isStartOfSentence: boolean): number {
-    const base = 25 + Math.random() * 25;
-    if (word.endsWith('.') || word.endsWith('!') || word.endsWith('?')) return base + 100;
-    if (word.endsWith(',')) return base + 40;
+    const base = 20 + Math.random() * 20;
+    if (word.endsWith('.') || word.endsWith('!') || word.endsWith('?')) return base + 80;
+    if (word.endsWith(',')) return base + 30;
     return base;
 }
 
@@ -254,8 +240,8 @@ async function streamText(
 // MAIN API ROUTE
 // ============================================
 export async function POST(request: NextRequest) {
+    const startTime = Date.now();
     try {
-        const supabase = await createSupabaseServerClient();
         const body = await request.json();
         const {
             userMessage,
@@ -274,7 +260,9 @@ export async function POST(request: NextRequest) {
         }
 
         const persistenceClient = await createServerSupabaseClient();
+        const currentTopic = skillTitle || currentSkillId || 'this topic';
 
+        // 1. Fetch current session state
         const { data: sessionData } = await persistenceClient
             .from('interactive_course_sessions')
             .select('learning_context, progress_state')
@@ -294,62 +282,43 @@ export async function POST(request: NextRequest) {
         };
         let goals: LearningGoal[] = currentContext.goals || [];
 
-        const aiAnalysis = await analyzeUnderstanding(userMessage, conversationHistory, skillTitle || currentSkillId, goals);
+        // 2. Detect patterns and analyze comprehension
+        const patterns = detectBehavioralPatterns(userMessage, conversationHistory || []);
+        const aiAnalysis = await analyzeUnderstanding(userMessage, conversationHistory || [], currentTopic, goals);
         
-        // Update progress state based on goals and confidence
-        const updatedProgress = { ...currentProgress };
-        if (aiAnalysis?.confidence) {
-            // Update overall course progress based on average goal confidence
-            const totalConfidence = goals.reduce((acc, g) => acc + (g.confidence || 0), 0);
-            updatedProgress.overallCourseProgress = goals.length > 0 ? Math.round(totalConfidence / goals.length) : 0;
-            
-            // Sync mastered and struggling skills from context
-            updatedProgress.masteredSkills = Array.from(new Set([
-                ...(updatedProgress.masteredSkills || []),
-                ...(currentContext.masteredConcepts || [])
-            ]));
-            updatedProgress.strugglingSkills = Array.from(new Set([
-                ...(updatedProgress.strugglingSkills || []),
-                ...(currentContext.strugglingAreas || [])
-            ]));
-        }
-
-        // Robust Fallback for Goal Updates (if AI analysis is vague but message is explicit)
-        if (userMessage.includes('correctly answered the quiz') || userMessage.includes('mastered the challenge')) {
-            const lastGoalInProgress = [...goals].reverse().find(g => g.status === 'in_progress') || goals.find(g => g.status === 'pending');
-            if (lastGoalInProgress) {
-                goals = goals.map(g => g.id === lastGoalInProgress.id ? {
-                    ...g,
-                    confidence: Math.min(100, (g.confidence || 0) + 20),
-                    status: (g.confidence + 20) >= 80 ? 'mastered' : 'in_progress',
-                    timestamp: new Date().toISOString()
-                } : g);
-            }
-        }
-
+        // 3. Update goals based on analysis
         if (aiAnalysis?.updatedGoals) {
-            goals = goals.map(goal => {
-                const update = aiAnalysis.updatedGoals.find((u: any) => u.id === goal.id);
+            goals = goals.map(g => {
+                const update = aiAnalysis.updatedGoals.find((u: any) => u.id === g.id);
                 if (update) {
-                    const newConfidence = Math.max(0, Math.min(100, (goal.confidence || 0) + update.confidenceAdjustment));
+                    const newConfidence = Math.max(0, Math.min(100, (g.confidence || 0) + (update.confidenceAdjustment || 0)));
                     return {
-                        ...goal,
+                        ...g,
                         confidence: newConfidence,
-                        status: newConfidence >= 80 ? 'mastered' : newConfidence > 0 ? 'in_progress' : 'pending',
-                        evidence: update.evidence || goal.evidence,
+                        status: newConfidence >= 80 ? 'mastered' : (newConfidence > 0 ? 'in_progress' : 'pending'),
+                        evidence: update.evidence || g.evidence,
                         timestamp: new Date().toISOString()
                     };
                 }
-                return goal;
+                return g;
             });
         }
 
-        const decision = await makeSmartDecision(userMessage, aiAnalysis, detectBehavioralPatterns(userMessage, conversationHistory), {
-            turnCount,
-            learningContext: { ...currentContext, goals }
+        // 4. Make a smart decision on the next stage
+        const decision = await makeSmartDecision(userMessage, aiAnalysis, patterns, {
+            currentStage: learningStage || 'EXPLAIN',
+            turnCount: turnCount || conversationHistory?.length || 0,
+            learningContext: { ...currentContext, goals },
+            goalsGiven: !!goals.length,
+            sessionId
         });
 
-        const effectiveStage = decision.forcedStage;
+        const effectiveStage = decision.forcedStage || 'EXPLAIN';
+
+        // 5. Update session in background
+        const updatedProgress = { ...currentProgress };
+        const totalConfidence = goals.reduce((acc, g) => acc + (g.confidence || 0), 0);
+        updatedProgress.overallCourseProgress = goals.length > 0 ? Math.round(totalConfidence / goals.length) : 0;
 
         await persistenceClient
             .from('interactive_course_sessions')
@@ -357,48 +326,63 @@ export async function POST(request: NextRequest) {
                 learning_context: {
                     ...currentContext,
                     goals,
-                    comprehensionLevel: aiAnalysis?.confidence || currentContext.comprehensionLevel || 0.5
+                    comprehensionLevel: aiAnalysis?.confidence || currentContext.comprehensionLevel || 0.5,
+                    lastDecision: decision
                 },
                 progress_state: updatedProgress,
                 last_interaction: new Date().toISOString()
             })
             .eq('id', sessionId);
 
-        let systemPrompt = `You are Genie, a world-class mentor for "${skillTitle || currentSkillId}".
-Your goal is to guide the student through the "${effectiveStage}" stage.
+        // 6. Construct system prompt
+        const courseContext = `CONTEXT: You are teaching "${currentTopic}". The learner is currently in the ${effectiveStage} phase.`;
+        let systemPrompt = '';
 
-CRITICAL INSTRUCTIONS:
-1. INTERNAL STAGE PROTECTION: Never reveal the current stage (e.g., "STAGE IS QUIZ") or any technical labels to the student. Speak naturally.
-2. CONCISE CONVERSATION: If STAGE is "QUIZ" or "CHALLENGE", minimize conversational filler. Provide the JSON block immediately.
-3. IF STAGE IS "GOALS": Output ONLY a [ROADMAP] JSON block.
-4. IF STAGE IS "QUIZ": Output ONLY a [QUIZ] JSON block.
-5. IF STAGE IS "CHALLENGE": Output ONLY a [CHALLENGE] JSON block.
-6. IF STAGE IS "EXPLAIN": Engage in deep, conversational Socratic tutoring.
-
-GOALS TO MASTER:
-${goals.map(g => `- ${g.text} (Current: ${g.confidence}%)`).join('\n')}
-
+        if (effectiveStage === 'GOALS') {
+            systemPrompt = `You are Genie, a world-class mentor for "${currentTopic}".
+Output ONLY a [ROADMAP] JSON block.
 [ROADMAP] STRUCTURE:
-{"title": "...", "description": "...", "items": [{"id": "g1", "text": "Goal Title", "description": "Goal Details", "confidence": 0}, ...]}
+{"title": "...", "description": "...", "items": [{"id": "g1", "text": "Goal Title", "description": "Goal Details", "confidence": 0}, ...]}`;
+        } else if (effectiveStage === 'QUIZ') {
+            systemPrompt = `You are Genie, an expert AI tutor. 
+${courseContext}
+YOUR MISSION:
+Deliver a single multiple-choice question testing "${currentTopic}".
+INSTRUCTIONS:
+- Transition: "${decision.transition || "Let's see what you've learned!"}"
+- Format: [QUIZ] followed by JSON.
+{"question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correctAnswer": "A|B|C|D", "explanation": "..."}`;
+        } else if (effectiveStage === 'CHALLENGE') {
+            systemPrompt = `You are Genie, a practical mentor for "${currentTopic}".
+${courseContext}
+YOUR MISSION:
+Present a small hands-on task.
+FORMAT: [CHALLENGE] followed by JSON.
+{"title": "...", "description": "...", "hint": "...", "expectedOutcome": "...", "difficulty": "beginner"}`;
+        } else {
+            systemPrompt = `You are Genie, a subject matter expert in "${currentTopic}". 
+${courseContext}
+RULES:
+- Be concise (2-4 sentences).
+- Stay interactive.
+- Use 1-2 emojis max.
+- Student readiness: ${aiAnalysis?.comprehensionLevel || 'medium'}.`;
+        }
 
-[QUIZ] STRUCTURE:
-{"question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correctAnswer": "...", "explanation": "..."}
-
-[CHALLENGE] STRUCTURE:
-{"title": "...", "description": "...", "hint": "...", "expectedOutcome": "...", "difficulty": "..."}`;
-
+        // 7. Stream the response
         const encoder = new TextEncoder();
         const stream = new ReadableStream({
             async start(controller) {
                 try {
+                    // Record user message
                     await persistenceClient.rpc('add_conversation_message', {
                         p_session_id: sessionId,
                         p_role: 'learner',
                         p_content: userMessage,
-                        p_message_type: 'explanation',
-                        p_metadata: {}
+                        p_message_type: 'explanation'
                     });
 
+                    // Send metadata update
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
                         type: 'goals_updated', 
                         goals,
@@ -406,86 +390,60 @@ ${goals.map(g => `- ${g.text} (Current: ${g.confidence}%)`).join('\n')}
                     })}\n\n`));
 
                     const finalPrompt = effectiveStage === 'GOALS' 
-                        ? `Generate the learning roadmap for ${skillTitle || currentSkillId} based on: ${userMessage}. Return ONLY the [ROADMAP] JSON block.`
+                        ? `Generate a 3-step learning roadmap for ${currentTopic}. Return only the JSON block.`
                         : userMessage;
 
-                    const result = await generateWithRetry({
+                    const aiResult = await generateWithRetry({
                         prompt: finalPrompt,
                         systemPrompt,
-                        temperature: effectiveStage === 'EXPLAIN' ? 0.7 : 0.05,
-                        maxTokens: 1200,
+                        temperature: effectiveStage === 'EXPLAIN' ? 0.7 : 0.1,
+                        maxTokens: 1000,
                     });
 
-                    const genieResponse = result.text || "Let's keep going!";
-
-                    // ROBUST COMPONENT DETECTION
+                    const genieResponse = aiResult.text || "I'm here to help! What's next?";
                     const extractedData = extractJSON(genieResponse);
-                    const hasRoadmap = genieResponse.includes('[ROADMAP]') || (extractedData && extractedData.items && extractedData.title);
-                    const hasQuiz = genieResponse.includes('[QUIZ]') || (extractedData && extractedData.question && extractedData.options);
-                    const hasChallenge = genieResponse.includes('[CHALLENGE]') || (extractedData && extractedData.title && extractedData.description && !extractedData.items);
 
-                    if (hasRoadmap) {
-                        const [intro] = genieResponse.split('[ROADMAP]');
-                        const roadmapData = extractedData || extractJSON(genieResponse.split('[ROADMAP]')[1]);
-                        
-                        if (intro && !genieResponse.startsWith('[ROADMAP]')) {
-                            await streamText(intro.trim(), controller, encoder);
-                        }
-
+                    if (genieResponse.includes('[ROADMAP]') || (extractedData && extractedData.items)) {
+                        const parts = genieResponse.split('[ROADMAP]');
+                        const intro = parts[0]?.trim();
+                        const roadmapData = extractedData || extractJSON(parts[1]);
+                        if (intro) await streamText(intro, controller, encoder);
                         if (roadmapData) {
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'roadmap', roadmapData })}\n\n`));
-                            const newGoals = roadmapData.items.map((it: any) => ({
-                                id: it.id,
-                                text: it.text,
-                                description: it.description,
-                                status: 'pending',
-                                confidence: it.confidence || 0
-                            }));
-                            await persistenceClient.from('interactive_course_sessions').update({
-                                learning_context: { ...currentContext, goals: newGoals }
-                            }).eq('id', sessionId);
-                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'goals_updated', goals: newGoals })}\n\n`));
-                            
                             await persistenceClient.rpc('add_conversation_message', {
                                 p_session_id: sessionId,
                                 p_role: 'genie',
-                                p_content: intro?.trim() || 'Here is our roadmap:',
+                                p_content: intro || 'Here is our roadmap:',
                                 p_message_type: 'summary',
                                 p_metadata: { roadmapData }
                             });
                         }
-                    } else if (hasQuiz) {
-                        const [intro] = genieResponse.split('[QUIZ]');
-                        const quizData = extractedData || extractJSON(genieResponse.split('[QUIZ]')[1]);
-
-                        if (intro && !genieResponse.startsWith('[QUIZ]')) {
-                            await streamText(intro.trim(), controller, encoder);
-                        }
-
+                    } else if (genieResponse.includes('[QUIZ]') || (extractedData && extractedData.question)) {
+                        const parts = genieResponse.split('[QUIZ]');
+                        const intro = parts[0]?.trim();
+                        const quizData = extractedData || extractJSON(parts[1]);
+                        if (intro) await streamText(intro, controller, encoder);
                         if (quizData) {
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'quiz', quizData })}\n\n`));
                             await persistenceClient.rpc('add_conversation_message', {
                                 p_session_id: sessionId,
                                 p_role: 'genie',
-                                p_content: quizData.question,
+                                p_content: intro || quizData.question,
                                 p_message_type: 'assessment',
                                 p_metadata: quizData
                             });
                         }
-                    } else if (hasChallenge) {
-                        const [intro] = genieResponse.split('[CHALLENGE]');
-                        const challengeData = extractedData || extractJSON(genieResponse.split('[CHALLENGE]')[1]);
-
-                        if (intro && !genieResponse.startsWith('[CHALLENGE]')) {
-                            await streamText(intro.trim(), controller, encoder);
-                        }
-
+                    } else if (genieResponse.includes('[CHALLENGE]') || (extractedData && extractedData.description && !extractedData.items)) {
+                        const parts = genieResponse.split('[CHALLENGE]');
+                        const intro = parts[0]?.trim();
+                        const challengeData = extractedData || extractJSON(parts[1]);
+                        if (intro) await streamText(intro, controller, encoder);
                         if (challengeData) {
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData })}\n\n`));
                             await persistenceClient.rpc('add_conversation_message', {
                                 p_session_id: sessionId,
                                 p_role: 'genie',
-                                p_content: challengeData.description,
+                                p_content: intro || challengeData.description,
                                 p_message_type: 'challenge',
                                 p_metadata: challengeData
                             });
@@ -496,12 +454,14 @@ ${goals.map(g => `- ${g.text} (Current: ${g.confidence}%)`).join('\n')}
                             p_session_id: sessionId,
                             p_role: 'genie',
                             p_content: genieResponse,
-                            p_message_type: 'explanation',
-                            p_metadata: {}
+                            p_message_type: 'explanation'
                         });
                     }
                     controller.close();
-                } catch (e) { controller.close(); }
+                } catch (e) { 
+                    console.error('Stream Error:', e);
+                    controller.close(); 
+                }
             }
         });
 
@@ -513,6 +473,7 @@ ${goals.map(g => `- ${g.text} (Current: ${g.confidence}%)`).join('\n')}
             },
         });
     } catch (error: any) {
+        console.error('POST Error:', error);
         return new Response(JSON.stringify({ error: error.message }), { status: 500 });
     }
 }

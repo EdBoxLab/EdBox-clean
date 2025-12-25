@@ -14,7 +14,7 @@ import { supabase } from '../lib/supabase/client';
 import { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { Button } from './ui/button';
 import { useRouter } from 'next/navigation';
-import { Share2, Copy, Check } from 'lucide-react';
+import { Share2, Copy, Check, HelpCircle } from 'lucide-react';
 
 type User = Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'];
 
@@ -79,14 +79,15 @@ export function UserMenu() {
     return <Button onClick={handleLogin}>Login</Button>;
   }
 
-  return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-accent transition-colors text-left min-w-0">
-            <div className="shrink-0">
-              <UserAvatar user={user} />
-            </div>
+    return (
+      <>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild data-tour="step-user">
+            <button className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-accent transition-colors text-left min-w-0">
+              <div className="shrink-0">
+                <UserAvatar user={user} />
+              </div>
+
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-foreground truncate leading-none mb-1">
                 {user.email?.split('@')[0]}
@@ -103,9 +104,14 @@ export function UserMenu() {
           <DropdownMenuItem onClick={() => router.push('/profile')} className="text-muted-foreground focus:bg-accent focus:text-foreground">
             Profile
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => router.push('/settings')} className="text-muted-foreground focus:bg-accent focus:text-foreground">
-            Settings
-          </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push('/settings')} className="text-muted-foreground focus:bg-accent focus:text-foreground">
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent('restart-tour'))} className="text-muted-foreground focus:bg-accent focus:text-foreground">
+              <HelpCircle className="w-4 h-4 mr-2" />
+              App Tour
+            </DropdownMenuItem>
+
           <DropdownMenuSeparator className="bg-border" />
           <DropdownMenuItem onClick={() => setShowShareModal(true)} className="text-muted-foreground focus:bg-accent focus:text-foreground">
             <Share2 className="w-4 h-4 mr-2" />

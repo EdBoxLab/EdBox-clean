@@ -62,22 +62,10 @@ export default function GoalTracker({ goals, className = '' }: GoalTrackerProps)
                                     <Circle className="w-4 h-4 text-gray-500" />
                                 )}
                             </div>
-                            <div className="space-y-1 flex-1">
-                                <div className="flex justify-between items-center gap-2">
-                                    <p className={`text-sm ${goal.status === 'mastered' ? 'text-green-100 line-through decoration-green-500/30' : 'text-gray-300'}`}>
-                                        {goal.text}
-                                    </p>
-                                    <span className={`text-[10px] font-bold ${goal.confidence >= 70 ? 'text-green-400' : goal.confidence >= 40 ? 'text-yellow-400' : 'text-gray-500'}`}>
-                                        {Math.round(goal.confidence || 0)}%
-                                    </span>
-                                </div>
-                                <div className="h-1 w-full bg-gray-900 rounded-full overflow-hidden">
-                                    <motion.div
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${goal.confidence || 0}%` }}
-                                        className={`h-full transition-all duration-500 ${goal.confidence >= 70 ? 'bg-green-500' : goal.confidence >= 40 ? 'bg-yellow-500' : 'bg-gray-600'}`}
-                                    />
-                                </div>
+                            <div className="space-y-1">
+                                <p className={`text-sm ${goal.status === 'mastered' ? 'text-green-100 line-through decoration-green-500/30' : 'text-gray-300'}`}>
+                                    {goal.text}
+                                </p>
                                 {goal.status === 'mastered' && goal.evidence && (
                                     <motion.p
                                         initial={{ opacity: 0 }}

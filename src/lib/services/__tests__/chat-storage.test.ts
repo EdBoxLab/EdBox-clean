@@ -25,10 +25,18 @@ describe('ChatStorageService', () => {
       currentConcepts: ['Variables'],
       masteredConcepts: [],
       strugglingAreas: [],
-      comprehensionLevel: 0.5,
-      preferredLearningStyle: 'interactive',
-      sessionGoals: ['Learn programming']
-    },
+        comprehensionLevel: 0.5,
+        preferredLearningStyle: 'interactive',
+        goals: [
+          {
+            id: 'goal-1',
+            text: 'Learn programming',
+            status: 'pending',
+            confidence: 0,
+            timestamp: new Date().toISOString()
+          }
+        ]
+      },
     progressState: {
       completedTopics: [],
       currentTopicProgress: 0.1,

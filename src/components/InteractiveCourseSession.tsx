@@ -308,15 +308,19 @@ export default function InteractiveCourseSession({
                 setMessages(prev => prev.map(msg =>
                   msg.id === genieMessageId ? { ...msg, type: 'challenge_trigger', challengeData: data.challengeData, content: data.challengeData.description } : msg
                 ));
+                if (!data.type || data.type === 'content') {
+                  setTimeout(() => setShowActionButtons(true), 1000);
+                }
               } else if (data.type === 'goals_updated') {
+                // Real-time Goal Update!
+                const newGoals = data.goals;
                 setSession(prev => {
                   if (!prev) return prev;
                   return {
                     ...prev,
                     learningContext: {
                       ...prev.learningContext,
-                      goals: data.goals,
-                      comprehensionLevel: data.comprehensionLevel ?? prev.learningContext.comprehensionLevel
+                      goals: newGoals
                     }
                   };
                 });
@@ -409,14 +413,14 @@ export default function InteractiveCourseSession({
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto">
-                {session?.learningContext?.goals && (
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest">Mastery Tracking</h3>
-                    <GoalTracker goals={session.learningContext.goals} />
-                  </div>
-                )}
-              </div>
+                <div className="flex-1 overflow-y-auto">
+                  {session?.learningContext?.goals && (
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest">Mastery Tracking</h3>
+                      <GoalTracker goals={session.learningContext.goals || []} />
+                    </div>
+                  )}
+                </div>
 
               <div className="pt-6 border-t border-gray-800">
                 <XPStreakDisplay showCompact={true} skillGraphId={courseId} />
@@ -438,10 +442,23 @@ export default function InteractiveCourseSession({
           </div>
         </div>
 
-        {session?.learningContext?.goals && (
+        {/* XP Display */}
+        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+          <XPStreakDisplay showCompact={true} skillGraphId={courseId} />
+        </div>
+
+        {/* Real-Time Goal Tracker */}
+        {session?.learningContext?.goals && session.learningContext.goals.length > 0 && (
+          <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+            <GoalTracker goals={session.learningContext.goals || []} />
+          </div>
+        )}
+
+        {/* Progress Section */}
+        {session && (
           <div className="space-y-4">
             <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest">Active Roadmap</h3>
-            <GoalTracker goals={session.learningContext.goals} />
+            <GoalTracker goals={session.learningContext.goals || []} />
           </div>
         )}
 

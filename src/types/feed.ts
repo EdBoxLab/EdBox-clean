@@ -155,6 +155,7 @@ export interface UserPreferences {
   interests: string[];
   learningStyle: 'visual' | 'auditory' | 'theoretical';
   onboarded: boolean;
+  tour_completed?: boolean;
 }
 
 export interface UserStats {

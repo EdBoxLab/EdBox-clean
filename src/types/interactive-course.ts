@@ -61,7 +61,6 @@ export interface LearningContext {
   comprehensionLevel: number; // 0-1 scale
   preferredLearningStyle?: string;
   goals?: LearningGoal[]; // Replaced string[] with strict schema
-  sessionGoals?: string[]; // Legacy field for compatibility with tests
   masteryScore?: number; // 0-100 overall mastery
 }
 

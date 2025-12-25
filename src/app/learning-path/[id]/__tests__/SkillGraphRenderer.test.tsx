@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { screen } from '@testing-library/dom';
 import '@testing-library/jest-dom';
 import SkillGraphRenderer from '../SkillGraphRenderer';
 import type { SkillGraph } from '@/lib/courseCreation/types';

@@ -52,6 +52,17 @@ export interface LearningGoal {
 }
 
 /**
+ * Specific learning goal for mastery tracking
+ */
+export interface LearningGoal {
+  id: string;
+  text: string;
+  status: 'pending' | 'in_progress' | 'mastered';
+  evidence?: string; // e.g., "Passed Quiz 1 with 100%"
+  timestamp: string;
+}
+
+/**
  * Learning context maintained throughout the session
  */
 export interface LearningContext {
@@ -87,28 +98,28 @@ export interface MessageMetadata {
   learnerEngagement?: number; // 0-1 scale
   responseTime?: number; // seconds
   hintsUsed?: number;
-    relatedChallenges?: string[];
-    roadmapData?: {
-      title: string;
-      description: string;
-      items: any[];
-    };
-    quizData?: {
-      question: string;
-      options: string[];
-      correctAnswer: string;
-      explanation: string;
-      answered?: string;
-      isCorrect?: boolean;
-    };
-    challengeData?: {
-      challengeId: string;
-      title: string;
-      description: string;
-      difficulty: DifficultyLevel;
-      status: 'pending' | 'started' | 'completed' | 'failed';
-    };
-  }
+  relatedChallenges?: string[];
+  roadmapData?: {
+    title: string;
+    description: string;
+    items: any[];
+  };
+  quizData?: {
+    question: string;
+    options: string[];
+    correctAnswer: string;
+    explanation: string;
+    answered?: string;
+    isCorrect?: boolean;
+  };
+  challengeData?: {
+    challengeId: string;
+    title: string;
+    description: string;
+    difficulty: DifficultyLevel;
+    status: 'pending' | 'started' | 'completed' | 'failed';
+  };
+}
 
 /**
  * Understanding assessment question and response

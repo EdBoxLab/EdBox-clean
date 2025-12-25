@@ -554,12 +554,16 @@ import { motion, AnimatePresence } from 'framer-motion';
                       <div className="font-bold">Onboarding Status</div>
                       <p className="text-sm text-muted-foreground">Toggle your onboarding completion status</p>
                     </div>
-                    <Button
-                      variant={preferences?.onboarded ? "default" : "outline"}
-                      onClick={() => updatePreferences({ onboarded: !preferences?.onboarded })}
-                    >
-                      {preferences?.onboarded ? 'Completed' : 'Restart Onboarding'}
-                    </Button>
+                      <Button
+                        variant={preferences?.onboarded ? "default" : "outline"}
+                        onClick={() => {
+                          updatePreferences({ onboarded: false });
+                          window.dispatchEvent(new CustomEvent('restart-tour'));
+                        }}
+                      >
+                        {preferences?.onboarded ? 'Completed' : 'Restart Onboarding'}
+                      </Button>
+
                   </div>
                 </CardContent>
               </Card>

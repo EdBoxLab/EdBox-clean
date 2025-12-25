@@ -401,7 +401,19 @@ export async function POST(request: NextRequest) {
 
     if (cached && cached.responseData) {
       console.log('📦 Returning cached course');
-      // ... (existing cache logic)
+
+      const cachedGraph = {
+        ...cached.responseData.skillGraph,
+        id: `sg_${Date.now()}_${user.id.substring(0, 8)}`,
+        userId: user.id,
+        createdAt: new Date().toISOString(),
+      };
+
+      return NextResponse.json({
+        success: true,
+        cached: true,
+        skillGraph: cachedGraph
+      });
     }
 
     let extractedContext = '';

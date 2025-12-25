@@ -5,7 +5,7 @@ import "./globals.css";
 import { seoConfig } from "@/lib/seo/config";
 import { OrganizationSchema, WebsiteSchema, SoftwareApplicationSchema } from "@/lib/seo/structured-data";
 import ClientLayout from "./ClientLayout";
-
+import { Analytics } from "@vercel/analytics/next"
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

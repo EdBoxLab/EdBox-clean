@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/dom';
 import ShareButton from '../ShareButton';
 import { ShareableContent } from '@/lib/services/sharing-service';
 

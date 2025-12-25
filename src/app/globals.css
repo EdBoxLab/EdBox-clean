@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "driver.js/dist/driver.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -154,12 +155,54 @@
   overflow: hidden;
 }
 
-/* Glassmorphism Utilities */
-.glass {
-    @apply bg-white/5 backdrop-blur-lg border border-white/10;
+/* Driver.js Customization */
+.driver-popover {
+  @apply !bg-card !text-foreground !border !border-border !rounded-xl !shadow-2xl !p-6 !max-w-[350px] !font-sans;
 }
-.glass-hover {
-    @apply hover:bg-white/10 transition-colors duration-200;
+
+.driver-popover-title {
+  @apply !text-xl !font-bold !mb-2 !text-foreground !font-sans;
+}
+
+.driver-popover-description {
+  @apply !text-muted-foreground !leading-relaxed !text-[15px] !mb-4 !font-sans;
+}
+
+.driver-popover-footer {
+  @apply !flex !items-center !justify-between !mt-6 !gap-2 !pt-4 !border-t !border-border;
+}
+
+.driver-popover-next-btn, .driver-popover-prev-btn {
+  @apply !px-4 !py-2 !rounded-lg !text-sm !font-medium !transition-all !duration-200 !shadow-sm !font-sans;
+}
+
+.driver-popover-next-btn {
+  @apply !bg-primary !text-primary-foreground hover:!bg-primary/90 !border-0;
+}
+
+.driver-popover-prev-btn {
+  @apply !bg-secondary !text-secondary-foreground hover:!bg-secondary/80 !border-0;
+}
+
+.driver-popover-close-btn {
+  @apply !text-muted-foreground hover:!text-foreground !p-1;
+}
+
+.driver-popover-progress-text {
+  @apply !text-xs !text-muted-foreground !font-medium !font-sans;
+}
+
+.driver-popover-arrow {
+  @apply !border-card;
+}
+
+.driver-popover-arrow-side-left { @apply !border-r-card; }
+.driver-popover-arrow-side-right { @apply !border-l-card; }
+.driver-popover-arrow-side-top { @apply !border-b-card; }
+.driver-popover-arrow-side-bottom { @apply !border-t-card; }
+
+.driver-overlay {
+  @apply !bg-black/60 !backdrop-blur-[2px];
 }
 
 /* Feed Responsive Utilities */

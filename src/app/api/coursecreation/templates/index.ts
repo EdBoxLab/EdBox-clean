@@ -1,23 +1,44 @@
 import fs from 'fs';
 import path from 'path';
 
-export type CourseCategory = 'language' | 'technical' | 'creative' | 'science' | 'business' | 'general';
+import { CourseCategory } from '@/lib/courseCreation/types';
+export { CourseCategory };
 
 const templateCache: Record<string, string> = {};
+const templatesDir = path.join(process.cwd(), 'src', 'app', 'api', 'coursecreation', 'templates');
+
+export function listTemplates(): string[] {
+  try {
+    return fs.readdirSync(templatesDir).filter(f => f.endsWith('.md'));
+  } catch (error) {
+    console.error('Error listing templates:', error);
+    return [];
+  }
+}
+
+export function getTemplateContent(filename: string): string {
+  const filePath = path.join(templatesDir, filename);
+  if (!fs.existsSync(filePath)) throw new Error(`Template ${filename} not found`);
+  return fs.readFileSync(filePath, 'utf-8');
+}
 
 export function getTemplateForCourse(category: CourseCategory): string {
   if (templateCache[category]) {
     return templateCache[category];
   }
 
-  const templatePath = path.join(process.cwd(), 'src', 'app', 'api', 'coursecreation', 'templates', `${category}.md`);
+  const templatePath = path.join(templatesDir, `${category}.md`);
   
   try {
-    const template = fs.readFileSync(templatePath, 'utf-8');
-    templateCache[category] = template;
-    return template;
+    if (fs.existsSync(templatePath)) {
+      const template = fs.readFileSync(templatePath, 'utf-8');
+      templateCache[category] = template;
+      return template;
+    }
+    console.warn(`Template file not found at ${templatePath}, using general template`);
+    return getGeneralTemplate();
   } catch (error) {
-    console.warn(`Template not found for ${category}, using general template`);
+    console.warn(`Error reading template for ${category}, using general template:`, error);
     return getGeneralTemplate();
   }
 }
@@ -39,7 +60,7 @@ export function detectCourseCategory(goal: string, domain: string): CourseCatego
     combined.includes('delf') ||
     combined.includes('jlpt')
   ) {
-    return 'language';
+    return CourseCategory.Language;
   }
 
   if (
@@ -49,9 +70,13 @@ export function detectCourseCategory(goal: string, domain: string): CourseCatego
     combined.includes('software') ||
     combined.includes('data science') ||
     combined.includes('machine learning') ||
-    combined.includes('algorithm')
+    combined.includes('algorithm') ||
+    combined.includes('python') ||
+    combined.includes('javascript') ||
+    combined.includes('typescript') ||
+    combined.includes('react')
   ) {
-    return 'technical';
+    return CourseCategory.Technical;
   }
 
   if (
@@ -61,9 +86,11 @@ export function detectCourseCategory(goal: string, domain: string): CourseCatego
     combined.includes('illustration') ||
     combined.includes('writing') ||
     combined.includes('creative') ||
-    combined.includes('photography')
+    combined.includes('photography') ||
+    combined.includes('music') ||
+    combined.includes('video')
   ) {
-    return 'creative';
+    return CourseCategory.Creative;
   }
 
   if (
@@ -71,9 +98,11 @@ export function detectCourseCategory(goal: string, domain: string): CourseCatego
     combined.includes('chemistry') ||
     combined.includes('biology') ||
     combined.includes('science') ||
-    combined.includes('experiment')
+    combined.includes('experiment') ||
+    combined.includes('math') ||
+    combined.includes('calculus')
   ) {
-    return 'science';
+    return CourseCategory.ScienceLower;
   }
 
   if (
@@ -82,12 +111,14 @@ export function detectCourseCategory(goal: string, domain: string): CourseCatego
     combined.includes('entrepreneur') ||
     combined.includes('marketing') ||
     combined.includes('investing') ||
-    combined.includes('economics')
+    combined.includes('economics') ||
+    combined.includes('startup') ||
+    combined.includes('management')
   ) {
-    return 'business';
+    return CourseCategory.BusinessLower;
   }
 
-  return 'general';
+  return CourseCategory.General;
 }
 
 function getGeneralTemplate(): string {
@@ -114,5 +145,5 @@ Respond ONLY with valid JSON matching the expected schema.`;
 
 export function injectTemplateIntoPrompt(basePrompt: string, category: CourseCategory): string {
   const template = getTemplateForCourse(category);
-  return `${template}\n\n---\n\n${basePrompt}`;
+  return `COURSE CONTENT GUIDELINES FOR ${category.toUpperCase()}:\n${template}\n\n---\n\nSTRUCTURAL REQUIREMENTS:\n${basePrompt}`;
 }

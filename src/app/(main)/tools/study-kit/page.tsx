@@ -356,18 +356,32 @@ function StudyKitContent() {
         setActiveTab(null);
 
         try {
-            let contentPrompt = prompt;
+            let fileData = null;
             if (uploadedFile) {
-                contentPrompt += ` [File: ${uploadedFile.name}]`;
+                const reader = new FileReader();
+                const base64Promise = new Promise<string>((resolve, reject) => {
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(uploadedFile);
+                });
+                
+                const content = await base64Promise;
+                fileData = {
+                    name: uploadedFile.name,
+                    type: uploadedFile.type,
+                    content: content
+                };
             }
 
             const response = await fetch('/api/study-kit/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    prompt: contentPrompt,
+                    prompt: prompt,
                     contentTypes: selectedTypes,
-                    fileName: uploadedFile?.name
+                    fileName: uploadedFile?.name,
+                    fileContent: fileData?.content,
+                    fileType: fileData?.type
                 }),
             });
 

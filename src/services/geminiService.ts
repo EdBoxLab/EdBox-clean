@@ -1,6 +1,6 @@
 import { HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import type { Source, ResearchPackage, CitationStyle } from '../app/types';
-import { generateWithRetry } from '../lib/ai-providers';
+import { generateWithRetry, extractContextFromText } from '../lib/ai-providers';
 import { formatAIText } from '../lib/utils/markdown';
 
 const safetySettings = [
@@ -96,7 +96,18 @@ export async function generateResearchPackage(
     setStatus: (status: string) => void
 ): Promise<Omit<ResearchPackage, 'id'>> {
     
-    const prompt = buildPrompt(goal, audience, citationStyle, sources);
+    setStatus("Extracting key information from sources...");
+    const processedSources = await Promise.all(sources.map(async (src) => {
+        // Only extract context if it's long (> 3000 chars)
+        if (src.content && src.content.length > 3000) {
+            console.log(`🧠 Extracting context for source: ${src.name}`);
+            const context = await extractContextFromText(src.content);
+            return { ...src, content: context };
+        }
+        return src;
+    }));
+
+    const prompt = buildPrompt(goal, audience, citationStyle, processedSources);
 
     try {
         setStatus("Synthesizing information and generating initial draft...");

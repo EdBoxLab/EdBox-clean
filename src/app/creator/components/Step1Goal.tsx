@@ -6,13 +6,15 @@ interface Step1GoalProps {
   setGoal: (goal: string) => void;
   uploadedFile: File | null;
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  isExtracting?: boolean;
 }
 
 const Step1Goal = memo(function Step1Goal({ 
   goal, 
   setGoal, 
   uploadedFile, 
-  handleFileUpload 
+  handleFileUpload,
+  isExtracting = false
 }: Step1GoalProps) {
   const quickExamples = [
     "Build websites",
@@ -77,39 +79,53 @@ I want to make digital art "
         <div className="flex-1 h-px bg-gray-700"></div>
       </div>
 
-      {/* File Upload */}
-      <div className="relative">
-        <input
-          type="file"
-          id="file-upload"
-          onChange={handleFileUpload}
-          accept=".txt,.pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.webp,.md"
-          className="hidden"
-        />
-        <label
-          htmlFor="file-upload"
-          className="block w-full bg-gray-800 border-2 border-dashed border-gray-700 hover:border-blue-500 rounded-2xl p-8 text-center cursor-pointer transition-colors group"
-        >
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-16 h-16 bg-gray-700 group-hover:bg-gray-600 rounded-full flex items-center justify-center transition-colors">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
+        {/* File Upload */}
+        <div className="relative">
+          <input
+            type="file"
+            id="file-upload"
+            onChange={handleFileUpload}
+            disabled={isExtracting}
+            accept=".txt,.pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.webp,.md"
+            className="hidden"
+          />
+          <label
+            htmlFor="file-upload"
+            className={`block w-full bg-gray-800 border-2 border-dashed rounded-2xl p-8 text-center transition-colors group ${
+              isExtracting 
+                ? 'border-blue-500 cursor-wait' 
+                : 'border-gray-700 hover:border-blue-500 cursor-pointer'
+            }`}
+          >
+            <div className="flex flex-col items-center gap-3">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${
+                isExtracting ? 'bg-blue-500/20' : 'bg-gray-700 group-hover:bg-gray-600'
+              }`}>
+                {isExtracting ? (
+                  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                )}
+              </div>
+              <div>
+                <p className="text-white font-semibold">
+                  {isExtracting ? 'Extracting meaningful context...' : (uploadedFile ? uploadedFile.name : 'Upload a file instead')}
+                </p>
+                <p className="text-sm text-gray-400 mt-1">
+                  {isExtracting ? 'Our AI is reading your document to build a custom course' : 'Job description, project brief, or learning plan'}
+                </p>
+                {!isExtracting && (
+                  <p className="text-xs text-gray-600 mt-2">
+                    PDF, Word, PowerPoint, images, text files • Max 10MB
+                  </p>
+                )}
+              </div>
             </div>
-            <div>
-              <p className="text-white font-semibold">
-                {uploadedFile ? uploadedFile.name : 'Upload a file instead'}
-              </p>
-              <p className="text-sm text-gray-400 mt-1">
-                Job description, project brief, or learning plan
-              </p>
-              <p className="text-xs text-gray-600 mt-2">
-                PDF, Word, PowerPoint, images, text files • Max 10MB
-              </p>
-            </div>
-          </div>
-        </label>
-      </div>
+          </label>
+        </div>
+
     </motion.div>
   );
 });

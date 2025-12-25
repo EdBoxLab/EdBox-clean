@@ -5,6 +5,7 @@ export interface Source {
   name: string;
   type: 'text' | 'file' | 'url';
   content: string; // The actual text content, or URL
+  mimeType?: string;
 }
 
 export interface Citation {

@@ -241,3 +241,39 @@ export async function generateWithRetry(
   }
   throw new Error('Max retries exceeded');
 }
+
+/**
+ * Extract meaningful context and information from raw text using AI
+ */
+export async function extractContextFromText(text: string): Promise<string> {
+  if (!text || text.trim().length === 0) return '';
+
+  const systemPrompt = `You are an expert information extractor. Your task is to analyze raw text extracted from a document (PDF, PPTX, etc.) and extract the core context, key concepts, and meaningful information.
+
+Constraints:
+- Focus on the main topic and educational value.
+- Identify the target audience if possible.
+- Extract key terminology and definitions.
+- Summarize the structure of the content.
+- DO NOT just repeat the text; synthesize it into a concise knowledge summary.
+- The summary should be optimized for another AI to use as context for generating educational materials.
+- Max 1000 tokens for the summary.
+
+Return the extraction in a clear, structured format.`;
+
+  try {
+    console.log('🧠 Extracting context from document text...');
+    const result = await generateWithRetry({
+      prompt: `Analyze the following raw text and extract meaningful context:\n\n${text.substring(0, 30000)}`,
+      systemPrompt,
+      temperature: 0.3, // Lower temperature for more factual extraction
+      maxTokens: 1000,
+    });
+    console.log('✅ Context extraction complete');
+    return result.text;
+  } catch (error) {
+    console.error('❌ Failed to extract context from text:', error);
+    // Fallback to a simple truncation if AI extraction fails
+    return text.substring(0, 5000);
+  }
+}

@@ -17,6 +17,7 @@ export default function OnboardingFlow() {
     context,
     timeAvailable,
     uploadedFile,
+    isExtracting,
     isGenerating,
     error,
     showContinue,
@@ -65,15 +66,17 @@ export default function OnboardingFlow() {
 
         {/* Step Content */}
         <AnimatePresence mode="wait">
-          {step === 1 && (
-            <Step1Goal
-              key="step1"
-              goal={goal}
-              setGoal={setGoal}
-              uploadedFile={uploadedFile}
-              handleFileUpload={handleFileUpload}
-            />
-          )}
+            {step === 1 && (
+              <Step1Goal
+                key="step1"
+                goal={goal}
+                setGoal={setGoal}
+                uploadedFile={uploadedFile}
+                handleFileUpload={handleFileUpload}
+                isExtracting={isExtracting}
+              />
+            )}
+
           {step === 2 && (
             <Step2Context
               key="step2"

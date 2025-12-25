@@ -45,15 +45,21 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      graph: {
-        id: graph.id,
-        userId: graph.user_id,
-        goal: graph.goal,
-        nodes: graph.nodes,
-        edges: graph.edges,
-        createdAt: graph.created_at,
-        updatedAt: graph.updated_at,
-      },
+        graph: {
+          id: graph.id,
+          userId: graph.user_id,
+          goal: graph.goal,
+          context: graph.context,
+          totalSkills: graph.total_skills,
+          estimatedHours: graph.estimated_hours,
+          skillPaths: graph.skill_paths,
+          miniProjects: graph.mini_projects,
+          capstone_project: graph.capstone_project,
+          nodes: graph.nodes,
+          edges: graph.edges,
+          createdAt: graph.created_at,
+          updatedAt: graph.updated_at,
+        },
       progress: progressMap,
     });
   } catch (error: any) {

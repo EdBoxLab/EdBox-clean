@@ -26,7 +26,13 @@ export enum CourseCategory {
   Arts = 'Arts',
   Humanities = 'Humanities',
   Health = 'Health',
-  Other = 'Other'
+  Other = 'Other',
+  Language = 'language',
+  Technical = 'technical',
+  Creative = 'creative',
+  ScienceLower = 'science',
+  BusinessLower = 'business',
+  General = 'general'
 }
 
 export enum CourseFormat {

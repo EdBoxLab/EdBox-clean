@@ -54,15 +54,33 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ onSourcesChanged
           return;
         }
         
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const content = e.target?.result as string;
-          addSource({ id: crypto.randomUUID(), name: file.name, type: 'file', content });
-        };
-        reader.onerror = () => {
-          setError('Failed to read file. Please try again.');
-        };
-        reader.readAsText(file);
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const content = e.target?.result as string;
+            addSource({ 
+                id: `file-${Date.now()}`, 
+                name: file.name, 
+                type: 'file', 
+                content,
+                mimeType: file.type 
+            });
+          };
+          reader.onerror = () => {
+            setError('Failed to read file. Please try again.');
+          };
+          
+          const isLikelyText = (file.type.startsWith('text/') || 
+                                file.name.endsWith('.txt') || 
+                                file.name.endsWith('.md') || 
+                                file.name.endsWith('.csv')) && 
+                                !file.name.toLowerCase().endsWith('.pdf');
+
+          if (isLikelyText) {
+              reader.readAsText(file);
+          } else {
+              reader.readAsDataURL(file);
+          }
+
       }
     }
   };

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { generateWithRetry } from '@/lib/ai-providers';
+import { generateWithRetry, extractContextFromText } from '@/lib/ai-providers';
 import { QUIZ_TEMPLATE, FLASHCARD_TEMPLATE, NOTES_TEMPLATE, MINDMAP_TEMPLATE } from './templates';
+import { processFileContent } from '@/lib/utils/fileProcessing';
 
 type ContentType = 'quizzes' | 'flashcards' | 'mindmaps' | 'notes';
 
@@ -47,7 +48,7 @@ function extractJSON(text: string, type: ContentType) {
 }
 
 function buildPrompt(type: ContentType, prompt: string) {
-  const base = `Topic: "${prompt}"\n\n`;
+  const base = `Topic/Content Source: "${prompt}"\n\n`;
   
   switch (type) {
     case 'quizzes':
@@ -75,16 +76,35 @@ export async function POST(request: NextRequest) {
     
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { prompt, contentTypes, fileName } = await request.json();
+    const body = await request.json();
+    const { prompt, contentTypes, fileName, fileContent, fileType } = body;
 
-    if (!prompt || !contentTypes?.length) {
+    if ((!prompt && !fileContent) || !contentTypes?.length) {
       return NextResponse.json({ error: 'Missing data' }, { status: 400 });
+    }
+
+    // Process file if provided
+    let finalPrompt = prompt || '';
+    if (fileContent) {
+      try {
+        console.log(`📄 Processing file in study kit: ${fileName} (${fileType})`);
+        const extractedText = await processFileContent(fileContent, fileType || '', fileName || '');
+        
+        // NEW: Extract meaningful context instead of sending raw text
+        const contextSummary = await extractContextFromText(extractedText);
+        
+        finalPrompt = `Based on the following extracted document context (${fileName}):\n\n${contextSummary}\n\nUser Context: ${prompt || 'Generate study materials'}\n\nIMPORTANT: Only generate content that is relevant to the provided document context.`;
+        console.log(`✅ File processed and context extracted, total prompt length: ${finalPrompt.length}`);
+      } catch (err) {
+        console.error('❌ File processing failed in study kit:', err);
+        // Fallback to prompt only
+      }
     }
 
     const results = await Promise.allSettled(
       contentTypes.map(async (type: ContentType) => {
         const result = await generateWithRetry({
-          prompt: buildPrompt(type, prompt),
+          prompt: buildPrompt(type, finalPrompt),
           systemPrompt: 'Output ONLY valid JSON with no extra text.',
           temperature: 0.7,
           maxTokens: type === 'notes' ? 3000 : 2000,
@@ -106,13 +126,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'All failed' }, { status: 500 });
     }
 
+    // Generate a better title if it was a file
+    let title = prompt?.slice(0, 100) || fileName?.split('.')[0] || 'Study Kit';
+    if (title.length < 3) title = 'My Study Kit';
+
     const { data: studyKit } = await supabase
       .from('study_kit_content')
       .insert({
         user_id: user.id,
-        title: prompt.slice(0, 100),
+        title: title,
         source_type: fileName ? 'file' : 'text',
-        source_content: prompt,
+        source_content: finalPrompt.substring(0, 5000), // Store partial context for reference
         file_name: fileName,
         content_types: Object.keys(generatedContent),
         generated_content: generatedContent,
@@ -127,6 +151,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
+    console.error('❌ Study kit generation failed:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

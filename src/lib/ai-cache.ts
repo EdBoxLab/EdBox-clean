@@ -10,6 +10,7 @@ export interface CacheOptions {
 export interface CachedResponse {
   id: string;
   responseData: any;
+  category?: string;
   similarity?: number;
 }
 
@@ -30,21 +31,22 @@ export async function checkCache(options: CacheOptions): Promise<CachedResponse 
       .eq('request_type', options.requestType)
       .single();
 
-    if (exactMatch) {
-      await supabase
-        .from('ai_response_cache')
-        .update({
-          accessed_count: exactMatch.accessed_count + 1,
-          last_accessed_at: new Date().toISOString(),
-        })
-        .eq('id', exactMatch.id);
+      if (exactMatch) {
+        await supabase
+          .from('ai_response_cache')
+          .update({
+            accessed_count: exactMatch.accessed_count + 1,
+            last_accessed_at: new Date().toISOString(),
+          })
+          .eq('id', exactMatch.id);
 
-      console.log('✅ Cache HIT (exact match)');
-      return {
-        id: exactMatch.id,
-        responseData: exactMatch.response_data,
-      };
-    }
+        console.log('✅ Cache HIT (exact match)');
+        return {
+          id: exactMatch.id,
+          responseData: exactMatch.response_data,
+          category: exactMatch.category,
+        };
+      }
 
     if (options.requestType === 'course_generation' && options.requestData.goal) {
       const { data: similarMatches, error } = await supabase.rpc('find_similar_course_cache', {
@@ -64,12 +66,13 @@ export async function checkCache(options: CacheOptions): Promise<CachedResponse 
           })
           .eq('id', match.id);
 
-        console.log(`✅ Cache HIT (similar match, ${(match.similarity * 100).toFixed(1)}% similarity)`);
-        return {
-          id: match.id,
-          responseData: match.response_data,
-          similarity: match.similarity,
-        };
+          console.log(`✅ Cache HIT (similar match, ${(match.similarity * 100).toFixed(1)}% similarity)`);
+          return {
+            id: match.id,
+            responseData: match.response_data,
+            category: match.category,
+            similarity: match.similarity,
+          };
       }
     }
 

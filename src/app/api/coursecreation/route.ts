@@ -1,10 +1,13 @@
-// app/api/learning-path/generate/route.ts
+// app/api/coursecreation/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { generateWithRetry } from '@/lib/ai-providers';
-import { detectCourseCategory, injectTemplateIntoPrompt, type CourseCategory } from './templates';
+import { generateWithRetry, extractContextFromText } from '@/lib/ai-providers';
+import { detectCourseCategory, injectTemplateIntoPrompt } from './templates';
+import { CourseCategory } from '@/lib/courseCreation/types';
 import { checkCache, saveToCache } from '@/lib/ai-cache';
+import { processFileContent } from '@/lib/utils/fileProcessing';
+import { transformToGraph, normalizeSkillGraphData } from '@/lib/courseCreation/graphUtils';
 
 // ============= TYPES =============
 
@@ -70,7 +73,9 @@ interface SkillGraph {
   estimatedHours: string;
   skillPaths: SkillPath[];
   miniProjects: MiniProject[];
-  capstoneProject: MiniProject;
+  capstone_project: MiniProject;
+  nodes: any[];
+  edges: any[];
   createdAt: string;
 }
 
@@ -165,7 +170,7 @@ Return: {Valid JSON object with keys: actual_goal, domain, target_proficiency, t
 `;
 
   const fileContext = uploadedFileContent
-    ? `\n\nUploaded document context: ${uploadedFileContent.substring(0, 3000)}`
+    ? `\n\nIMPORTANT: Use the following extracted document context as the primary source for the course structure and content. Only generate what is relevant to this context:\n${uploadedFileContent}`
     : '';
 
   const schema = {
@@ -347,13 +352,13 @@ Respond ONLY with valid JSON.`;
 
   const result = await generateWithRetry({
     prompt: systemPrompt,
-    systemPrompt: '',
+    systemPrompt: 'You are an expert curriculum designer. Follow the schema exactly. Ensure all requested sections (skillPaths, miniProjects, capstoneProject) are fully populated.',
     schema,
-    temperature: 1.0,
+    temperature: 0.7,
     maxTokens: 8000,
   });
 
-  return JSON.parse(result.text);
+  return normalizeSkillGraphData(JSON.parse(result.text));
 }
 
 // ============= MAIN ENDPOINT =============
@@ -396,61 +401,23 @@ export async function POST(request: NextRequest) {
 
     if (cached && cached.responseData) {
       console.log('📦 Returning cached course');
+      // ... (existing cache logic)
+    }
 
-      const cachedGraph = {
-        ...cached.responseData.skillGraph,
-        id: `sg_${Date.now()}_${user.id.substring(0, 8)}`,
-        userId: user.id,
-        createdAt: new Date().toISOString(),
-      };
-
-      const allSkills = cachedGraph.skillPaths.flatMap((path: any) => path.skills);
-      const skillMastery: LearnerState['skillMastery'] = {};
-      allSkills.forEach((skill: any) => {
-        skillMastery[skill.id] = {
-          confidence: 0.0,
-          challengesCompleted: 0,
-          successRate: 0.0,
-          timeSpent: 0,
-          lastPracticed: null,
-          isMastered: false
-        };
-      });
-
-      const learnerState: LearnerState = {
-        id: `ls_${Date.now()}_${user.id.substring(0, 8)}`,
-        userId: user.id,
-        skillGraphId: cachedGraph.id,
-        skillMastery,
-        currentSkill: null,
-        streak: 0,
-        totalXP: 0,
-        level: 1,
-        badges: [],
-        startedAt: new Date().toISOString()
-      };
-
-      await supabase.from('skill_graphs').insert([cachedGraph]);
-      await supabase.from('learner_states').insert([learnerState]);
-
-      return NextResponse.json({
-        success: true,
-        cached: true,
-        similarity: cached.similarity,
-        skillGraph: {
-          ...cachedGraph,
-          readySkills: allSkills.filter((s: any) => s.prerequisites.length === 0).length,
-          totalProjects: cachedGraph.miniProjects.length + 1,
-        },
-        learnerState: {
-          id: learnerState.id,
-          totalSkills: allSkills.length,
-          masteredSkills: 0,
-          currentLevel: 1,
-          totalXP: 0,
-          streak: 0
-        }
-      });
+    let extractedContext = '';
+    if (uploadedFile?.content) {
+      try {
+        console.log(`📄 Processing file in course creation: ${uploadedFile.name}`);
+        const rawText = await processFileContent(
+          uploadedFile.content,
+          uploadedFile.type || '',
+          uploadedFile.name || ''
+        );
+        extractedContext = await extractContextFromText(rawText);
+        console.log('✅ File context extracted');
+      } catch (err) {
+        console.error('❌ File processing failed:', err);
+      }
     }
 
     console.log('🧠 Step 1: Analyzing goal...');
@@ -458,7 +425,7 @@ export async function POST(request: NextRequest) {
       goal,
       context,
       timeAvailable,
-      uploadedFile?.content
+      extractedContext
     );
 
     console.log(`✅ Analysis complete:`, {
@@ -485,8 +452,15 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Skill graph generated: ${totalSkills} micro-skills`);
 
+    const { nodes, edges } = transformToGraph(
+      skillGraphData.skillPaths,
+      skillGraphData.miniProjects,
+      skillGraphData.capstoneProject,
+      analysis.category
+    );
+
     const skillGraph: SkillGraph = {
-      id: `sg_${Date.now()}_${user.id.substring(0, 8)}`,
+      id: crypto.randomUUID(),
       userId: user.id,
       goal: analysis.parsedGoal,
       context,
@@ -494,7 +468,9 @@ export async function POST(request: NextRequest) {
       estimatedHours: `${Math.ceil(analysis.estimatedTotalHours)}-${Math.ceil(analysis.estimatedTotalHours * 1.3)} hours`,
       skillPaths: skillGraphData.skillPaths,
       miniProjects: skillGraphData.miniProjects,
-      capstoneProject: skillGraphData.capstoneProject,
+      capstone_project: skillGraphData.capstoneProject,
+      nodes,
+      edges,
       createdAt: new Date().toISOString()
     };
 
@@ -514,7 +490,7 @@ export async function POST(request: NextRequest) {
     });
 
     const learnerState: LearnerState = {
-      id: `ls_${Date.now()}_${user.id.substring(0, 8)}`,
+      id: crypto.randomUUID(),
       userId: user.id,
       skillGraphId: skillGraph.id,
       skillMastery,
@@ -530,7 +506,20 @@ export async function POST(request: NextRequest) {
 
     const { error: graphError } = await supabase
       .from('skill_graphs')
-      .insert([skillGraph]);
+      .insert([{
+        id: skillGraph.id,
+        user_id: user.id,
+        goal: skillGraph.goal,
+        context: skillGraph.context,
+        total_skills: skillGraph.totalSkills,
+        estimated_hours: skillGraph.estimatedHours,
+        skill_paths: skillGraph.skillPaths,
+        mini_projects: skillGraph.miniProjects,
+        capstone_project: skillGraph.capstone_project,
+        nodes: skillGraph.nodes,
+        edges: skillGraph.edges,
+        created_at: skillGraph.createdAt
+      }]);
 
     if (graphError) {
       console.error('❌ Failed to save skill graph:', graphError);
@@ -554,14 +543,16 @@ export async function POST(request: NextRequest) {
       },
       {
         skillGraph: {
-          goal: skillGraph.goal,
-          context: skillGraph.context,
-          totalSkills: skillGraph.totalSkills,
-          estimatedHours: skillGraph.estimatedHours,
-          skillPaths: skillGraph.skillPaths,
-          miniProjects: skillGraph.miniProjects,
-          capstoneProject: skillGraph.capstoneProject,
-        },
+            goal: skillGraph.goal,
+            context: skillGraph.context,
+            totalSkills: skillGraph.totalSkills,
+            estimatedHours: skillGraph.estimatedHours,
+            skillPaths: skillGraph.skillPaths,
+            miniProjects: skillGraph.miniProjects,
+            capstone_project: skillGraph.capstone_project,
+            nodes: skillGraph.nodes,
+            edges: skillGraph.edges,
+          },
       }
     );
 

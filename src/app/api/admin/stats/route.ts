@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
         const { data: recentUsers } = await supabase
             .from('profiles')
             .select('id')
-            .gte('id', sevenDaysAgo.toISOString());
+            .gte('created_at', sevenDaysAgo.toISOString());
 
         // Get total notes
         const { count: totalNotes } = await supabase

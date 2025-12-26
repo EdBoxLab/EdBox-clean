@@ -52,7 +52,7 @@ export const InsightCard: React.FC<InsightCardProps> = ({ item, isActive }) => {
     }, [isActive, item.full_content]);
 
     return (
-        <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden bg-slate-950">
+        <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden bg-transparent">
             {/* Stunning Background Effects */}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(99,102,241,0.15),transparent_80%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(168,85,247,0.1),transparent_70%)]" />

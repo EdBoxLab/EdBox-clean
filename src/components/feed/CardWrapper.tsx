@@ -40,10 +40,10 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
 
     return (
         <div
-            className={`relative h-full w-full flex flex-col justify-between p-4 sm:p-6 text-white overflow-hidden rounded-[2.5rem] transition-all duration-700 ease-[0.23,1,0.32,1] ${
+            className={`relative h-full w-full flex flex-col justify-between p-4 sm:p-6 text-white overflow-hidden rounded-3xl transition-all duration-700 ease-[0.23,1,0.32,1] ${
                 isActive 
-                    ? 'border-white/10 shadow-[0_0_80px_rgba(0,0,0,0.5)] bg-[#050505] ring-1 ring-white/5' 
-                    : 'scale-[0.92] grayscale-[0.5] opacity-40'
+                    ? 'border-white/10 shadow-2xl bg-slate-950 ring-1 ring-white/5' 
+                    : 'scale-[0.98] opacity-60'
             }`}
         >
             {/* Sidebar Interactions (Premium TikTok Style) */}

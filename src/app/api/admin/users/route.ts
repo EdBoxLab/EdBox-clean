@@ -213,10 +213,63 @@ export async function PATCH(request: NextRequest) {
       success: true,
       user: data,
     });
-  } catch (error: any) {
+    } catch (error: any) {
     console.error('Admin users PATCH error:', error);
     return NextResponse.json({ 
       error: 'Failed to update user role',
+      details: error.message 
+    }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createSupabaseServerClient();
+    
+    // Check admin access
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: adminRecord } = await supabase
+      .from('admins')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (!adminRecord) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    const { userId } = await request.json();
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'userId is required' },
+        { status: 400 }
+      );
+    }
+
+    // Delete user profile (cascading will handle others if set up, or we do it manually)
+    // Note: This won't delete from auth.users unless using admin auth client,
+    // but we can at least remove their profile data.
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', userId);
+
+    if (error) throw error;
+
+    return NextResponse.json({
+      success: true,
+      message: 'User profile deleted successfully',
+    });
+  } catch (error: any) {
+    console.error('Admin users DELETE error:', error);
+    return NextResponse.json({ 
+      error: 'Failed to delete user',
       details: error.message 
     }, { status: 500 });
   }

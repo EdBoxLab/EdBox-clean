@@ -5,10 +5,10 @@ export interface Comment {
   avatar: string;
 }
 
-export type FeedItemType = 'video' | 'story' | 'infographic' | 'quiz' | 'article' | 'challenge' | 'fact' | 'meme' | 'ad' | 'insight' | 'poll';
+export type FeedItemType = 'video' | 'story' | 'infographic' | 'quiz' | 'article' | 'challenge' | 'fact' | 'meme' | 'ad' | 'insight' | 'poll' | 'debate';
 
 export type GenieReaction = 'cheer' | 'wink' | 'hint' | 'hype' | 'default' | 'sad';
-export type Theme = 'purple-gradient' | 'blue-gradient' | 'green-gradient' | 'orange-gradient' | 'red-gradient';
+export type Theme = 'purple-gradient' | 'blue-gradient' | 'green-gradient' | 'orange-gradient' | 'red-gradient' | 'cyan-gradient' | 'rose-gradient';
 export type Feedback = 'like' | 'dislike';
 export type LoadingState = 'idle' | 'loading' | 'complete' | 'error';
 export type ImageGenerationState = 'pending' | 'generating' | 'ready' | 'error';
@@ -135,6 +135,16 @@ export interface MemeFeedItem extends BaseFeedItem {
   imageGenerationState?: ImageGenerationState;
 }
 
+export interface DebateFeedItem extends BaseFeedItem {
+  type: 'debate';
+  question: string;
+  viewpoint_a: string;
+  viewpoint_b: string;
+  visualPrompt?: string;
+  imageUrl?: string;
+  imageGenerationState?: ImageGenerationState;
+}
+
 // Unified Feed Item Type
 export type FeedItem =
   | StoryFeedItem
@@ -146,7 +156,8 @@ export type FeedItem =
   | ChallengeFeedItem
   | FactFeedItem
   | MemeFeedItem
-  | PollFeedItem;
+  | PollFeedItem
+  | DebateFeedItem;
 
 // Legacy alias to support existing code during migration (will be removed)
 export type Lesson = FeedItem;

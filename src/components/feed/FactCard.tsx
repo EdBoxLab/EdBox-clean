@@ -13,7 +13,7 @@ export const FactCard: React.FC<FactCardProps> = ({ item, isActive }) => {
     const [isRevealed, setIsRevealed] = useState(false);
 
     return (
-        <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden bg-slate-950">
+        <div className="w-full text-center flex flex-col justify-center items-center h-full px-4 relative overflow-hidden bg-transparent">
             {/* Stunning Background Effects */}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(6,182,212,0.15),transparent_80%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_80%,rgba(59,130,246,0.1),transparent_70%)]" />

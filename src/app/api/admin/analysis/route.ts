@@ -64,7 +64,7 @@ Format your response in clear markdown with sections.
                     content: statsContext,
                 },
             ],
-            model: 'llama3-70b-8192',
+            model: 'llama-3.3-70b-versatile',
             temperature: 0.8,
             max_tokens: 2000,
         });
@@ -76,14 +76,22 @@ Format your response in clear markdown with sections.
             generatedAt: new Date().toISOString(),
         });
     } catch (error: any) {
-        console.error('Admin analysis error:', error);
+        console.error('Admin analysis error detailed:', {
+            message: error.message,
+            stack: error.stack,
+            cause: error.cause,
+            response: error.response?.data
+        });
 
         if (error.message === 'Admin access required') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
         return NextResponse.json(
-            { error: 'Failed to generate analysis' },
+            { 
+                error: 'Failed to generate analysis',
+                details: error.message
+            },
             { status: 500 }
         );
     }

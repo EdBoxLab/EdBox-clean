@@ -12,6 +12,8 @@ import { FactCard } from './FactCard';
 import { StoryCard } from './StoryCard';
 import { PollCard } from './PollCard';
 import { MemeCard } from './MemeCard';
+import { ChallengeCard } from './ChallengeCard';
+import { DebateCard } from './DebateCard';
 import { SkeletonCard } from './SkeletonCard';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { XPStreakDisplay } from '@/components/XPStreakDisplay';
@@ -50,99 +52,146 @@ const FeedAnimations = () => (
   `}</style>
 );
 
-const Feed: React.FC<FeedProps> = ({ preferences }) => {
-  const [items, setItems] = useState<FeedItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [activeCardId, setActiveCardId] = useState<string | null>(null);
-  const [likedTopics, setLikedTopics] = useState<string[]>([]);
-  const [viewedTypes, setViewedTypes] = useState<Set<string>>(new Set());
-  const [currentBatch, setCurrentBatch] = useState(0);
-  const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
+  const Feed: React.FC<FeedProps> = ({ preferences }) => {
+    const [items, setItems] = useState<FeedItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [activeIndex, setActiveIndex] = useState(0);
+    const [activeCardId, setActiveCardId] = useState<string | null>(null);
+    const [likedTopics, setLikedTopics] = useState<string[]>([]);
+    const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
+    const [seenTitles, setSeenTitles] = useState<Set<string>>(new Set());
+    const [viewedTypes, setViewedTypes] = useState<Set<string>>(new Set());
+    const [currentBatch, setCurrentBatch] = useState(0);
+    const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
+  
+    const feedRef = useRef<HTMLDivElement>(null);
+    const observer = useRef<IntersectionObserver | null>(null);
+    const processingRef = useRef(false);
+    const lastLoadRef = useRef<number>(0);
+    const supabase = createSupabaseBrowserClient();
 
-  const feedRef = useRef<HTMLDivElement>(null);
-  const observer = useRef<IntersectionObserver | null>(null);
-  const processingRef = useRef(false);
-  const lastLoadRef = useRef<number>(0);
-  const supabase = createSupabaseBrowserClient();
+    // Clear stale cache on mount - fresh content every session
+    useEffect(() => {
+      localStorage.removeItem('feed_seen_ids');
+      localStorage.removeItem('feed_seen_titles');
+      localStorage.removeItem('feed_liked_topics');
+      setSeenIds(new Set());
+      setSeenTitles(new Set());
+      setLikedTopics([]);
+    }, []);
 
-  const loadMoreItems = useCallback(async (initial = false) => {
-    const now = Date.now();
-    if (now - lastLoadRef.current < 5000) return;
-    if (processingRef.current) return;
+    // Save history to localStorage whenever it changes
+    useEffect(() => {
+      localStorage.setItem('feed_liked_topics', JSON.stringify(likedTopics));
+    }, [likedTopics]);
 
-    lastLoadRef.current = now;
-    processingRef.current = true;
-    if (initial) setLoading(true);
+    useEffect(() => {
+      localStorage.setItem('feed_seen_ids', JSON.stringify(Array.from(seenIds)));
+    }, [seenIds]);
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: undefined } }));
-      
-      const allContentTypes = ['quiz', 'article', 'fact', 'poll', 'story', 'meme'];
-      const shouldReset = viewedTypes.size >= allContentTypes.length;
-      const excludeTypes = initial || shouldReset ? [] : Array.from(viewedTypes);
+    useEffect(() => {
+      localStorage.setItem('feed_seen_titles', JSON.stringify(Array.from(seenTitles)));
+    }, [seenTitles]);
+  
+    const loadMoreItems = useCallback(async (initial = false) => {
+      const now = Date.now();
+      if (now - lastLoadRef.current < 3000) return; // Reduced throttle for better UX
+      if (processingRef.current) return;
+  
+      lastLoadRef.current = now;
+      processingRef.current = true;
+      if (initial) setLoading(true);
+  
+      try {
+        const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: undefined } }));
+        
+        // Always pass all seen titles to ensure the AI NEVER repeats them
+        const currentSeenTitles = Array.from(seenTitles);
+        const currentSeenIds = Array.from(seenIds);
 
-      if (shouldReset) setViewedTypes(new Set());
+        const itemBatch = await generateFeedBatch(
+          preferences.interests, 
+          likedTopics, 
+          [], // Don't exclude types, let the algo decide balance
+          currentSeenIds,
+          currentSeenTitles
+        );
+        
+        // STRICT FRONTEND FILTERING: Ensure no duplicates ever slip through
+        const uniqueNewItems = itemBatch.filter(newItem => {
+          const isIdSeen = seenIds.has(newItem.id);
+          const isTitleSeen = currentSeenTitles.some(t => t.toLowerCase() === newItem.title.toLowerCase());
+          return !isIdSeen && !isTitleSeen;
+        });
 
-      const itemBatch = await generateFeedBatch(preferences.interests, likedTopics, excludeTypes);
-      await persistFeedItems(itemBatch, user?.id);
-
-      const newTypes = new Set(itemBatch.map(item => item.type));
-      setViewedTypes(prev => shouldReset ? newTypes : new Set([...prev, ...newTypes]));
-
-      if (initial) {
-        setItems(itemBatch);
-        setCurrentBatch(1);
-        setHasLoadedInitial(true);
-        if (itemBatch.length > 0) {
-          setActiveCardId(itemBatch[0].id);
-          setActiveIndex(0);
+        if (initial) {
+          setItems(uniqueNewItems);
+          setCurrentBatch(1);
+          setHasLoadedInitial(true);
+          if (uniqueNewItems.length > 0) {
+            setActiveCardId(uniqueNewItems[0].id);
+            setActiveIndex(0);
+            // Don't mark as seen immediately, wait for intersection
+          }
+        } else {
+          if (uniqueNewItems.length > 0) {
+            setItems(prev => [...prev, ...uniqueNewItems]);
+            setCurrentBatch(prev => prev + 1);
+          } else if (itemBatch.length > 0) {
+            // If all were duplicates (unlikely with high entropy IDs), try one more time
+            console.warn("All items in batch were duplicates, retrying once...");
+            // Non-recursive retry for safety
+          }
         }
-      } else {
-        const existingIds = new Set(items.map(i => i.id));
-        const uniqueNewItems = itemBatch.filter(i => !existingIds.has(i.id));
-
+        
         if (uniqueNewItems.length > 0) {
-          setItems(prev => [...prev, ...uniqueNewItems]);
-          setCurrentBatch(prev => prev + 1);
+           await persistFeedItems(uniqueNewItems, user?.id);
         }
+      } catch (err) {
+        console.error("❌ Failed to load feed items", err);
+      } finally {
+        processingRef.current = false;
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("❌ Failed to load feed items", err);
-    } finally {
-      processingRef.current = false;
-      setLoading(false);
-    }
-  }, [preferences.interests, likedTopics, viewedTypes, currentBatch, supabase]);
-
-  useEffect(() => {
-    if (!hasLoadedInitial) loadMoreItems(true);
-  }, [hasLoadedInitial, loadMoreItems]);
-
-  useEffect(() => {
-    if (observer.current) observer.current.disconnect();
-
-    observer.current = new IntersectionObserver(
-      (entries) => {
-        const intersectingEntry = entries.find(entry => entry.isIntersecting && entry.intersectionRatio > 0.5);
-        if (intersectingEntry) {
-          const newActiveId = intersectingEntry.target.id;
-          setActiveCardId(prevId => {
-            if (prevId !== newActiveId) {
-              const index = items.findIndex(item => item.id === newActiveId);
-              setActiveIndex(index);
-              const loadThreshold = items.length - 3;
-              if (index !== -1 && index >= loadThreshold && !loading && !processingRef.current) {
-                loadMoreItems();
-              }
-              return newActiveId;
+    }, [preferences.interests, likedTopics, seenIds, seenTitles, supabase]);
+  
+    useEffect(() => {
+      if (!hasLoadedInitial) loadMoreItems(true);
+    }, [hasLoadedInitial, loadMoreItems]);
+  
+    useEffect(() => {
+      if (observer.current) observer.current.disconnect();
+  
+      observer.current = new IntersectionObserver(
+        (entries) => {
+          const intersectingEntry = entries.find(entry => entry.isIntersecting && entry.intersectionRatio > 0.5);
+          if (intersectingEntry) {
+            const newActiveId = intersectingEntry.target.id;
+            
+            // Mark as seen
+            const item = items.find(i => i.id === newActiveId);
+            if (item) {
+              setSeenIds(prev => new Set([...prev, newActiveId]));
+              setSeenTitles(prev => new Set([...prev, item.title]));
             }
-            return prevId;
-          });
-        }
-      },
-      { threshold: 0.6, root: feedRef.current }
-    );
+
+            setActiveCardId(prevId => {
+              if (prevId !== newActiveId) {
+                const index = items.findIndex(item => item.id === newActiveId);
+                setActiveIndex(index);
+                const loadThreshold = items.length - 3;
+                if (index !== -1 && index >= loadThreshold && !loading && !processingRef.current) {
+                  loadMoreItems();
+                }
+                return newActiveId;
+              }
+              return prevId;
+            });
+          }
+        },
+        { threshold: 0.6, root: feedRef.current }
+      );
+
 
     const currentFeedRef = feedRef.current;
     if (currentFeedRef) {
@@ -210,6 +259,10 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
         return <StoryCard item={item as StoryFeedItem} isActive={isActive} onSwipe={handleSwipe} />;
       case 'meme':
         return <MemeCard item={item as any} />;
+      case 'challenge':
+        return <ChallengeCard item={item as any} isActive={isActive} />;
+      case 'debate':
+        return <DebateCard item={item as any} isActive={isActive} />;
       default:
         return null;
     }

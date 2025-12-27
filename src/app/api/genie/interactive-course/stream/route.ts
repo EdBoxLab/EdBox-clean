@@ -24,21 +24,42 @@ function detectBehavioralPatterns(userMessage: string, conversationHistory: any[
     ];
 
     const quizRequest = [
-        "quiz me", "test me", "give me a quiz", "ready for a quiz"
+        "quiz me", "test me", "give me a quiz", "ready for a quiz", "quiz me on what we've learned"
     ];
 
     const msg = userMessage.toLowerCase();
 
+    // Detect quiz completion with success
+    const quizSuccess = msg.includes('correctly answered') || 
+        msg.includes('quiz: correct') || 
+        (msg.includes('quiz') && msg.includes('correct'));
+    
+    // Detect quiz completion with failure
+    const quizFail = (msg.includes('struggled with the quiz') || 
+        (msg.includes('quiz') && msg.includes('struggled')));
+
+    // Detect challenge completion with success
+    const challengeSuccess = msg.includes('successfully mastered the challenge') || 
+        msg.includes('challenge completed') || 
+        msg.includes('mastered the challenge') ||
+        (msg.includes('challenge') && msg.includes('mastered'));
+    
+    // Detect challenge completion with failure
+    const challengeFail = (msg.includes('struggled with the challenge') || 
+        (msg.includes('challenge') && msg.includes('need more practice')));
+
     return {
-        showsUnderstanding: explicitUnderstanding.some(phrase => msg.includes(phrase)),
-        showsConfusion: explicitConfusion.some(phrase => msg.includes(phrase)),
+        showsUnderstanding: explicitUnderstanding.some(phrase => msg.includes(phrase)) || quizSuccess || challengeSuccess,
+        showsConfusion: explicitConfusion.some(phrase => msg.includes(phrase)) || quizFail || challengeFail,
         wantsChallenge: challengeRequest.some(phrase => msg.includes(phrase)),
         wantsQuiz: quizRequest.some(phrase => msg.includes(phrase)),
         isEngaged: userMessage.split(' ').length > 8 || msg.includes('?'),
         responseLength: userMessage.split(' ').length,
         exchangeCount: conversationHistory ? conversationHistory.filter((m: any) => m.role === 'assistant').length : 0,
-        justFinishedChallenge: msg.includes('challenge completed') || msg.includes('mastered the challenge'),
-        justFinishedQuiz: msg.includes('i chose') || msg.includes("exactly right") || msg.includes('quiz result')
+        justFinishedChallenge: challengeSuccess,
+        justFinishedQuiz: quizSuccess,
+        challengeFailed: challengeFail,
+        quizFailed: quizFail
     };
 }
 
@@ -141,13 +162,51 @@ async function makeSmartDecision(
     console.log('[DECISION_DEBUG] context.currentStage:', context.currentStage);
     console.log('[DECISION_DEBUG] turnCount:', turnCount);
     console.log('[DECISION_DEBUG] patterns.justFinishedChallenge:', patterns.justFinishedChallenge);
+    console.log('[DECISION_DEBUG] patterns.justFinishedQuiz:', patterns.justFinishedQuiz);
 
     // Turn 0-1: Send goals first
     if (turnCount <= 1 && !context.goalsGiven) {
         return {
             action: 'generate_roadmap',
             forcedStage: 'GOALS',
-            transition: "Let's set our roadmap for today! 🎯"
+            transition: "Let's set our roadmap for today! \ud83c\udfaf"
+        };
+    }
+
+    // Handle quiz/challenge completion - provide appropriate feedback
+    if (patterns.justFinishedQuiz) {
+        return {
+            action: 'quiz_feedback',
+            forcedStage: 'EXPLAIN',
+            transition: "Great job on the quiz! \ud83c\udf1f Your progress has been recorded.",
+            progressUpdate: { type: 'quiz_success', boost: 20 }
+        };
+    }
+
+    if (patterns.quizFailed) {
+        return {
+            action: 'quiz_retry',
+            forcedStage: 'EXPLAIN',
+            transition: "No worries! Let me explain this concept differently. \ud83d\udca1",
+            progressUpdate: { type: 'quiz_fail', boost: -5 }
+        };
+    }
+
+    if (patterns.justFinishedChallenge) {
+        return {
+            action: 'challenge_feedback',
+            forcedStage: 'EXPLAIN',
+            transition: "Excellent work on that challenge! \ud83d\ude80 You're making great progress!",
+            progressUpdate: { type: 'challenge_success', boost: 30 }
+        };
+    }
+
+    if (patterns.challengeFailed) {
+        return {
+            action: 'challenge_retry',
+            forcedStage: 'EXPLAIN',
+            transition: "That was a tough one! Let's review the concepts and try again. \ud83d\udcaa",
+            progressUpdate: { type: 'challenge_fail', boost: -10 }
         };
     }
 
@@ -156,32 +215,14 @@ async function makeSmartDecision(
         return {
             action: 'send_challenge',
             forcedStage: 'CHALLENGE',
-            transition: "Alright, let's jump into a practical challenge! 🚀"
+            transition: "Alright, let's jump into a practical challenge! \ud83d\ude80"
         };
     }
     if (patterns.wantsQuiz || aiAnalysis?.readyForQuiz) {
         return {
             action: 'send_quiz',
             forcedStage: 'QUIZ',
-            transition: "Let's test your knowledge with a quick quiz! ⚡"
-        };
-    }
-
-    // After challenge, verify with a Quiz
-    if (patterns.justFinishedChallenge) {
-        return {
-            action: 'send_quiz',
-            forcedStage: 'QUIZ',
-            transition: "Great work on the challenge! Let's do a quick pulse check to confirm your mastery. 🎯"
-        };
-    }
-
-    // After quiz or deep conversation, continue explaining
-    if (patterns.justFinishedQuiz || (turnCount >= 4 && !patterns.justFinishedChallenge)) {
-        return {
-            action: 'continue_explaining',
-            forcedStage: 'EXPLAIN',
-            transition: "You've got this down! Let's dive deeper into some advanced nuances. 🧠"
+            transition: "Let's test your knowledge with a quick quiz! \u26a1"
         };
     }
 
@@ -200,7 +241,7 @@ async function makeSmartDecision(
         return {
             action: 'send_quiz',
             forcedStage: 'QUIZ',
-            transition: "You're showing great understanding! Ready for a quick check? ⚡"
+            transition: "You're showing great understanding! Ready for a quick check? \u26a1"
         };
     }
 
@@ -315,10 +356,35 @@ export async function POST(request: NextRequest) {
 
         const effectiveStage = decision.forcedStage || 'EXPLAIN';
 
+        // 4b. Apply progress updates from decision (quiz/challenge completion)
+        if (decision.progressUpdate && goals.length > 0) {
+            const boost = decision.progressUpdate.boost || 0;
+            // Find the first in_progress goal to update
+            const inProgressGoalIndex = goals.findIndex(g => g.status === 'in_progress');
+            if (inProgressGoalIndex >= 0) {
+                const g = goals[inProgressGoalIndex];
+                const newConfidence = Math.max(0, Math.min(100, (g.confidence || 0) + boost));
+                goals[inProgressGoalIndex] = {
+                    ...g,
+                    confidence: newConfidence,
+                    status: newConfidence >= 80 ? 'mastered' : (newConfidence > 0 ? 'in_progress' : 'pending'),
+                    timestamp: new Date().toISOString()
+                };
+            }
+        }
+
         // 5. Update session in background
         const updatedProgress = { ...currentProgress };
         const totalConfidence = goals.reduce((acc, g) => acc + (g.confidence || 0), 0);
         updatedProgress.overallCourseProgress = goals.length > 0 ? Math.round(totalConfidence / goals.length) : 0;
+
+        // Track quiz and challenge completions
+        if (patterns.justFinishedQuiz) {
+            updatedProgress.assessmentsCompleted = (updatedProgress.assessmentsCompleted || 0) + 1;
+        }
+        if (patterns.justFinishedChallenge) {
+            updatedProgress.challengesCompleted = (updatedProgress.challengesCompleted || 0) + 1;
+        }
 
         await persistenceClient
             .from('interactive_course_sessions')
@@ -340,24 +406,44 @@ export async function POST(request: NextRequest) {
 
         if (effectiveStage === 'GOALS') {
             systemPrompt = `You are Genie, a world-class mentor for "${currentTopic}".
-Output ONLY a [ROADMAP] JSON block.
-[ROADMAP] STRUCTURE:
-{"title": "...", "description": "...", "items": [{"id": "g1", "text": "Goal Title", "description": "Goal Details", "confidence": 0}, ...]}`;
+CRITICAL: You MUST output exactly one [ROADMAP] block containing the JSON.
+[ROADMAP]
+{
+  "title": "Mastering ${currentTopic}",
+  "description": "Our journey through ${currentTopic}",
+  "items": [
+    {"id": "g1", "text": "Foundation", "description": "...", "confidence": 0},
+    {"id": "g2", "text": "Core Concepts", "description": "...", "confidence": 0},
+    {"id": "g3", "text": "Advanced Mastery", "description": "...", "confidence": 0}
+  ]
+}`;
         } else if (effectiveStage === 'QUIZ') {
             systemPrompt = `You are Genie, an expert AI tutor. 
 ${courseContext}
 YOUR MISSION:
 Deliver a single multiple-choice question testing "${currentTopic}".
 INSTRUCTIONS:
-- Transition: "${decision.transition || "Let's see what you've learned!"}"
-- Format: [QUIZ] followed by JSON.
+1. Provide a brief encouraging transition text.
+2. Follow it with the [QUIZ] tag and the JSON object.
+CRITICAL: You MUST include the [QUIZ] tag.
+
+Example:
+Great progress! Let's check your understanding.
+[QUIZ]
 {"question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "correctAnswer": "A|B|C|D", "explanation": "..."}`;
         } else if (effectiveStage === 'CHALLENGE') {
             systemPrompt = `You are Genie, a practical mentor for "${currentTopic}".
 ${courseContext}
 YOUR MISSION:
 Present a small hands-on task.
-FORMAT: [CHALLENGE] followed by JSON.
+INSTRUCTIONS:
+1. Provide a brief encouraging transition text.
+2. Follow it with the [CHALLENGE] tag and the JSON object.
+CRITICAL: You MUST include the [CHALLENGE] tag.
+
+Example:
+Time for some action!
+[CHALLENGE]
 {"title": "...", "description": "...", "hint": "...", "expectedOutcome": "...", "difficulty": "beginner"}`;
         } else {
             systemPrompt = `You are Genie, a subject matter expert in "${currentTopic}". 

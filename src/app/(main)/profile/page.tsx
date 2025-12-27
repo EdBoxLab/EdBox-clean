@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { type User } from '@supabase/supabase-js';
 import { Upload, User as UserIcon, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { StreakCard } from '@/components/StreakXP';
 
 const AVAILABLE_AVATARS = [
   '😀', '😎', '🤓', '🚀', '🎨', '🎯', '💡', '⚡', '🌟', '🔥',
@@ -148,8 +149,16 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#09090b] via-[#0f0f14] to-[#09090b] p-4 sm:p-6 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <motion.div
+<div className="max-w-4xl mx-auto space-y-6">
+          {/* Streak Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <StreakCard />
+          </motion.div>
+
+          <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center gap-3"

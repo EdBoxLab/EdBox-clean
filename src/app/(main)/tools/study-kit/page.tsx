@@ -1,9 +1,21 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { Upload, FileText, Brain, Zap, Map, CheckCircle2, Loader2, X, ArrowLeft, Trash2, Library } from 'lucide-react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSearchParams } from 'next/navigation';
+import { 
+    Brain, 
+    Zap, 
+    FileText, 
+    Map, 
+    Loader2, 
+    X, 
+    ArrowLeft, 
+    CheckCircle2, 
+    Library, 
+    Trash2, 
+    Upload 
+} from 'lucide-react';
 import ShareButton from '@/components/ShareButton';
 import ShareModal, { useShareModal } from '@/components/ShareModal';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
@@ -58,6 +70,7 @@ const FlashcardItem = ({ card }: { card: any }) => {
 
 function StudyKitContent() {
     const searchParams = useSearchParams();
+    const router = useRouter();
     const id = searchParams.get('id');
     const supabase = createSupabaseBrowserClient();
     const { isOpen, content, openShareModal, closeShareModal } = useShareModal();
@@ -125,7 +138,7 @@ function StudyKitContent() {
             if (data.success) {
                 setStudyKits(studyKits.filter(k => k.id !== kitId));
                 if (id === kitId) {
-                    window.location.href = '/tools/study-kit';
+                    router.push('/tools/study-kit');
                 }
             } else {
                 alert(data.error || 'Failed to delete study kit');
@@ -283,30 +296,27 @@ function StudyKitContent() {
     const fetchStudyKit = async (kitId: string) => {
         setIsLoadingKit(true);
         try {
-            const response = await fetch('/api/study-kit/list');
+            const response = await fetch(`/api/study-kit/${kitId}`);
             const data = await response.json();
 
-            if (data.studyKits) {
-                const kit = data.studyKits.find((k: any) => k.id === kitId);
-                if (kit) {
-                    setStudyKit(kit);
-                    const normalized = normalizeContent(kit.generated_content);
-                    console.log('Normalized content:', normalized);
-                    setGeneratedContent(normalized);
-                    setSelectedTypes(kit.content_types || []);
-                    setActiveTab(kit.content_types?.[0] || null);
+            if (data.studyKit) {
+                const kit = data.studyKit;
+                setStudyKit(kit);
+                const normalized = normalizeContent(kit.generated_content);
+                console.log('Normalized content:', normalized);
+                setGeneratedContent(normalized);
+                setSelectedTypes(kit.content_types || []);
+                setActiveTab(kit.content_types?.[0] || null);
 
-                    // Initialize quiz states for loaded kit
-                    if (normalized.quizzes && Array.isArray(normalized.quizzes)) {
-                        setCurrentQuizStates(normalized.quizzes.map(() => ({
-                            selectedOption: null,
-                            isConfirmed: false
-                        })));
-                        setScore(null);
-                    }
-                } else {
-                    setError('Study kit not found');
+                if (normalized.quizzes && Array.isArray(normalized.quizzes)) {
+                    setCurrentQuizStates(normalized.quizzes.map(() => ({
+                        selectedOption: null,
+                        isConfirmed: false
+                    })));
+                    setScore(null);
                 }
+            } else {
+                setError(data.error || 'Study kit not found');
             }
         } catch (err) {
             console.error('Error fetching study kit:', err);
@@ -418,7 +428,11 @@ function StudyKitContent() {
     };
 
     const handleBackToCreate = () => {
-        window.location.href = '/tools/study-kit';
+        if (window.history.length > 1) {
+            router.back();
+        } else {
+            router.push('/tools/study-kit');
+        }
     };
 
     // Loading state when fetching a specific kit

@@ -104,6 +104,29 @@ export interface GenerateResult {
 }
 
 /**
+ * Clean AI response by removing markdown code blocks and extracting JSON
+ */
+export function cleanJsonResponse(text: string): string {
+  // Remove markdown code blocks if present
+  let cleaned = text.trim();
+
+  // Handle cases where the model returns ```json { ... } ``` or similar
+  const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (jsonMatch && jsonMatch[1]) {
+    cleaned = jsonMatch[1].trim();
+  } else {
+    // Sometimes it might return just { ... } with some text around it
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
+  }
+
+  return cleaned;
+}
+
+/**
  * Generate AI content with prioritized Groq (as requested by user)
  */
 export async function generateWithFallback(options: GenerateOptions): Promise<GenerateResult> {
@@ -144,7 +167,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
     }
 
     const response = await groq.chat.completions.create({
-      model: hasImages ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile',
+      model: hasImages ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile',
       messages,
       temperature,
       max_tokens: maxTokens,
@@ -213,7 +236,6 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
     }
   }
 }
-
 
 
 /**

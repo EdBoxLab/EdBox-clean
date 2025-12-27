@@ -92,6 +92,46 @@ export default function AdminDashboard() {
     if (activeTab === 'skill-config') fetchSkillGraph();
   }, [currentPage, activeTab]);
 
+  const toggleUserRole = async (userId: string, currentRole: string) => {
+    const newRole = currentRole === 'admin' ? 'user' : 'admin';
+    if (!confirm(`Are you sure you want to change this user's role to ${newRole}?`)) return;
+
+    setActionLoading(userId);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, role: newRole }),
+      });
+      if (!res.ok) throw new Error('Failed to update role');
+      fetchUsers(currentPage);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+
+    setActionLoading(userId);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      if (!res.ok) throw new Error('Failed to delete user');
+      fetchUsers(currentPage);
+      fetchStats();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const fetchStats = async () => {
     try {
       const res = await fetch('/api/admin/stats');
@@ -166,46 +206,6 @@ export default function AdminDashboard() {
       if (!res.ok) throw new Error('Failed to update usage');
       fetchUsers(currentPage);
       setEditingUsage(null);
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const toggleUserRole = async (userId: string, currentRole: string) => {
-    const newRole = currentRole === 'admin' ? 'user' : 'admin';
-    if (!confirm(`Are you sure you want to change this user's role to ${newRole}?`)) return;
-
-    setActionLoading(userId);
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, role: newRole }),
-      });
-      if (!res.ok) throw new Error('Failed to update role');
-      fetchUsers(currentPage);
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const deleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
-
-    setActionLoading(userId);
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      });
-      if (!res.ok) throw new Error('Failed to delete user');
-      fetchUsers(currentPage);
-      fetchStats();
     } catch (err: any) {
       alert(err.message);
     } finally {

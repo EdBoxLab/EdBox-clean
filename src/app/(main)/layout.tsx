@@ -6,6 +6,7 @@ import Footer from '../../components/Footer';
 import KoalaGenie from '../../components/KoalaGenie';
 import { Toaster } from '../../components/ui/toaster';
 import { AppTour } from '../../components/AppTour';
+import { StreakCelebrationModal } from '../../components/StreakXP';
 
 export default function MainAppLayout({
   children,
@@ -22,6 +23,7 @@ export default function MainAppLayout({
       <div className="fixed bottom-4 right-4 z-50">
         <KoalaGenie />
       </div>
+      <StreakCelebrationModal />
       <Toaster />
     </div>
   );

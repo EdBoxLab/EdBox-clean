@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Trophy,
@@ -12,9 +12,14 @@ import {
     ArrowLeft,
     Sparkles,
     Zap,
-    Code
+    Code,
+    Camera,
+    Image as ImageIcon,
+    Upload,
+    X
 } from 'lucide-react';
 import { GeneratedChallenge } from '@/types/skill-progression';
+import { supabase } from '@/lib/supabase/client';
 
 interface ChallengeViewProps {
     challenge: GeneratedChallenge & {
@@ -42,6 +47,9 @@ export default function ChallengeView({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [status, setStatus] = useState<'idle' | 'success' | 'fail'>('idle');
     const [feedback, setFeedback] = useState('');
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Parse challenge title for a leading "Phase" prefix like "Phase 03: Practical Challenge"
     const parseChallengeHeader = (title: string) => {
@@ -67,8 +75,44 @@ export default function ChallengeView({
 
     const xpReward = challenge.difficultyLevel === 'Easy' ? 50 : challenge.difficultyLevel === 'Medium' ? 100 : 200;
 
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            setFeedback("Please upload an image file.");
+            setStatus('fail');
+            return;
+        }
+
+        setIsUploading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random()}.${fileExt}`;
+            const filePath = `challenge-answers/${sessionId || 'temp'}/${fileName}`;
+
+            const { error: uploadError, data } = await supabase.storage
+                .from('challenge-submissions')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('challenge-submissions')
+                .getPublicUrl(filePath);
+
+            setImageUrl(publicUrl);
+        } catch (error: any) {
+            console.error('Error uploading image:', error);
+            setFeedback("Failed to upload image. Please try again.");
+            setStatus('fail');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     const handleSubmit = async () => {
-        if (!answer.trim() || isSubmitting) return;
+        if ((!answer.trim() && !imageUrl) || isSubmitting) return;
 
         setIsSubmitting(true);
         setStatus('idle');
@@ -78,7 +122,7 @@ export default function ChallengeView({
             const response = await fetch('/api/genie/interactive-course/evaluate-challenge', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ challenge, answer, sessionId })
+                body: JSON.stringify({ challenge, answer, sessionId, imageUrl })
             });
 
             const result = await response.json();
@@ -86,7 +130,10 @@ export default function ChallengeView({
             // Send answer to chat for Genie to see - Format cleanly
             if (onSendToChat) {
                 // Just send the answer text contextually
-                onSendToChat(`I've completed the challenge! Here is my submission:\n\n${answer}`);
+                const submissionMsg = imageUrl 
+                    ? `I've completed the challenge with an image submission!\n\n${answer}\n\n[Image Submission](${imageUrl})`
+                    : `I've completed the challenge! Here is my submission:\n\n${answer}`;
+                onSendToChat(submissionMsg);
             }
 
             if (result.passed) {
@@ -232,6 +279,45 @@ export default function ChallengeView({
                                 disabled={status !== 'idle' || isSubmitting}
                             />
 
+                            {/* Image Upload Area */}
+                            <div className="mt-4 flex flex-wrap gap-4">
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileUpload}
+                                    accept="image/*"
+                                    className="hidden"
+                                />
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={status !== 'idle' || isSubmitting || isUploading}
+                                    className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl border border-gray-700 transition-all disabled:opacity-50"
+                                >
+                                    {isUploading ? (
+                                        <div className="w-4 h-4 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+                                    ) : (
+                                        <Camera className="w-4 h-4 text-purple-400" />
+                                    )}
+                                    {imageUrl ? 'Change Image' : 'Upload Image'}
+                                </button>
+
+                                {imageUrl && (
+                                    <div className="relative group/img">
+                                        <img 
+                                            src={imageUrl} 
+                                            alt="Submission" 
+                                            className="h-24 w-24 object-cover rounded-xl border border-purple-500/50"
+                                        />
+                                        <button
+                                            onClick={() => setImageUrl(null)}
+                                            className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover/img:opacity-100 transition-opacity"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
                             <AnimatePresence>
                                 {showHints && (
                                     <motion.div
@@ -312,10 +398,10 @@ export default function ChallengeView({
 
                     <button
                         onClick={handleSubmit}
-                        disabled={!answer.trim() || isSubmitting || status === 'success'}
+                        disabled={(!answer.trim() && !imageUrl) || isSubmitting || status === 'success'}
                         className={`
               relative px-8 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all active:scale-95
-              ${!answer.trim() || isSubmitting
+              ${(!answer.trim() && !imageUrl) || isSubmitting
                                 ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
                                 : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-xl shadow-purple-900/20 hover:shadow-purple-900/40 hover:-translate-y-0.5'}
             `}

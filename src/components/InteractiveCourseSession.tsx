@@ -1,13 +1,62 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, BookOpen, Brain, Trophy, MessageCircle, Menu, X, Loader, Check, AlertCircle } from 'lucide-react';
+import { Send, BookOpen, Brain, Trophy, MessageCircle, Menu, X, Loader, Check, AlertCircle, Map } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { XPStreakDisplay } from '@/components/XPStreakDisplay';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import {
+
+const StepProgress = ({ goals }: { goals: any[] }) => {
+  if (!goals || goals.length === 0) return null;
+  
+  return (
+    <div className="flex items-center gap-3 p-4 bg-gray-950/80 backdrop-blur-xl border-b border-gray-800 sticky top-0 z-30 overflow-x-auto no-scrollbar shadow-2xl">
+      <div className="flex-shrink-0 mr-2">
+        <div className="p-2 bg-purple-500/10 rounded-lg border border-purple-500/20">
+          <Map className="w-4 h-4 text-purple-400" />
+        </div>
+      </div>
+      <div className="flex items-center gap-4 min-w-max pr-6">
+        {goals.map((goal, idx) => (
+          <React.Fragment key={goal.id}>
+            <div className="flex items-center gap-2">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black transition-all duration-500 ${
+                goal.status === 'mastered' ? 'bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.4)]' : 
+                goal.status === 'in_progress' ? 'bg-purple-600 text-white animate-pulse shadow-[0_0_15px_rgba(147,51,234,0.4)]' : 
+                'bg-gray-800 text-gray-500 border border-gray-700'
+              }`}>
+                {goal.status === 'mastered' ? <Check className="w-4 h-4" strokeWidth={3} /> : idx + 1}
+              </div>
+              <div className="flex flex-col">
+                <span className={`text-[9px] font-black uppercase tracking-wider truncate max-w-[80px] ${
+                  goal.status === 'mastered' ? 'text-green-400' : 
+                  goal.status === 'in_progress' ? 'text-purple-400' : 
+                  'text-gray-500'
+                }`}>
+                  {goal.text}
+                </span>
+                <div className="h-0.5 w-full bg-gray-800 rounded-full mt-0.5 overflow-hidden">
+                   <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${goal.confidence || 0}%` }}
+                    className={`h-full ${goal.status === 'mastered' ? 'bg-green-500' : 'bg-purple-500'}`}
+                   />
+                </div>
+              </div>
+            </div>
+            {idx < goals.length - 1 && (
+              <div className={`h-[1px] w-6 flex-shrink-0 ${
+                goals[idx+1].status !== 'pending' ? 'bg-purple-500/50' : 'bg-gray-800'
+              }`} />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+};import {
   InteractiveCourseSession as SessionType,
   QuickCheckQuestion
 } from '@/types/interactive-course';
@@ -195,6 +244,7 @@ export default function InteractiveCourseSession({
             };
           });
           setMessages(mappedMessages);
+          setShowActionButtons(true);
           setIsInitializing(false);
           return;
         }
@@ -484,9 +534,11 @@ export default function InteractiveCourseSession({
             </div>
             <span className="text-[10px] font-bold text-gray-500">{Math.round((session?.learningContext?.comprehensionLevel || 0) * 100)}%</span>
           </div>
-        </header>
+          </header>
 
-        {/* Message List */}
+          <StepProgress goals={session?.learningContext?.goals || []} />
+
+          {/* Message List */}
         <div className="flex-1 overflow-y-auto scroll-smooth">
           <div className="w-full px-4 lg:px-6 py-8 space-y-8">
             <AnimatePresence>
@@ -551,7 +603,58 @@ export default function InteractiveCourseSession({
         </div>
 
         {/* Input Footer */}
-        <footer className="p-4 border-t border-gray-800 bg-gray-900/80 backdrop-blur-md">
+        <footer className="p-4 border-t border-gray-800 bg-gray-900/80 backdrop-blur-md space-y-3">
+          {/* Action Buttons - Quiz and Challenge */}
+          <AnimatePresence>
+            {showActionButtons && !isLoading && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                className="flex gap-2 overflow-x-auto pb-2 no-scrollbar"
+              >
+                <button
+                  onClick={() => {
+                    setLearningStage('QUIZ');
+                    handleSendMessage("Quiz me on what we've learned!", true, 'QUIZ');
+                  }}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 text-blue-300 rounded-xl text-sm font-semibold whitespace-nowrap transition-all active:scale-95"
+                >
+                  <Brain className="w-4 h-4" />
+                  Quiz Me
+                </button>
+                <button
+                  onClick={() => {
+                    setLearningStage('CHALLENGE');
+                    handleSendMessage("I'm ready for a challenge!", true, 'CHALLENGE');
+                  }}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-amber-600/20 hover:bg-amber-600/40 border border-amber-500/30 text-amber-300 rounded-xl text-sm font-semibold whitespace-nowrap transition-all active:scale-95"
+                >
+                  <Trophy className="w-4 h-4" />
+                  Challenge Me
+                </button>
+                <button
+                  onClick={() => {
+                    handleSendMessage("Tell me more about this topic", true);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gray-700/50 hover:bg-gray-700 border border-gray-600/30 text-gray-300 rounded-xl text-sm font-semibold whitespace-nowrap transition-all active:scale-95"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Explain More
+                </button>
+                {onStartChallenge && (
+                  <button
+                    onClick={onStartChallenge}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-green-600/20 hover:bg-green-600/40 border border-green-500/30 text-green-300 rounded-xl text-sm font-semibold whitespace-nowrap transition-all active:scale-95"
+                  >
+                    <Trophy className="w-4 h-4" />
+                    Start Practice
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
           <div className="w-full flex gap-3">
             <input
               ref={inputRef}
@@ -564,7 +667,8 @@ export default function InteractiveCourseSession({
             />
             <button
               onClick={() => handleSendMessage(inputMessage)}
-              className="p-3 bg-purple-600 rounded-xl hover:bg-purple-500 transition-colors"
+              disabled={isLoading}
+              className="p-3 bg-purple-600 rounded-xl hover:bg-purple-500 transition-colors disabled:opacity-50"
             >
               <Send className="w-5 h-5" />
             </button>

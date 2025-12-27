@@ -88,15 +88,19 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { content, username, shared_content } = await request.json();
+    const { content, username, shared_content, mentions } = await request.json();
 
-    if (!content || !username) {
-      return NextResponse.json({ error: 'Message content and username are required' }, { status: 400 });
+    if (!content && !shared_content) {
+      return NextResponse.json({ error: 'Message content or shared content is required' }, { status: 400 });
+    }
+
+    if (!username) {
+      return NextResponse.json({ error: 'Username is required' }, { status: 400 });
     }
 
     // Use admin client for insert
     const messageData: any = { 
-      content, 
+      content: content || '', 
       user_id: user.id, 
       circle_id: numericCircleId, 
       username 
@@ -105,6 +109,11 @@ export async function POST(
     // Add shared content if provided
     if (shared_content) {
       messageData.shared_content = shared_content;
+    }
+    
+    // Add mentions if provided
+    if (mentions) {
+      messageData.mentions = mentions;
     }
 
     const { data, error } = await supabaseAdmin

@@ -2,33 +2,70 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FeedItem } from '@/types/feed';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { generateWithRetry } from '@/lib/ai-providers';
+import { getUnsplashImageUrl } from '@/lib/utils/unsplash';
+
+interface UserContext {
+    courses: string[];
+    studyKits: { title: string; topics: string[] }[];
+    interests: string[];
+    learningStyle: string;
+    country?: string;
+}
 
 async function generateMadFeed(
-    userCourses: string[],
-    studyKitContext: string[],
+    userContext: UserContext,
     seenTitles: string[]
 ): Promise<FeedItem[]> {
     const timestamp = Date.now();
     const randomSeed = Math.random().toString(36).substring(2, 10);
 
-    const contextSeeds = [...userCourses, ...studyKitContext].filter(Boolean);
+    const coursesList = userContext.courses.filter(Boolean);
+    const studyKitTitles = userContext.studyKits.map(sk => sk.title).filter(Boolean);
+    const studyKitTopics = userContext.studyKits.flatMap(sk => sk.topics).filter(Boolean);
+    const interestsList = userContext.interests.filter(Boolean);
 
-    if (contextSeeds.length === 0) {
-        contextSeeds.push(
-            'Quantum Computing', 'sports', 'music', 'Behavioral Economics', 'Neuroscience',
-            'Space Exploration', 'psychology', 'Cryptography', 'Philosophy of Mind'
-        );
-    }
+    const allTopics = [
+        ...coursesList,
+        ...studyKitTitles,
+        ...studyKitTopics,
+        ...interestsList
+    ].filter(Boolean);
+
+    const contextSeeds = allTopics.length > 0 ? allTopics : [
+        'Quantum Computing', 'sports', 'music', 'Behavioral Economics', 'Neuroscience',
+        'Space Exploration', 'psychology', 'Cryptography', 'Philosophy of Mind'
+    ];
 
     const blacklist = seenTitles.slice(-100).join(' | ');
     const primaryTopic = contextSeeds[Math.floor(Math.random() * contextSeeds.length)];
-    const secondaryTopics = contextSeeds.slice(0, 5).join(', ');
+    const uniqueTopics = [...new Set(allTopics)].slice(0, 15).join(', ');
+
+    const studyKitInfo = userContext.studyKits.length > 0
+        ? `\nUSER'S STUDY KITS: ${userContext.studyKits.map(sk => `${sk.title} (${sk.topics.join(', ')})`).join('; ')}`
+        : '';
+
+    const preferencesInfo = userContext.interests.length > 0
+        ? `\nUSER INTERESTS: ${userContext.interests.join(', ')}`
+        : '';
+
+    const learningStyleInfo = userContext.learningStyle
+        ? `\nLEARNING STYLE: ${userContext.learningStyle} - tailor content accordingly`
+        : '';
+
+    const countryInfo = userContext.country
+        ? `\nUSER COUNTRY: ${userContext.country} - include relevant cultural/regional context when appropriate`
+        : '';
 
     const systemPrompt = `You are the LEAD ALGORITHM DESIGNER for the world's most addictive educational app. Your mission: create content that triggers "intellectual dopamine" - the same neurological reward loop as TikTok/Instagram but for learning.
 
 CURRENT USER CONTEXT:
-- Primary Learning Focus: ${primaryTopic}
-- All Learning Areas: ${secondaryTopics}
+- Courses/Goals: ${coursesList.length > 0 ? coursesList.join(', ') : 'None specified'}
+- Study Kits: ${studyKitTitles.length > 0 ? studyKitTitles.join(', ') : 'None'}
+- Study Kit Topics: ${studyKitTopics.length > 0 ? studyKitTopics.slice(0, 10).join(', ') : 'None'}
+- User Interests: ${interestsList.length > 0 ? interestsList.join(', ') : 'General'}
+- Learning Style: ${userContext.learningStyle || 'visual'}
+- Country: ${userContext.country || 'Not specified'}
+- Primary Focus for this batch: ${primaryTopic}
 - Session Seed: ${randomSeed} (USE THIS FOR RANDOMIZATION)
 
 BLACKLISTED CONTENT (ABSOLUTELY NEVER GENERATE THESE):
@@ -36,45 +73,62 @@ ${blacklist || 'None yet'}
 
 ENGAGEMENT PRINCIPLES (TikTok Algorithm Secrets Applied to Learning):
 1. THE HOOK (First 3 words must create an "open loop" the brain NEEDS to close)
-2. PATTERN INTERRUPT (Every piece should subvert expectations)
-3. VARIABLE REWARD (Mix difficulty, format, and topic unpredictably)
-4. IDENTITY REINFORCEMENT ("You're the type of person who...")
+2. VISUAL STIMULATION (Every item MUST have compelling image keywords for Unsplash)
+3. PATTERN INTERRUPT (Every piece should subvert expectations)
+4. VARIABLE REWARD (Mix difficulty, format, and topic unpredictably)
 5. KNOWLEDGE GAP (Create urgency by revealing they don't know something important)
 
 CONTENT MIX (Generate EXACTLY 8 items with this distribution):
-- 2x "Mind-Bender": Counter-intuitive facts that break mental models
-- 2x "Deep Dive": Advanced applications of their courses that feel like insider secrets
-- 2x "Challenge": Problems that make them feel smart when solved
+- 2x "media": Visual-first content with headline + body text + Unsplash keywords
+- 2x "Mind-Bender" (fact): Counter-intuitive facts that break mental models
+- 1x "Deep Dive" (insight): Advanced applications that feel like insider secrets  
+- 1x "Challenge": Problems that make them feel smart when solved
+- 1x "Quiz": Multiple choice to test understanding
 - 1x "Debate": Controversial takes with no clear answer
-- 1x "Story": Narrative-driven micro-learning (3 slides max)
 
-QUALITY RULES:
-- NO definitions, NO introductions, NO "Did you know..."
-- Every title MUST create curiosity tension
-- Content should make them want to screenshot and share
-- Difficulty: Assume they're intelligent but make them work for insights
+CRITICAL: For image_keywords, provide 2-3 simple, concrete English words that will work on Unsplash.
+Good: "brain, neurons, science" or "mathematics, abstract, patterns" or "technology, future, digital"
+Bad: "quantum superposition visualization" or "abstract concept"
 
 OUTPUT FORMAT: Return a JSON object with an "items" key containing exactly 8 objects. Each object MUST have:
-- "type": one of ["fact", "insight", "challenge", "debate", "story", "quiz"]
+- "type": one of ["media", "fact", "insight", "challenge", "quiz", "debate"]
 - "topic": the learning area
 - "title": THE HOOK (max 10 words, curiosity-driven)
+- "image_keywords": 2-3 simple concrete Unsplash keywords (e.g., "space, stars, galaxy")
 
 Plus type-specific fields:
+- media: { "headline": "bold statement", "body": "2-3 sentence explanation", "source": "optional attribution" }
 - fact: { "explanation": "the mind-bending content" }
 - insight: { "summary": "1-line hook", "full_content": "the deep insight (2-3 paragraphs)" }
 - challenge: { "question": "the problem", "hint": "subtle nudge", "answer": "elegant solution" }
-- debate: { "viewpoint_a": "position 1", "viewpoint_b": "position 2", "question": "the dilemma" }
-- story: { "slides": [{ "text": "slide 1" }, { "text": "slide 2" }, { "text": "slide 3" }] }
-- quiz: { "question": "...", "options": ["A", "B", "C", "D"], "correctIndex": 0, "explanation": "why" }`;
+- quiz: { "question": "...", "options": ["A", "B", "C", "D"], "correctIndex": 0, "explanation": "why" }
+- debate: { "viewpoint_a": "position 1", "viewpoint_b": "position 2", "question": "the dilemma" }`;
 
-    const prompt = `Generate 8 pieces of viral educational content for someone studying: ${secondaryTopics}.
+    const prompt = `Generate 8 pieces of viral educational content personalized for this user.
 
-CRITICAL: Use session seed "${randomSeed}" to ensure completely unique angles. Never repeat topics from blacklist.
+USER PROFILE:
+- Courses/Goals: ${coursesList.length > 0 ? coursesList.join(', ') : 'General learning'}
+- Study Kits: ${studyKitTitles.length > 0 ? studyKitTitles.join(', ') : 'None'}
+- Study Kit Topics: ${studyKitTopics.length > 0 ? studyKitTopics.slice(0, 10).join(', ') : 'None'}
+- Interests: ${interestsList.length > 0 ? interestsList.join(', ') : 'General'}
+- Learning Style: ${userContext.learningStyle || 'visual'}
+- Country: ${userContext.country || 'Global'}
 
-Make every piece feel like an exclusive insight they can't get anywhere else. Return a JSON object with an "items" array.`;
+CRITICAL: 
+1. Use session seed "${randomSeed}" to ensure completely unique angles
+2. Never repeat topics from blacklist
+3. Include simple, concrete "image_keywords" for each item (2-3 words that work on image searches)
+4. GENERATE CONTENT RELEVANT TO THE USER'S COURSES, STUDY KITS, AND INTERESTS ABOVE
+5. If user has study kits or courses, at least 5 items should be directly related to those topics
+
+Return a JSON object with an "items" array.`;
 
     try {
-        console.log(`🧠 MAD ALGO: Generating for [${secondaryTopics}] with seed ${randomSeed}`);
+        console.log(`🧠  ALGO: Generating with seed ${randomSeed}`);
+        console.log(`📚 Full Context - Courses: ${coursesList.length}, Study Kits: ${studyKitTitles.length}, Topics: ${studyKitTopics.length}, Interests: ${interestsList.length}, Country: ${userContext.country || 'N/A'}`);
+        console.log(`📋 Courses: ${coursesList.slice(0, 5).join(', ')}`);
+        console.log(`📋 Study Kits: ${studyKitTitles.slice(0, 5).join(', ')}`);
+        console.log(`📋 Interests: ${interestsList.slice(0, 5).join(', ')}`);
 
         const result = await generateWithRetry({
             prompt,
@@ -88,11 +142,15 @@ Make every piece feel like an exclusive insight they can't get anywhere else. Re
                         type: "array",
                         items: {
                             type: "object",
-                            required: ["type", "topic", "title"],
+                            required: ["type", "topic", "title", "image_keywords"],
                             properties: {
-                                type: { type: "string", enum: ["quiz", "insight", "fact", "story", "challenge", "debate"] },
+                                type: { type: "string", enum: ["media", "quiz", "insight", "fact", "story", "challenge", "debate"] },
                                 topic: { type: "string" },
                                 title: { type: "string" },
+                                image_keywords: { type: "string" },
+                                headline: { type: "string" },
+                                body: { type: "string" },
+                                source: { type: "string" },
                                 question: { type: "string" },
                                 options: { type: "array", items: { type: "string" } },
                                 correctIndex: { type: "number" },
@@ -148,7 +206,6 @@ Make every piece feel like an exclusive insight they can't get anywhere else. Re
         } else if (parsed && Array.isArray(parsed.items)) {
             items = parsed.items;
         } else if (parsed && typeof parsed === 'object') {
-            // Try to find ANY array in the object
             const arrays = Object.values(parsed).find(v => Array.isArray(v));
             if (arrays) items = arrays as any[];
         }
@@ -165,11 +222,18 @@ Make every piece feel like an exclusive insight they can't get anywhere else. Re
             const title = item.title || `${item.topic} Discovery`;
             const uniqueId = `mad_${randomSeed}_${timestamp}_${idx}`;
 
+            const imageKeywords = item.image_keywords || item.visual_prompt || item.topic || 'education';
+            const imageUrl = getUnsplashImageUrl(imageKeywords);
+
             const base: any = {
                 id: uniqueId,
                 type,
                 topic: item.topic || contextSeeds[idx % contextSeeds.length],
                 title,
+                visualPrompt: imageKeywords,
+                imageKeywords: imageKeywords,
+                imageUrl: imageUrl,
+                imageGenerationState: 'ready',
                 xp_reward: 100 + Math.floor(Math.random() * 100),
                 genie_reaction: ['wink', 'cheer', 'hype', 'hint', 'shock', 'fire'][idx % 6],
                 theme: ['purple-gradient', 'blue-gradient', 'green-gradient', 'orange-gradient', 'red-gradient', 'cyan-gradient', 'rose-gradient'][idx % 7],
@@ -179,7 +243,11 @@ Make every piece feel like an exclusive insight they can't get anywhere else. Re
                 comments: [],
             };
 
-            if (type === 'quiz') {
+            if (type === 'media') {
+                base.headline = item.headline || title;
+                base.body = item.body || item.explanation || 'Explore this fascinating topic with Genie.';
+                base.source = item.source || null;
+            } else if (type === 'quiz') {
                 base.question = item.question || 'Test your understanding';
                 base.options = Array.isArray(item.options) && item.options.length >= 2 ? item.options : ['Option A', 'Option B', 'Option C', 'Option D'];
                 base.correctIndex = typeof item.correctIndex === 'number' ? item.correctIndex : 0;
@@ -206,7 +274,7 @@ Make every piece feel like an exclusive insight they can't get anywhere else. Re
         });
 
     } catch (error: any) {
-        console.error('❌ MAD ALGO FAILED:', error.message);
+        console.error('❌  ALGO FAILED:', error.message);
         throw error;
     }
 }
@@ -219,35 +287,63 @@ export const POST = async (request: NextRequest) => {
         const supabase = await createSupabaseServerClient();
         const { data: { user } } = await supabase.auth.getUser();
 
-        let userCourses: string[] = [];
-        let studyKitContext: string[] = [];
+        const userContext: UserContext = {
+            courses: [],
+            studyKits: [],
+            interests: [],
+            learningStyle: 'visual',
+            country: undefined
+        };
 
         if (user) {
-            const [coursesRes, studyKitsRes] = await Promise.all([
+            const [coursesRes, studyKitsRes, profileRes, preferencesRes] = await Promise.all([
                 supabase.from('skill_graphs').select('goal').eq('user_id', user.id).limit(10),
-                supabase.from('study_kit_content').select('title, source_content, generated_content').eq('user_id', user.id).limit(10)
+                supabase.from('study_kit_content').select('title, source_content, generated_content').eq('user_id', user.id).limit(10),
+                supabase.from('profiles').select('interests, goal, country').eq('id', user.id).single(),
+                supabase.from('user_preferences').select('interests, learning_style').eq('id', user.id).single()
             ]);
 
             if (coursesRes.data) {
-                userCourses = coursesRes.data.map(c => c.goal).filter(Boolean);
+                userContext.courses = coursesRes.data.map(c => c.goal).filter(Boolean);
             }
 
             if (studyKitsRes.data) {
-                studyKitContext = studyKitsRes.data.map(kit => {
-                    let context = kit.title || '';
+                userContext.studyKits = studyKitsRes.data.map(kit => {
+                    const topics: string[] = [];
                     if (kit.generated_content && typeof kit.generated_content === 'object') {
                         const gc = kit.generated_content as any;
-                        if (gc.summary) context += ` - ${gc.summary}`;
-                        if (gc.keyTopics) context += ` (${gc.keyTopics.slice(0, 3).join(', ')})`;
+                        if (gc.keyTopics) topics.push(...gc.keyTopics.slice(0, 5));
+                        if (gc.concepts) topics.push(...gc.concepts.slice(0, 3));
                     }
-                    return context;
-                }).filter(Boolean);
+                    return {
+                        title: kit.title || 'Untitled Kit',
+                        topics
+                    };
+                }).filter(sk => sk.title);
+            }
+
+            // Merge profile and preferences
+            const profile = profileRes.data;
+            const prefs = preferencesRes.data;
+
+            if (profile) {
+                userContext.interests = [...new Set([...(profile.interests || []), ...(prefs?.interests || [])])];
+                userContext.country = profile.country;
+                if (profile.goal && !userContext.courses.includes(profile.goal)) {
+                    userContext.courses.push(profile.goal);
+                }
+            } else if (prefs) {
+                userContext.interests = prefs.interests || [];
+            }
+
+            if (prefs) {
+                userContext.learningStyle = prefs.learning_style || 'visual';
             }
         }
 
-        console.log(`🔥 MAD FEED REQUEST: ${userCourses.length} courses, ${studyKitContext.length} study kits, ${seenTitles.length} blacklisted titles`);
+        console.log(`🔥  FEED REQUEST: ${userContext.courses.length} courses, ${userContext.studyKits.length} study kits, ${userContext.interests.length} interests, ${seenTitles.length} blacklisted titles`);
 
-        const feedItems = await generateMadFeed(userCourses, studyKitContext, seenTitles);
+        const feedItems = await generateMadFeed(userContext, seenTitles);
 
         const uniqueItems = feedItems.filter(item => {
             const titleLower = item.title.toLowerCase();

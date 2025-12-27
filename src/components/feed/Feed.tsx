@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
-import type { FeedItem, InsightFeedItem, StoryFeedItem, QuizFeedItem, FactFeedItem, PollFeedItem, Feedback, UserPreferences, AudioGenerationState } from '@/types/feed';
+import type { FeedItem, InsightFeedItem, StoryFeedItem, QuizFeedItem, FactFeedItem, PollFeedItem, MediaFeedItem, Feedback, UserPreferences, AudioGenerationState } from '@/types/feed';
 import { generateFeedBatch, persistFeedItems, trackInteraction } from '@/services/feedService';
 import { CardWrapper } from './CardWrapper';
 import { QuizCard } from './QuizCard';
@@ -14,6 +14,7 @@ import { PollCard } from './PollCard';
 import { MemeCard } from './MemeCard';
 import { ChallengeCard } from './ChallengeCard';
 import { DebateCard } from './DebateCard';
+import { MediaCard } from './MediaCard';
 import { SkeletonCard } from './SkeletonCard';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { XPStreakDisplay } from '@/components/XPStreakDisplay';
@@ -242,31 +243,33 @@ const FeedAnimations = () => (
     }
   };
 
-  const renderCardContent = (item: FeedItem, isActive: boolean) => {
-    switch (item.type) {
-      case 'quiz':
-        return <QuizCard item={item as QuizFeedItem} isActive={isActive} onCorrect={() => {}} onIncorrect={() => {}} onSwipe={handleSwipe} />;
-      case 'video':
-        return <VideoCard item={item as any} isActive={isActive} />;
-      case 'insight':
-      case 'article':
-        return <InsightCard item={item as InsightFeedItem} isActive={isActive} />;
-      case 'poll':
-        return <PollCard item={item as PollFeedItem} isActive={isActive} />;
-      case 'fact':
-        return <FactCard item={item as FactFeedItem} isActive={isActive} />;
-      case 'story':
-        return <StoryCard item={item as StoryFeedItem} isActive={isActive} onSwipe={handleSwipe} />;
-      case 'meme':
-        return <MemeCard item={item as any} />;
-      case 'challenge':
-        return <ChallengeCard item={item as any} isActive={isActive} />;
-      case 'debate':
-        return <DebateCard item={item as any} isActive={isActive} />;
-      default:
-        return null;
-    }
-  };
+const renderCardContent = (item: FeedItem, isActive: boolean) => {
+      switch (item.type) {
+        case 'quiz':
+          return <QuizCard item={item as QuizFeedItem} isActive={isActive} onCorrect={() => {}} onIncorrect={() => {}} onSwipe={handleSwipe} />;
+        case 'video':
+          return <VideoCard item={item as any} isActive={isActive} />;
+        case 'insight':
+        case 'article':
+          return <InsightCard item={item as InsightFeedItem} isActive={isActive} />;
+        case 'poll':
+          return <PollCard item={item as PollFeedItem} isActive={isActive} />;
+        case 'fact':
+          return <FactCard item={item as FactFeedItem} isActive={isActive} />;
+        case 'story':
+          return <StoryCard item={item as StoryFeedItem} isActive={isActive} onSwipe={handleSwipe} />;
+        case 'meme':
+          return <MemeCard item={item as any} />;
+        case 'challenge':
+          return <ChallengeCard item={item as any} isActive={isActive} />;
+        case 'debate':
+          return <DebateCard item={item as any} isActive={isActive} />;
+        case 'media':
+          return <MediaCard item={item as MediaFeedItem} isActive={isActive} onSwipe={handleSwipe} onFeedback={handleFeedback} />;
+        default:
+          return null;
+      }
+    };
 
   if (loading && items.length === 0) {
     return (

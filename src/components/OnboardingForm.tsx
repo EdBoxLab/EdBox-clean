@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, GraduationCap, MapPin, Calendar, Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import Select from 'react-select';
+import countryList from 'react-select-country-list';
 
 export default function OnboardingForm() {
   const supabase = createSupabaseBrowserClient();
@@ -20,6 +22,8 @@ export default function OnboardingForm() {
     interests: [] as string[],
     goal: ''
   });
+
+  const countryOptions = useMemo(() => countryList().getData(), []);
 
   const educationLevels = [
     'High School',
@@ -124,14 +128,24 @@ export default function OnboardingForm() {
           .select();
       }
 
-      if (result.error) {
-        console.error('Database error:', result.error);
-        alert(`Failed to save profile: ${result.error.message}`);
-        setIsSubmitting(false);
-      } else {
-        router.push('/');
-        router.refresh();
-      }
+if (result.error) {
+          console.error('Database error:', result.error);
+          alert(`Failed to save profile: ${result.error.message}`);
+          setIsSubmitting(false);
+        } else {
+            await supabase
+              .from('user_preferences')
+              .upsert({
+                id: user.id,
+                interests: formData.interests,
+                learning_style: 'visual',
+                onboarded: true,
+                updated_at: new Date().toISOString()
+              }, { onConflict: 'id' });
+          
+          router.push('/');
+          router.refresh();
+        }
     } catch (err) {
       console.error('Unexpected error:', err);
       alert('An unexpected error occurred. Please try again.');
@@ -225,24 +239,61 @@ export default function OnboardingForm() {
               >
                 {step === 1 && (
                   <div className="space-y-6">
-                    <div>
-                      <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-3">
-                        <MapPin className="w-4 h-4 text-indigo-400" />
-                        Where are you from?
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.country}
-                        onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                        placeholder="e.g., United States, Nigeria, India"
-                        className="w-full bg-zinc-800/50 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && isStepValid()) {
-                            handleNext();
-                          }
-                        }}
-                      />
-                    </div>
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-3">
+                          <MapPin className="w-4 h-4 text-indigo-400" />
+                          Where are you from?
+                        </label>
+                        <Select
+                          options={countryOptions}
+                          value={countryOptions.find((option: { label: string; value: string }) => option.label === formData.country)}
+                          onChange={(value) => setFormData({ ...formData, country: value?.label || '' })}
+                          placeholder="Select your country"
+                          classNamePrefix="react-select"
+                          styles={{
+                            control: (base) => ({
+                              ...base,
+                              backgroundColor: 'rgba(39, 39, 42, 0.5)',
+                              borderColor: '#3f3f46',
+                              borderRadius: '0.75rem',
+                              padding: '2px',
+                              color: 'white',
+                              boxShadow: 'none',
+                              '&:hover': {
+                                borderColor: '#52525b'
+                              }
+                            }),
+                            menu: (base) => ({
+                              ...base,
+                              backgroundColor: '#18181b',
+                              border: '1px solid #3f3f46',
+                              borderRadius: '0.75rem',
+                              zIndex: 100
+                            }),
+                            option: (base, state) => ({
+                              ...base,
+                              backgroundColor: state.isFocused ? '#27272a' : 'transparent',
+                              color: 'white',
+                              cursor: 'pointer',
+                              '&:active': {
+                                backgroundColor: '#3f3f46'
+                              }
+                            }),
+                            singleValue: (base) => ({
+                              ...base,
+                              color: 'white'
+                            }),
+                            input: (base) => ({
+                              ...base,
+                              color: 'white'
+                            }),
+                            placeholder: (base) => ({
+                              ...base,
+                              color: '#71717a'
+                            })
+                          }}
+                        />
+                      </div>
                     <div>
                       <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-3">
                         <Calendar className="w-4 h-4 text-indigo-400" />

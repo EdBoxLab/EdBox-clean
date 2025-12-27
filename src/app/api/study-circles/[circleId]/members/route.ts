@@ -1,5 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase/admin';
+
+// GET - Get all members of a circle with their profiles
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ circleId: string }> }
+) {
+  try {
+    const { circleId } = await context.params;
+    const numericCircleId = parseInt(circleId, 10);
+    
+    const supabase = createServerSupabaseClient();
+    
+    const { data, error } = await supabase
+      .from('circle_members')
+      .select(`
+        user_id,
+        joined_at,
+        profiles (
+          id,
+          full_name,
+          avatar_url
+        )
+      `)
+      .eq('circle_id', numericCircleId);
+
+    if (error) throw error;
+
+    const members = data.map((m: any) => ({
+      id: m.user_id,
+      full_name: m.profiles?.full_name || 'Anonymous',
+      avatar_url: m.profiles?.avatar_url,
+      joined_at: m.joined_at
+    }));
+
+    return NextResponse.json(members);
+  } catch (error) {
+    console.error('Error fetching members:', error);
+    return NextResponse.json({ error: 'Failed to fetch members' }, { status: 500 });
+  }
+}
 
 // POST - Add a member to a circle
 export async function POST(

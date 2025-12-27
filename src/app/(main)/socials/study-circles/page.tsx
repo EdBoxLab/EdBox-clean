@@ -2,9 +2,47 @@
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Session, AuthChangeEvent } from '@supabase/supabase-js';
-import { Users, Plus, MessageCircle, Video, Phone, Search, Send, Sparkles, ArrowLeft, MoreVertical, Share2, UserPlus, Clock } from 'lucide-react';
+import { Users, Plus, MessageCircle, Video, Phone, Search, Send, Sparkles, ArrowLeft, MoreVertical, Share2, UserPlus, Clock, BookOpen, GraduationCap, X, AtSign } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useSearchParams, useRouter } from 'next/navigation';
+
+// --- Shared Components for Chat ---
+
+const SharedContentCard = ({ content }: { content: any }) => {
+  const router = useRouter();
+  const isStudyKit = content.type === 'study-kit';
+  
+  const handleClick = () => {
+    if (isStudyKit && content.id) {
+      router.push(`/tools/study-kit?id=${content.id}`);
+    }
+  };
+  
+  return (
+    <div 
+      onClick={handleClick}
+      className="mt-2 bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:bg-white/10 transition-colors group cursor-pointer max-w-sm"
+    >
+      <div className="flex gap-3 p-3">
+        <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/20 text-blue-400">
+          <BookOpen className="w-6 h-6" />
+        </div>
+        <div className="min-w-0">
+          <h4 className="text-sm font-bold text-slate-200 truncate">{content.title}</h4>
+          <p className="text-xs text-gray-400 line-clamp-1">{content.description || 'Study Kit'}</p>
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">
+              Study Kit
+            </span>
+            <span className="text-[10px] font-bold text-blue-400 group-hover:text-blue-300">Tap to Open</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- End Shared Components ---
 
 // Dashboard View Component
 const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }: {
@@ -312,27 +350,51 @@ const CircleChat = ({ circle, onBack, session }: {
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
+  const [members, setMembers] = useState<any[]>([]);
+  const [filteredMembers, setFilteredMembers] = useState<any[]>([]);
+  const [userContent, setUserContent] = useState<{ courses: any[], kits: any[] }>({ courses: [], kits: [] });
+  const [selectedAttachments, setSelectedAttachments] = useState<any[]>([]);
+  const [mentionSearch, setMentionSearch] = useState('');
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
-    const fetchMessages = async () => {
+    const fetchData = async () => {
       if (!circle) return;
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/study-circles/${circle.id}/messages`);
-        const data = await response.json();
-        setMessages(Array.isArray(data) ? data : []);
+        // Fetch messages
+        const msgRes = await fetch(`/api/study-circles/${circle.id}/messages`);
+        const msgData = await msgRes.json();
+        setMessages(Array.isArray(msgData) ? msgData : []);
+
+        // Fetch members for tagging
+        const memRes = await fetch(`/api/study-circles/${circle.id}/members`);
+        const memData = await memRes.json();
+        setMembers(Array.isArray(memData) ? memData : []);
+
+        // Fetch user's content (kits only)
+        const kitsRes = await fetch('/api/study-kit/list');
+        const kitsData = await kitsRes.json();
+        setUserContent({
+          courses: [],
+          kits: Array.isArray(kitsData.studyKits) ? kitsData.studyKits : []
+        });
+
       } catch (error) {
-        console.error("Failed to fetch messages:", error);
+        console.error("Failed to fetch data:", error);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchMessages();
+    fetchData();
   }, [circle?.id]);
 
   useEffect(() => {
@@ -358,9 +420,62 @@ const CircleChat = ({ circle, onBack, session }: {
     };
   }, [circle?.id]);
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNewMessage(value);
+
+    // Detect @ for mentions
+    const cursorPosition = e.target.selectionStart || 0;
+    const textBeforeCursor = value.slice(0, cursorPosition);
+    const lastAtSymbol = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtSymbol !== -1) {
+      const search = textBeforeCursor.slice(lastAtSymbol + 1);
+      if (!search.includes(' ')) {
+        setMentionSearch(search);
+        setFilteredMembers(members.filter(m => 
+          m.full_name.toLowerCase().includes(search.toLowerCase())
+        ));
+        setShowMentionSuggestions(true);
+        return;
+      }
+    }
+    setShowMentionSuggestions(false);
+  };
+
+  const handleMentionSelect = (member: any) => {
+    const cursorPosition = inputRef.current?.selectionStart || 0;
+    const textBeforeAt = newMessage.slice(0, newMessage.lastIndexOf('@', cursorPosition - 1));
+    const textAfterMention = newMessage.slice(cursorPosition);
+    const updatedMessage = `${textBeforeAt}@${member.full_name} ${textAfterMention}`;
+    
+    setNewMessage(updatedMessage);
+    setShowMentionSuggestions(false);
+    inputRef.current?.focus();
+  };
+
+  const toggleAttachment = (item: any, type: 'course' | 'study-kit') => {
+    const attachment = { id: item.id, title: item.title, type, description: item.description };
+    setSelectedAttachments(prev => {
+      const exists = prev.find(a => a.id === item.id);
+      if (exists) return prev.filter(a => a.id !== item.id);
+      return [...prev, attachment];
+    });
+  };
+
+  const handlePlusClick = () => {
+    console.log("Plus button clicked, current showAttachMenu:", showAttachMenu);
+    setShowAttachMenu(!showAttachMenu);
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() && selectedAttachments.length === 0) return;
+
+    // Extract mentions from text
+    const mentions = members
+      .filter(m => newMessage.includes(`@${m.full_name}`))
+      .map(m => ({ id: m.id, name: m.full_name }));
 
     try {
       await fetch(`/api/study-circles/${circle.id}/messages`, {
@@ -368,10 +483,14 @@ const CircleChat = ({ circle, onBack, session }: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content: newMessage,
-          username: session?.user?.user_metadata?.full_name || session?.user?.email || 'Anonymous'
+          username: session?.user?.user_metadata?.full_name || session?.user?.email || 'Anonymous',
+          shared_content: selectedAttachments.length > 0 ? selectedAttachments : null,
+          mentions: mentions.length > 0 ? mentions : null
         }),
       });
       setNewMessage('');
+      setSelectedAttachments([]);
+      setShowAttachMenu(false);
     } catch (error) {
       console.error("Error sending message:", error);
     }
@@ -384,6 +503,31 @@ const CircleChat = ({ circle, onBack, session }: {
   };
 
   if (!circle) return null;
+
+  const renderMessageContent = (content: string, mentions: any[]) => {
+    if (!mentions || mentions.length === 0) return content;
+    
+    let parts = [content];
+    mentions.forEach(mention => {
+      const mentionText = `@${mention.name}`;
+      const newParts: any[] = [];
+      parts.forEach(part => {
+        if (typeof part !== 'string') {
+          newParts.push(part);
+          return;
+        }
+        const split = part.split(mentionText);
+        split.forEach((s, i) => {
+          newParts.push(s);
+          if (i < split.length - 1) {
+            newParts.push(<span key={mention.id + i} className="text-purple-300 font-bold">@{mention.name}</span>);
+          }
+        });
+      });
+      parts = newParts;
+    });
+    return parts;
+  };
 
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-[#1a0b2e] via-[#2d144d] to-[#1a0b2e] text-slate-200 flex flex-col z-50">
@@ -467,7 +611,11 @@ const CircleChat = ({ circle, onBack, session }: {
                         ? 'bg-gradient-to-br from-purple-900/40 to-pink-900/20 border border-purple-500/30 text-slate-300 rounded-bl-sm'
                         : 'bg-white/10 text-slate-300 rounded-bl-sm'
                     }`}>
-                    {msg.content}
+                    {renderMessageContent(msg.content, msg.mentions)}
+                    
+                    {msg.shared_content && msg.shared_content.map((content: any, cidx: number) => (
+                      <SharedContentCard key={cidx} content={content} />
+                    ))}
                   </div>
 
                   <span className={`text-[10px] text-gray-400 ${isUser ? 'mr-1' : 'ml-1'}`}>
@@ -487,22 +635,126 @@ const CircleChat = ({ circle, onBack, session }: {
         <div ref={messagesEndRef} />
       </main>
 
-      {/* Bottom Input Area */}
-      <footer className="p-4 border-t border-white/5 bg-[#1a0b2e]/80 backdrop-blur-xl">
-        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-          <button
-            type="button"
-            className="w-10 h-10 rounded-full text-gray-400 bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
-            <Plus className="w-5 h-5" />
-          </button>
+      {/* Mention Suggestions Popup */}
+      {showMentionSuggestions && filteredMembers.length > 0 && (
+        <div className="mx-4 mb-2 bg-[#2d144d] border border-white/10 rounded-xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-2">
+          <div className="p-2 border-b border-white/5 bg-white/5 flex items-center gap-2">
+            <AtSign className="w-4 h-4 text-purple-400" />
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Mention Member</span>
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {filteredMembers.map(member => (
+              <button
+                key={member.id}
+                onClick={() => handleMentionSelect(member)}
+                className="w-full flex items-center gap-3 p-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-0"
+              >
+                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-xs font-bold text-purple-300">
+                  {member.full_name[0]}
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-slate-200">{member.full_name}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Attachment Selection Menu */}
+      {showAttachMenu && (
+        <div className="mx-4 mb-2 bg-[#2d144d] border border-white/10 rounded-2xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-2">
+          <div className="p-3 border-b border-white/10 bg-white/5 flex items-center justify-between">
+            <h3 className="font-bold flex items-center gap-2">
+              <Share2 className="w-4 h-4 text-purple-400" />
+              Share Content
+            </h3>
+            <button onClick={() => setShowAttachMenu(false)} className="text-gray-400 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="p-4 grid grid-cols-1 gap-6 max-h-80 overflow-y-auto">
+              {/* Study Kits Section */}
+            <div>
+              <h4 className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <BookOpen className="w-3.5 h-3.5" />
+                Study Kits
+              </h4>
+              <div className="space-y-2">
+                {userContent.kits.length === 0 ? (
+                  <p className="text-xs text-gray-500 italic">No study kits created yet.</p>
+                ) : (
+                  userContent.kits.map(kit => (
+                    <div 
+                      key={kit.id}
+                      onClick={() => toggleAttachment(kit, 'study-kit')}
+                      className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                        selectedAttachments.find(a => a.id === kit.id)
+                          ? 'bg-blue-500/20 border-blue-500/50'
+                          : 'bg-white/5 border-white/5 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold truncate">{kit.title}</p>
+                        <p className="text-[10px] text-gray-500">Study Kit</p>
+                      </div>
+                      {selectedAttachments.find(a => a.id === kit.id) && <Plus className="w-4 h-4 text-blue-400 rotate-45" />}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Send Button for Sharing Menu */}
+            {selectedAttachments.length > 0 && (
+              <div className="sticky bottom-0 pt-4 bg-[#2d144d] border-t border-white/10 mt-2">
+                <button
+                  onClick={handleSendMessage}
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-slate-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-500/30"
+                >
+                  <Send className="w-4 h-4" />
+                  Send {selectedAttachments.length} {selectedAttachments.length === 1 ? 'Item' : 'Items'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Selected Attachments Preview */}
+      {selectedAttachments.length > 0 && !showAttachMenu && (
+        <div className="px-4 py-2 flex gap-2 overflow-x-auto no-scrollbar">
+          {selectedAttachments.map(a => (
+            <div key={a.id} className="shrink-0 flex items-center gap-2 bg-purple-500/20 border border-purple-500/30 px-3 py-1.5 rounded-full">
+              <span className="text-xs font-bold text-purple-300">{a.title}</span>
+              <button onClick={() => toggleAttachment(a, a.type)}>
+                <X className="w-3 h-3 text-purple-400" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+        {/* Bottom Input Area */}
+        <footer className="p-4 border-t border-white/5 bg-[#1a0b2e]/80 backdrop-blur-xl">
+          <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handlePlusClick}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                showAttachMenu ? 'bg-purple-600 text-white' : 'text-gray-400 bg-white/10 hover:bg-white/20'
+              }`}>
+              <Plus className="w-5 h-5" />
+            </button>
 
           <div className="flex-1 bg-white/10 border border-white/10 rounded-3xl px-4 py-2 flex items-center focus-within:border-purple-500/50 focus-within:ring-1 focus-within:ring-purple-500/50 transition-all">
             <input
+              ref={inputRef}
               className="bg-transparent border-none focus:ring-0 w-full text-base placeholder-gray-500 text-slate-200 p-0 h-10"
               placeholder="Ask AI or chat..."
               type="text"
               value={newMessage}
-              onChange={e => setNewMessage(e.target.value)}
+              onChange={handleInputChange}
             />
             <button
               type="button"

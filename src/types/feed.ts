@@ -5,7 +5,7 @@ export interface Comment {
   avatar: string;
 }
 
-export type FeedItemType = 'video' | 'story' | 'infographic' | 'quiz' | 'article' | 'challenge' | 'fact' | 'meme' | 'ad' | 'insight' | 'poll' | 'debate';
+export type FeedItemType = 'video' | 'story' | 'infographic' | 'quiz' | 'article' | 'challenge' | 'fact' | 'meme' | 'ad' | 'insight' | 'poll' | 'debate' | 'media';
 
 export type GenieReaction = 'cheer' | 'wink' | 'hint' | 'hype' | 'default' | 'sad';
 export type Theme = 'purple-gradient' | 'blue-gradient' | 'green-gradient' | 'orange-gradient' | 'red-gradient' | 'cyan-gradient' | 'rose-gradient';
@@ -28,6 +28,8 @@ export interface BaseFeedItem {
   comments: Comment[];
   feedback?: Feedback | null;
   courseReference?: string;
+  imageUrl?: string;
+  imageGenerationState?: ImageGenerationState;
 }
 
 // === Content Specific Interfaces ===
@@ -145,6 +147,17 @@ export interface DebateFeedItem extends BaseFeedItem {
   imageGenerationState?: ImageGenerationState;
 }
 
+export interface MediaFeedItem extends BaseFeedItem {
+  type: 'media';
+  headline: string;
+  body: string;
+  imageKeywords: string;
+  visualPrompt: string;
+  imageUrl?: string;
+  imageGenerationState: ImageGenerationState;
+  source?: string;
+}
+
 // Unified Feed Item Type
 export type FeedItem =
   | StoryFeedItem
@@ -157,7 +170,8 @@ export type FeedItem =
   | FactFeedItem
   | MemeFeedItem
   | PollFeedItem
-  | DebateFeedItem;
+  | DebateFeedItem
+  | MediaFeedItem;
 
 // Legacy alias to support existing code during migration (will be removed)
 export type Lesson = FeedItem;

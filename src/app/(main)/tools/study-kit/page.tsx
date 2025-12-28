@@ -19,6 +19,7 @@ import {
 import ShareButton from '@/components/ShareButton';
 import ShareModal, { useShareModal } from '@/components/ShareModal';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import posthog from 'posthog-js';
 
 const contentTypes = [
     { id: 'quizzes', label: 'Quizzes', icon: Brain, description: 'Multiple choice, true/false, and short answer' },
@@ -130,6 +131,9 @@ function StudyKitContent() {
         if (!confirm('Are you sure you want to delete this study kit?')) return;
 
         try {
+            // Get kit info before deletion for tracking
+            const deletedKit = studyKits.find(k => k.id === kitId);
+
             const response = await fetch(`/api/study-kit/${kitId}`, {
                 method: 'DELETE',
             });
@@ -137,6 +141,14 @@ function StudyKitContent() {
 
             if (data.success) {
                 setStudyKits(studyKits.filter(k => k.id !== kitId));
+
+                // Track study kit deletion event
+                posthog.capture('study_kit_deleted', {
+                    kit_id: kitId,
+                    kit_title: deletedKit?.title,
+                    content_types: deletedKit?.content_types,
+                });
+
                 if (id === kitId) {
                     router.push('/tools/study-kit');
                 }
@@ -401,6 +413,15 @@ function StudyKitContent() {
                 console.log('Raw API response:', data.content);
                 const normalized = normalizeContent(data.content);
                 console.log('After normalization in handleGenerate:', normalized);
+
+                // Track study kit generation event
+                posthog.capture('study_kit_generated', {
+                    prompt: prompt,
+                    content_types: selectedTypes,
+                    has_file: !!uploadedFile,
+                    file_name: uploadedFile?.name,
+                    file_type: uploadedFile?.type,
+                });
 
                 // Use setTimeout to ensure state update happens after current render cycle
                 setTimeout(() => {

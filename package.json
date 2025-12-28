@@ -40,6 +40,8 @@
     "next": "^16.0.10",
     "office-text-extractor": "^3.0.3",
     "pdf-parse": "^1.1.1",
+    "posthog-js": "^1.310.1",
+    "posthog-node": "^5.18.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",

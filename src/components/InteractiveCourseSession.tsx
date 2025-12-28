@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, BookOpen, Brain, Trophy, MessageCircle, Menu, X, Loader, Check, AlertCircle, Map } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import posthog from 'posthog-js';
 import { XPStreakDisplay } from '@/components/XPStreakDisplay';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -364,6 +365,23 @@ export default function InteractiveCourseSession({
               } else if (data.type === 'goals_updated') {
                 // Real-time Goal Update!
                 const newGoals = data.goals;
+                // Track skill mastered events for newly mastered goals
+                if (session?.learningContext?.goals) {
+                  const previousGoals = session.learningContext.goals;
+                  newGoals.forEach((goal: any) => {
+                    const prevGoal = previousGoals.find((g: any) => g.id === goal.id);
+                    if (goal.status === 'mastered' && prevGoal?.status !== 'mastered') {
+                      posthog.capture('skill_mastered', {
+                        course_id: courseId,
+                        course_title: courseTitle,
+                        skill_id: goal.id,
+                        skill_name: goal.text,
+                        confidence_level: goal.confidence,
+                        session_id: session?.id,
+                      });
+                    }
+                  });
+                }
                 setSession(prev => {
                   if (!prev) return prev;
                   return {
@@ -412,11 +430,31 @@ export default function InteractiveCourseSession({
         sessionId={session?.id}
         onSuccess={() => {
           const title = activeChallenge.title;
+          // Track challenge completed event (success)
+          posthog.capture('challenge_completed', {
+            course_id: courseId,
+            course_title: courseTitle,
+            challenge_id: activeChallenge.id,
+            challenge_title: title,
+            difficulty: activeChallenge.difficultyLevel,
+            success: true,
+            session_id: session?.id,
+          });
           setActiveChallenge(null);
           handleSendMessage(`I've successfully mastered the challenge: "${title}"!`, true);
         }}
         onFail={() => {
           const title = activeChallenge.title;
+          // Track challenge completed event (failed)
+          posthog.capture('challenge_completed', {
+            course_id: courseId,
+            course_title: courseTitle,
+            challenge_id: activeChallenge.id,
+            challenge_title: title,
+            difficulty: activeChallenge.difficultyLevel,
+            success: false,
+            session_id: session?.id,
+          });
           setActiveChallenge(null);
           handleSendMessage(`I struggled with the challenge: "${title}". I need more practice.`, true);
         }}
@@ -558,13 +596,30 @@ export default function InteractiveCourseSession({
                     {message.type === 'roadmap' && message.roadmapData ? (
                       <RoadmapWelcome
                         {...message.roadmapData}
-                        onStart={() => handleSendMessage("Let's tackle the first goal!", true)}
+                        onStart={() => {
+                          // Track learning path started event
+                          posthog.capture('learning_path_started', {
+                            course_id: courseId,
+                            course_title: courseTitle,
+                            objectives_count: message.roadmapData?.items?.length || 0,
+                          });
+                          handleSendMessage("Let's tackle the first goal!", true);
+                        }}
                       />
                     ) : message.type === 'quiz' && message.quizData ? (
                       <QuizBubble
                         {...message.quizData}
                         onAnswer={(ans, corr) => {
                           const question = message.quizData?.question;
+                          // Track quiz answered event
+                          posthog.capture('quiz_answered', {
+                            course_id: courseId,
+                            course_title: courseTitle,
+                            question: question,
+                            answer_given: ans,
+                            is_correct: corr,
+                            session_id: session?.id,
+                          });
                           handleSendMessage(
                             corr
                               ? `I correctly answered the quiz: "${question}"`

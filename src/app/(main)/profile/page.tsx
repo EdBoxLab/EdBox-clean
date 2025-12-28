@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import posthog from 'posthog-js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -138,6 +139,13 @@ export default function ProfilePage() {
         variant: 'destructive',
       });
     } else {
+      // Track profile updated event
+      posthog.capture('profile_updated', {
+        has_avatar: !!avatarUrl,
+        avatar_type: selectedEmoji ? 'emoji' : 'image',
+        name_changed: fullName !== user?.user_metadata?.full_name,
+      });
+
       toast({
         title: 'Profile Updated!',
         description: 'Your changes have been saved',

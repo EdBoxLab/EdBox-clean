@@ -5,6 +5,7 @@ import { Session, AuthChangeEvent } from '@supabase/supabase-js';
 import { Users, Plus, MessageCircle, Video, Phone, Search, Send, Sparkles, ArrowLeft, MoreVertical, Share2, UserPlus, Clock, BookOpen, GraduationCap, X, AtSign } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useSearchParams, useRouter } from 'next/navigation';
+import posthog from 'posthog-js';
 
 // --- Shared Components for Chat ---
 
@@ -88,6 +89,13 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }: {
       if (!response.ok) {
         throw new Error(data.error || 'Failed to join circle');
       }
+
+      // Track study circle joined event
+      posthog.capture('study_circle_joined', {
+        circle_id: data.circle?.id,
+        circle_name: data.circle?.name,
+        join_method: 'invite_code',
+      });
 
       setShowJoinModal(false);
       setInviteCode('');
@@ -488,6 +496,16 @@ const CircleChat = ({ circle, onBack, session }: {
           mentions: mentions.length > 0 ? mentions : null
         }),
       });
+
+      // Track message sent event
+      posthog.capture('message_sent', {
+        circle_id: circle.id,
+        circle_name: circle.name,
+        has_attachments: selectedAttachments.length > 0,
+        has_mentions: mentions.length > 0,
+        mentions_count: mentions.length,
+      });
+
       setNewMessage('');
       setSelectedAttachments([]);
       setShowAttachMenu(false);
@@ -833,6 +851,14 @@ const CreateCircleModal = ({ onClose, onCircleCreated, session }: {
       }
 
       const newCircle = await response.json();
+
+      // Track study circle created event
+      posthog.capture('study_circle_created', {
+        circle_id: newCircle.id,
+        circle_name: name,
+        has_description: !!description,
+      });
+
       onCircleCreated(newCircle);
       onClose();
     } catch (err: any) {

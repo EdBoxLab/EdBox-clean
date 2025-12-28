@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import posthog from 'posthog-js';
 import { Share2, MessageCircle, Send, Mail, Copy, Check, Users } from 'lucide-react';
 import {
   ShareableContent,
@@ -53,7 +54,15 @@ export default function ShareButton({
       await shareFunction();
       await trackShare(content, platform, userId);
       setIsOpen(false);
-      
+
+      // Track share event in PostHog
+      posthog.capture('content_shared', {
+        platform: platform,
+        content_type: content.type,
+        content_id: content.id,
+        content_title: content.title,
+      });
+
       // Update share count
       if (showCount) {
         setShareCount(prev => prev + 1);
@@ -69,7 +78,15 @@ export default function ShareButton({
       setCopied(true);
       await trackShare(content, 'copy_link', userId);
       setTimeout(() => setCopied(false), 2000);
-      
+
+      // Track copy link event in PostHog
+      posthog.capture('content_shared', {
+        platform: 'copy_link',
+        content_type: content.type,
+        content_id: content.id,
+        content_title: content.title,
+      });
+
       if (showCount) {
         setShareCount(prev => prev + 1);
       }
@@ -81,7 +98,15 @@ export default function ShareButton({
     if (success) {
       await trackShare(content, 'native_share', userId);
       setIsOpen(false);
-      
+
+      // Track native share event in PostHog
+      posthog.capture('content_shared', {
+        platform: 'native_share',
+        content_type: content.type,
+        content_id: content.id,
+        content_title: content.title,
+      });
+
       if (showCount) {
         setShareCount(prev => prev + 1);
       }

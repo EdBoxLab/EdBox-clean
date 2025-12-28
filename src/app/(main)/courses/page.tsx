@@ -7,6 +7,7 @@ import { BookOpen, Clock, Trophy, Plus, Loader2, TrendingUp, Trash2 } from 'luci
 import ShareButton from '@/components/ShareButton';
 import ShareModal, { useShareModal } from '@/components/ShareModal';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import posthog from 'posthog-js';
 
 interface SkillGraph {
   id: string;
@@ -58,6 +59,9 @@ export default function CoursesPage() {
     if (!confirm('Are you sure you want to delete this course? This action cannot be undone.')) return;
 
     try {
+      // Get course info before deletion for tracking
+      const deletedCourse = courses.find(c => c.id === courseId);
+
       const response = await fetch(`/api/skill-graph/${courseId}`, {
         method: 'DELETE',
       });
@@ -65,6 +69,13 @@ export default function CoursesPage() {
 
       if (data.success) {
         setCourses(courses.filter(c => c.id !== courseId));
+
+        // Track course deletion event
+        posthog.capture('course_deleted', {
+          course_id: courseId,
+          course_title: deletedCourse?.goal,
+          skills_count: deletedCourse?.nodes?.length || 0,
+        });
       } else {
         alert(data.error || 'Failed to delete course');
       }

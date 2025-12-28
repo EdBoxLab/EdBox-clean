@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import posthog from 'posthog-js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -76,12 +77,29 @@ export default function SignUpPage() {
       });
 
       if (error) {
+        // Track signup failed event
+        posthog.capture('signup_failed', {
+          method: 'email',
+          error_reason: error.message.includes('already registered') ? 'email_exists' : 'unknown',
+          error_message: error.message,
+        });
         setError(error.message);
         setLoading(false);
         return;
       }
 
         if (data.user) {
+          // Identify the user in PostHog
+          posthog.identify(data.user.id, {
+            email: email,
+          });
+
+          // Track signup event
+          posthog.capture('user_signed_up', {
+            method: 'email',
+            email: email,
+          });
+
           // Show success message
           setMessage(
             'Signup successful! Please check your email inbox and confirm your account before signing in.'
@@ -111,6 +129,11 @@ export default function SignUpPage() {
       const data = await response.json();
 
       if (response.ok) {
+        // Track waitlist join event
+        posthog.capture('waitlist_joined', {
+          email: email,
+        });
+
         setMessage(data.message || 'Successfully added to waitlist! We\'ll notify you when we launch.');
         setEmail('');
       } else {
@@ -134,6 +157,11 @@ export default function SignUpPage() {
       setError('Beta is full. Please join the waitlist instead.');
       return;
     }
+
+    // Track OAuth signup attempt
+    posthog.capture('user_signed_up', {
+      method: 'google',
+    });
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import posthog from 'posthog-js';
 
 // Mock data for rewards
 const mockRewards = [
@@ -10,7 +11,7 @@ const mockRewards = [
     { id: 'r4', title: 'Creator Course: Advanced CSS', cost: 5000, type: 'course' },
 ];
 
-const RewardCard = ({ reward, userCoins }: { reward: any, userCoins: number }) => {
+const RewardCard = ({ reward, userCoins, onRedeem }: { reward: any, userCoins: number, onRedeem: (reward: any) => void }) => {
     const canAfford = userCoins >= reward.cost;
     const iconMap: Record<string, string> = {
         sticker: '🎨',
@@ -19,16 +20,32 @@ const RewardCard = ({ reward, userCoins }: { reward: any, userCoins: number }) =
         course: '🎓'
     }
 
+    const handleRedeem = () => {
+        if (canAfford) {
+            // Track reward redeemed event
+            posthog.capture('reward_redeemed', {
+                reward_id: reward.id,
+                reward_title: reward.title,
+                reward_type: reward.type,
+                reward_cost: reward.cost,
+                user_coins_before: userCoins,
+                user_coins_after: userCoins - reward.cost,
+            });
+            onRedeem(reward);
+        }
+    };
+
     return (
         <div className={`p-5 rounded-lg border ${canAfford ? 'border-gray-700 bg-gray-800' : 'border-gray-800 bg-gray-800/50'}`}>
             <div className="text-3xl mb-3">{iconMap[reward.type]}</div>
             <h3 className="text-xl font-bold text-white">{reward.title}</h3>
             <div className="flex justify-between items-center mt-4">
                 <span className="font-bold text-lg text-yellow-400">{reward.cost} EdCoins</span>
-                <button 
+                <button
                     disabled={!canAfford}
-                    className={`font-bold py-2 px-4 rounded-lg transition-colors ${canAfford 
-                        ? 'bg-green-600 text-white hover:bg-green-500' 
+                    onClick={handleRedeem}
+                    className={`font-bold py-2 px-4 rounded-lg transition-colors ${canAfford
+                        ? 'bg-green-600 text-white hover:bg-green-500'
                         : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`
                     }
                 >
@@ -46,8 +63,18 @@ export default function ReferralsPage() {
 
     const copyToClipboard = () => {
         navigator.clipboard.writeText(referralLink);
+        // Track referral link copied event
+        posthog.capture('referral_link_copied', {
+            referral_code: referralCode,
+            referral_link: referralLink,
+        });
         // Add a toast notification in a real app
         alert('Referral link copied to clipboard!');
+    };
+
+    const handleRewardRedeem = (reward: any) => {
+        // In a real app, this would call an API to redeem the reward
+        alert(`Successfully redeemed: ${reward.title}`);
     };
 
   return (
@@ -77,7 +104,7 @@ export default function ReferralsPage() {
             <h2 className="text-3xl font-bold mb-6 border-l-4 border-yellow-400 pl-4">Redeem Rewards</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {mockRewards.map(reward => (
-                    <RewardCard key={reward.id} reward={reward} userCoins={userCoins} />
+                    <RewardCard key={reward.id} reward={reward} userCoins={userCoins} onRedeem={handleRewardRedeem} />
                 ))}
             </div>
         </div>

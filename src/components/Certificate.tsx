@@ -3,6 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Award, Download, Share2, CheckCircle } from 'lucide-react';
+import posthog from 'posthog-js';
 
 interface CertificateProps {
   certificate: {
@@ -24,7 +25,20 @@ export const Certificate: React.FC<CertificateProps> = ({ certificate }) => {
   };
 
   const handleShare = async () => {
-    if (navigator.share) {
+    const canShare = typeof navigator.share === 'function';
+    const shareMethod = canShare ? 'native_share' : 'clipboard_copy';
+
+    // Track certificate shared event
+    posthog.capture('certificate_shared', {
+      certificate_id: certificate.id,
+      course_name: certificate.courseName,
+      mastered_skills: certificate.masteredSkills,
+      total_skills: certificate.totalSkills,
+      overall_mastery: certificate.overallMastery,
+      share_method: shareMethod,
+    });
+
+    if (canShare) {
       await navigator.share({
         title: `${certificate.userName}'s Certificate`,
         text: `I earned a certificate for ${certificate.courseName}!`,

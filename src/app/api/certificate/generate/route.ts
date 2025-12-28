@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getPostHogClient } from '@/lib/posthog-server';
 
 export async function POST(request: NextRequest) {
     try {
@@ -79,6 +80,21 @@ export async function POST(request: NextRequest) {
         if (error) {
             throw new Error('Failed to save certificate');
         }
+
+        // Track certificate generated event (server-side)
+        const posthog = getPostHogClient();
+        posthog.capture({
+            distinctId: user.id,
+            event: 'certificate_generated',
+            properties: {
+                certificate_id: certificateId,
+                skill_graph_id: skillGraphId,
+                course_name: graph.goal,
+                mastered_skills: competencyData.summary.masteredSkills,
+                total_skills: competencyData.summary.totalSkills,
+                overall_mastery: competencyData.summary.overallMastery,
+            },
+        });
 
         return NextResponse.json({
             success: true,

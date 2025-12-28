@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import posthog from 'posthog-js';
 import { LearningContext } from '../types';
 
 export function useOnboardingFlow() {
@@ -69,6 +70,13 @@ export function useOnboardingFlow() {
           
             const data = await response.json();
             if (data.success) {
+              // Track file uploaded event
+              posthog.capture('file_uploaded', {
+                file_name: file.name,
+                file_type: file.type,
+                file_size_bytes: file.size,
+                extraction_success: true,
+              });
               // Only set goal if it's empty or just a placeholder
               // And avoid setting it to the messy extraction summary
               const friendlyGoal = `Course based on: ${file.name}`;
@@ -144,6 +152,17 @@ export function useOnboardingFlow() {
       const data = await response.json();
 
       if (data.success) {
+        // Track course created event
+        posthog.capture('course_created', {
+          course_id: data.skillGraph.id,
+          goal: goal,
+          context: context,
+          time_available: timeAvailable,
+          has_uploaded_file: !!uploadedFile,
+          file_type: uploadedFile?.type,
+          skills_count: data.skillGraph.nodes?.length || 0,
+        });
+
         router.push(`/learning-path/${data.skillGraph.id}`);
       } else {
         throw new Error(data.error || 'Generation failed');
@@ -158,13 +177,28 @@ export function useOnboardingFlow() {
   }, [goal, context, timeAvailable, uploadedFile, router]);
 
   const nextStep = useCallback(() => {
+    // Track onboarding step completed event
+    const stepNames: Record<number, string> = {
+      1: 'goal_setting',
+      2: 'learning_context',
+      3: 'time_available',
+    };
+    posthog.capture('onboarding_step_completed', {
+      step_number: step,
+      step_name: stepNames[step] || `step_${step}`,
+      goal: step === 1 ? goal : undefined,
+      context: step === 2 ? context : undefined,
+      time_available: step === 3 ? timeAvailable : undefined,
+      has_uploaded_file: !!uploadedFile,
+    });
+
     if (step < 3) {
       setStep(step + 1);
       setShowContinue(false);
     } else {
       handleGenerate();
     }
-  }, [step, handleGenerate]);
+  }, [step, goal, context, timeAvailable, uploadedFile, handleGenerate]);
 
   const prevStep = useCallback(() => {
     setStep(step - 1);

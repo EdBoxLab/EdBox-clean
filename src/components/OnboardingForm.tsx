@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import posthog from 'posthog-js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, GraduationCap, MapPin, Calendar, Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
@@ -142,7 +143,24 @@ if (result.error) {
                 onboarded: true,
                 updated_at: new Date().toISOString()
               }, { onConflict: 'id' });
-          
+
+          // Track onboarding completed event
+          posthog.capture('onboarding_completed', {
+            country: formData.country,
+            education: formData.education,
+            age: parseInt(formData.age, 10),
+            interests: formData.interests,
+            goal: formData.goal,
+          });
+
+          // Update user properties in PostHog
+          posthog.identify(user.id, {
+            country: formData.country,
+            education: formData.education,
+            interests: formData.interests,
+            goal: formData.goal,
+          });
+
           router.push('/');
           router.refresh();
         }

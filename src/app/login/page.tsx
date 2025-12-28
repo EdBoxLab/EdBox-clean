@@ -13,6 +13,7 @@ import {
   Chrome
 } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import posthog from 'posthog-js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -56,13 +57,25 @@ export default function LoginPage() {
     });
 
     if (error) {
+      let errorReason = 'unknown';
+      let errorMessage = error.message;
+
       if (error.message.includes('Email not confirmed')) {
-        setError('Please confirm your email before signing in. Check your inbox for the confirmation link.');
+        errorReason = 'email_not_confirmed';
+        errorMessage = 'Please confirm your email before signing in. Check your inbox for the confirmation link.';
       } else if (error.message === 'Invalid login credentials') {
-        setError('Invalid email or password.');
-      } else {
-        setError(error.message);
+        errorReason = 'invalid_credentials';
+        errorMessage = 'Invalid email or password.';
       }
+
+      // Track login failed event
+      posthog.capture('login_failed', {
+        method: 'email',
+        error_reason: errorReason,
+        error_message: error.message,
+      });
+
+      setError(errorMessage);
       return;
     }
 
@@ -80,12 +93,29 @@ export default function LoginPage() {
 
       setUser({ ...data.user, profile });
       setMessage('Login successful!');
+
+      // Identify the user in PostHog
+      posthog.identify(data.user.id, {
+        email: data.user.email,
+        name: profile?.full_name || data.user.user_metadata?.full_name,
+      });
+
+      // Track login event
+      posthog.capture('user_logged_in', {
+        method: 'email',
+        email: data.user.email,
+      });
+
       // Redirect through callback page so session is refreshed
       router.push('/auth/callback');
     }
   };
 
   const handleGoogleLogin = async () => {
+    // Track OAuth login attempt
+    posthog.capture('user_logged_in', {
+      method: 'google',
+    });
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {

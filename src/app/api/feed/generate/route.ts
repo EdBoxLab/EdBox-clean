@@ -367,7 +367,7 @@ export const POST = async (request: NextRequest) => {
                 if (error) {
                     console.error('Failed to persist feed items to history:', error);
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error('Exception while persisting feed items to history:', err);
             }
         }

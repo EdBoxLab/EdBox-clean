@@ -86,9 +86,9 @@ const FeedAnimations = () => (
             .select('feed_item_id')
             .eq('user_id', user.id);
           
-          if (data) {
-            setSavedItemIds(new Set(data.map(d => d.feed_item_id)));
-          }
+            if (data) {
+              setSavedItemIds(new Set(data.map((d: { feed_item_id: string }) => d.feed_item_id)));
+            }
         }
       };
       fetchSavedStatus();
@@ -199,9 +199,9 @@ const FeedAnimations = () => (
         if (uniqueNewItems.length > 0) {
            await persistFeedItems(uniqueNewItems, user?.id);
         }
-      } catch (err) {
-        console.error("❌ Failed to load feed items", err);
-      } finally {
+        } catch (err: any) {
+          console.error("❌ Failed to load feed items", err);
+        } finally {
         processingRef.current = false;
         setLoading(false);
       }
@@ -290,9 +290,9 @@ const FeedAnimations = () => (
               skillGraphId: 'default'
             })
           });
-        } catch (error) {
-          console.error('Failed to update XP:', error);
-        }
+          } catch (error: any) {
+            console.error('Failed to update XP:', error);
+          }
       }
     }
 

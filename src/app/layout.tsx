@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import Script from "next/script";
 import "./globals.css";
 import { seoConfig } from "@/lib/seo/config";
 import { OrganizationSchema, WebsiteSchema, SoftwareApplicationSchema } from "@/lib/seo/structured-data";
@@ -117,6 +118,12 @@ export default function RootLayout({
       >
         <ClientLayout>{children}</ClientLayout>
         <Analytics />
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7134321558578802"
+          crossOrigin="anonymous"
+          strategy="lazyOnload"
+        />
       </body>
     </html>
   );

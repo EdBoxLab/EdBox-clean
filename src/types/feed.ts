@@ -158,6 +158,12 @@ export interface MediaFeedItem extends BaseFeedItem {
   source?: string;
 }
 
+export interface AdFeedItem extends BaseFeedItem {
+  type: 'ad';
+  adClient?: string;
+  adSlot?: string;
+}
+
 // Unified Feed Item Type
 export type FeedItem =
   | StoryFeedItem
@@ -171,7 +177,8 @@ export type FeedItem =
   | MemeFeedItem
   | PollFeedItem
   | DebateFeedItem
-  | MediaFeedItem;
+  | MediaFeedItem
+  | AdFeedItem;
 
 // Legacy alias to support existing code during migration (will be removed)
 export type Lesson = FeedItem;

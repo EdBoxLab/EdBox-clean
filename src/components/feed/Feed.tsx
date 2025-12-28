@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
-import type { FeedItem, InsightFeedItem, StoryFeedItem, QuizFeedItem, FactFeedItem, PollFeedItem, MediaFeedItem, Feedback, UserPreferences, AudioGenerationState } from '@/types/feed';
+import type { FeedItem, InsightFeedItem, StoryFeedItem, QuizFeedItem, FactFeedItem, PollFeedItem, MediaFeedItem, Feedback, UserPreferences, AudioGenerationState, AdFeedItem } from '@/types/feed';
 import { generateFeedBatch, persistFeedItems, trackInteraction } from '@/services/feedService';
 import { CardWrapper } from './CardWrapper';
 import { QuizCard } from './QuizCard';
@@ -15,6 +15,7 @@ import { MemeCard } from './MemeCard';
 import { ChallengeCard } from './ChallengeCard';
 import { DebateCard } from './DebateCard';
 import { MediaCard } from './MediaCard';
+import { AdCard } from './AdCard';
 import { SkeletonCard } from './SkeletonCard';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { XPStreakDisplay } from '@/components/XPStreakDisplay';
@@ -125,18 +126,46 @@ const FeedAnimations = () => (
           return !isIdSeen && !isTitleSeen;
         });
 
+        // Inject Ad every 12 cards
+        const itemsWithAds: FeedItem[] = [];
+        let globalIndex = items.length;
+        
+        uniqueNewItems.forEach((item) => {
+          itemsWithAds.push(item);
+          globalIndex++;
+          if (globalIndex % 12 === 0) {
+            const adItem: AdFeedItem = {
+              id: `ad-${globalIndex}-${Date.now()}`,
+              type: 'ad',
+              topic: 'Sponsored',
+              title: 'Sponsored Content',
+              xp_reward: 0,
+              genie_reaction: 'hype',
+              theme: 'purple-gradient',
+              likedByUser: false,
+              likes: 0,
+              shares: 0,
+              comments: [],
+              adClient: "ca-pub-7134321558578802",
+              adSlot: "8765432109"
+            };
+            itemsWithAds.push(adItem);
+            globalIndex++;
+          }
+        });
+
         if (initial) {
-          setItems(uniqueNewItems);
+          setItems(itemsWithAds);
           setCurrentBatch(1);
           setHasLoadedInitial(true);
-          if (uniqueNewItems.length > 0) {
-            setActiveCardId(uniqueNewItems[0].id);
+          if (itemsWithAds.length > 0) {
+            setActiveCardId(itemsWithAds[0].id);
             setActiveIndex(0);
             // Don't mark as seen immediately, wait for intersection
           }
         } else {
-          if (uniqueNewItems.length > 0) {
-            setItems(prev => [...prev, ...uniqueNewItems]);
+          if (itemsWithAds.length > 0) {
+            setItems(prev => [...prev, ...itemsWithAds]);
             setCurrentBatch(prev => prev + 1);
           } else if (itemBatch.length > 0) {
             // If all were duplicates (unlikely with high entropy IDs), try one more time
@@ -263,11 +292,18 @@ const renderCardContent = (item: FeedItem, isActive: boolean) => {
         case 'challenge':
           return <ChallengeCard item={item as any} isActive={isActive} />;
         case 'debate':
-          return <DebateCard item={item as any} isActive={isActive} />;
+            return <DebateCard item={item as any} isActive={isActive} />;
         case 'media':
-          return <MediaCard item={item as MediaFeedItem} isActive={isActive} onSwipe={handleSwipe} onFeedback={handleFeedback} />;
+            return <MediaCard item={item as MediaFeedItem} isActive={isActive} onSwipe={handleSwipe} onFeedback={handleFeedback} />;
+        case 'ad':
+            return <AdCard 
+              adClient={(item as AdFeedItem).adClient} 
+              adSlot={(item as AdFeedItem).adSlot} 
+              onSkip={() => handleSwipe(item.id, 'skip')} 
+            />;
         default:
-          return null;
+            return null;
+
       }
     };
 

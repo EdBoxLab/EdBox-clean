@@ -89,6 +89,7 @@ function StudyKitContent() {
     const [studyKits, setStudyKits] = useState<any[]>([]);
     const [isLoadingKits, setIsLoadingKits] = useState(false);
     const [user, setUser] = useState<any>(null);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     // Quiz State moved to top level
     const [currentQuizStates, setCurrentQuizStates] = useState<any[]>([]);
@@ -161,7 +162,7 @@ function StudyKitContent() {
         }
     };
 
-    const normalizeContent = (content: any) => {
+    const normalizeContent = (content: any, requestedTypes: string[] = []) => {
         console.log('🔍 Starting normalization with:', JSON.stringify(content, null, 2));
 
         const parseIfString = (data: any) => {
@@ -200,6 +201,13 @@ function StudyKitContent() {
 
         const normalized: any = {};
 
+        // Initialize all requested types with default values to prevent validation failures
+        requestedTypes.forEach(typeId => {
+            if (typeId === 'quizzes' || typeId === 'flashcards') normalized[typeId] = [];
+            else if (typeId === 'notes') normalized[typeId] = '';
+            else if (typeId === 'mindmaps') normalized[typeId] = { central: 'Topic', branches: [] };
+        });
+
         // Normalize quizzes
         if (content.quizzes) {
             const parsed = parseIfString(content.quizzes);
@@ -209,9 +217,12 @@ function StudyKitContent() {
                 normalized.quizzes = parsed;
             } else if (parsed.questions && Array.isArray(parsed.questions)) {
                 normalized.quizzes = parsed.questions;
-            } else {
-                console.error('❌ Unexpected quizzes format:', parsed);
-                normalized.quizzes = [];
+            } else if (typeof parsed === 'object') {
+                // Handle case where AI returns an object with a property that is an array
+                const arrayKey = Object.keys(parsed).find(key => Array.isArray(parsed[key]));
+                if (arrayKey) {
+                    normalized.quizzes = parsed[arrayKey];
+                }
             }
         }
 
@@ -314,7 +325,7 @@ function StudyKitContent() {
             if (data.studyKit) {
                 const kit = data.studyKit;
                 setStudyKit(kit);
-                const normalized = normalizeContent(kit.generated_content);
+                const normalized = normalizeContent(kit.generated_content, kit.content_types || []);
                 console.log('Normalized content:', normalized);
                 setGeneratedContent(normalized);
                 setSelectedTypes(kit.content_types || []);
@@ -353,6 +364,15 @@ function StudyKitContent() {
                 return;
             }
             setUploadedFile(file);
+        }
+        if (e.target) {
+            e.target.value = '';
+        }
+    };
+
+    const handleBrowseClick = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.click();
         }
     };
 
@@ -411,7 +431,7 @@ function StudyKitContent() {
 
             if (data.success) {
                 console.log('Raw API response:', data.content);
-                const normalized = normalizeContent(data.content);
+                const normalized = normalizeContent(data.content, selectedTypes);
                 console.log('After normalization in handleGenerate:', normalized);
 
                 // Track study kit generation event
@@ -614,15 +634,22 @@ function StudyKitContent() {
                                             <Upload className="w-12 h-12 text-zinc-500 mx-auto mb-4" />
                                             <p className="text-zinc-400 mb-2">Drag & drop your file here</p>
                                             <p className="text-sm text-zinc-500 mb-4">Supports PDF, PPTX, DOCX, images • Max 10MB</p>
-                                            <label className="inline-block px-6 py-2 border border-zinc-700 hover:border-indigo-500 rounded-lg cursor-pointer transition">
-                                                <span className="text-zinc-300">Browse Files</span>
-                                                <input
-                                                    type="file"
-                                                    onChange={handleFileChange}
-                                                    accept=".pdf,.pptx,.ppt,.docx,.doc,.jpg,.jpeg,.png,.gif,.bmp,.webp,.txt,.md,.csv"
-                                                    className="hidden"
-                                                />
-                                            </label>
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                multiple={false}
+                                                onChange={handleFileChange}
+                                                accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.md,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,image/*"
+                                                className="hidden"
+                                                aria-label="Upload file"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleBrowseClick}
+                                                className="inline-block px-6 py-2 border border-zinc-700 hover:border-indigo-500 rounded-lg cursor-pointer transition text-zinc-300"
+                                            >
+                                                Browse Files
+                                            </button>
                                         </>
                                     )}
                                 </div>
@@ -734,40 +761,26 @@ function StudyKitContent() {
                         </div>
                     </div>
                 ) : generatedContent ? (
-                    // Generated Results View
                     <div className="space-y-6">
-                        {/* Only render if generatedContent is properly normalized */}
+                        {/* Generated Results View */}
+                        {/* Success message if some failed but others succeeded */}
                         {(() => {
-                            // Safety check - ensure content types are properly formatted
-                            const hasValidData = selectedTypes.every(typeId => {
-                                const data = generatedContent[typeId];
+                            const requestedCount = selectedTypes.length;
+                            const actualCount = Object.keys(generatedContent).filter(k => {
+                                const data = generatedContent[k];
                                 if (!data) return false;
-
-                                // For arrays, check they're actually arrays
-                                if (typeId === 'quizzes' || typeId === 'flashcards') {
-                                    return Array.isArray(data);
-                                }
-
-                                // For notes and mindmaps, any truthy value is ok
+                                if (Array.isArray(data)) return data.length > 0;
                                 return true;
-                            });
+                            }).length;
 
-                            if (!hasValidData) {
-                                console.error('Invalid data detected:', generatedContent);
+                            if (actualCount > 0 && actualCount < requestedCount) {
                                 return (
-                                    <div className="p-8 bg-zinc-900 rounded-xl text-center">
-                                        <p className="text-zinc-400 mb-4">Data validation failed. Please try regenerating.</p>
-                                        <button
-                                            onClick={() => setGeneratedContent(null)}
-                                            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-lg transition"
-                                        >
-                                            Try Again
-                                        </button>
+                                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-yellow-200 text-sm mb-4">
+                                        Note: Some content types couldn't be generated perfectly and were skipped.
                                     </div>
                                 );
                             }
-
-                            return null; // Data is valid, continue rendering
+                            return null;
                         })()}
 
                         {/* Tabs */}

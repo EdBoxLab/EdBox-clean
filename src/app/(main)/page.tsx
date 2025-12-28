@@ -181,7 +181,7 @@ const Dashboard: React.FC = () => {
   }
   
   if (!profile || !profile.onboarding_completed) {
-    return <OnboardingForm />;
+    return <OnboardingForm onComplete={(newProfile) => setProfile(newProfile)} />;
   }
 
   const cardVariants: Variants = {

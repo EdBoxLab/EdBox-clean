@@ -10,7 +10,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 import Select from 'react-select';
 import countryList from 'react-select-country-list';
 
-export default function OnboardingForm() {
+export default function OnboardingForm({ onComplete }: { onComplete?: (profile: any) => void }) {
   const supabase = createSupabaseBrowserClient();
   const router = useRouter();
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -153,17 +153,25 @@ if (result.error) {
             goal: formData.goal,
           });
 
-          // Update user properties in PostHog
-          posthog.identify(user.id, {
-            country: formData.country,
-            education: formData.education,
-            interests: formData.interests,
-            goal: formData.goal,
-          });
+            // Update user properties in PostHog
+            posthog.identify(user.id, {
+              country: formData.country,
+              education: formData.education,
+              interests: formData.interests,
+              goal: formData.goal,
+            });
 
-          router.push('/');
-          router.refresh();
-        }
+            if (onComplete) {
+              onComplete({ ...profileData, id: user.id });
+            } else {
+              router.push('/');
+              router.refresh();
+              // Fallback to hard refresh if navigation doesn't trigger update
+              setTimeout(() => {
+                window.location.href = '/';
+              }, 500);
+            }
+          }
     } catch (err) {
       console.error('Unexpected error:', err);
       alert('An unexpected error occurred. Please try again.');

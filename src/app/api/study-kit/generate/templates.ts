@@ -1,5 +1,5 @@
 export const QUIZ_TEMPLATE = `
-Generate 20 high-quality multiple-choice questions.
+Generate 15 high-quality multiple-choice questions.
 
 CRITICAL REQUIREMENTS:
 - correctAnswer MUST be 0, 1, 2, or 3 (NOT 1-4!)
@@ -7,6 +7,13 @@ CRITICAL REQUIREMENTS:
 - 1 = second option  
 - 2 = third option
 - 3 = fourth option
+
+IMPORTANT FOR MATH/SCIENCE TOPICS:
+- Write mathematical expressions in plain text (e.g., "x^2 + 2x + 1" instead of LaTeX)
+- Use words for operations when clearer (e.g., "the square root of 16" or "sqrt(16)")
+- Avoid special Unicode math symbols that may break JSON
+- For fractions, use "/" notation (e.g., "3/4" or "three-fourths")
+- Keep all text ASCII-safe
 
 Output format (ONLY JSON, no other text):
 [

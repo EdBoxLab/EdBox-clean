@@ -6,43 +6,105 @@ import { processFileContent } from '@/lib/utils/fileProcessing';
 
 type ContentType = 'quizzes' | 'flashcards' | 'mindmaps' | 'notes';
 
+function sanitizeMathText(text: string): string {
+  if (typeof text !== 'string') return String(text || '');
+  return text
+    .replace(/[\u2200-\u22FF]/g, (char) => {
+      const mathMap: Record<string, string> = {
+        '\u221A': 'sqrt', '\u00B2': '^2', '\u00B3': '^3', '\u00B9': '^1',
+        '\u2264': '<=', '\u2265': '>=', '\u2260': '!=', '\u00D7': '*',
+        '\u00F7': '/', '\u03C0': 'pi', '\u221E': 'infinity',
+      };
+      return mathMap[char] || char;
+    })
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function extractJSON(text: string, type: ContentType) {
   try {
     let cleaned = text.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '');
     
+    // Preliminary cleaning to handle common AI JSON artifacts
+    cleaned = cleaned
+      .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+      .replace(/\\n/g, ' ')           // Convert escaped newlines to spaces
+      .replace(/\r?\n/g, ' ');        // Convert actual newlines to spaces
+    
+    // Find the actual JSON structure
     const start = cleaned.indexOf(type === 'mindmaps' ? '{' : '[');
     const end = cleaned.lastIndexOf(type === 'mindmaps' ? '}' : ']');
     
-    if (start === -1 || end === -1) throw new Error('No JSON found');
+    if (start === -1 || end === -1) {
+      // Fallback: if we're looking for an array but found an object (common AI mistake)
+      if (type !== 'mindmaps') {
+        const altStart = cleaned.indexOf('{');
+        const altEnd = cleaned.lastIndexOf('}');
+        if (altStart !== -1 && altEnd !== -1) {
+          const possibleObj = cleaned.substring(altStart, altEnd + 1);
+          try {
+            const parsedObj = JSON.parse(possibleObj);
+            // If it has a property that looks like our array, use that
+            const arrayKey = Object.keys(parsedObj).find(key => Array.isArray(parsedObj[key]));
+            if (arrayKey) return parsedObj[arrayKey];
+          } catch (e) { /* ignore and throw original error */ }
+        }
+      }
+      throw new Error('No valid JSON structure found in AI response');
+    }
     
-    cleaned = cleaned.substring(start, end + 1).replace(/,\s*([}\]])/g, '$1');
+    cleaned = cleaned.substring(start, end + 1);
     
-    const parsed = JSON.parse(cleaned);
+    // Remove trailing commas before closing brackets/braces
+    cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
+    
+    let parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (parseError) {
+      // More aggressive cleaning for math-heavy content
+      cleaned = cleaned
+        // Escape all backslashes that aren't already escaping a quote or backslash
+        // This is crucial for LaTeX/Math symbols like \sqrt, \frac, etc.
+        .replace(/\\(?!"|\\)/g, '\\\\')
+        // Remove any remaining control characters
+        .replace(/[\u0000-\u001F]/g, '');
+      
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch (secondError) {
+        console.error(`❌ Second JSON parse attempt failed for ${type}:`, secondError);
+        // Last ditch effort: try to fix missing quotes around keys or other common issues
+        // but for now, we'll throw to trigger retry or failure
+        throw secondError;
+      }
+    }
     
     if (type === 'quizzes' && Array.isArray(parsed)) {
       return parsed.map((q, i) => ({
-        question: String(q.question || `Question ${i + 1}`),
-        options: Array.isArray(q.options) && q.options.length === 4 
-          ? q.options.map(String)
+        question: sanitizeMathText(q.question || `Question ${i + 1}`),
+        options: Array.isArray(q.options) && q.options.length >= 2
+          ? q.options.slice(0, 4).map((opt: any) => sanitizeMathText(opt))
           : ['Option A', 'Option B', 'Option C', 'Option D'],
         correctAnswer: typeof q.correctAnswer === 'number' && q.correctAnswer >= 0 && q.correctAnswer <= 3
           ? q.correctAnswer
-          : (typeof q.correctAnswer === 'string' ? parseInt(q.correctAnswer) : 0),
-        explanation: String(q.explanation || 'No explanation provided.'),
+          : (typeof q.correctAnswer === 'string' ? Math.min(3, Math.max(0, parseInt(q.correctAnswer) || 0)) : 0),
+        explanation: sanitizeMathText(q.explanation || 'No explanation provided.'),
         difficulty: ['Easy', 'Medium', 'Hard'].includes(q.difficulty) ? q.difficulty : 'Medium',
       }));
     }
     
     if (type === 'flashcards' && Array.isArray(parsed)) {
       return parsed.filter(c => c.front && c.back).map(c => ({
-        front: String(c.front),
-        back: String(c.back),
-        hint: String(c.hint || ''),
+        front: sanitizeMathText(c.front),
+        back: sanitizeMathText(c.back),
+        hint: sanitizeMathText(c.hint || ''),
       }));
     }
     
     return parsed;
   } catch (error) {
+    console.error(`❌ JSON extraction failed for ${type}:`, error, 'Raw text sample:', text.substring(0, 500));
     throw new Error(`Failed to parse ${type}: ${error}`);
   }
 }
@@ -103,12 +165,12 @@ export async function POST(request: NextRequest) {
 
     const results = await Promise.allSettled(
       contentTypes.map(async (type: ContentType) => {
-        const result = await generateWithRetry({
-          prompt: buildPrompt(type, finalPrompt),
-          systemPrompt: 'Output ONLY valid JSON with no extra text.',
-          temperature: 0.7,
-          maxTokens: type === 'notes' ? 3000 : 2000,
-        });
+          const result = await generateWithRetry({
+            prompt: buildPrompt(type, finalPrompt),
+            systemPrompt: 'Output ONLY valid JSON with no extra text.',
+            temperature: 0.7,
+            maxTokens: type === 'notes' ? 3000 : 4000,
+          });
 
         const output = type === 'notes' ? result.text : extractJSON(result.text, type);
         return { type, content: output };

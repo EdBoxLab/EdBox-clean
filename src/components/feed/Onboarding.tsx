@@ -40,13 +40,13 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center p-6 relative overflow-y-auto overscroll-contain py-12 scroll-smooth">
             {/* Stunning Background Effects */}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(139,92,246,0.2),transparent_70%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_0%_100%,rgba(59,130,246,0.1),transparent_60%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_100%,rgba(236,72,153,0.1),transparent_60%)]" />
 
-            <div className="max-w-xl w-full space-y-12 z-10">
+            <div className="max-w-xl w-full space-y-12 z-10 my-auto">
                 <div className="text-center space-y-4">
                     <motion.div
                         initial={{ scale: 0.5, opacity: 0 }}

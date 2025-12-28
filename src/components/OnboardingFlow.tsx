@@ -46,7 +46,7 @@ export const OnboardingFlow = () => {
     };
 
     return (
-        <div className="w-full max-w-2xl mx-auto p-6">
+        <div className="w-full max-w-2xl mx-auto p-6 overflow-y-auto overscroll-contain">
             <AnimatePresence mode="wait">
 
                 {/* STEP 1: WELCOME */}

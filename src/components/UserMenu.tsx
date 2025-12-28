@@ -18,86 +18,88 @@ import { Share2, Copy, Check, HelpCircle } from 'lucide-react';
 
 type User = Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'];
 
-export function UserMenu() {
-  const [user, setUser] = useState<User | null>(null);
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const router = useRouter();
-
-    useEffect(() => {
-      const { data: authListener } = supabase.auth.onAuthStateChange(
-        (event: AuthChangeEvent, session: Session | null) => {
-          setUser(session?.user ?? null);
-        }
-      );
-
-
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
+  export function UserMenu({ isMobileHeader }: { isMobileHeader?: boolean }) {
+    const [user, setUser] = useState<User | null>(null);
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [copied, setCopied] = useState(false);
+    const router = useRouter();
+  
+      useEffect(() => {
+        const { data: authListener } = supabase.auth.onAuthStateChange(
+          (event: AuthChangeEvent, session: Session | null) => {
+            setUser(session?.user ?? null);
+          }
+        );
+  
+  
+      const fetchUser = async () => {
+        const { data } = await supabase.auth.getUser();
+        setUser(data.user);
+      }
+      fetchUser();
+  
+      return () => {
+        authListener.subscription.unsubscribe();
+      };
+    }, []);
+  
+    const handleLogout = async () => {
+      await supabase.auth.signOut();
+      router.push('/');
+      setUser(null);
+      router.refresh();
+    };
+  
+    const handleLogin = () => {
+      router.push('/login');
+    };
+  
+    const handleCopyLink = () => {
+      const shareUrl = window.location.origin;
+      navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    };
+  
+    const handleShare = (platform: string) => {
+      const shareUrl = window.location.origin;
+      const shareText = 'Check out EdBox - Your AI-Powered Learning Platform!';
+  
+      const urls: Record<string, string> = {
+        whatsapp: `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`,
+        twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
+        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
+        linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`,
+      };
+  
+      window.open(urls[platform], '_blank', 'width=600,height=400');
+    };
+  
+    if (!user) {
+      return <Button onClick={handleLogin}>Login</Button>;
     }
-    fetchUser();
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
-    setUser(null);
-    router.refresh();
-  };
-
-  const handleLogin = () => {
-    router.push('/login');
-  };
-
-  const handleCopyLink = () => {
-    const shareUrl = window.location.origin;
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleShare = (platform: string) => {
-    const shareUrl = window.location.origin;
-    const shareText = 'Check out EdBox - Your AI-Powered Learning Platform!';
-
-    const urls: Record<string, string> = {
-      whatsapp: `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`,
-      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
-      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`,
-    };
-
-    window.open(urls[platform], '_blank', 'width=600,height=400');
-  };
-
-  if (!user) {
-    return <Button onClick={handleLogin}>Login</Button>;
-  }
-
-    return (
-      <>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild data-tour="step-user">
-            <button className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-accent transition-colors text-left min-w-0">
-              <div className="shrink-0">
-                <UserAvatar user={user} />
-              </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-foreground truncate leading-none mb-1">
-                {user.email?.split('@')[0]}
-              </div>
-              <div className="text-[10px] text-muted-foreground truncate leading-none">
-                {user.email}
-              </div>
-            </div>
-          </button>
-        </DropdownMenuTrigger>
+  
+      return (
+        <>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild data-tour={isMobileHeader ? "step-user-mobile-trigger" : "step-user"}>
+              <button className={`${isMobileHeader ? 'p-1' : 'w-full flex items-center gap-2.5 px-2 py-1.5'} rounded-lg hover:bg-accent transition-colors text-left min-w-0`}>
+                <div className="shrink-0">
+                  <UserAvatar user={user} />
+                </div>
+  
+              {!isMobileHeader && (
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-foreground truncate leading-none mb-1">
+                    {user.email?.split('@')[0]}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground truncate leading-none">
+                    {user.email}
+                  </div>
+                </div>
+              )}
+            </button>
+          </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56 bg-card border-border">
           <DropdownMenuLabel className="text-foreground">{user.email}</DropdownMenuLabel>
           <DropdownMenuSeparator className="bg-border" />

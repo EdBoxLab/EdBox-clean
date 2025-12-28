@@ -187,19 +187,19 @@ if (result.error) {
   };
 
   return (
-    // ✅ FIXED: Removed overflow-hidden from parent
-    <div className="fixed inset-0 bg-gradient-to-br from-zinc-950 via-indigo-950 to-zinc-950 flex items-center justify-center p-4">
+    // ✅ FIXED: Better scroll handling for mobile
+    <div className="fixed inset-0 bg-gradient-to-br from-zinc-950 via-indigo-950 to-zinc-950 flex flex-col items-center p-4 overflow-y-auto overscroll-contain scroll-smooth z-[100]">
       {/* Animated background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
         <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-indigo-500/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
 
-      {/* ✅ FIXED: Proper scroll container structure */}
+      {/* ✅ FIXED: Proper scroll container structure - removed max-h and added my-auto for centering */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative w-full max-w-2xl max-h-[90vh] bg-zinc-900/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-zinc-800/50 flex flex-col"
+        className="relative w-full max-w-2xl bg-zinc-900/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-zinc-800/50 flex flex-col my-auto shrink-0 mb-8"
       >
         {/* Progress bar - Fixed position */}
         <div className="h-1.5 bg-zinc-800 flex-shrink-0">

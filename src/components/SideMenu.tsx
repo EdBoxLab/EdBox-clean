@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -32,6 +32,32 @@ const SideMenu = () => {
   const pathname = usePathname();
   const router = useRouter();
 
+  // Handle body scroll lock
+  useEffect(() => {
+    if (sidebarOpen) {
+      const scrollY = window.scrollY;
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.overflowY = 'hidden';
+    } else {
+      const scrollY = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflowY = '';
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
+    }
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflowY = '';
+    };
+  }, [sidebarOpen]);
+
   return (
     <>
       {/* Mobile Sidebar Overlay */}
@@ -49,33 +75,36 @@ const SideMenu = () => {
           flex flex-col transition-transform duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
+        style={{ overscrollBehavior: 'contain' }}
       >
-          {/* Header/Logo */}
-          <div className="h-16 flex items-center px-6 border-b border-zinc-800 bg-zinc-950" data-tour="step-1">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-purple-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20">
-                E
-              </div>
-              <span className="text-xl font-bold tracking-tight text-white">
-                EdBox
-              </span>
+        {/* Header/Logo - Fixed */}
+        <div className="h-16 flex items-center px-6 border-b border-zinc-800 bg-zinc-950 shrink-0" data-tour="step-1">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-purple-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20">
+              E
             </div>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="ml-auto lg:hidden text-gray-400 hover:text-white"
-            >
-              <X size={20} />
-            </button>
+            <span className="text-xl font-bold tracking-tight text-white">
+              EdBox
+            </span>
           </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="ml-auto lg:hidden text-gray-400 hover:text-white"
+          >
+            <X size={20} />
+          </button>
+        </div>
 
-        {/* Navigation Items */}
-            <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-              {/* Streak/XP Display */}
-              <div className="mb-4 px-1">
-                <StreakXPDisplay />
-              </div>
-              
-              {NAV_ITEMS.map((item, index) => {
+        {/* Scrollable Container for everything else */}
+        <div className="flex-1 overflow-y-auto flex flex-col min-h-0 custom-scrollbar">
+          {/* Navigation Items */}
+          <nav className="p-4 space-y-1">
+            {/* Streak/XP Display */}
+            <div className="mb-4 px-1">
+              <StreakXPDisplay />
+            </div>
+            
+            {NAV_ITEMS.map((item, index) => {
               const isActive = pathname === item.href;
               return (
                 <Link
@@ -97,73 +126,83 @@ const SideMenu = () => {
             })}
           </nav>
 
+          {/* Bottom sections pushed to end of scrollable area */}
+          <div className="mt-auto">
+            {/* Contact Support Button */}
+            <div className="p-4 border-t border-zinc-800">
+              <button
+                onClick={() => setShowSupport(true)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-zinc-800/50 hover:text-white border border-zinc-800 transition-all duration-200"
+              >
+                <MessageCircle size={18} />
+                <span>Contact Support</span>
+              </button>
+            </div>
 
-        {/* Contact Support Button */}
-        <div className="p-4 border-t border-zinc-800">
-          <button
-            onClick={() => setShowSupport(true)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-zinc-800/50 hover:text-white border border-zinc-800 transition-all duration-200"
-          >
-            <MessageCircle size={18} />
-            <span>Contact Support</span>
-          </button>
-        </div>
+            {/* User Menu */}
+            <div className="p-4 border-t border-zinc-800 bg-zinc-950">
+              <UserMenu />
+            </div>
 
-        {/* User Menu */}
-        <div className="p-4 border-t border-zinc-800 mt-auto bg-zinc-950">
-          <UserMenu />
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-zinc-800 bg-zinc-950">
-          <p className="text-xs text-gray-500 text-center">&copy; {new Date().getFullYear()} EdBox</p>
+            {/* Footer */}
+            <div className="p-4 border-t border-zinc-800 bg-zinc-950">
+              <p className="text-xs text-gray-500 text-center">&copy; {new Date().getFullYear()} EdBox</p>
+            </div>
+          </div>
         </div>
       </aside>
 
       {/* Mobile Header */}
-      <header className="lg:hidden h-16 bg-zinc-950 border-b border-zinc-800 flex items-center px-4 shrink-0 sticky top-0 z-30">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-gray-400 hover:text-white p-1"
-          >
-            <Menu size={24} />
-          </button>
-          {pathname !== '/' && (
+        <header className="lg:hidden h-16 bg-zinc-950 border-b border-zinc-800 flex items-center justify-between px-4 shrink-0 sticky top-0 z-30">
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => router.back()}
-              className="text-indigo-400 hover:text-indigo-300 p-1 flex items-center justify-center bg-zinc-800/50 rounded-lg border border-zinc-800"
-              aria-label="Go back"
+              onClick={() => setSidebarOpen(true)}
+              className="text-gray-400 hover:text-white p-1"
             >
-              <ArrowLeft size={20} />
+              <Menu size={24} />
             </button>
-          )}
-        </div>
-        <span className="font-semibold text-white ml-2">EdBox</span>
-      </header>
+            {pathname !== '/' && (
+              <button
+                onClick={() => router.back()}
+                className="text-indigo-400 hover:text-indigo-300 p-1 flex items-center justify-center bg-zinc-800/50 rounded-lg border border-zinc-800"
+                aria-label="Go back"
+              >
+                <ArrowLeft size={20} />
+              </button>
+            )}
+            <span className="font-semibold text-white ml-2" data-tour="step-1-mobile">EdBox</span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <div data-tour="step-user-mobile">
+              <UserMenu isMobileHeader />
+            </div>
+          </div>
+        </header>
 
-      {/* Mobile Bottom Navigation - Icons Only */}
-      <nav className="fixed bottom-0 inset-x-0 z-50 bg-zinc-950/95 backdrop-blur border-t border-zinc-800 lg:hidden">
-        <ul className="flex justify-around items-center py-2">
-          {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  aria-label={item.label}
-                  className={`flex flex-col items-center justify-center px-3 py-2 rounded-md transition-colors ${
-                    isActive ? 'text-indigo-400' : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <item.icon size={24} strokeWidth={isActive ? 2.5 : 2} />
-                  <span className="text-[10px] mt-1">{item.label}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+        {/* Mobile Bottom Navigation - Icons Only */}
+        <nav className="fixed bottom-0 inset-x-0 z-50 bg-zinc-950/95 backdrop-blur border-t border-zinc-800 lg:hidden">
+          <ul className="flex justify-around items-center py-2">
+            {NAV_ITEMS.map((item, index) => {
+              const isActive = pathname === item.href;
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    aria-label={item.label}
+                    data-tour={`step-${index + 2}-mobile`}
+                    className={`flex flex-col items-center justify-center px-3 py-2 rounded-md transition-colors ${
+                      isActive ? 'text-indigo-400' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <item.icon size={24} strokeWidth={isActive ? 2.5 : 2} />
+                    <span className="text-[10px] mt-1">{item.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
 
       {showSupport && (
         <ContactSupport onClose={() => setShowSupport(false)} />

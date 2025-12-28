@@ -9,7 +9,7 @@ export type FeedItemType = 'video' | 'story' | 'infographic' | 'quiz' | 'article
 
 export type GenieReaction = 'cheer' | 'wink' | 'hint' | 'hype' | 'default' | 'sad';
 export type Theme = 'purple-gradient' | 'blue-gradient' | 'green-gradient' | 'orange-gradient' | 'red-gradient' | 'cyan-gradient' | 'rose-gradient';
-export type Feedback = 'like' | 'dislike';
+export type Feedback = 'like' | 'dislike' | 'save';
 export type LoadingState = 'idle' | 'loading' | 'complete' | 'error';
 export type ImageGenerationState = 'pending' | 'generating' | 'ready' | 'error';
 export type AudioGenerationState = 'idle' | 'generating' | 'ready' | 'error' | 'playing' | 'paused';
@@ -27,6 +27,7 @@ export interface BaseFeedItem {
   shares: number;
   comments: Comment[];
   feedback?: Feedback | null;
+  isSavedByUser?: boolean;
   courseReference?: string;
   imageUrl?: string;
   imageGenerationState?: ImageGenerationState;

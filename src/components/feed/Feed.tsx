@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import type { FeedItem, InsightFeedItem, StoryFeedItem, QuizFeedItem, FactFeedItem, PollFeedItem, MediaFeedItem, Feedback, UserPreferences, AudioGenerationState, AdFeedItem } from '@/types/feed';
 import { generateFeedBatch, persistFeedItems, trackInteraction } from '@/services/feedService';
 import { CardWrapper } from './CardWrapper';
@@ -17,7 +18,7 @@ import { DebateCard } from './DebateCard';
 import { MediaCard } from './MediaCard';
 import { AdCard } from './AdCard';
 import { SkeletonCard } from './SkeletonCard';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/client';
 import { XPStreakDisplay } from '@/components/XPStreakDisplay';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -65,36 +66,34 @@ const FeedAnimations = () => (
     const [viewedTypes, setViewedTypes] = useState<Set<string>>(new Set());
     const [currentBatch, setCurrentBatch] = useState(0);
     const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
+    const [savedItemIds, setSavedItemIds] = useState<Set<string>>(new Set());
   
     const feedRef = useRef<HTMLDivElement>(null);
+    const searchParams = useSearchParams();
+    const targetId = searchParams.get('id');
+
     const observer = useRef<IntersectionObserver | null>(null);
+    const lastLoadRef = useRef(0);
     const processingRef = useRef(false);
-    const lastLoadRef = useRef<number>(0);
-    const supabase = createSupabaseBrowserClient();
 
-    // Clear stale cache on mount - fresh content every session
+    // Fetch user's saved items on mount
     useEffect(() => {
-      localStorage.removeItem('feed_seen_ids');
-      localStorage.removeItem('feed_seen_titles');
-      localStorage.removeItem('feed_liked_topics');
-      setSeenIds(new Set());
-      setSeenTitles(new Set());
-      setLikedTopics([]);
-    }, []);
+      const fetchSavedStatus = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data } = await supabase
+            .from('saved_feed_items')
+            .select('feed_item_id')
+            .eq('user_id', user.id);
+          
+          if (data) {
+            setSavedItemIds(new Set(data.map(d => d.feed_item_id)));
+          }
+        }
+      };
+      fetchSavedStatus();
+    }, [supabase]);
 
-    // Save history to localStorage whenever it changes
-    useEffect(() => {
-      localStorage.setItem('feed_liked_topics', JSON.stringify(likedTopics));
-    }, [likedTopics]);
-
-    useEffect(() => {
-      localStorage.setItem('feed_seen_ids', JSON.stringify(Array.from(seenIds)));
-    }, [seenIds]);
-
-    useEffect(() => {
-      localStorage.setItem('feed_seen_titles', JSON.stringify(Array.from(seenTitles)));
-    }, [seenTitles]);
-  
     const loadMoreItems = useCallback(async (initial = false) => {
       const now = Date.now();
       if (now - lastLoadRef.current < 3000) return; // Reduced throttle for better UX
@@ -107,6 +106,21 @@ const FeedAnimations = () => (
       try {
         const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: undefined } }));
         
+        let initialItems: FeedItem[] = [];
+
+        // Handle deep linking for shared content
+        if (initial && targetId) {
+          const { data: sharedItem } = await supabase
+            .from('feed_items_history')
+            .select('content')
+            .eq('id', targetId)
+            .single();
+          
+          if (sharedItem?.content) {
+            initialItems.push(sharedItem.content as FeedItem);
+          }
+        }
+
         // Always pass all seen titles to ensure the AI NEVER repeats them
         const currentSeenTitles = Array.from(seenTitles);
         const currentSeenIds = Array.from(seenIds);
@@ -121,16 +135,18 @@ const FeedAnimations = () => (
         
         // STRICT FRONTEND FILTERING: Ensure no duplicates ever slip through
         const uniqueNewItems = itemBatch.filter(newItem => {
-          const isIdSeen = seenIds.has(newItem.id);
+          const isIdSeen = seenIds.has(newItem.id) || (initial && targetId === newItem.id);
           const isTitleSeen = currentSeenTitles.some(t => t.toLowerCase() === newItem.title.toLowerCase());
           return !isIdSeen && !isTitleSeen;
         });
+
+        const combinedItems = [...initialItems, ...uniqueNewItems];
 
         // Inject Ad every 12 cards
         const itemsWithAds: FeedItem[] = [];
         let globalIndex = items.length;
         
-        uniqueNewItems.forEach((item) => {
+        combinedItems.forEach((item) => {
           itemsWithAds.push(item);
           globalIndex++;
           if (globalIndex % 12 === 0) {
@@ -154,18 +170,24 @@ const FeedAnimations = () => (
           }
         });
 
+        // Enrich items with saved status
+        const enrichedItems = itemsWithAds.map(item => ({
+          ...item,
+          isSavedByUser: savedItemIds.has(item.id)
+        }));
+
         if (initial) {
-          setItems(itemsWithAds);
+          setItems(enrichedItems);
           setCurrentBatch(1);
           setHasLoadedInitial(true);
-          if (itemsWithAds.length > 0) {
-            setActiveCardId(itemsWithAds[0].id);
+          if (enrichedItems.length > 0) {
+            setActiveCardId(enrichedItems[0].id);
             setActiveIndex(0);
             // Don't mark as seen immediately, wait for intersection
           }
         } else {
-          if (itemsWithAds.length > 0) {
-            setItems(prev => [...prev, ...itemsWithAds]);
+          if (enrichedItems.length > 0) {
+            setItems(prev => [...prev, ...enrichedItems]);
             setCurrentBatch(prev => prev + 1);
           } else if (itemBatch.length > 0) {
             // If all were duplicates (unlikely with high entropy IDs), try one more time
@@ -183,7 +205,7 @@ const FeedAnimations = () => (
         processingRef.current = false;
         setLoading(false);
       }
-    }, [preferences.interests, likedTopics, seenIds, seenTitles, supabase]);
+    }, [preferences.interests, likedTopics, seenIds, seenTitles, supabase, targetId, savedItemIds, items.length]);
   
     useEffect(() => {
       if (!hasLoadedInitial) loadMoreItems(true);
@@ -235,6 +257,15 @@ const FeedAnimations = () => (
   const handleFeedback = async (id: string, feedback: Feedback) => {
     const item = items.find(i => i.id === id);
     if (!item) return;
+
+    if (feedback === 'save') {
+      const isCurrentlySaved = item.isSavedByUser;
+      setItems(prev => prev.map(i => i.id === id ? { ...i, isSavedByUser: !isCurrentlySaved } : i));
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) await trackInteraction(user.id, id, 'save');
+      return;
+    }
 
     const newFeedback = item.feedback === feedback ? null : feedback;
     setItems(prev => prev.map(i => i.id === id ? { ...i, feedback: newFeedback } : i));

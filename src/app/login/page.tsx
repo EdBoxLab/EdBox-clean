@@ -111,21 +111,22 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    // Track OAuth login attempt
-    posthog.capture('user_logged_in', {
-      method: 'google',
-    });
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    if (error) {
-      setError(error.message);
-    }
-  };
+    const handleGoogleLogin = async () => {
+      // Track OAuth login attempt
+      posthog.capture('user_logged_in', {
+        method: 'google',
+      });
+      const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${baseUrl}/auth/callback`,
+        },
+      });
+      if (error) {
+        setError(error.message);
+      }
+    };
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-zinc-950 via-indigo-950 to-zinc-950 flex items-center justify-center p-4 overflow-hidden">

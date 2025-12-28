@@ -1,7 +1,7 @@
 import React from 'react';
 import type { FeedItem, Feedback } from '@/types/feed';
 import { ThumbsUpIcon, ShareIcon } from './MediaIcons';
-import { ArrowRight, Share2, ThumbsUp } from 'lucide-react';
+import { ArrowRight, Share2, ThumbsUp, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CardImage } from './CardImage';
 
@@ -15,10 +15,13 @@ interface CardWrapperProps {
 
 export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwipe, children, onFeedback }) => {
     const handleShare = async () => {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+        const shareUrl = `${baseUrl.replace(/\/$/, '')}/feed?id=${item.id}`;
+        
         const shareData = {
             title: item.title,
             text: `Check out this ${item.type} on EdBox: ${item.title}`,
-            url: window.location.href,
+            url: shareUrl,
         };
 
         if (navigator.share) {
@@ -37,7 +40,29 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
         }
     };
 
+    const handleSave = async () => {
+        // Optimistic UI update
+        onFeedback(item.id, 'save');
+        
+        try {
+            const response = await fetch('/api/feed/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    feed_item_id: item.id,
+                    feed_item_type: item.type,
+                    content: item
+                })
+            });
+            
+            if (!response.ok) throw new Error('Failed to save');
+        } catch (err) {
+            console.error('Error saving item:', err);
+        }
+    };
+
     const isLiked = item.feedback === 'like';
+    const isSaved = item.isSavedByUser;
     const isMediaType = item.type === 'media';
 
     return (
@@ -55,8 +80,8 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
                     imageUrl={item.imageUrl} 
                     altText={item.title} 
                 />
-                {/* Stronger gradient overlay for text readability */}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/20 to-black/95 z-10" />
+                {/* Stronger gradient overlay for text readability - Increased opacity on mobile */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-black/95 z-10 sm:from-black/60 sm:via-black/20 sm:to-black/95" />
                 {/* Subtle blur for better text contrast */}
                 <div className="absolute inset-0 backdrop-blur-[2px] z-10" />
             </div>
@@ -92,6 +117,26 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
                         <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Like</span>
                     </motion.div>
 
+                    {/* Save Button */}
+                    <motion.div 
+                        initial={false}
+                        animate={isActive ? { x: 0, opacity: 1 } : { x: 20, opacity: 0 }}
+                        transition={{ delay: 0.55 }}
+                        className="flex flex-col items-center gap-2 pointer-events-auto"
+                    >
+                        <button
+                            onClick={handleSave}
+                            className={`group relative p-3.5 sm:p-4 rounded-full backdrop-blur-2xl border transition-all duration-500 ${
+                                isSaved 
+                                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]' 
+                                    : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:border-white/20'
+                            }`}
+                        >
+                            <Bookmark className={`h-5 w-5 sm:h-6 sm:w-6 transition-transform duration-500 ${isSaved ? 'scale-110' : 'group-hover:scale-110'}`} fill={isSaved ? "currentColor" : "none"} />
+                        </button>
+                        <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Save</span>
+                    </motion.div>
+
                     <motion.div 
                         initial={false}
                         animate={isActive ? { x: 0, opacity: 1 } : { x: 20, opacity: 0 }}
@@ -116,7 +161,7 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
 
             {/* Bottom Section: Metadata & Actions - Only show if NOT media type */}
             {!isMediaType && (
-                <div className="absolute bottom-6 sm:bottom-10 left-6 sm:left-10 right-20 sm:right-24 z-30 pointer-events-none">
+                <div className="absolute bottom-20 sm:bottom-12 left-6 sm:left-10 right-20 sm:right-24 z-30 pointer-events-none">
                     <motion.div 
                         initial={false}
                         animate={isActive ? { y: 0, opacity: 1 } : { y: 20, opacity: 0 }}
@@ -124,14 +169,14 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({ item, isActive, onSwip
                         className="space-y-3"
                     >
                         {item.courseReference && (
-                            <div className="flex items-center gap-2 px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-full w-fit backdrop-blur-sm">
-                                <ArrowRight className="w-3 h-3 text-purple-400" />
-                                <span className="text-[9px] font-black text-purple-400 uppercase tracking-[0.15em]">Related to {item.courseReference}</span>
+                            <div className="flex items-center gap-2 px-3 py-1 bg-purple-500/20 border border-purple-500/30 rounded-full w-fit backdrop-blur-md">
+                                <ArrowRight className="w-3 h-3 text-purple-300" />
+                                <span className="text-[9px] font-black text-purple-300 uppercase tracking-[0.15em]">Related to {item.courseReference}</span>
                             </div>
                         )}
-                        <div className="space-y-1">
-                            <p className="font-black text-white text-base sm:text-lg tracking-tight drop-shadow-lg">@{item.topic.toLowerCase().replace(/\s+/g, '')}</p>
-                            <p className="text-sm sm:text-base text-white/90 font-medium leading-relaxed line-clamp-2 max-w-[90%] drop-shadow-md">{item.title}</p>
+                        <div className="space-y-1.5 p-5 rounded-2xl bg-black/60 backdrop-blur-md border border-white/10 sm:bg-transparent sm:backdrop-blur-none sm:border-none sm:p-0">
+                            <p className="font-black text-white text-base sm:text-lg tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">@{item.topic.toLowerCase().replace(/\s+/g, '')}</p>
+                            <p className="text-sm sm:text-base text-white/95 font-semibold leading-relaxed line-clamp-2 max-w-[90%] drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{item.title}</p>
                         </div>
                     </motion.div>
                 </div>

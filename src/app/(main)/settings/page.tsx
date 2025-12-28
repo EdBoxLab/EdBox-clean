@@ -386,7 +386,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 
   // Share Profile
   const handleShare = () => {
-    const url = `${window.location.origin}/profile/${user?.id}`;
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');
+    const url = `${baseUrl}/profile/${user?.id}`;
     setShareUrl(url);
     setShareDialogOpen(true);
   };

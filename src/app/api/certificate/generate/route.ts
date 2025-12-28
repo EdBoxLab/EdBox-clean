@@ -17,8 +17,9 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Skill graph ID required' }, { status: 400 });
         }
 
+        const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
         // Fetch competency data
-        const competencyResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/competency/track`, {
+        const competencyResponse = await fetch(`${baseUrl}/api/competency/track`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ skillGraphId }),
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
             totalSkills: competencyData.summary.totalSkills,
             overallMastery: competencyData.summary.overallMastery,
             issuedAt: new Date().toISOString(),
-            verificationUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/verify/${certificateId}`,
+            verificationUrl: `${baseUrl}/verify/${certificateId}`,
         };
 
         // Save certificate to database

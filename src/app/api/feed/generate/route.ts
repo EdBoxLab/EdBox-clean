@@ -352,6 +352,26 @@ export const POST = async (request: NextRequest) => {
 
         console.log(`✅ Returning ${uniqueItems.length} unique items`);
 
+        // Persist to history table for deep linking support
+        if (uniqueItems.length > 0) {
+            const historyItems = uniqueItems.map(item => ({
+                id: item.id,
+                type: item.type,
+                topic: item.topic,
+                title: item.title,
+                content: item
+            }));
+            
+            try {
+                const { error } = await supabase.from('feed_items_history').insert(historyItems);
+                if (error) {
+                    console.error('Failed to persist feed items to history:', error);
+                }
+            } catch (err) {
+                console.error('Exception while persisting feed items to history:', err);
+            }
+        }
+
         return NextResponse.json(uniqueItems);
 
     } catch (error: any) {

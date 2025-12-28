@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Feed from '@/components/feed/Feed';
 import Onboarding from '@/components/feed/Onboarding';
@@ -10,7 +10,7 @@ import { getUserPreferences, saveUserPreferences } from '@/services/userPreferen
 import { Loader2 } from 'lucide-react';
 import { NavigationTracker } from '@/components/NavigationTracker';
 
-export default function FeedPage() {
+function FeedPageContent() {
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
@@ -19,24 +19,19 @@ export default function FeedPage() {
   useEffect(() => {
     const checkAuthAndPreferences = async () => {
       try {
-        // Check if user is authenticated
         const { data: { user: currentUser } } = await supabase.auth.getUser();
 
         if (!currentUser) {
-          // Redirect to login if not authenticated
           router.push('/login');
           return;
         }
 
         setUser(currentUser);
-
-        // Fetch user preferences from Supabase
         const userPrefs = await getUserPreferences(currentUser.id);
 
         if (userPrefs && userPrefs.onboarded) {
           setPreferences(userPrefs);
         } else {
-          // User needs to complete onboarding
           setPreferences(null);
         }
       } catch (error) {
@@ -51,24 +46,20 @@ export default function FeedPage() {
 
   const handleOnboardingComplete = async (prefs: UserPreferences) => {
     if (!user) return;
-
-    // Save to Supabase
     const success = await saveUserPreferences(user.id, prefs);
-
     if (success) {
       setPreferences(prefs);
     } else {
       console.error('Failed to save preferences');
-      // Still set preferences locally so user can proceed
       setPreferences(prefs);
     }
   };
 
   if (loading) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-background">
-        <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
-        <h2 className="text-xl font-light tracking-wide text-muted-foreground">
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900">
+        <Loader2 className="w-12 h-12 animate-spin text-purple-500 mb-4" />
+        <h2 className="text-xl font-light tracking-wide text-white/50">
           Loading...
         </h2>
       </div>
@@ -83,5 +74,17 @@ export default function FeedPage() {
     <NavigationTracker title="Daily Feed">
       <Feed preferences={preferences} />
     </NavigationTracker>
+  );
+}
+
+export default function FeedPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900">
+        <Loader2 className="w-12 h-12 animate-spin text-purple-500 mb-4" />
+      </div>
+    }>
+      <FeedPageContent />
+    </Suspense>
   );
 }

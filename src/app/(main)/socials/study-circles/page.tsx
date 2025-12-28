@@ -51,9 +51,8 @@ const ShareCircleModal = ({ circle, onClose }: { circle: any; onClose: () => voi
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   
-  const shareLink = typeof window !== 'undefined' 
-    ? `${window.location.origin}/socials/study-circles?join=${circle.invite_code}` 
-    : '';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+  const shareLink = `${baseUrl.replace(/\/$/, '')}/socials/study-circles?join=${circle.invite_code}`;
 
   const copyLink = async () => {
     await navigator.clipboard.writeText(shareLink);

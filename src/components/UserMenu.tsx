@@ -54,15 +54,19 @@ type User = Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'];
       router.push('/login');
     };
   
+    const getBaseUrl = () => {
+      return (process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');
+    };
+
     const handleCopyLink = () => {
-      const shareUrl = window.location.origin;
+      const shareUrl = getBaseUrl();
       navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     };
   
     const handleShare = (platform: string) => {
-      const shareUrl = window.location.origin;
+      const shareUrl = getBaseUrl();
       const shareText = 'Check out EdBox - Your AI-Powered Learning Platform!';
   
       const urls: Record<string, string> = {
@@ -202,7 +206,7 @@ type User = Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'];
                 onClick={handleCopyLink}
                 className="w-full flex items-center justify-between p-3 bg-secondary hover:bg-accent border border-border rounded-lg transition-all group"
               >
-                <span className="text-foreground text-sm truncate">{window.location.origin}</span>
+                <span className="text-foreground text-sm truncate">{getBaseUrl()}</span>
                 {copied ? (
                   <Check className="w-5 h-5 text-green-500 flex-shrink-0 ml-2" />
                 ) : (

@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
             throw new Error('Failed to create share link');
         }
 
-        const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/shared/${shareToken}`;
+        const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+        const shareUrl = `${baseUrl}/shared/${shareToken}`;
 
         return NextResponse.json({
             success: true,

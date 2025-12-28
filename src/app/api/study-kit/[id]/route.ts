@@ -11,7 +11,7 @@ export async function GET(
 
         const { data: studyKit, error } = await supabase
             .from('study_kit_content')
-            .select('id, title, source_type, content_types, generated_content, created_at')
+            .select('id, title, source_type, content_types, generated_content, created_at, user_id')
             .eq('id', id)
             .single();
 

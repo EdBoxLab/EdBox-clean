@@ -4,44 +4,55 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
+import { useSubscription } from '@/lib/hooks/useSubscription';
+import { PlusCircle } from 'lucide-react';
 
 interface QuizOption {
-  question: string;
-  options: string[];
-  answer: string;
-  id: string;
+question: string;
+options: string[];
+answer: string;
+id: string;
 }
 
 export default function QuizForgePage() {
-  const [notes, setNotes] = useState('');
-  const [quiz, setQuiz] = useState<QuizOption[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
-  const [submitted, setSubmitted] = useState(false);
+const [notes, setNotes] = useState('');
+const [quiz, setQuiz] = useState<QuizOption[] | null>(null);
+const [loading, setLoading] = useState(false);
+const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
+const [submitted, setSubmitted] = useState(false);
+const { isPremium } = useSubscription();
 
-  const handleCreateQuiz = async () => {
-    setLoading(true);
-    setQuiz(null);
-    setSubmitted(false);
-    setSelectedAnswers({});
-    try {
-      const res = await fetch('/api/quiz-forge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes }),
-      });
-      const data = await res.json();
-      const formattedQuiz = data.questions.map((q: any, index: number) => ({
-        ...q,
-        id: `q-${index}`,
-      }));
-      setQuiz(formattedQuiz);
-    } catch (err) {
-      console.error('Error creating quiz:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+const handleCreateQuiz = async (isMore: boolean = false) => {
+setLoading(true);
+if (!isMore) {
+setQuiz(null);
+setSubmitted(false);
+setSelectedAnswers({});
+}
+try {
+const res = await fetch('/api/quiz-forge', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ notes, count: isMore ? 10 : undefined }),
+});
+const data = await res.json();
+const formattedQuiz = data.questions.map((q: any, index: number) => ({
+...q,
+id: `q-${(quiz?.length || 0) + index}`,
+}));
+
+if (isMore && quiz) {
+setQuiz([...quiz, ...formattedQuiz]);
+} else {
+setQuiz(formattedQuiz);
+}
+} catch (err) {
+console.error('Error creating quiz:', err);
+} finally {
+setLoading(false);
+}
+};
+
 
   const handleSelectAnswer = (questionId: string, option: string) => {
     if (submitted) return;
@@ -64,7 +75,7 @@ export default function QuizForgePage() {
       />
 
       <Button
-        onClick={handleCreateQuiz}
+        onClick={() => handleCreateQuiz()}
         disabled={loading || !notes.trim()}
         className="w-full border border-white text-white hover:bg-white hover:text-black transition-colors"
       >
@@ -105,13 +116,26 @@ export default function QuizForgePage() {
             ))}
 
             {!submitted && (
-              <Button
-                onClick={handleSubmit}
-                className="w-full border border-white text-white hover:bg-white hover:text-black transition-colors mt-4"
-              >
-                Submit Answers
-              </Button>
-            )}
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleSubmit}
+                    className="flex-grow border border-white text-white hover:bg-white hover:text-black transition-colors mt-4"
+                  >
+                    Submit Answers
+                  </Button>
+                  {isPremium && (
+                    <Button
+                      onClick={() => handleCreateQuiz(true)}
+                      disabled={loading}
+                      className="mt-4 border border-white text-white hover:bg-white hover:text-black"
+                      variant="outline"
+                    >
+                      <PlusCircle className="w-4 h-4 mr-2" /> More
+                    </Button>
+                  )}
+                </div>
+              )}
+
           </CardContent>
         </Card>
       )}

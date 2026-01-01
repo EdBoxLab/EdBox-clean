@@ -4,24 +4,32 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-    Brain, 
-    Zap, 
-    FileText, 
-    Map, 
-    Loader2, 
-    X, 
-    ArrowLeft, 
-    CheckCircle2, 
-    Library, 
-    Trash2, 
-    Upload 
+Brain, 
+Zap, 
+FileText, 
+Map, 
+Loader2, 
+X, 
+ArrowLeft, 
+CheckCircle2, 
+Library, 
+Trash2, 
+Upload,
+Info,
+Plus,
+Sparkles,
+Crown,
+Send
 } from 'lucide-react';
 import ShareButton from '@/components/ShareButton';
 import ShareModal, { useShareModal } from '@/components/ShareModal';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { useSubscription } from '@/lib/hooks/useSubscription';
 import posthog from 'posthog-js';
+import { Button } from '@/components/ui/button';
 
 const contentTypes = [
+
     { id: 'quizzes', label: 'Quizzes', icon: Brain, description: 'Multiple choice, true/false, and short answer' },
     { id: 'flashcards', label: 'Flashcards', icon: Zap, description: 'Front and back study cards' },
     { id: 'notes', label: 'Notes', icon: FileText, description: 'Structured summary notes' },
@@ -94,8 +102,14 @@ function StudyKitContent() {
     // Quiz State moved to top level
     const [currentQuizStates, setCurrentQuizStates] = useState<any[]>([]);
     const [score, setScore] = useState<{ correct: number, total: number } | null>(null);
+    
+    // Pro features state
+    const [isGeneratingMore, setIsGeneratingMore] = useState(false);
+    const [showNotesModal, setShowNotesModal] = useState(false);
+    const [notesSpecification, setNotesSpecification] = useState('');
 
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const { isPremium } = useSubscription();
 
     // Fetch specific study kit if ID is present
     useEffect(() => {
@@ -476,6 +490,61 @@ function StudyKitContent() {
         }
     };
 
+    const handleGenerateMore = async (contentType: 'quizzes' | 'flashcards' | 'notes', notesSpec?: string) => {
+        if (!studyKit?.id || !isPremium) return;
+        
+        setIsGeneratingMore(true);
+        try {
+            const existingContent = generatedContent?.[contentType];
+            
+            const response = await fetch('/api/study-kit/generate-more', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    studyKitId: studyKit.id,
+                    contentType,
+                    existingContent: Array.isArray(existingContent) ? existingContent : undefined,
+                    notesSpecification: notesSpec || notesSpecification,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                posthog.capture('study_kit_generate_more', {
+                    kit_id: studyKit.id,
+                    content_type: contentType,
+                    new_items_count: Array.isArray(data.newContent) ? data.newContent.length : 1,
+                });
+
+                setGeneratedContent((prev: any) => ({
+                    ...prev,
+                    [contentType]: data.updatedContent
+                }));
+
+                if (contentType === 'quizzes' && Array.isArray(data.updatedContent)) {
+                    setCurrentQuizStates(data.updatedContent.map(() => ({
+                        selectedOption: null,
+                        isConfirmed: false
+                    })));
+                    setScore(null);
+                }
+
+                if (contentType === 'notes') {
+                    setShowNotesModal(false);
+                    setNotesSpecification('');
+                }
+            } else {
+                alert('Generation failed: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Generate more error:', error);
+            alert('Failed to generate more content. Please try again.');
+        } finally {
+            setIsGeneratingMore(false);
+        }
+    };
+
     // Loading state when fetching a specific kit
     if (id && isLoadingKit) {
         return (
@@ -812,9 +881,31 @@ function StudyKitContent() {
                             )}
                         </div>
 
-                        {/* Content Display */}
-                        <div className="min-h-[400px]">
-                            <AnimatePresence mode="wait">
+                          {/* Content Display */}
+                          <div className="min-h-[400px]">
+                              {!isPremium && (
+                                <div className="mb-6 p-4 bg-zinc-800/50 border border-zinc-700 rounded-xl flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-indigo-500/20 rounded-lg">
+                                      <Info className="w-5 h-5 text-indigo-400" />
+                                    </div>
+                                    <div>
+                                      <p className="text-sm font-medium text-white">Sponsored Study Break</p>
+                                      <p className="text-xs text-zinc-400">Upgrade to Premium to remove all ads and unlock unlimited kits.</p>
+                                    </div>
+                                  </div>
+                                  <Button 
+                                    onClick={() => router.push('/pricing')}
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="border-indigo-500 text-indigo-400 hover:bg-indigo-500 hover:text-white"
+                                  >
+                                    Remove Ads
+                                  </Button>
+                                </div>
+                              )}
+                              <AnimatePresence mode="wait">
+
                                 <motion.div
                                     key={activeTab}
                                     initial={{ opacity: 0, y: 10 }}
@@ -943,11 +1034,48 @@ function StudyKitContent() {
                                                     </>
                                                 );
                                             })()}
+                                            
+                                            {/* Generate More Quizzes Button - Pro Only */}
+                                            {studyKit && isPremium && (
+                                                <div className="mt-6 flex justify-center">
+                                                    <button
+                                                        onClick={() => handleGenerateMore('quizzes')}
+                                                        disabled={isGeneratingMore}
+                                                        className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-sm transition-all shadow-lg"
+                                                    >
+                                                        {isGeneratingMore ? (
+                                                            <>
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                                Generating...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Crown className="w-4 h-4" />
+                                                                <Plus className="w-4 h-4" />
+                                                                Generate 10 More Quizzes
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {studyKit && !isPremium && (
+                                                <div className="mt-6 p-4 bg-zinc-800/50 border border-zinc-700 rounded-xl text-center">
+                                                    <p className="text-sm text-zinc-400 mb-2">Want more quizzes?</p>
+                                                    <button
+                                                        onClick={() => router.push('/pricing')}
+                                                        className="flex items-center gap-2 mx-auto px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-lg text-sm font-medium transition"
+                                                    >
+                                                        <Crown className="w-4 h-4" />
+                                                        Upgrade to Pro
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
                                     {activeTab === 'flashcards' && generatedContent.flashcards && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                             {(() => {
                                                 let flashcardData = generatedContent.flashcards;
                                                 if (!Array.isArray(flashcardData)) {
@@ -960,37 +1088,153 @@ function StudyKitContent() {
                                                     <FlashcardItem key={i} card={card} />
                                                 ));
                                             })()}
+                                            </div>
+                                            
+                                            {/* Generate More Flashcards Button - Pro Only */}
+                                            {studyKit && isPremium && (
+                                                <div className="mt-6 flex justify-center">
+                                                    <button
+                                                        onClick={() => handleGenerateMore('flashcards')}
+                                                        disabled={isGeneratingMore}
+                                                        className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-sm transition-all shadow-lg"
+                                                    >
+                                                        {isGeneratingMore ? (
+                                                            <>
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                                Generating...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Crown className="w-4 h-4" />
+                                                                <Plus className="w-4 h-4" />
+                                                                Generate 10 More Flashcards
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {studyKit && !isPremium && (
+                                                <div className="mt-6 p-4 bg-zinc-800/50 border border-zinc-700 rounded-xl text-center">
+                                                    <p className="text-sm text-zinc-400 mb-2">Want more flashcards?</p>
+                                                    <button
+                                                        onClick={() => router.push('/pricing')}
+                                                        className="flex items-center gap-2 mx-auto px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-lg text-sm font-medium transition"
+                                                    >
+                                                        <Crown className="w-4 h-4" />
+                                                        Upgrade to Pro
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
                                     {activeTab === 'notes' && generatedContent.notes && (
-                                        <div className="bg-gray-800 border border-zinc-700 rounded-2xl p-8 lg:p-12 shadow-2xl">
-                                            <div className="prose prose-invert prose-indigo max-w-none">
-                                                {(() => {
-                                                    let notesContent = generatedContent.notes;
-                                                    if (typeof notesContent === 'object' && !Array.isArray(notesContent)) {
-                                                        notesContent = notesContent.notes || JSON.stringify(notesContent, null, 2);
-                                                    } else if (Array.isArray(notesContent)) {
-                                                        notesContent = notesContent.join('\n\n');
-                                                    }
+                                        <div>
+                                            <div className="bg-gray-800 border border-zinc-700 rounded-2xl p-8 lg:p-12 shadow-2xl">
+                                                <div className="prose prose-invert prose-indigo max-w-none">
+                                                    {(() => {
+                                                        let notesContent = generatedContent.notes;
+                                                        if (typeof notesContent === 'object' && !Array.isArray(notesContent)) {
+                                                            notesContent = notesContent.notes || JSON.stringify(notesContent, null, 2);
+                                                        } else if (Array.isArray(notesContent)) {
+                                                            notesContent = notesContent.join('\n\n');
+                                                        }
 
-                                                    if (typeof notesContent !== 'string') return <div className="text-zinc-400">Invalid notes format</div>;
+                                                        if (typeof notesContent !== 'string') return <div className="text-zinc-400">Invalid notes format</div>;
 
-                                                    // Use a simpler approach for internal HTML rendering to avoid overly complex regex
-                                                    return (
-                                                        <div className="text-zinc-200 leading-relaxed space-y-6 whitespace-pre-wrap">
-                                                            {notesContent.split('\n').map((line, idx) => {
-                                                                if (line.startsWith('# ')) return <h1 key={idx} className="text-4xl font-bold text-white mb-6 border-b border-zinc-800 pb-4">{line.replace('# ', '')}</h1>;
-                                                                if (line.startsWith('## ')) return <h2 key={idx} className="text-2xl font-bold text-indigo-400 mt-10 mb-4">{line.replace('## ', '')}</h2>;
-                                                                if (line.startsWith('### ')) return <h3 key={idx} className="text-xl font-bold text-white mt-8 mb-3">{line.replace('### ', '')}</h3>;
-                                                                if (line.startsWith('- ') || line.startsWith('* ')) return <li key={idx} className="ml-4 text-zinc-300">{line.replace(/^[-*] /, '')}</li>;
-                                                                if (line.trim() === '') return <div key={idx} className="h-2" />;
-                                                                return <p key={idx} className="text-zinc-300">{line}</p>;
-                                                            })}
-                                                        </div>
-                                                    );
-                                                })()}
+                                                        return (
+                                                            <div className="text-zinc-200 leading-relaxed space-y-6 whitespace-pre-wrap">
+                                                                {notesContent.split('\n').map((line, idx) => {
+                                                                    if (line.startsWith('# ')) return <h1 key={idx} className="text-4xl font-bold text-white mb-6 border-b border-zinc-800 pb-4">{line.replace('# ', '')}</h1>;
+                                                                    if (line.startsWith('## ')) return <h2 key={idx} className="text-2xl font-bold text-indigo-400 mt-10 mb-4">{line.replace('## ', '')}</h2>;
+                                                                    if (line.startsWith('### ')) return <h3 key={idx} className="text-xl font-bold text-white mt-8 mb-3">{line.replace('### ', '')}</h3>;
+                                                                    if (line.startsWith('- ') || line.startsWith('* ')) return <li key={idx} className="ml-4 text-zinc-300">{line.replace(/^[-*] /, '')}</li>;
+                                                                    if (line.trim() === '') return <div key={idx} className="h-2" />;
+                                                                    return <p key={idx} className="text-zinc-300">{line}</p>;
+                                                                })}
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
                                             </div>
+                                            
+                                            {/* Custom Notes Section - Pro Only */}
+                                            {studyKit && isPremium && (
+                                                <div className="mt-6">
+                                                    {!showNotesModal ? (
+                                                        <div className="flex justify-center">
+                                                            <button
+                                                                onClick={() => setShowNotesModal(true)}
+                                                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-xl font-bold text-sm transition-all shadow-lg"
+                                                            >
+                                                                <Crown className="w-4 h-4" />
+                                                                <Sparkles className="w-4 h-4" />
+                                                                Generate Custom Notes
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, y: 10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            className="bg-zinc-900 border border-amber-500/30 rounded-2xl p-6"
+                                                        >
+                                                            <div className="flex items-center gap-2 mb-4">
+                                                                <Crown className="w-5 h-5 text-amber-400" />
+                                                                <h3 className="font-bold text-lg text-white">Generate Custom Notes</h3>
+                                                            </div>
+                                                            <p className="text-sm text-zinc-400 mb-4">
+                                                                Specify exactly what you want in your notes - topics, depth, examples, format, etc.
+                                                            </p>
+                                                            <textarea
+                                                                value={notesSpecification}
+                                                                onChange={(e) => setNotesSpecification(e.target.value)}
+                                                                placeholder="e.g., I need detailed notes on the causes and effects of the French Revolution, with a focus on economic factors. Include a timeline of key events and at least 3 primary source quotes..."
+                                                                className="w-full h-32 bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 transition resize-none"
+                                                            />
+                                                            <div className="flex items-center justify-end gap-3 mt-4">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setShowNotesModal(false);
+                                                                        setNotesSpecification('');
+                                                                    }}
+                                                                    className="px-4 py-2 text-zinc-400 hover:text-white transition"
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleGenerateMore('notes')}
+                                                                    disabled={!notesSpecification.trim() || isGeneratingMore}
+                                                                    className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 rounded-lg font-bold text-sm transition-all"
+                                                                >
+                                                                    {isGeneratingMore ? (
+                                                                        <>
+                                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                                            Generating...
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Send className="w-4 h-4" />
+                                                                            Generate Notes
+                                                                        </>
+                                                                    )}
+                                                                </button>
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {studyKit && !isPremium && (
+                                                <div className="mt-6 p-4 bg-zinc-800/50 border border-zinc-700 rounded-xl text-center">
+                                                    <p className="text-sm text-zinc-400 mb-2">Want custom notes tailored to your needs?</p>
+                                                    <button
+                                                        onClick={() => router.push('/pricing')}
+                                                        className="flex items-center gap-2 mx-auto px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-lg text-sm font-medium transition"
+                                                    >
+                                                        <Crown className="w-4 h-4" />
+                                                        Upgrade to Pro
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 

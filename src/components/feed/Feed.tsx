@@ -140,35 +140,44 @@ const FeedAnimations = () => (
           return !isIdSeen && !isTitleSeen;
         });
 
-        const combinedItems = [...initialItems, ...uniqueNewItems];
+const combinedItems = [...initialItems, ...uniqueNewItems];
 
-        // Inject Ad every 12 cards
-        const itemsWithAds: FeedItem[] = [];
-        let globalIndex = items.length;
-        
-        combinedItems.forEach((item) => {
-          itemsWithAds.push(item);
-          globalIndex++;
-          if (globalIndex % 12 === 0) {
-            const adItem: AdFeedItem = {
-              id: `ad-${globalIndex}-${Date.now()}`,
-              type: 'ad',
-              topic: 'Sponsored',
-              title: 'Sponsored Content',
-              xp_reward: 0,
-              genie_reaction: 'hype',
-              theme: 'purple-gradient',
-              likedByUser: false,
-              likes: 0,
-              shares: 0,
-              comments: [],
-              adClient: "ca-pub-7134321558578802",
-              adSlot: "8765432109"
-            };
-            itemsWithAds.push(adItem);
-            globalIndex++;
-          }
-        });
+// Inject Ad every 12 cards only for free users
+const { data: subscription } = await supabase
+.from('user_subscriptions')
+.select('plan_id')
+.eq('user_id', user?.id)
+.single();
+
+const isPremium = subscription?.plan_id === 'premium';
+
+const itemsWithAds: FeedItem[] = [];
+let globalIndex = items.length;
+
+combinedItems.forEach((item) => {
+itemsWithAds.push(item);
+globalIndex++;
+if (!isPremium && globalIndex % 12 === 0) {
+const adItem: AdFeedItem = {
+id: `ad-${globalIndex}-${Date.now()}`,
+type: 'ad',
+topic: 'Sponsored',
+title: 'Sponsored Content',
+xp_reward: 0,
+genie_reaction: 'hype',
+theme: 'purple-gradient',
+likedByUser: false,
+likes: 0,
+shares: 0,
+comments: [],
+adClient: "ca-pub-7134321558578802",
+adSlot: "8765432109"
+};
+itemsWithAds.push(adItem);
+globalIndex++;
+}
+});
+
 
         // Enrich items with saved status
         const enrichedItems = itemsWithAds.map(item => ({

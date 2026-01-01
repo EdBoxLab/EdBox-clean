@@ -310,7 +310,7 @@ BEGIN
   VALUES (new.id);
   
   INSERT INTO public.user_subscriptions (user_id, plan_id, status)
-  VALUES (new.id, 'free', 'active');
+  VALUES (new.id, 'premium', 'active');
   
   RETURN new;
 END;

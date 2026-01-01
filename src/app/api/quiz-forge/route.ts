@@ -2,31 +2,32 @@ import { NextResponse } from 'next/server';
 import { generateWithRetry } from '@/lib/ai-providers';
 
 export async function POST(request: Request) {
-  try {
-    const { notes } = await request.json();
+try {
+const { notes, count = 10 } = await request.json();
 
-    const prompt = `
-      Generate a multiple-choice quiz from the following notes. 
-      
-      CRITICAL REQUIREMENT:
-      Focus on application-based and calculation-heavy questions rather than just theoretical definitions. 
-      If the notes involve math, physics, or any logic-based steps (like Mathematical Induction), ensure at least 60% of the questions involve actual computation or multi-step problem solving.
-      
-      Each question should have four options, and one correct answer.
-      Return the quiz as a JSON object with a "questions" property, which is an array of objects. 
-      Each question object should have a "question", "options" (an array of four strings), and "answer" (the correct option string).
-      
-      Example of a good calculation question:
-      {
-        "question": "In the induction step for P(n): 1+2+...+n = n(n+1)/2, if we assume P(k) is true, what is the value of 1+2+...+k + (k+1)?",
-        "options": ["(k+1)(k+2)/2", "k(k+1)/2 + k", "(k+1)^2/2", "k^2/2 + k + 1"],
-        "answer": "(k+1)(k+2)/2"
-      }
+const prompt = `
+Generate a multiple-choice quiz with ${count} questions from the following notes. 
 
-      Total questions: between 10-20.
-      Notes:
-      ${notes}
-    `;
+CRITICAL REQUIREMENT:
+Focus on application-based and calculation-heavy questions rather than just theoretical definitions. 
+If the notes involve math, physics, or any logic-based steps (like Mathematical Induction), ensure at least 60% of the questions involve actual computation or multi-step problem solving.
+
+Each question should have four options, and one correct answer.
+Return the quiz as a JSON object with a "questions" property, which is an array of objects. 
+Each question object should have a "question", "options" (an array of four strings), and "answer" (the correct option string).
+
+Example of a good calculation question:
+{
+"question": "In the induction step for P(n): 1+2+...+n = n(n+1)/2, if we assume P(k) is true, what is the value of 1+2+...+k + (k+1)?",
+"options": ["(k+1)(k+2)/2", "k(k+1)/2 + k", "(k+1)^2/2", "k^2/2 + k + 1"],
+"answer": "(k+1)(k+2)/2"
+}
+
+Total questions: ${count}.
+Notes:
+${notes}
+`;
+
 
     const result = await generateWithRetry({
       prompt,

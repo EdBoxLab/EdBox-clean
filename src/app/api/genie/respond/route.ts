@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { generateWithRetry } from '@/lib/ai-providers';
 import { handleAPIError } from '@/lib/utils/errorHandler';
 import { bufferToBase64, extractTextFromPPTX, extractTextFromPDF, isImageType, isPDFType } from '@/lib/utils/fileProcessing';
+import { checkUsageLimit } from '@/lib/usage';
 
 export async function POST(request: NextRequest) {
     try {
@@ -53,8 +54,22 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Message required' }, { status: 400 });
         }
 
-        const { data: { session } } = await supabase.auth.getSession();
-        let userProfileContext = '';
+const { data: { session } } = await supabase.auth.getSession();
+
+if (!session) {
+return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+}
+
+const { allowed, remaining } = await checkUsageLimit('genie_message');
+if (!allowed) {
+return NextResponse.json({ 
+error: 'Daily limit reached', 
+message: 'You have reached your limit of 50 Genie messages for today. Upgrade to Premium for unlimited access!' 
+}, { status: 429 });
+}
+
+let userProfileContext = '';
+
         let studySetsContext = '';
         let notesContext = '';
         let competencyContext = '';

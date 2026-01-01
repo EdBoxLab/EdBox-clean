@@ -10,7 +10,13 @@ import {
   ChevronLeft,
   AlertCircle,
   X,
+Sparkles,
+Wand2,
 } from 'lucide-react';
+import { useSubscription } from '@/lib/hooks/useSubscription';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 
 /* ================= TYPES ================= */
 
@@ -37,9 +43,41 @@ export default function NotesPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+const { isPremium } = useSubscription();
+const [aiInstructions, setAiInstructions] = useState('');
+const [isGenerating, setIsGenerating] = useState(false);
 
-  /* ================= DATA ================= */
+/* ================= AI LOGIC ================= */
+const handleGenerateAI = async (isMore: boolean = false) => {
+if (!isPremium) return;
+setIsGenerating(true);
+try {
+const res = await fetch('/api/notes/generate', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({
+currentContent: editedContent,
+instructions: aiInstructions,
+isMore,
+}),
+});
+const data = await res.json();
+if (isMore) {
+setEditedContent(prev => prev + '\n\n' + data.content);
+} else {
+setEditedContent(data.content);
+}
+setIsEditing(true);
+} catch (err) {
+setError('AI Generation failed');
+} finally {
+setIsGenerating(false);
+}
+};
+
+/* ================= DATA ================= */
+
 
   useEffect(() => {
     let active = true;
@@ -267,26 +305,59 @@ export default function NotesPage() {
             )}
           </div>
 
-          {/* CONTENT */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {isEditing ? (
-              <textarea
-                ref={textareaRef}
-                value={editedContent}
-                onChange={e => setEditedContent(e.target.value)}
-                className="w-full min-h-[300px] p-4 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Write your note…"
-              />
-            ) : (
-              <div className="bg-white rounded-lg p-4 whitespace-pre-wrap">
-                {selectedNote.content || (
-                  <span className="text-gray-400 italic">
-                    This note is empty
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+{/* CONTENT */}
+<div className="flex-1 overflow-y-auto p-4 space-y-4">
+{isPremium && isEditing && (
+<div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4 space-y-3">
+<div className="flex items-center gap-2 text-blue-800 font-medium text-sm">
+<Sparkles className="h-4 w-4" />
+Premium AI Assistant
+</div>
+<Textarea
+placeholder="Specify what should be in your notes (e.g., 'Focus on the structural differences between plant and animal cells', 'Use a professional tone', 'Add a summary at the end')"
+value={aiInstructions}
+onChange={e => setAiInstructions(e.target.value)}
+className="bg-white border-blue-200 focus:ring-blue-500 min-h-[80px]"
+/>
+<div className="flex gap-2">
+<Button
+onClick={() => handleGenerateAI(false)}
+disabled={isGenerating}
+className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
+>
+    {isGenerating ? 'Generating...' : 'Regenerate with AI'}
+</Button>
+<Button
+onClick={() => handleGenerateAI(true)}
+disabled={isGenerating}
+variant="outline"
+className="border-blue-200 text-blue-700 hover:bg-blue-100 flex-1"
+>
+<Wand2 className="h-4 w-4 mr-2" />
+Generate More
+</Button>
+</div>
+</div>
+)}
+{isEditing ? (
+<textarea
+ref={textareaRef}
+value={editedContent}
+onChange={e => setEditedContent(e.target.value)}
+className="w-full min-h-[400px] p-4 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+placeholder="Write your note…"
+/>
+) : (
+<div className="bg-white rounded-lg p-4 whitespace-pre-wrap">
+{selectedNote.content || (
+<span className="text-gray-400 italic">
+This note is empty
+</span>
+)}
+</div>
+)}
+</div>
+
         </main>
       )}
     </div>

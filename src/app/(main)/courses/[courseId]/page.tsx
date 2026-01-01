@@ -217,11 +217,6 @@ export default function CoursePlayerPage() {
                         </p>
                     </div>
                 )}
-
-                {/* XP Display */}
-                <div className="mb-6">
-                    <XPStreakDisplay showCompact={true} skillGraphId={courseId} />
-                </div>
             </aside>
 
             {/* Main Content */}

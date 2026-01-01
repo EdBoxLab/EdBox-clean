@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateWithRetry, cleanJsonResponse } from '@/lib/ai-providers';
 import { sessionManager } from '@/lib/services/interactive-course-session-manager';
+import { createServerSupabaseClient } from '@/lib/supabase/admin';
 
 export async function POST(request: NextRequest) {
+    const supabase = createServerSupabaseClient();
     try {
         const { challenge, answer, sessionId, imageUrl } = await request.json();
 
@@ -95,6 +97,35 @@ Format: Return ONLY the JSON object. DO NOT include any explanatory text or mark
                     }
 
                     await sessionManager.persistSession(session);
+
+                    // Update the new user_competency table (Anthropic Memory style)
+                    if (session.userId && session.currentTopic && concept) {
+                        const { data: existingCompetency } = await supabase
+                            .from('user_competency')
+                            .select('confidence, mastery_state')
+                            .eq('user_id', session.userId)
+                            .eq('topic', session.currentTopic)
+                            .eq('concept', concept)
+                            .single();
+
+                        const currentConfidence = existingCompetency?.confidence || 0;
+                        const newConfidence = Math.min(1.0, currentConfidence + 0.2); // Increment by 20% on pass
+
+                        await supabase
+                            .from('user_competency')
+                            .upsert({
+                                user_id: session.userId,
+                                topic: session.currentTopic,
+                                concept: concept,
+                                confidence: newConfidence,
+                                mastery_state: {
+                                    ...existingCompetency?.mastery_state,
+                                    last_score: evaluation.score,
+                                    last_evaluated_at: new Date().toISOString()
+                                },
+                                last_updated: new Date().toISOString()
+                            }, { onConflict: 'user_id,topic,concept' });
+                    }
                 }
             } catch (persistError) {
                 console.error('Failed to persist challenge progress:', persistError);

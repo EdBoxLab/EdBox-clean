@@ -164,7 +164,7 @@ export default function NotesPage() {
     };
 
     return (
-        <div className="h-[calc(100vh-64px)] overflow-hidden bg-[#09090b] text-zinc-100 flex relative">
+        <div className="h-[calc(100vh-64px-5rem)] lg:h-[calc(100vh-64px)] overflow-hidden bg-[#09090b] text-zinc-100 flex relative -mb-20 lg:mb-0">
             
             <AnimatePresence mode="wait">
                 {(!isMobile || mobileView === 'list') && (

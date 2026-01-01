@@ -183,9 +183,9 @@ export function StreakCard() {
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm animate-pulse">
-        <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-4" />
-        <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded" />
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 sm:p-4 shadow-sm animate-pulse">
+        <div className="h-5 w-24 bg-zinc-700 rounded mb-3" />
+        <div className="h-16 bg-zinc-700 rounded" />
       </div>
     );
   }
@@ -198,51 +198,51 @@ export function StreakCard() {
   const today = new Date().getDay();
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Your Progress</h3>
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 sm:p-4 shadow-sm w-full box-border overflow-hidden">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm sm:text-base font-semibold text-white">Your Progress</h3>
         <div className="flex items-center gap-1 text-orange-500">
-          <Flame className="w-5 h-5" />
-          <span className="font-bold">{streak.current}</span>
+          <Flame className="w-4 h-4 sm:w-5 sm:h-5" />
+          <span className="font-bold text-sm sm:text-base">{streak.current}</span>
         </div>
       </div>
 
-      <div className="flex justify-between mb-4">
+      <div className="flex justify-between mb-3">
         {weekDays.map((day, index) => {
           const isToday = index === today;
           const isPast = index < today;
           const isActive = isPast || isToday;
           
           return (
-            <div key={index} className="flex flex-col items-center gap-1">
-              <span className="text-xs text-gray-500 dark:text-gray-400">{day}</span>
+            <div key={index} className="flex flex-col items-center gap-0.5 flex-1 min-w-0">
+              <span className="text-[9px] sm:text-[10px] text-gray-400">{day}</span>
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                className={`w-5 h-5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all ${
                   isActive
                     ? 'bg-orange-500 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-400'
-                } ${isToday ? 'ring-2 ring-orange-300 ring-offset-2 dark:ring-offset-gray-800' : ''}`}
+                    : 'bg-zinc-800 text-gray-500'
+                } ${isToday ? 'ring-2 ring-orange-400/50 ring-offset-1 ring-offset-zinc-900' : ''}`}
               >
-                {isActive && <Flame className="w-4 h-4" />}
+                {isActive && <Flame className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" />}
               </div>
             </div>
           );
         })}
       </div>
 
-      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Star className="w-4 h-4 text-purple-500" />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+      <div className="bg-zinc-800/50 rounded-lg p-2 sm:p-3">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-1.5">
+            <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />
+            <span className="text-[10px] sm:text-xs font-medium text-gray-300">
               Level {xp.level}
             </span>
           </div>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
+          <span className="text-[9px] sm:text-[10px] text-gray-500">
             {xp.total} / {xp.xpForNextLevel} XP
           </span>
         </div>
-        <div className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+        <div className="w-full h-1.5 sm:h-2 bg-zinc-700 rounded-full overflow-hidden">
           <motion.div
             className="h-full bg-gradient-to-r from-purple-500 to-indigo-500"
             initial={{ width: 0 }}
@@ -252,18 +252,18 @@ export function StreakCard() {
         </div>
       </div>
 
-      <div className="mt-3 flex justify-between text-sm">
-        <div className="text-center">
-          <div className="font-semibold text-gray-900 dark:text-white">{streak.longest}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Best Streak</div>
+      <div className="mt-2 sm:mt-3 flex justify-between text-[10px] sm:text-xs">
+        <div className="text-center flex-1 min-w-0">
+          <div className="font-semibold text-white">{streak.longest}</div>
+          <div className="text-[9px] sm:text-[10px] text-gray-500">Best Streak</div>
         </div>
-        <div className="text-center">
-          <div className="font-semibold text-gray-900 dark:text-white">{xp.total}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Total XP</div>
+        <div className="text-center flex-1 min-w-0">
+          <div className="font-semibold text-white">{xp.total}</div>
+          <div className="text-[9px] sm:text-[10px] text-gray-500">Total XP</div>
         </div>
-        <div className="text-center">
-          <div className="font-semibold text-gray-900 dark:text-white">{xp.level}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Level</div>
+        <div className="text-center flex-1 min-w-0">
+          <div className="font-semibold text-white">{xp.level}</div>
+          <div className="text-[9px] sm:text-[10px] text-gray-500">Level</div>
         </div>
       </div>
     </div>

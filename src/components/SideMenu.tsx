@@ -16,7 +16,6 @@ import {
 import { useRouter } from 'next/navigation';
 import { UserMenu } from './UserMenu';
 import { ContactSupport } from './ContactSupport';
-import { StreakXPDisplay } from './StreakXP';
 
 const NAV_ITEMS = [
   { label: 'Home', icon: Home, href: '/' },
@@ -97,14 +96,10 @@ const SideMenu = () => {
 
         {/* Scrollable Container for everything else */}
         <div className="flex-1 overflow-y-auto flex flex-col min-h-0 custom-scrollbar">
-          {/* Navigation Items */}
-          <nav className="p-4 space-y-1">
-            {/* Streak/XP Display */}
-            <div className="mb-4 px-1">
-              <StreakXPDisplay />
-            </div>
-            
-            {NAV_ITEMS.map((item, index) => {
+            {/* Navigation Items */}
+            <nav className="p-4 space-y-1">
+              
+              {NAV_ITEMS.map((item, index) => {
               const isActive = pathname === item.href;
               return (
                 <Link

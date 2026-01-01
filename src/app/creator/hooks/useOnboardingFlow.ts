@@ -7,10 +7,11 @@ export function useOnboardingFlow() {
   const router = useRouter();
   
   // State
-  const [step, setStep] = useState(1);
-  const [goal, setGoal] = useState('');
-  const [context, setContext] = useState<LearningContext | null>(null);
-  const [timeAvailable, setTimeAvailable] = useState<string | null>(null);
+    const [step, setStep] = useState(1);
+    const [goal, setGoal] = useState('');
+    const [level, setLevel] = useState<'beginner' | 'intermediate' | 'advanced' | null>(null);
+    const [context, setContext] = useState<LearningContext | null>(null);
+    const [timeAvailable, setTimeAvailable] = useState<string | null>(null);
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
     const [fileContext, setFileContext] = useState<string | null>(null);
     const [isExtracting, setIsExtracting] = useState(false);
@@ -20,14 +21,14 @@ export function useOnboardingFlow() {
   const [showContinue, setShowContinue] = useState(false);
 
   // Auto-advance logic
-  useEffect(() => {
-    const shouldShow = 
-      (step === 1 && goal.length > 1) ||
-      (step === 2 && context !== null) ||
-      (step === 3 && timeAvailable !== null);
-    
-    setShowContinue(shouldShow);
-  }, [step, goal.length, context, timeAvailable]);
+    useEffect(() => {
+      const shouldShow = 
+        (step === 1 && goal.length > 1 && level !== null) ||
+        (step === 2 && context !== null) ||
+        (step === 3 && timeAvailable !== null);
+      
+      setShowContinue(shouldShow);
+    }, [step, goal.length, level, context, timeAvailable]);
 
   // Handlers
     const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,6 +139,7 @@ export function useOnboardingFlow() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             goal,
+            level,
             context,
             timeAvailable,
             uploadedFile: fileData,
@@ -215,7 +217,9 @@ export function useOnboardingFlow() {
     generationStep,
     error,
     showContinue,
+    level,
     setGoal,
+    setLevel,
     setContext,
     setTimeAvailable,
     handleFileUpload,

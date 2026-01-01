@@ -53,6 +53,7 @@ function detectBehavioralPatterns(userMessage: string, conversationHistory: any[
         showsConfusion: explicitConfusion.some(phrase => msg.includes(phrase)) || quizFail || challengeFail,
         wantsChallenge: challengeRequest.some(phrase => msg.includes(phrase)),
         wantsQuiz: quizRequest.some(phrase => msg.includes(phrase)),
+        wantsRoadmap: msg.includes('roadmap') || msg.includes('diving into'),
         isEngaged: userMessage.split(' ').length > 8 || msg.includes('?'),
         responseLength: userMessage.split(' ').length,
         exchangeCount: conversationHistory ? conversationHistory.filter((m: any) => m.role === 'assistant').length : 0,
@@ -164,8 +165,8 @@ async function makeSmartDecision(
     console.log('[DECISION_DEBUG] patterns.justFinishedChallenge:', patterns.justFinishedChallenge);
     console.log('[DECISION_DEBUG] patterns.justFinishedQuiz:', patterns.justFinishedQuiz);
 
-    // Turn 0-1: Send goals first
-    if (turnCount <= 1 && !context.goalsGiven) {
+    // Turn 0-2: Send goals first if not provided, or if explicitly requested
+    if ((turnCount <= 2 && !context.goalsGiven) || patterns.wantsRoadmap) {
         return {
             action: 'generate_roadmap',
             forcedStage: 'GOALS',

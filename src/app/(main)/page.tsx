@@ -6,6 +6,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import OnboardingForm from '@/components/OnboardingForm';
 import { motion, Variants } from 'framer-motion';
 import { ArrowRight, Book, FileText, Zap, PlayCircle, Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { StreakCard } from '@/components/StreakXP';
 
 const Dashboard: React.FC = () => {
   const supabase = createSupabaseBrowserClient();
@@ -389,15 +390,20 @@ const Dashboard: React.FC = () => {
     );
   };
 
-  return (
-    <div className="min-h-screen bg-zinc-950">
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
-        <div className="mb-12">
-          <h1 className="text-4xl font-extrabold text-white mb-2">
-            Welcome, {profile?.username || user?.email?.split('@')[0]}!
-          </h1>
-          <p className="text-lg text-gray-400">Let's continue your learning journey.</p>
-        </div>
+    return (
+      <div className="min-h-screen bg-zinc-950 overflow-x-hidden">
+        <div className="max-w-7xl mx-auto px-3 py-4 sm:p-6 md:p-8">
+          <div className="flex flex-col gap-4 sm:gap-6 mb-8 sm:mb-12">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mb-1 sm:mb-2 break-words">
+                Welcome, {profile?.username || user?.email?.split('@')[0]}!
+              </h1>
+              <p className="text-sm sm:text-base md:text-lg text-gray-400">Let's continue your learning journey.</p>
+            </div>
+            <div className="w-full max-w-full lg:max-w-sm">
+              <StreakCard />
+            </div>
+          </div>
 
         {recentCourse && (
           <div className="mb-12">

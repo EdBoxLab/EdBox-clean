@@ -145,7 +145,6 @@ export default function HeroSection({
             {[
               { icon: Target, label: `${masteredSkills}/${graph?.nodes?.length || 0} Mastered`, color: '#00ff00' },
               { icon: Zap, label: `${unlockedSkills} Unlocked`, color: '#00ffff' },
-              { icon: Trophy, label: `${earnedXP}/${totalXP} XP`, color: '#ffff00' },
               { icon: Clock, label: `${totalMinutes} min total`, color: '#ff00ff' }
             ].map((stat, i) => (
               <motion.div

@@ -106,11 +106,11 @@ export default function CoursesPage() {
     <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto">
 
-        {/* Header */}
-        <div className="mb-8 md:mb-12">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">My Learning Paths</h1>
-          <p className="text-gray-400">Continue your journey or start a new one</p>
-        </div>
+          {/* Header */}
+          <div className="mb-8 md:mb-12">
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">My Learning Paths</h1>
+            <p className="text-gray-400">Continue your journey or start a new one</p>
+          </div>
 
         {/* Courses Grid */}
         {courses.length === 0 ? (
@@ -201,15 +201,11 @@ export default function CoursesPage() {
                         <BookOpen className="w-4 h-4" />
                         <span>{course.nodes.length} skills</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        <span>{totalMinutes}m</span>
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" />
+                          <span>{totalMinutes}m</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Trophy className="w-4 h-4" />
-                        <span>{totalXP} XP</span>
-                      </div>
-                    </div>
 
                     {/* Progress Bar */}
                     <div className="h-2 bg-gray-700 rounded-full overflow-hidden">

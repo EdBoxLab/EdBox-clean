@@ -91,8 +91,8 @@ export default function ImmersiveEngineView({
 
     const skillTitle = selectedSkill.title || (selectedSkill as any).name || 'this skill';
     const totalSteps = sessionChallenges.length + 1; // +1 for interactive learning
-    const currentStep = activeChallengeIndex + 2; // +1 for 0-index, +1 for interactive learning
-    const progressPercent = (currentStep / totalSteps) * 100;
+    const currentStep = activeChallengeIndex + 1; // interactive is 0, first challenge is 1...
+    const progressPercent = Math.max(0, Math.min(100, (currentStep / totalSteps) * 100));
 
     const renderEngine = () => {
         if (!currentChallenge) return null;

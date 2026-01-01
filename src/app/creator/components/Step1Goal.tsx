@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 interface Step1GoalProps {
   goal: string;
   setGoal: (goal: string) => void;
+  level: 'beginner' | 'intermediate' | 'advanced' | null;
+  setLevel: (level: 'beginner' | 'intermediate' | 'advanced') => void;
   uploadedFile: File | null;
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   isExtracting?: boolean;
@@ -12,6 +14,8 @@ interface Step1GoalProps {
 const Step1Goal = memo(function Step1Goal({ 
   goal, 
   setGoal, 
+  level,
+  setLevel,
   uploadedFile, 
   handleFileUpload,
   isExtracting = false
@@ -40,23 +44,43 @@ const Step1Goal = memo(function Step1Goal({
         </p>
       </div>
 
-      {/* Text Input */}
-      <div className="relative">
-        <textarea
-          value={goal}
-          onChange={(e) => setGoal(e.target.value)}
-          placeholder="I want to build AI chatbots 
+        {/* Text Input */}
+        <div className="relative">
+          <textarea
+            value={goal}
+            onChange={(e) => setGoal(e.target.value)}
+            placeholder="I want to build AI chatbots 
 I want to learn Spanish for my trip 
 I want to make digital art "
-          className="w-full bg-gray-800 border-2 border-gray-700 focus:border-blue-500 rounded-2xl p-6 text-white placeholder-gray-500 focus:outline-none min-h-[180px] text-lg resize-none transition-colors"
-          maxLength={500}
-        />
-        <div className="absolute bottom-4 right-4 text-sm text-gray-500">
-          {goal.length}/500
+            className="w-full bg-gray-800 border-2 border-gray-700 focus:border-blue-500 rounded-2xl p-6 text-white placeholder-gray-500 focus:outline-none min-h-[150px] text-lg resize-none transition-colors"
+            maxLength={500}
+          />
+          <div className="absolute bottom-4 right-4 text-sm text-gray-500">
+            {goal.length}/500
+          </div>
         </div>
-      </div>
 
-      {/* Quick Examples */}
+        {/* Level Selection */}
+        <div className="space-y-3">
+          <p className="text-sm text-gray-400 font-medium">Select your current level:</p>
+          <div className="grid grid-cols-3 gap-3">
+            {(['beginner', 'intermediate', 'advanced'] as const).map((l) => (
+              <button
+                key={l}
+                onClick={() => setLevel(l)}
+                className={`py-3 px-4 rounded-xl border-2 transition-all capitalize font-medium ${
+                  level === l
+                    ? 'bg-blue-500/10 border-blue-500 text-blue-400 shadow-lg shadow-blue-500/20'
+                    : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600'
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Examples */}
       <div className="space-y-2">
         <p className="text-sm text-gray-400">Quick picks:</p>
         <div className="flex flex-wrap gap-2">

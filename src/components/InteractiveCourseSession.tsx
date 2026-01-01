@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, BookOpen, Brain, Trophy, MessageCircle, Menu, X, Loader, Check, AlertCircle, Map } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import posthog from 'posthog-js';
-import { XPStreakDisplay } from '@/components/XPStreakDisplay';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -97,11 +96,10 @@ function RoadmapWelcome({
           <div className="p-3 bg-purple-500/20 rounded-2xl border border-purple-500/30">
             <BookOpen className="w-8 h-8 text-purple-400" />
           </div>
-          <div>
-            <h2 className="text-2xl font-black text-white tracking-tight">{title}</h2>
-            <p className="text-purple-300/60 font-medium uppercase tracking-widest text-[10px]">Course Roadmap</p>
+            <div>
+              <h2 className="text-2xl font-black text-white tracking-tight">{title}</h2>
+            </div>
           </div>
-        </div>
         <p className="text-gray-300 leading-relaxed text-sm lg:text-base font-medium">
           {description}
         </p>
@@ -267,7 +265,7 @@ export default function InteractiveCourseSession({
       setMessages([introMessage]);
       setIsInitializing(false);
 
-      handleSendMessage(`Diving into ${courseTitle}! Let's see the roadmap.`, true);
+      handleSendMessage(`Diving into ${courseTitle}! Let's see the roadmap.`, true, undefined, newSession.id);
 
     } catch (error) {
       console.error('Failed to initialize session:', error);
@@ -277,10 +275,16 @@ export default function InteractiveCourseSession({
     }
   };
 
-  const handleSendMessage = async (text: string, isAuto = false, stageOverride?: 'EXPLAIN' | 'QUIZ' | 'CHALLENGE') => {
+  const handleSendMessage = async (text: string, isAuto = false, stageOverride?: 'EXPLAIN' | 'QUIZ' | 'CHALLENGE', sessionIdOverride?: string) => {
     if (!text.trim() || isLoading) return;
 
     const currentSkillId = safeSkillGraph?.nodes?.[0]?.id || courseId;
+    const effectiveSessionId = sessionIdOverride || session?.id;
+
+    if (!effectiveSessionId && !isInitializing) {
+      console.warn('No session ID available for message');
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: 'user-' + Date.now(),
@@ -312,13 +316,13 @@ export default function InteractiveCourseSession({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userMessage: userMessage.content,
-          sessionId: session?.id,
+          sessionId: effectiveSessionId,
           courseId,
           currentSkillId,
           skillTitle: courseTitle,
           learningStage: stageOverride || learningStage,
           conversationHistory: messages.slice(-5),
-          turnCount: messages.length,
+          turnCount: messages.length, // Already includes the user message just added
           learningContext: session?.learningContext
         })
       });
@@ -359,9 +363,6 @@ export default function InteractiveCourseSession({
                 setMessages(prev => prev.map(msg =>
                   msg.id === genieMessageId ? { ...msg, type: 'challenge_trigger', challengeData: data.challengeData, content: data.challengeData.description } : msg
                 ));
-                if (!data.type || data.type === 'content') {
-                  setTimeout(() => setShowActionButtons(true), 1000);
-                }
               } else if (data.type === 'goals_updated') {
                 // Real-time Goal Update!
                 const newGoals = data.goals;
@@ -401,7 +402,11 @@ export default function InteractiveCourseSession({
     } catch (error) {
       console.error(error);
       setMessages(prev => prev.map(msg =>
-        msg.id === genieMessageId ? { ...msg, content: "I encountered an issue. Try asking again!" } : msg
+        msg.id === genieMessageId ? { 
+          ...msg, 
+          type: 'error' as any,
+          content: "I encountered an issue while processing your request." 
+        } : msg
       ));
     } finally {
       setIsLoading(false);
@@ -488,72 +493,56 @@ export default function InteractiveCourseSession({
                   <div className="p-2.5 bg-purple-600/20 rounded-xl border border-purple-500/20">
                     <Brain className="w-5 h-5 text-purple-400" />
                   </div>
-                  <div>
-                    <h2 className="font-bold text-sm tracking-tight">Roadmap</h2>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest">Interactive Session</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsSidebarOpen(false)}
-                  className="p-2 text-gray-500 hover:text-white transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-                <div className="flex-1 overflow-y-auto">
-                  {session?.learningContext?.goals && (
-                    <div className="space-y-4">
-                      <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest">Mastery Tracking</h3>
-                      <GoalTracker goals={session.learningContext.goals || []} />
+                    <div>
+                      <h2 className="font-bold text-sm tracking-tight">Quest Log</h2>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest">Cognitive Ascent</p>
                     </div>
-                  )}
+                  </div>
+                  <button
+                    onClick={() => setIsSidebarOpen(false)}
+                    className="p-2 text-gray-500 hover:text-white transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+  
+                  <div className="flex-1 overflow-y-auto">
+                    {session?.learningContext?.goals && (
+                      <div className="space-y-4">
+                        <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest">Growth Pulse</h3>
+                        <GoalTracker goals={session.learningContext.goals || []} />
+                      </div>
+                    )}
                 </div>
 
-              <div className="pt-6 border-t border-gray-800">
-                <XPStreakDisplay showCompact={true} skillGraphId={courseId} />
-              </div>
+                <div className="pt-6 border-t border-gray-800">
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
-      {/* Sidebar with Sticky Goal Tracker (Desktop) */}
-      <aside className="hidden lg:flex w-[320px] bg-gray-900 border-r border-gray-800 flex-col p-6 gap-6 overflow-y-auto shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-purple-600/20 rounded-xl border border-purple-500/20">
-            <Brain className="w-5 h-5 text-purple-400" />
+        {/* Sidebar with Sticky Goal Tracker (Desktop) */}
+        <aside className="hidden lg:flex w-[320px] bg-gray-900 border-r border-gray-800 flex-col p-6 gap-6 overflow-y-auto shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-purple-600/20 rounded-xl border border-purple-500/20">
+              <Brain className="w-5 h-5 text-purple-400" />
+            </div>
+              <div>
+                <h2 className="text-lg font-bold">{courseTitle}</h2>
+              </div>
+            </div>
+
+            {/* Real-Time Goal Tracker */}
+            {session?.learningContext?.goals && session.learningContext.goals.length > 0 && (
+              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                <GoalTracker goals={session.learningContext.goals || []} />
+              </div>
+            )}
+
+          <div className="mt-auto pt-6 border-t border-gray-800">
           </div>
-          <div>
-            <h2 className="text-lg font-bold">{courseTitle}</h2>
-            <p className="text-xs text-gray-500 uppercase tracking-widest">Mastery Tracking</p>
-          </div>
-        </div>
-
-        {/* XP Display */}
-        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-          <XPStreakDisplay showCompact={true} skillGraphId={courseId} />
-        </div>
-
-        {/* Real-Time Goal Tracker */}
-        {session?.learningContext?.goals && session.learningContext.goals.length > 0 && (
-          <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-            <GoalTracker goals={session.learningContext.goals || []} />
-          </div>
-        )}
-
-        {/* Progress Section */}
-        {session && (
-          <div className="space-y-4">
-            <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest">Active Roadmap</h3>
-            <GoalTracker goals={session.learningContext.goals || []} />
-          </div>
-        )}
-
-        <div className="mt-auto pt-6 border-t border-gray-800">
-          <XPStreakDisplay showCompact={true} skillGraphId={courseId} />
-        </div>
-      </aside>
+        </aside>
 
       {/* Main Chat Area */}
       <main className="flex-1 flex flex-col min-h-0 relative">
@@ -563,14 +552,34 @@ export default function InteractiveCourseSession({
             <div className="lg:hidden p-2 text-gray-400" onClick={() => setIsSidebarOpen(true)}><Menu /></div>
             <h1 className="font-bold text-sm tracking-tight">GENIE <span className="text-purple-500">SESSION</span></h1>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="h-1.5 w-24 bg-gray-800 rounded-full overflow-hidden">
-              <motion.div
-                animate={{ width: `${(session?.learningContext?.comprehensionLevel || 0) * 100}%` }}
-                className="h-full bg-purple-500"
-              />
-            </div>
-            <span className="text-[10px] font-bold text-gray-500">{Math.round((session?.learningContext?.comprehensionLevel || 0) * 100)}%</span>
+          <div className="flex items-center gap-3">
+            {(() => {
+              const progress = session?.progressState?.overallCourseProgress || 0;
+              return (
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${progress <= 30 ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+                    progress <= 69 ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
+                      'bg-green-500/10 border-green-500/30 text-green-400'
+                  }`}>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[8px] font-black uppercase tracking-tighter leading-none opacity-60">Mastery</span>
+                    <span className="text-xs font-black leading-none">{Math.round(progress)}%</span>
+                  </div>
+                  <div className="w-1.5 h-6 bg-gray-800 rounded-full overflow-hidden flex flex-col justify-end">
+                    <motion.div
+                      initial={{ height: 0 }}
+                      animate={{ height: `${progress}%` }}
+                      className={`w-full rounded-full ${progress <= 30 ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' :
+                          progress <= 69 ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]' :
+                            'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'
+                        }`}
+                    />
+                  </div>
+                  {progress >= 70 && (
+                    <Trophy className="w-3.5 h-3.5 text-green-400 animate-bounce" />
+                  )}
+                </div>
+              );
+            })()}
           </div>
           </header>
 
@@ -643,11 +652,39 @@ export default function InteractiveCourseSession({
                           Accept Challenge
                         </button>
                       </div>
-                    ) : (
-                      <div className="prose prose-invert max-w-none text-sm leading-relaxed">
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
-                      </div>
-                    )}
+                      ) : message.type === 'error' ? (
+                          <div className="flex flex-col items-center gap-4 p-6 bg-red-500/10 border border-red-500/20 rounded-2xl">
+                            <div className="p-3 bg-red-500/20 rounded-full">
+                              <AlertCircle className="w-6 h-6 text-red-500" />
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-medium text-red-200 mb-1">I encountered a little hiccup!</p>
+                              <p className="text-xs text-red-400/60">Don't worry, just tap below to get back on track.</p>
+                            </div>
+                          <button
+                            onClick={() => {
+                              // Remove the error message and its preceding user message, then retry
+                              setMessages(prev => {
+                                const newMessages = [...prev];
+                                const errorIdx = newMessages.findIndex(m => m.id === message.id);
+                                if (errorIdx > 0) {
+                                  const lastUserMsg = newMessages[errorIdx - 1];
+                                  newMessages.splice(errorIdx - 1, 2);
+                                  setTimeout(() => handleSendMessage(lastUserMsg.content, true), 100);
+                                }
+                                return newMessages;
+                              });
+                            }}
+                            className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-black rounded-xl transition-all active:scale-95 shadow-lg shadow-red-900/20"
+                          >
+                            Let's Start!
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="prose prose-invert max-w-none text-sm leading-relaxed">
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        </div>
+                      )}
                   </div>
                 </motion.div>
               ))}

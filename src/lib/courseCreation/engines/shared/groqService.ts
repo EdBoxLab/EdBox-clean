@@ -61,7 +61,7 @@ function getNextGroqClient(): Groq {
 export async function callGroq(
   systemPrompt: string,
   userPrompt: string,
-  model: string = 'llama-3.1-8b-instant'
+  model: string = 'openai/gpt-oss-120b'
 ): Promise<string> {
   const groq = getNextGroqClient();
 

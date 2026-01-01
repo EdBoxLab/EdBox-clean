@@ -167,7 +167,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
     }
 
     const response = await groq.chat.completions.create({
-      model: hasImages ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile',
+      model: hasImages ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'openai/gpt-oss-120b',
       messages,
       temperature,
       max_tokens: maxTokens,

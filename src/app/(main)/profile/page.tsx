@@ -158,14 +158,6 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#09090b] via-[#0f0f14] to-[#09090b] p-4 sm:p-6 md:p-8">
 <div className="max-w-4xl mx-auto space-y-6">
-          {/* Streak Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <StreakCard />
-          </motion.div>
-
           <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

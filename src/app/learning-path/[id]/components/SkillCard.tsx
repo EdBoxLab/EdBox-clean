@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Clock, Trophy, CheckCircle, Target, Lock, AlertCircle } from 'lucide-react';
 import { SkillNode } from '@/lib/courseCreation/types';
 import type { SkillState } from '@/types/skill-progression';
+import { RadialProgress } from '@/components/ui/RadialProgress';
 
 interface SkillProgress {
   challengesCompleted: number;
@@ -148,22 +149,32 @@ export default function SkillCard({
           />
         </div>
 
-        {/* State Icon */}
-        <div className="absolute top-3 right-3">
-          <motion.div
-            animate={skillState === 'mastered' ? {
-              scale: [1, 1.1, 1],
-              rotate: [0, 5, -5, 0]
-            } : {}}
-            transition={{
-              duration: 2,
-              repeat: skillState === 'mastered' ? Infinity : 0,
-              repeatDelay: 3
-            }}
-          >
-            <StateIcon className={`w-5 h-5 ${styles.iconColor}`} />
-          </motion.div>
-        </div>
+          {/* State Icon / Radial Progress */}
+          <div className="absolute top-3 right-3">
+            {progress && skillState !== 'locked' ? (
+              <RadialProgress 
+                value={progress.progressPercentage / 100} 
+                size={40} 
+                strokeWidth={4}
+                color={skillState === 'mastered' ? 'stroke-green-500' : 'stroke-indigo-500'}
+              />
+            ) : (
+              <motion.div
+                animate={skillState === 'mastered' ? {
+                  scale: [1, 1.1, 1],
+                  rotate: [0, 5, -5, 0]
+                } : {}}
+                transition={{
+                  duration: 2,
+                  repeat: skillState === 'mastered' ? Infinity : 0,
+                  repeatDelay: 3
+                }}
+              >
+                <StateIcon className={`w-5 h-5 ${styles.iconColor}`} />
+              </motion.div>
+            )}
+          </div>
+
 
         {/* Content */}
         <div className="mt-2">

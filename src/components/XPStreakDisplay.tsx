@@ -65,14 +65,14 @@ export function XPStreakDisplay({ userId, skillGraphId = 'default', showCompact 
             <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 bg-gradient-to-r from-purple-600/20 to-pink-600/20 px-3 py-1.5 rounded-full border border-purple-500/30">
                     <Zap className="w-4 h-4 text-purple-400" />
-                    <span className="text-sm font-bold text-purple-300">{xpData.xp} XP</span>
-                    <span className="text-xs text-gray-400">Lv.{xpData.level}</span>
+                    <span className="text-sm font-bold text-purple-300">{xpData.xp} Knowledge Gems</span>
+                    <span className="text-xs text-gray-400">Rank {xpData.level}</span>
                 </div>
                 
                 <div className="flex items-center gap-2 bg-gradient-to-r from-orange-600/20 to-red-600/20 px-3 py-1.5 rounded-full border border-orange-500/30">
                     <Flame className="w-4 h-4 text-orange-400" />
                     <span className="text-sm font-bold text-orange-300">{xpData.streak}</span>
-                    <span className="text-xs text-gray-400">day streak</span>
+                    <span className="text-xs text-gray-400">Flow State</span>
                 </div>
             </div>
         );
@@ -91,8 +91,8 @@ export function XPStreakDisplay({ userId, skillGraphId = 'default', showCompact 
                             <TrendingUp className="w-6 h-6 text-purple-400" />
                         </div>
                         <div>
-                            <h3 className="text-2xl font-bold text-white">Level {xpData.level}</h3>
-                            <p className="text-sm text-gray-400">{xpData.xp} Total XP</p>
+                            <h3 className="text-2xl font-bold text-white">Rank {xpData.level}</h3>
+                            <p className="text-sm text-gray-400">{xpData.xp} Knowledge Gems Collected</p>
                         </div>
                     </div>
 
@@ -100,15 +100,15 @@ export function XPStreakDisplay({ userId, skillGraphId = 'default', showCompact 
                         <Flame className="w-5 h-5 text-orange-400" />
                         <div className="text-right">
                             <div className="text-2xl font-bold text-orange-300">{xpData.streak}</div>
-                            <div className="text-xs text-gray-400">day streak</div>
+                            <div className="text-xs text-gray-400">Flow State</div>
                         </div>
                     </div>
                 </div>
 
                 <div className="mb-2">
                     <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-400">Progress to Level {xpData.level + 1}</span>
-                        <span className="text-purple-400 font-bold">{xpInCurrentLevel}/100 XP</span>
+                        <span className="text-gray-400">Ascension to Rank {xpData.level + 1}</span>
+                        <span className="text-purple-400 font-bold">{xpInCurrentLevel}/100 Gems</span>
                     </div>
                     <div className="h-3 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
                         <motion.div

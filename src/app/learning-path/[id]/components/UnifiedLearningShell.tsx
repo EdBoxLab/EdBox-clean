@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, Sparkles, Heart, Zap, HelpCircle } from 'lucide-react';
+import { X, ChevronLeft, Sparkles, Heart, Zap, HelpCircle, Trophy } from 'lucide-react';
 import { Challenge } from '@/lib/courseCreation/types';
 
 interface UnifiedLearningShellProps {
@@ -51,11 +51,31 @@ export default function UnifiedLearningShell({
                     <div className="absolute inset-0 bg-white/5 pointer-events-none" />
                 </div>
 
-                {/* Status Indicators */}
+                {/* Mastery Status Bar */}
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-800/50 rounded-lg">
-                        <Heart className="w-4 h-4 text-red-500 fill-current" />
-                        <span className="text-sm font-bold">{lives}</span>
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${
+                        progress <= 30 ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+                        progress <= 69 ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
+                        'bg-green-500/10 border-green-500/30 text-green-400'
+                    }`}>
+                        <div className="flex flex-col items-end">
+                            <span className="text-[10px] font-black uppercase tracking-tighter leading-none opacity-60">Mastery</span>
+                            <span className="text-sm font-black leading-none">{Math.round(progress)}%</span>
+                        </div>
+                        <div className="w-2 h-8 bg-gray-800 rounded-full overflow-hidden flex flex-col justify-end">
+                            <motion.div 
+                                initial={{ height: 0 }}
+                                animate={{ height: `${progress}%` }}
+                                className={`w-full rounded-full ${
+                                    progress <= 30 ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' :
+                                    progress <= 69 ? 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]' :
+                                    'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]'
+                                }`}
+                            />
+                        </div>
+                        {progress >= 70 && (
+                            <Trophy className="w-4 h-4 text-green-400 animate-bounce" />
+                        )}
                     </div>
                     <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-800/50 rounded-lg">
                         <Zap className="w-4 h-4 text-yellow-500 fill-current" />

@@ -21,7 +21,9 @@ export default function OnboardingFlow() {
     isGenerating,
     error,
     showContinue,
+    level,
     setGoal,
+    setLevel,
     setContext,
     setTimeAvailable,
     handleFileUpload,
@@ -71,6 +73,8 @@ export default function OnboardingFlow() {
                 key="step1"
                 goal={goal}
                 setGoal={setGoal}
+                level={level}
+                setLevel={setLevel}
                 uploadedFile={uploadedFile}
                 handleFileUpload={handleFileUpload}
                 isExtracting={isExtracting}

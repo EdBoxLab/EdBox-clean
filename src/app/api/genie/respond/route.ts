@@ -57,13 +57,17 @@ export async function POST(request: NextRequest) {
         let userProfileContext = '';
         let studySetsContext = '';
         let notesContext = '';
+        let competencyContext = '';
+        let recentSummaryContext = '';
 
         if (session) {
-            // Get user profile
+            const userId = session.user.id;
+
+            // 1. Get user profile
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('education, country, age')
-                .eq('id', session.user.id)
+                .eq('id', userId)
                 .single();
 
             if (profile) {
@@ -74,11 +78,11 @@ User Profile:
 - Age: ${profile.age || 'Unknown'}`;
             }
 
-            // Get user's study sets
+            // 2. Get user's study sets
             const { data: studySets } = await supabase
                 .from('skill_graphs')
                 .select('id,goal,nodes,edges')
-                .eq('user_id', session.user.id)
+                .eq('user_id', userId)
                 .order('created_at', { ascending: false })
                 .limit(10);
 
@@ -88,11 +92,11 @@ User Profile:
                 ).join('\n')}`;
             }
 
-            // Get user's notes
+            // 3. Get user's notes
             const { data: notes } = await supabase
                 .from('notes')
                 .select('id, title, content')
-                .eq('user_id', session.user.id)
+                .eq('user_id', userId)
                 .order('created_at', { ascending: false })
                 .limit(10);
 
@@ -100,6 +104,35 @@ User Profile:
                 notesContext = `\n\nUser's Recent Notes:\n${notes.map(note =>
                     `- "${note.title}"${note.content ? `: ${note.content.substring(0, 100)}...` : ''}`
                 ).join('\n')}`;
+            }
+
+            // 4. Get Competency (Anthropic Memory style)
+            if (skillTitle) {
+                const { data: competencies } = await supabase
+                    .from('user_competency')
+                    .select('concept, confidence, mastery_state')
+                    .eq('user_id', userId)
+                    .eq('topic', skillTitle);
+
+                if (competencies && competencies.length > 0) {
+                    competencyContext = `\n\nUser Competency for "${skillTitle}":\n${competencies.map(c =>
+                        `- ${c.concept}: ${Math.round(c.confidence * 100)}% mastery (${JSON.stringify(c.mastery_state)})`
+                    ).join('\n')}`;
+                }
+
+                // 5. Get Recent Summary (Supermemory style)
+                const { data: summary } = await supabase
+                    .from('chat_summaries')
+                    .select('summary_text, key_insights')
+                    .eq('user_id', userId)
+                    .eq('topic', skillTitle)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (summary) {
+                    recentSummaryContext = `\n\nRecent Learning Session Summary:\n${summary.summary_text}\nKey Insights: ${JSON.stringify(summary.key_insights)}`;
+                }
             }
         }
 
@@ -115,7 +148,7 @@ User Profile:
         if (isInteractiveCourse) {
             // Interactive course-specific prompt
             systemPrompt = `You are Genie, an enthusiastic AI learning companion guiding users through an interactive course experience on "${skillTitle}".
-${userProfileContext}${studySetsContext}${notesContext}
+${userProfileContext}${studySetsContext}${notesContext}${competencyContext}${recentSummaryContext}
 
 INTERACTIVE COURSE CONTEXT: ${context}
 ${extraContextFromFiles}
@@ -123,6 +156,8 @@ ${extraContextFromFiles}
 INTERACTIVE COURSE GUIDELINES:
 - You are conducting a conversational learning session, not just answering questions
 - Build on the user's current learning context and previously mastered concepts
+- ALWAYS check user competency. If they have low confidence (e.g., < 0.5) in a prerequisite concept, address it BEFORE moving forward.
+- NEVER go "back to basics" if the competency shows they have already mastered those basics (e.g., > 0.8).
 - Adapt explanations to their comprehension level (shown in context)
 - Use a natural, conversational tone as if you're sitting together learning
 - Transform static content into engaging dialogue
@@ -144,13 +179,14 @@ Respond as their learning companion in this interactive course:`;
         } else {
             // Standard Genie prompt for general interactions
             systemPrompt = `You are Genie, an enthusiastic AI learning companion helping users master "${skillTitle}".
-${userProfileContext}${studySetsContext}${notesContext}
+${userProfileContext}${studySetsContext}${notesContext}${competencyContext}${recentSummaryContext}
 
 Current context: ${context || 'User is learning this skill'}
 ${extraContextFromFiles}
 
 Guidelines:
 - You have full knowledge of the user's study materials, notes, and learning progress above.
+- Use the User Competency and Recent Summary to avoid repeating things they know or going back to basics unnecessarily.
 - Adapt to the user's education level and region.
 - Be encouraging, friendly, and supportive like a study buddy.
 - Explain concepts clearly and simply.
@@ -175,6 +211,68 @@ Respond naturally as a friendly companion:`;
         });
 
         const genieResponse = result.text || "Hey! I'm Genie, your study buddy. What would you like to know?";
+
+        // Background: Update summary and competency (Supermemory/Anthropic style)
+        if (session && skillTitle) {
+            const userId = session.user.id;
+            
+            // This is a simplified "background" process
+            // In a real production app, you might use a queue or a separate edge function
+            (async () => {
+                try {
+                    const summaryPrompt = `Summarize this learning exchange for user mastery tracking. 
+User said: "${userMessage}"
+Genie responded: "${genieResponse}"
+
+Return a JSON with:
+"summary": a one-sentence summary of the exchange.
+"mastery_update": { "concept": string, "confidence_delta": number (-0.5 to 0.5) } (only if mastery changed)
+"key_insights": string[] (e.g. ["struggling with hypothesis", "mastered base case"])`;
+
+                    const summaryResult = await generateWithRetry({
+                        prompt: summaryPrompt,
+                        systemPrompt: "You are a learning progress analyzer. Be concise.",
+                        temperature: 0.1,
+                    });
+
+                    const summaryData = JSON.parse(summaryResult.text || '{}');
+
+                    if (summaryData.summary) {
+                        await supabase.from('chat_summaries').insert({
+                            user_id: userId,
+                            topic: skillTitle,
+                            summary_text: summaryData.summary,
+                            key_insights: summaryData.key_insights || []
+                        });
+                    }
+
+                    if (summaryData.mastery_update?.concept) {
+                        const concept = summaryData.mastery_update.concept;
+                        const delta = summaryData.mastery_update.confidence_delta || 0;
+
+                        const { data: existing } = await supabase
+                            .from('user_competency')
+                            .select('confidence')
+                            .eq('user_id', userId)
+                            .eq('topic', skillTitle)
+                            .eq('concept', concept)
+                            .single();
+
+                        const newConfidence = Math.max(0, Math.min(1.0, (existing?.confidence || 0) + delta));
+
+                        await supabase.from('user_competency').upsert({
+                            user_id: userId,
+                            topic: skillTitle,
+                            concept: concept,
+                            confidence: newConfidence,
+                            last_updated: new Date().toISOString()
+                        }, { onConflict: 'user_id,topic,concept' });
+                    }
+                } catch (e) {
+                    console.error('Failed to update learning state:', e);
+                }
+            })();
+        }
 
         return NextResponse.json({
             success: true,

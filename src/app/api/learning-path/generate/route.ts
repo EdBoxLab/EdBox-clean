@@ -50,6 +50,7 @@ async function retryWithBackoff<T>(
 async function analyzeGoal(
   goal: string,
   context: LearningContext,
+  level: string,
   timeAvailable?: string,
   uploadedFileContent?: string
 ): Promise<{
@@ -59,47 +60,74 @@ async function analyzeGoal(
   estimatedTotalHours: number;
   recommendedEngine: EngineType;
   category: CourseCategory;
+  adjustedDifficulty: string;
 }> {
   const systemPrompt = `Role: {Act as an expert learning path designer for Gen Z students (16–24). You are not just a planner, but a motivational architect who designs practical, build-focused learning journeys.}
 
 Expertise: {Analyze user goals deeply, translate vague ambitions into specific skills, and map them to the right domain, proficiency level, realistic time estimate, and best engine. Always optimize for bite-sized (2–5 min) micro-skills, mobile-first learning, and building tangible outcomes.}
 
+User Level: ${level}
+Time Available: ${timeAvailable || 'Not specified'}
 Audience Context:
 - Situation: ${context}
 - Preferences: Bite-sized learning, mobile-first, build > theory
 
 Constraints: {Never output vague or generic paths. Always be specific, practical, and builder-oriented. Return ONLY valid JSON. No extra text.}
 
-Goal: {Provide a JSON learning path analysis with 5 fields: parsedGoal, domain, targetProficiency, estimatedTotalHours, recommendedEngine.}
+Goal: {Provide a JSON learning path analysis with 6 fields: parsedGoal, domain, targetProficiency, estimatedTotalHours, recommendedEngine, adjustedDifficulty.}
 
-Engagement Rules:
-- **Specificity**: Translate broad goals into concrete skills (e.g., "learn coding" → "build a responsive website").  
-- **Builder Focus**: Emphasize creation, projects, and applied learning.  
-- **Realism**: Time estimates must be achievable for Gen Z students.  
-- **Motivation**: Design paths that feel exciting and rewarding.  
-- **JSON Enforcement**: Output strictly valid JSON, no extra commentary.  
+  Engagement Rules:
+  - **COURSE NAMING (CRITICAL)**: The parsedGoal MUST be a proper course title that reflects the technology/subject being learned. Examples:
+    - User says "learn React" → parsedGoal: "React Fundamentals" or "React Mastery Course" or "Learn React from Scratch"
+    - User says "learn Python" → parsedGoal: "Python Programming Course" or "Python Fundamentals"
+    - User says "web development" → parsedGoal: "Full-Stack Web Development" or "Web Development Bootcamp"
+    - NEVER use generic task names like "Build a counter" or "Create a component" as the course title
+    - The course title should sound like an actual course you'd find on an e-learning platform
+  - **NO COMPETITOR REFERENCES**: NEVER mention competitors like Scrimba, Codecademy, Udemy, Coursera, etc. in any part of the output. All learning happens within EdBox.
+  - **Specificity**: Translate broad goals into concrete skills while keeping the course title professional.
+  - **Builder Focus**: Emphasize creation, projects, and applied learning.  
+  - **Realism**: Time estimates must be achievable for Gen Z students.  
+  - **Motivation**: Design paths that feel exciting and rewarding.  
+  - **JSON Enforcement**: Output strictly valid JSON, no extra commentary.  
+  - **STRICT Context Primacy**: If a document or extracted context is provided, you MUST use it as the SOLE source of truth for the curriculum. DO NOT hallucinate external topics that are not in the document. If the user goal is vague but a document is present, the document defines the scope.
+  - **Level Calibration**: The course MUST be tailored to the ${level} level. Beginners need foundational concepts; advanced users need complex, deep-dive technical skills.
+  - **Duration Calibration**: 
+    - If time is ~5min: Focus on 1-3 atomic, high-impact micro-skills.
+    - If time is ~15min: Focus on 4-7 micro-skills with slightly more depth.
+    - If time is ~1hour: Design a comprehensive path with 12-15 micro-skills and projects.
+    - Set estimatedTotalHours exactly to the numeric value of the timeAvailable (e.g., 5 min = 0.083, 15 min = 0.25, 1 hour = 1.0).
 
-Return: {Valid JSON object with keys: parsedGoal, domain, targetProficiency, estimatedTotalHours, recommendedEngine.}
+Return: {Valid JSON object with keys: parsedGoal, domain, targetProficiency, estimatedTotalHours, recommendedEngine, adjustedDifficulty.}
 `;
 
   const fileContext = uploadedFileContent
-    ? `\n\nUploaded document context: ${uploadedFileContent.substring(0, 10000)}`
+    ? `\n\nCRITICAL CONTEXT (UPLOADED DOCUMENT):
+----------------------------------
+${uploadedFileContent.substring(0, 15000)}
+----------------------------------
+The course MUST be 100% based on the material above if it contains specific technical content or a syllabus.`
     : '';
 
   const schema = {
     type: "object",
     properties: {
-      parsedGoal: { type: "string", description: "A concrete, exciting goal based on the user's input and document content. DO NOT use generic names like 'Course' or 'Trash'." },
+      parsedGoal: { type: "string", description: "A professional course title (e.g., 'React Fundamentals', 'Python Programming Course', 'Web Development Bootcamp'). MUST sound like a real course title. NEVER use task-based names like 'Build a counter' or 'Create a component'. NEVER reference competitors like Scrimba, Codecademy, Udemy, etc." },
       domain: { type: "string" },
       targetProficiency: { type: "string" },
       estimatedTotalHours: { type: "number" },
       recommendedEngine: { type: "string" },
+      adjustedDifficulty: { type: "string", description: "The difficulty adjusted based on the user level and duration (e.g. 'Introductory', 'Intensive', 'Deep Dive')" },
     },
-    required: ['parsedGoal', 'domain', 'targetProficiency', 'estimatedTotalHours', 'recommendedEngine']
+    required: ['parsedGoal', 'domain', 'targetProficiency', 'estimatedTotalHours', 'recommendedEngine', 'adjustedDifficulty']
   };
 
   const result = await generateWithRetry({
-    prompt: `Goal: "${goal}"${fileContext}\n\nBased on the goal and any uploaded context above, generate a detailed and professional learning plan. If a document was uploaded, use its content as the primary source of truth for the curriculum.`,
+    prompt: `User Goal: "${goal}"
+Level: ${level}
+Duration: ${timeAvailable || 'Not specified'}
+${fileContext}
+
+Based on the goal, level, and duration, generate a detailed learning plan analysis. If a document was uploaded, use its content as the primary source of truth. Ensure the target proficiency matches the user's level (${level}) and the estimated hours match the requested duration (${timeAvailable}).`,
     systemPrompt,
     schema,
     temperature: 0.7,
@@ -126,9 +154,12 @@ async function generateSkillGraph(
   parsedGoal: string,
   domain: string,
   context: LearningContext,
+  level: string,
   targetProficiency: string,
   primaryEngine: EngineType,
-  category: CourseCategory
+  category: CourseCategory,
+  timeAvailable?: string,
+  uploadedFileContent?: string
 ): Promise<{
   skillPaths: SkillPath[];
   miniProjects: MiniProject[];
@@ -161,33 +192,60 @@ async function generateSkillGraph(
 - Full-stack capabilities`
   };
 
+  const fileContext = uploadedFileContent
+    ? `\n\nCRITICAL: The curriculum MUST be strictly based on the following uploaded content:
+----------------------------------
+${uploadedFileContent.substring(0, 15000)}
+----------------------------------`
+    : '';
+
+  const durationRules = `
+    DURATION RULES (STRICT COMPLIANCE REQUIRED):
+    - **Total Duration Selected**: ${timeAvailable || 'unspecified'}
+    - If duration is **5 minutes**:
+      - Break skills into 1-2 minute atomic chunks.
+      - Limit total micro-skills to 2-4.
+      - Keep explanations extremely concise.
+      - Ensure the sum of all estimatedMinutes (including projects) is exactly 5 minutes.
+    - If duration is **15 minutes**:
+      - Include 5-8 micro-skills.
+      - Provide slightly deeper but still concise explanations.
+      - Ensure total estimated time across all elements is exactly 15 minutes.
+    - If duration is **1 hour**:
+      - Expand to 12-20 micro-skills.
+      - Include detailed explanations and specific practice opportunities.
+      - Ensure total estimated time across all elements is exactly 60 minutes.
+  `;
+
   const basePrompt = `You are an expert curriculum designer for Gen Z learners.
 
-Create a skill graph with MICRO-SKILLS (2-5 minutes each).
+Create a skill graph with MICRO-SKILLS tailored to the selected duration.
 
-CRITICAL RULES:
-1. Each micro-skill = ONE atomic capability (not a broad topic)
-2. Skills must be DEMONSTRABLE in an engine
-3. Total 12-20 micro-skills (not more!)
-4. Organize into 3-5 logical skill paths
-5. Include 2-3 mini-projects (5-15 min each)
-6. One epic capstone project (20-40 min)
+    CRITICAL RULES:
+    1. Each micro-skill = ONE atomic capability (not a broad topic)
+    2. Skills must be DEMONSTRABLE in an engine
+    3. Total micro-skills count must follow the Duration Rules below.
+    4. Organize into 1-5 logical skill paths based on duration.
+    5. Include mini-projects (scaled to duration).
+    6. Include one capstone project (scaled to duration).
+    7. **Level Appropriateness**: All skills and projects MUST be strictly tailored for a **${level}** learner.
+    8. **STRICT Context Primacy**: If a document is provided, you MUST use its contents as the EXCLUSIVE source of truth. DO NOT include outside information or topics not present in the source material.
+    9. **NO COMPETITOR REFERENCES**: NEVER mention competitors like Scrimba, Codecademy, Udemy, Coursera, FreeCodeCamp, etc. in skill names, descriptions, or any output. All learning happens within EdBox's engines (codestudio, mathlab, physicssim, lingualab, etc.).
+    10. **SKILL NAMING**: Use action-oriented skill names that describe what the learner will DO (e.g., "Create Your First React Component", "Build a State Counter", "Implement Event Handlers").
+    
+    ${durationRules}
 
 Target: ${parsedGoal}
 Domain: ${domain}
 Proficiency: ${targetProficiency}
+Level: ${level}
 Primary Engine: ${primaryEngine}
+${fileContext}
 
 PERSONALIZATION:
 ${contextualGuidance[context]}
 
 Micro-skill naming: Be SPECIFIC and ACTION-oriented
-❌ Bad: "Learn Variables"
-✅ Good: "Declare and Use Variables"
-
-❌ Bad: "Understanding Functions"  
-✅ Good: "Write Your First Function"
-
 Each skill unlocks when prerequisites are mastered.
 
 Respond ONLY with valid JSON.`;
@@ -288,6 +346,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       goal,
+      level = 'beginner',
       context = LearningContext.College,
       timeAvailable,
       uploadedFile,
@@ -441,6 +500,7 @@ export async function POST(request: NextRequest) {
     const analysis = await analyzeGoal(
       goal,
       context,
+      level,
       timeAvailable,
       processedContent
     );
@@ -457,9 +517,12 @@ export async function POST(request: NextRequest) {
       analysis.parsedGoal,
       analysis.domain,
       context,
+      level,
       analysis.targetProficiency,
       analysis.recommendedEngine as EngineType,
-      analysis.category
+      analysis.category,
+      timeAvailable,
+      processedContent
     );
 
     const totalSkills = skillGraphData.skillPaths.reduce(
@@ -482,7 +545,7 @@ export async function POST(request: NextRequest) {
       goal: analysis.parsedGoal,
       context,
       totalSkills,
-      estimatedHours: `${Math.ceil(analysis.estimatedTotalHours)}-${Math.ceil(analysis.estimatedTotalHours * 1.3)} hours`,
+      estimatedHours: timeAvailable || `${Math.ceil(analysis.estimatedTotalHours)}-${Math.ceil(analysis.estimatedTotalHours * 1.3)} hours`,
       skillPaths: skillGraphData.skillPaths,
       miniProjects: skillGraphData.miniProjects,
       capstone_project: skillGraphData.capstoneProject,
@@ -580,19 +643,33 @@ export async function POST(request: NextRequest) {
             capstone_project: skillGraph.capstone_project,
             nodes: skillGraph.nodes,
             edges: skillGraph.edges,
+            adjustedDifficulty: analysis.adjustedDifficulty
           },
       }
     );
 
     console.log('✅ Learning path generated successfully!');
 
+    // Generate skill breakdown for the response summary
+    const skillBreakdown = allSkills.map(s => ({
+      name: s.name,
+      estimatedMinutes: s.estimatedMinutes
+    }));
+
     return NextResponse.json({
       success: true,
       cached: false,
+      summary: {
+        totalDuration: timeAvailable || skillGraph.estimatedHours,
+        numberOfSkills: totalSkills,
+        skillBreakdown,
+        adjustedDifficulty: analysis.adjustedDifficulty
+      },
       skillGraph: {
         ...skillGraph,
         readySkills: allSkills.filter(s => s.prerequisites.length === 0).length,
         totalProjects: skillGraphData.miniProjects.length + 1,
+        adjustedDifficulty: analysis.adjustedDifficulty
       },
       learnerState: {
         id: learnerState.id,

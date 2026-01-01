@@ -6,26 +6,24 @@ export async function POST(request: Request) {
     const { notes } = await request.json();
 
     const prompt = `
-      Generate a multiple-choice quiz from the following notes. Each question should have four options, and one correct answer.
+      Generate a multiple-choice quiz from the following notes. 
+      
+      CRITICAL REQUIREMENT:
+      Focus on application-based and calculation-heavy questions rather than just theoretical definitions. 
+      If the notes involve math, physics, or any logic-based steps (like Mathematical Induction), ensure at least 60% of the questions involve actual computation or multi-step problem solving.
+      
+      Each question should have four options, and one correct answer.
       Return the quiz as a JSON object with a "questions" property, which is an array of objects. 
       Each question object should have a "question", "options" (an array of four strings), and "answer" (the correct option string).
-
-      For example:
+      
+      Example of a good calculation question:
       {
-        "questions": [
-          {
-            "question": "What is the capital of France?",
-            "options": ["London", "Berlin", "Paris", "Madrid"],
-            "answer": "Paris"
-          },
-          {
-            "question": "What is the powerhouse of the cell?",
-            "options": ["Nucleus", "Ribosome", "Mitochondria", "Golgi apparatus"],
-            "answer": "Mitochondria"
-          }
-        ]
+        "question": "In the induction step for P(n): 1+2+...+n = n(n+1)/2, if we assume P(k) is true, what is the value of 1+2+...+k + (k+1)?",
+        "options": ["(k+1)(k+2)/2", "k(k+1)/2 + k", "(k+1)^2/2", "k^2/2 + k + 1"],
+        "answer": "(k+1)(k+2)/2"
       }
-in total the quiz should consist of between 10-20 questions.
+
+      Total questions: between 10-20.
       Notes:
       ${notes}
     `;

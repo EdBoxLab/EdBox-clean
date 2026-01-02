@@ -5,7 +5,7 @@ import { initializeTransaction } from '@/lib/services/paystack';
 
 export async function POST(req: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = createRouteHandlerClient({ cookies });  // Pass factory directly—no await
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {

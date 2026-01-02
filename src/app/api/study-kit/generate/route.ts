@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
             prompt: buildPrompt(type, finalPrompt, isAppend, type === 'notes' ? customInstructions : ''),
             systemPrompt: 'Output ONLY valid JSON with no extra text.',
             temperature: 0.7,
-            maxTokens: type === 'notes' ? 3000 : 4000,
+            maxTokens: type === 'notes' ? 6000 : 4000,
           });
 
         const output = type === 'notes' ? result.text : extractJSON(result.text, type);

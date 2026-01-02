@@ -522,6 +522,14 @@ const { isPremium } = useSubscription();
                     [contentType]: data.updatedContent
                 }));
 
+                setStudyKit((prev: any) => ({
+                    ...prev,
+                    generated_content: {
+                        ...prev.generated_content,
+                        [contentType]: data.updatedContent
+                    }
+                }));
+
                 if (contentType === 'quizzes' && Array.isArray(data.updatedContent)) {
                     setCurrentQuizStates(data.updatedContent.map(() => ({
                         selectedOption: null,
@@ -1128,35 +1136,215 @@ const { isPremium } = useSubscription();
                                         </div>
                                     )}
 
-                                    {activeTab === 'notes' && generatedContent.notes && (
-                                        <div>
-                                            <div className="bg-gray-800 border border-zinc-700 rounded-2xl p-8 lg:p-12 shadow-2xl">
-                                                <div className="prose prose-invert prose-indigo max-w-none">
-                                                    {(() => {
-                                                        let notesContent = generatedContent.notes;
-                                                        if (typeof notesContent === 'object' && !Array.isArray(notesContent)) {
-                                                            notesContent = notesContent.notes || JSON.stringify(notesContent, null, 2);
-                                                        } else if (Array.isArray(notesContent)) {
-                                                            notesContent = notesContent.join('\n\n');
-                                                        }
+{activeTab === 'notes' && generatedContent.notes && (
+                                          <div>
+                                              <div className="bg-gray-800 border border-zinc-700 rounded-2xl p-8 lg:p-12 shadow-2xl">
+                                                  <div className="prose prose-invert prose-indigo max-w-none">
+                                                      {(() => {
+                                                          let notesContent = generatedContent.notes;
+                                                          if (typeof notesContent === 'object' && !Array.isArray(notesContent)) {
+                                                              notesContent = notesContent.notes || JSON.stringify(notesContent, null, 2);
+                                                          } else if (Array.isArray(notesContent)) {
+                                                              notesContent = notesContent.join('\n\n');
+                                                          }
 
-                                                        if (typeof notesContent !== 'string') return <div className="text-zinc-400">Invalid notes format</div>;
+                                                          if (typeof notesContent !== 'string') return <div className="text-zinc-400">Invalid notes format</div>;
 
-                                                        return (
-                                                            <div className="text-zinc-200 leading-relaxed space-y-6 whitespace-pre-wrap">
-                                                                {notesContent.split('\n').map((line, idx) => {
-                                                                    if (line.startsWith('# ')) return <h1 key={idx} className="text-4xl font-bold text-white mb-6 border-b border-zinc-800 pb-4">{line.replace('# ', '')}</h1>;
-                                                                    if (line.startsWith('## ')) return <h2 key={idx} className="text-2xl font-bold text-indigo-400 mt-10 mb-4">{line.replace('## ', '')}</h2>;
-                                                                    if (line.startsWith('### ')) return <h3 key={idx} className="text-xl font-bold text-white mt-8 mb-3">{line.replace('### ', '')}</h3>;
-                                                                    if (line.startsWith('- ') || line.startsWith('* ')) return <li key={idx} className="ml-4 text-zinc-300">{line.replace(/^[-*] /, '')}</li>;
-                                                                    if (line.trim() === '') return <div key={idx} className="h-2" />;
-                                                                    return <p key={idx} className="text-zinc-300">{line}</p>;
-                                                                })}
-                                                            </div>
-                                                        );
-                                                    })()}
-                                                </div>
-                                            </div>
+                                                          const renderInlineFormatting = (text: string, keyPrefix: string) => {
+                                                              const parts: React.ReactNode[] = [];
+                                                              let remaining = text;
+                                                              let partIndex = 0;
+                                                              
+                                                              while (remaining.length > 0) {
+                                                                  const inlineCodeMatch = remaining.match(/`([^`]+)`/);
+                                                                  const boldMatch = remaining.match(/\*\*([^*]+)\*\*/);
+                                                                  
+                                                                  let firstMatch: { index: number; length: number; content: string; type: 'code' | 'bold' } | null = null;
+                                                                  
+                                                                  if (inlineCodeMatch && inlineCodeMatch.index !== undefined) {
+                                                                      firstMatch = { index: inlineCodeMatch.index, length: inlineCodeMatch[0].length, content: inlineCodeMatch[1], type: 'code' };
+                                                                  }
+                                                                  if (boldMatch && boldMatch.index !== undefined) {
+                                                                      if (!firstMatch || boldMatch.index < firstMatch.index) {
+                                                                          firstMatch = { index: boldMatch.index, length: boldMatch[0].length, content: boldMatch[1], type: 'bold' };
+                                                                      }
+                                                                  }
+                                                                  
+                                                                  if (firstMatch) {
+                                                                      if (firstMatch.index > 0) {
+                                                                          parts.push(<span key={`${keyPrefix}-${partIndex++}`}>{remaining.substring(0, firstMatch.index)}</span>);
+                                                                      }
+                                                                      if (firstMatch.type === 'code') {
+                                                                          parts.push(<code key={`${keyPrefix}-${partIndex++}`} className="bg-zinc-900 text-indigo-300 px-1.5 py-0.5 rounded text-sm font-mono">{firstMatch.content}</code>);
+                                                                      } else if (firstMatch.type === 'bold') {
+                                                                          parts.push(<strong key={`${keyPrefix}-${partIndex++}`} className="text-white font-semibold">{firstMatch.content}</strong>);
+                                                                      }
+                                                                      remaining = remaining.substring(firstMatch.index + firstMatch.length);
+                                                                  } else {
+                                                                      parts.push(<span key={`${keyPrefix}-${partIndex++}`}>{remaining}</span>);
+                                                                      break;
+                                                                  }
+                                                              }
+                                                              return parts.length > 0 ? parts : text;
+                                                          };
+
+                                                          const lines = notesContent.split('\n');
+                                                          const elements: React.ReactNode[] = [];
+                                                          let i = 0;
+                                                          let codeBlock: string[] = [];
+                                                          let inCodeBlock = false;
+                                                          let codeLanguage = '';
+                                                          let tableRows: string[][] = [];
+                                                          let inTable = false;
+
+                                                          while (i < lines.length) {
+                                                              const line = lines[i];
+                                                              
+                                                              if (line.startsWith('```')) {
+                                                                  if (!inCodeBlock) {
+                                                                      inCodeBlock = true;
+                                                                      codeLanguage = line.slice(3).trim() || 'text';
+                                                                      codeBlock = [];
+                                                                  } else {
+                                                                      elements.push(
+                                                                          <div key={`code-${i}`} className="my-6 rounded-xl overflow-hidden border border-zinc-700">
+                                                                              <div className="bg-zinc-900 px-4 py-2 text-xs text-zinc-400 font-mono border-b border-zinc-700 flex items-center justify-between">
+                                                                                  <span>{codeLanguage}</span>
+                                                                                  <button
+                                                                                      onClick={() => navigator.clipboard.writeText(codeBlock.join('\n'))}
+                                                                                      className="text-zinc-500 hover:text-white transition"
+                                                                                  >
+                                                                                      Copy
+                                                                                  </button>
+                                                                              </div>
+                                                                              <pre className="bg-zinc-950 p-4 overflow-x-auto">
+                                                                                  <code className="text-sm font-mono text-indigo-200 whitespace-pre">
+                                                                                      {codeBlock.join('\n')}
+                                                                                  </code>
+                                                                              </pre>
+                                                                          </div>
+                                                                      );
+                                                                      inCodeBlock = false;
+                                                                      codeBlock = [];
+                                                                  }
+                                                                  i++;
+                                                                  continue;
+                                                              }
+                                                              
+                                                              if (inCodeBlock) {
+                                                                  codeBlock.push(line);
+                                                                  i++;
+                                                                  continue;
+                                                              }
+
+                                                              if (line.startsWith('|') && line.endsWith('|')) {
+                                                                  if (!inTable) {
+                                                                      inTable = true;
+                                                                      tableRows = [];
+                                                                  }
+                                                                  const cells = line.split('|').slice(1, -1).map(c => c.trim());
+                                                                  if (!cells.every(c => /^[-:]+$/.test(c))) {
+                                                                      tableRows.push(cells);
+                                                                  }
+                                                                  i++;
+                                                                  continue;
+                                                              } else if (inTable) {
+                                                                  elements.push(
+                                                                      <div key={`table-${i}`} className="my-6 overflow-x-auto">
+                                                                          <table className="w-full border-collapse">
+                                                                              <thead>
+                                                                                  <tr className="bg-zinc-900">
+                                                                                      {tableRows[0]?.map((cell, ci) => (
+                                                                                          <th key={ci} className="border border-zinc-700 px-4 py-2 text-left text-indigo-300 font-semibold">{renderInlineFormatting(cell, `th-${i}-${ci}`)}</th>
+                                                                                      ))}
+                                                                                  </tr>
+                                                                              </thead>
+                                                                              <tbody>
+                                                                                  {tableRows.slice(1).map((row, ri) => (
+                                                                                      <tr key={ri} className={ri % 2 === 0 ? 'bg-zinc-800/50' : 'bg-zinc-800/30'}>
+                                                                                          {row.map((cell, ci) => (
+                                                                                              <td key={ci} className="border border-zinc-700 px-4 py-2 text-zinc-300">{renderInlineFormatting(cell, `td-${i}-${ri}-${ci}`)}</td>
+                                                                                          ))}
+                                                                                      </tr>
+                                                                                  ))}
+                                                                              </tbody>
+                                                                          </table>
+                                                                      </div>
+                                                                  );
+                                                                  inTable = false;
+                                                                  tableRows = [];
+                                                              }
+
+                                                              if (line.startsWith('# ')) {
+                                                                  elements.push(<h1 key={i} className="text-4xl font-bold text-white mb-6 border-b border-zinc-800 pb-4">{renderInlineFormatting(line.slice(2), `h1-${i}`)}</h1>);
+                                                              } else if (line.startsWith('## ')) {
+                                                                  elements.push(<h2 key={i} className="text-2xl font-bold text-indigo-400 mt-10 mb-4">{renderInlineFormatting(line.slice(3), `h2-${i}`)}</h2>);
+                                                              } else if (line.startsWith('### ')) {
+                                                                  elements.push(<h3 key={i} className="text-xl font-bold text-white mt-8 mb-3">{renderInlineFormatting(line.slice(4), `h3-${i}`)}</h3>);
+                                                              } else if (line.startsWith('#### ')) {
+                                                                  elements.push(<h4 key={i} className="text-lg font-semibold text-zinc-200 mt-6 mb-2">{renderInlineFormatting(line.slice(5), `h4-${i}`)}</h4>);
+                                                              } else if (line.match(/^(\d+)\.\s/)) {
+                                                                  const match = line.match(/^(\d+)\.\s(.*)$/);
+                                                                  if (match) {
+                                                                      elements.push(
+                                                                          <div key={i} className="flex gap-3 ml-4 my-1">
+                                                                              <span className="text-indigo-400 font-semibold min-w-[20px]">{match[1]}.</span>
+                                                                              <span className="text-zinc-300">{renderInlineFormatting(match[2], `ol-${i}`)}</span>
+                                                                          </div>
+                                                                      );
+                                                                  }
+                                                              } else if (line.startsWith('- ') || line.startsWith('* ')) {
+                                                                  elements.push(
+                                                                      <div key={i} className="flex gap-3 ml-4 my-1">
+                                                                          <span className="text-indigo-400 mt-1.5">•</span>
+                                                                          <span className="text-zinc-300">{renderInlineFormatting(line.slice(2), `li-${i}`)}</span>
+                                                                      </div>
+                                                                  );
+                                                              } else if (line.startsWith('> ')) {
+                                                                  elements.push(
+                                                                      <blockquote key={i} className="border-l-4 border-indigo-500 pl-4 my-4 italic text-zinc-400 bg-zinc-900/50 py-2 rounded-r">
+                                                                          {renderInlineFormatting(line.slice(2), `bq-${i}`)}
+                                                                      </blockquote>
+                                                                  );
+                                                              } else if (line.trim() === '---') {
+                                                                  elements.push(<hr key={i} className="border-zinc-700 my-8" />);
+                                                              } else if (line.trim() === '') {
+                                                                  elements.push(<div key={i} className="h-2" />);
+                                                              } else {
+                                                                  elements.push(<p key={i} className="text-zinc-300 my-2">{renderInlineFormatting(line, `p-${i}`)}</p>);
+                                                              }
+                                                              i++;
+                                                          }
+
+                                                          if (inTable && tableRows.length > 0) {
+                                                              elements.push(
+                                                                  <div key="table-end" className="my-6 overflow-x-auto">
+                                                                      <table className="w-full border-collapse">
+                                                                          <thead>
+                                                                              <tr className="bg-zinc-900">
+                                                                                  {tableRows[0]?.map((cell, ci) => (
+                                                                                      <th key={ci} className="border border-zinc-700 px-4 py-2 text-left text-indigo-300 font-semibold">{renderInlineFormatting(cell, `th-end-${ci}`)}</th>
+                                                                                  ))}
+                                                                              </tr>
+                                                                          </thead>
+                                                                          <tbody>
+                                                                              {tableRows.slice(1).map((row, ri) => (
+                                                                                  <tr key={ri} className={ri % 2 === 0 ? 'bg-zinc-800/50' : 'bg-zinc-800/30'}>
+                                                                                      {row.map((cell, ci) => (
+                                                                                          <td key={ci} className="border border-zinc-700 px-4 py-2 text-zinc-300">{renderInlineFormatting(cell, `td-end-${ri}-${ci}`)}</td>
+                                                                                      ))}
+                                                                                  </tr>
+                                                                              ))}
+                                                                          </tbody>
+                                                                      </table>
+                                                                  </div>
+                                                              );
+                                                          }
+
+                                                          return <div className="text-zinc-200 leading-relaxed space-y-1">{elements}</div>;
+                                                      })()}
+                                                  </div>
+                                              </div>
                                             
                                             {/* Custom Notes Section - Pro Only */}
                                             {studyKit && isPremium && (

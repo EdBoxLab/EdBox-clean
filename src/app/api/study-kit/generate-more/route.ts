@@ -200,16 +200,21 @@ export async function POST(request: NextRequest) {
       updatedGeneratedContent[contentType] = [...existingArray, ...newContent];
     }
 
-    await supabase
-      .from('study_kit_content')
-      .update({ generated_content: updatedGeneratedContent })
-      .eq('id', studyKitId);
+      const { error: updateError } = await supabase
+        .from('study_kit_content')
+        .update({ generated_content: updatedGeneratedContent })
+        .eq('id', studyKitId);
 
-    return NextResponse.json({ 
-      success: true, 
-      newContent,
-      updatedContent: updatedGeneratedContent[contentType]
-    });
+      if (updateError) {
+        console.error('Database update error:', updateError);
+        return NextResponse.json({ error: 'Failed to save to database' }, { status: 500 });
+      }
+
+      return NextResponse.json({ 
+        success: true, 
+        newContent,
+        updatedContent: updatedGeneratedContent[contentType]
+      });
 
   } catch (error: any) {
     console.error('Generate more failed:', error);

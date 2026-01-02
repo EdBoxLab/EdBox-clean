@@ -46,16 +46,57 @@ Format as a JSON array:
 `;
 
 export const NOTES_TEMPLATE = `
-Generate comprehensive, professionally structured study notes.
-Use Markdown for formatting. The notes should be detailed, reliable, and cover:
-1. Overview: High-level overview.
-2. Core Concepts: Detailed breakdown of key ideas with definitions.
-3. Examples & Use Cases: Concrete examples to illustrate concepts.
-4. Deep Dive: Nuanced details, edge cases, or advanced context.
-5. Common Pitfalls / Misconceptions: What to avoid or clarify.
-6. Key Takeaways: Bulleted list of critical points.
+Generate comprehensive, professionally structured study notes that are DETAILED and HIGHLY USEFUL for students.
 
-Structure the response with clear H1, H2, and H3 headers.
+CRITICAL: These notes must be SUBSTANTIAL and THOROUGH - at least 2000 words minimum. Do NOT generate basic, surface-level summaries.
+
+Use Markdown formatting. Structure as follows:
+
+# [Topic Title]
+
+## Overview
+Provide a comprehensive introduction (2-3 paragraphs) explaining what this topic is, why it matters, and how it connects to broader concepts. Include real-world relevance.
+
+## Core Concepts
+For EACH major concept:
+### [Concept Name]
+- **Definition**: Clear, precise explanation
+- **Key Points**: Detailed breakdown with multiple bullet points
+- **How It Works**: Step-by-step explanation where applicable
+- **Example**: Concrete illustration with code snippets (use \`\`\`language) if relevant
+
+## Examples & Use Cases
+Provide 3-5 detailed, practical examples that show the concept in action. Include:
+- Real-world scenarios
+- Code examples with explanations (properly formatted in code blocks)
+- Step-by-step walkthroughs
+
+## Deep Dive
+Advanced details including:
+- Edge cases and exceptions
+- Performance considerations
+- Best practices and patterns
+- How experts approach this topic
+- Related advanced concepts
+
+## Common Pitfalls / Misconceptions
+List at least 5 common mistakes with:
+| Pitfall | Why It Happens | How to Avoid |
+|---------|----------------|--------------|
+Create a detailed table format.
+
+## Key Takeaways
+- Comprehensive bulleted summary (8-12 key points)
+- Each takeaway should be actionable and specific
+
+## Quick Reference
+Provide a cheat-sheet style summary with the most important syntax, formulas, or concepts in an easy-to-scan format.
+
+IMPORTANT: 
+- Be thorough and detailed - students should be able to learn the topic entirely from these notes
+- Include code examples in proper code blocks when relevant
+- Use tables for structured comparisons
+- Do NOT be superficial or generic
 `;
 
 export const MINDMAP_TEMPLATE = `

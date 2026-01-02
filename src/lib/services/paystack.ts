@@ -1,65 +1,263 @@
 export const PAYSTACK_PLANS = {
   PREMIUM_MONTHLY_USD: {
     name: 'EdBox Premium Monthly (Global)',
-    amount: 999, // In cents
+    amount: 999, // $9.99 in cents
     currency: 'USD',
     interval: 'monthly',
+    plan_code: process.env.PAYSTACK_PLAN_USD_MONTHLY,
+  },
+  PREMIUM_YEARLY_USD: {
+    name: 'EdBox Premium Yearly (Global)',
+    amount: 10188, // $101.88 in cents (15% discount)
+    currency: 'USD',
+    interval: 'annually',
+    plan_code: process.env.PAYSTACK_PLAN_USD_YEARLY,
   },
   PREMIUM_MONTHLY_NGN: {
     name: 'EdBox Premium Monthly (Nigeria)',
-    amount: 250000, // In kobo
+    amount: 250000, // ₦2,500 in kobo
     currency: 'NGN',
     interval: 'monthly',
+    plan_code: process.env.PAYSTACK_PLAN_NGN_MONTHLY,
+  },
+  PREMIUM_YEARLY_NGN: {
+    name: 'EdBox Premium Yearly (Nigeria)',
+    amount: 2550000, // ₦25,500 in kobo (15% discount)
+    currency: 'NGN',
+    interval: 'annually',
+    plan_code: process.env.PAYSTACK_PLAN_NGN_YEARLY,
   },
 };
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 
-export async function initializeTransaction(email: string, amount: number, currency: string, plan?: string, metadata?: any) {
-  const response = await fetch('https://api.paystack.co/transaction/initialize', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+if (!PAYSTACK_SECRET_KEY) {
+  throw new Error('PAYSTACK_SECRET_KEY is not defined in environment variables');
+}
+
+interface PaystackResponse {
+  status: boolean;
+  message: string;
+  data?: any;
+}
+
+// Modified: Now supports recurring payments via plans
+export async function initializeTransaction(
+  email: string,
+  amount: number,
+  currency: string,
+  planId?: string,
+  metadata?: any
+): Promise<PaystackResponse> {
+  try {
+    console.log('Initializing Paystack transaction:', {
       email,
       amount,
       currency,
-      plan,
+      planId,
       metadata,
-      callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/payments/paystack/callback`,
-    }),
-  });
+    });
 
-  return await response.json();
-}
+    if (!email || !amount || !currency) {
+      throw new Error('Missing required fields: email, amount, or currency');
+    }
 
-export async function verifyTransaction(reference: string) {
-  const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-    },
-  });
+    if (amount <= 0) {
+      throw new Error('Amount must be greater than 0');
+    }
 
-  return await response.json();
-}
+    // Get the plan code for recurring payments
+    const planKey = `PREMIUM_${planId?.includes('yearly') ? 'YEARLY' : 'MONTHLY'}_${currency}` as keyof typeof PAYSTACK_PLANS;
+    const plan = PAYSTACK_PLANS[planKey];
 
-export async function createPlan(name: string, amount: number, interval: string, currency: string) {
-  const response = await fetch('https://api.paystack.co/plan', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      name,
+    if (!plan) {
+      throw new Error(`Invalid plan: ${planKey}`);
+    }
+
+    const payload: any = {
+      email,
       amount,
-      interval,
       currency,
-    }),
-  });
+      metadata: {
+        ...metadata,
+        plan_id: planId,
+      },
+      callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/payments/paystack/callback`,
+      channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
+    };
 
-  return await response.json();
+    // Add plan code for recurring payments
+    if (plan.plan_code) {
+      payload.plan = plan.plan_code;
+      console.log('Using plan for recurring payment:', plan.plan_code);
+    }
+
+    const response = await fetch(`${PAYSTACK_BASE_URL}/transaction/initialize`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data: PaystackResponse = await response.json();
+
+    if (!response.ok) {
+      console.error('Paystack initialization failed:', data);
+      throw new Error(data.message || 'Failed to initialize transaction');
+    }
+
+    console.log('Paystack transaction initialized:', data.data?.reference);
+    return data;
+  } catch (error: any) {
+    console.error('Paystack initializeTransaction error:', error);
+    throw new Error(error.message || 'Failed to initialize payment');
+  }
+}
+
+export async function verifyTransaction(reference: string): Promise<PaystackResponse> {
+  try {
+    console.log('Verifying Paystack transaction:', reference);
+
+    if (!reference) {
+      throw new Error('Transaction reference is required');
+    }
+
+    const response = await fetch(
+      `${PAYSTACK_BASE_URL}/transaction/verify/${encodeURIComponent(reference)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+        },
+      }
+    );
+
+    const data: PaystackResponse = await response.json();
+
+    if (!response.ok) {
+      console.error('Paystack verification failed:', data);
+      throw new Error(data.message || 'Failed to verify transaction');
+    }
+
+    console.log('Transaction verified:', {
+      reference,
+      status: data.data?.status,
+      amount: data.data?.amount,
+      subscription_code: data.data?.authorization?.subscription_code,
+    });
+
+    return data;
+  } catch (error: any) {
+    console.error('Paystack verifyTransaction error:', error);
+    throw new Error(error.message || 'Failed to verify payment');
+  }
+}
+
+export async function createPlan(
+  name: string,
+  amount: number,
+  interval: string,
+  currency: string
+): Promise<PaystackResponse> {
+  try {
+    console.log('Creating Paystack plan:', { name, amount, interval, currency });
+
+    if (!name || !amount || !interval || !currency) {
+      throw new Error('Missing required fields for plan creation');
+    }
+
+    const response = await fetch(`${PAYSTACK_BASE_URL}/plan`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name,
+        amount,
+        interval, // 'monthly', 'annually', 'quarterly', 'weekly'
+        currency,
+      }),
+    });
+
+    const data: PaystackResponse = await response.json();
+
+    if (!response.ok) {
+      console.error('Paystack plan creation failed:', data);
+      throw new Error(data.message || 'Failed to create plan');
+    }
+
+    console.log('Plan created successfully:', data.data?.plan_code);
+    return data;
+  } catch (error: any) {
+    console.error('Paystack createPlan error:', error);
+    throw new Error(error.message || 'Failed to create plan');
+  }
+}
+
+// Get subscription details
+export async function getSubscription(
+  subscriptionCode: string
+): Promise<PaystackResponse> {
+  try {
+    const response = await fetch(
+      `${PAYSTACK_BASE_URL}/subscription/${encodeURIComponent(subscriptionCode)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+        },
+      }
+    );
+
+    const data: PaystackResponse = await response.json();
+
+    if (!response.ok) {
+      console.error('Failed to get subscription:', data);
+      throw new Error(data.message || 'Failed to get subscription');
+    }
+
+    return data;
+  } catch (error: any) {
+    console.error('Paystack getSubscription error:', error);
+    throw new Error(error.message || 'Failed to get subscription');
+  }
+}
+
+// Cancel subscription
+export async function cancelSubscription(
+  subscriptionCode: string,
+  emailToken: string
+): Promise<PaystackResponse> {
+  try {
+    console.log('Cancelling Paystack subscription:', subscriptionCode);
+
+    const response = await fetch(`${PAYSTACK_BASE_URL}/subscription/disable`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        code: subscriptionCode,
+        token: emailToken,
+      }),
+    });
+
+    const data: PaystackResponse = await response.json();
+
+    if (!response.ok) {
+      console.error('Paystack subscription cancellation failed:', data);
+      throw new Error(data.message || 'Failed to cancel subscription');
+    }
+
+    console.log('Subscription cancelled successfully');
+    return data;
+  } catch (error: any) {
+    console.error('Paystack cancelSubscription error:', error);
+    throw new Error(error.message || 'Failed to cancel subscription');
+  }
 }

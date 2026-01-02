@@ -32,25 +32,35 @@ export function PricingClient() {
       const response = await fetch('/api/payments/paystack/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // ← ADD THIS - Important for cookies!
         body: JSON.stringify({
-          amount: currency === 'NGN' ? plan.price * 100 : plan.price * 100, // Paystack expects kobo/cents
+          amount: plan.price * 100, // Paystack expects kobo/cents
           currency: plan.currency,
+          plan: plan.id, // ← ADD THIS - Your backend expects this
           metadata: {
             plan_id: plan.id,
+            interval: plan.interval, // Also good to include
           },
         }),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
+
       if (data.authorization_url) {
         window.location.href = data.authorization_url;
       } else {
-        throw new Error(data.error || 'Failed to initialize payment');
+        throw new Error('No authorization URL returned');
       }
     } catch (error: any) {
+      console.error('Payment initialization error:', error);
       toast({
         title: 'Error',
-        description: error.message,
+        description: error.message || 'Failed to initialize payment',
         variant: 'destructive',
       });
     } finally {
@@ -74,9 +84,8 @@ export function PricingClient() {
               className="relative w-12 h-6 bg-primary/20 rounded-full p-1 transition-colors"
             >
               <div
-                className={`w-4 h-4 bg-primary rounded-full transition-transform ${
-                  currency === 'NGN' ? 'translate-x-6' : 'translate-x-0'
-                }`}
+                className={`w-4 h-4 bg-primary rounded-full transition-transform ${currency === 'NGN' ? 'translate-x-6' : 'translate-x-0'
+                  }`}
               />
             </button>
             <span className={`text-sm ${currency === 'NGN' ? 'font-bold' : 'text-muted-foreground'}`}>Nigeria (NGN)</span>
@@ -85,17 +94,15 @@ export function PricingClient() {
           <div className="flex items-center gap-4 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">
             <button
               onClick={() => setBillingInterval('monthly')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                billingInterval === 'monthly' ? 'bg-primary text-primary-foreground shadow-lg' : 'text-zinc-400 hover:text-white'
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${billingInterval === 'monthly' ? 'bg-primary text-primary-foreground shadow-lg' : 'text-zinc-400 hover:text-white'
+                }`}
             >
               Monthly
             </button>
             <button
               onClick={() => setBillingInterval('yearly')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                billingInterval === 'yearly' ? 'bg-primary text-primary-foreground shadow-lg' : 'text-zinc-400 hover:text-white'
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${billingInterval === 'yearly' ? 'bg-primary text-primary-foreground shadow-lg' : 'text-zinc-400 hover:text-white'
+                }`}
             >
               Yearly
               <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-bold">

@@ -1,10 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { generateWithRetry, extractContextFromText } from '@/lib/ai-providers';
-import { QUIZ_TEMPLATE, FLASHCARD_TEMPLATE, NOTES_TEMPLATE, MINDMAP_TEMPLATE } from './templates';
 import { processFileContent } from '@/lib/utils/fileProcessing';
 
 type ContentType = 'quizzes' | 'flashcards' | 'mindmaps' | 'notes';
+
+// Updated Templates
+const NOTES_TEMPLATE = `
+Generate comprehensive, professionally structured study notes that are DETAILED and HIGHLY USEFUL for students.
+
+CRITICAL: These notes must be SUBSTANTIAL and THOROUGH - at least 2500 words minimum. Do NOT generate basic, surface-level summaries.
+
+**ABSOLUTELY CRITICAL - CODE RULES:**
+- NEVER include programming code (JavaScript, Python, Java, etc.) unless the topic is SPECIFICALLY about programming, software development, or computer science
+- For math/science/history/business topics: NO code examples, NO function definitions, NO React components
+- If you need to show a calculation, write it in plain text or mathematical notation, NOT as code
+- Example of what NOT to do for non-programming topics: \`\`\`javascript or function example()
+- Example of what TO do: "Calculate using the formula: x = (b ± √(b² - 4ac)) / 2a"
+
+Use Markdown formatting. Structure as follows:
+
+# [Topic Title]
+
+## Overview
+Provide a comprehensive introduction (3-4 paragraphs) explaining what this topic is, why it matters, and how it connects to broader concepts. Include real-world relevance and historical context if applicable.
+
+## Core Concepts
+For EACH major concept:
+### [Concept Name]
+- **Definition**: Clear, precise explanation
+- **Detailed Breakdown**: Use multiple bullet points to explain nuances
+- **How It Works**: Step-by-step explanation of processes or mechanisms
+- **Formulas/Notation**: Use plain text mathematical expressions (e.g., "x^2 + 2x + 1" or "Force = mass × acceleration")
+- **Example**: Concrete illustration using prose and calculations, NOT code
+
+## Examples & Use Cases
+Provide 4-6 detailed, practical examples that show the concept in action. Include:
+- Real-world scenarios
+- Detailed walkthroughs of how to solve related problems
+- Step-by-step calculations or reasoning (in plain text)
+- Visual descriptions or diagrams represented in text
+
+## Deep Dive
+Advanced details including:
+- Edge cases and exceptions
+- Performance considerations or advanced theoretical implications
+- Best practices and expert-level insights
+- Related advanced concepts and future trends
+
+## Common Pitfalls / Misconceptions
+List at least 7-10 common mistakes with a detailed table:
+| Pitfall | Why It Happens | How to Avoid / Correct Understanding |
+|---------|----------------|-------------------------------------|
+
+## Key Takeaways
+- Comprehensive bulleted summary (10-15 key points)
+- Each takeaway should be actionable, specific, and memorable
+
+## Quick Reference & Cheat Sheet
+Provide a summary of the most important formulas, terms, or concepts in an easy-to-scan format. Use tables or lists, NOT code blocks.
+
+REMEMBER: Output pure Markdown text. NO code blocks unless the topic is programming-related!
+`;
+
+const MINDMAP_TEMPLATE = `
+Generate a structured, hierarchical mind map of the topic.
+The mind map should be beautifully organized and logically consistent.
+
+Format as a strict JSON object with a central node and branches:
+{
+  "central": "Main Topic Name",
+  "branches": [
+    {
+      "topic": "Major Category",
+      "subtopics": ["Sub-point 1", "Sub-point 2", "Sub-point 3"],
+      "details": "Brief summary of this category"
+    }
+  ]
+}
+`;
 
 function sanitizeMathText(text: string): string {
   if (typeof text !== 'string') return String(text || '');
@@ -21,18 +95,40 @@ function sanitizeMathText(text: string): string {
     .trim();
 }
 
+/**
+ * Clean Markdown response by removing wrapping code blocks if the AI accidentally added them
+ */
+function cleanMarkdown(text: string): string {
+  let cleaned = text.trim();
+  
+  // Remove wrapping markdown code blocks if present
+  // Matches: ```markdown [content] ``` or ``` [content] ```
+  const mdMatch = cleaned.match(/^```(?:markdown)?\n([\s\S]*?)\n```$/i);
+  if (mdMatch && mdMatch[1]) {
+    return mdMatch[1].trim();
+  }
+  
+  // Also handle cases where it might just start with ``` and end with ``` without newlines
+  const mdMatchSimple = cleaned.match(/^```(?:markdown)?([\s\S]*?)```$/i);
+  if (mdMatchSimple && mdMatchSimple[1]) {
+    return mdMatchSimple[1].trim();
+  }
+
+  return cleaned;
+}
+
 function extractJSON(text: string, type: ContentType) {
   try {
     let cleaned = text.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '');
-    
+
     cleaned = cleaned
       .replace(/[\x00-\x1F\x7F]/g, '')
       .replace(/\\n/g, ' ')
       .replace(/\r?\n/g, ' ');
-    
+
     const start = cleaned.indexOf(type === 'mindmaps' ? '{' : '[');
     const end = cleaned.lastIndexOf(type === 'mindmaps' ? '}' : ']');
-    
+
     if (start === -1 || end === -1) {
       if (type !== 'mindmaps') {
         const altStart = cleaned.indexOf('{');
@@ -48,10 +144,10 @@ function extractJSON(text: string, type: ContentType) {
       }
       throw new Error('No valid JSON structure found in AI response');
     }
-    
+
     cleaned = cleaned.substring(start, end + 1);
     cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
-    
+
     let parsed;
     try {
       parsed = JSON.parse(cleaned);
@@ -63,7 +159,7 @@ function extractJSON(text: string, type: ContentType) {
         throw secondError;
       }
     }
-    
+
     if (type === 'quizzes' && Array.isArray(parsed)) {
       return parsed.map((q, i) => ({
         question: sanitizeMathText(q.question || `Question ${i + 1}`),
@@ -77,7 +173,7 @@ function extractJSON(text: string, type: ContentType) {
         difficulty: ['Easy', 'Medium', 'Hard'].includes(q.difficulty) ? q.difficulty : 'Medium',
       }));
     }
-    
+
     if (type === 'flashcards' && Array.isArray(parsed)) {
       return parsed.filter(c => c.front && c.back).map(c => ({
         front: sanitizeMathText(c.front),
@@ -85,17 +181,30 @@ function extractJSON(text: string, type: ContentType) {
         hint: sanitizeMathText(c.hint || ''),
       }));
     }
-    
+
     return parsed;
   } catch (error) {
     throw new Error(`Failed to parse ${type}: ${error}`);
   }
 }
 
+function isProgrammingTopic(prompt: string): boolean {
+  const programmingKeywords = [
+    'code', 'programming', 'javascript', 'python', 'java', 'react', 'component',
+    'function', 'algorithm', 'software', 'development', 'web development',
+    'api', 'database', 'frontend', 'backend', 'typescript', 'html', 'css',
+    'node', 'angular', 'vue', 'coding', 'developer', 'syntax', 'variable',
+    'array', 'object', 'class', 'method', 'loop', 'conditional'
+  ];
+
+  const lowerPrompt = prompt.toLowerCase();
+  return programmingKeywords.some(keyword => lowerPrompt.includes(keyword));
+}
+
 function buildPrompt(type: ContentType, prompt: string, isAppend: boolean = false, customInstructions: string = '') {
   const base = `Topic/Content Source: "${prompt}"\n\n`;
   const count = isAppend ? 10 : 15;
-  
+
   switch (type) {
     case 'quizzes':
       return base + `Generate ${count} high-quality multiple-choice questions.
@@ -140,7 +249,17 @@ Format as a JSON array:
       return base + MINDMAP_TEMPLATE + '\nOutput ONLY JSON object.';
 
     case 'notes':
+      const isCodeRelated = isProgrammingTopic(prompt);
       let notesPrompt = base + NOTES_TEMPLATE;
+
+      if (!isCodeRelated) {
+        notesPrompt += `\n\n**EXTRA CRITICAL REMINDER FOR THIS TOPIC:**
+This topic ("${prompt}") is NOT about programming or software development.
+Therefore, you MUST NOT include ANY code examples, function definitions, or programming syntax.
+Use plain text explanations, mathematical notation, and prose examples only.
+Any code-like syntax will be considered an error.`;
+      }
+
       if (customInstructions) {
         notesPrompt += `\n\nCUSTOM INSTRUCTIONS FOR THESE NOTES: ${customInstructions}\nIMPORTANT: Please follow these details strictly.`;
       }
@@ -152,7 +271,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
@@ -168,7 +287,7 @@ export async function POST(request: NextRequest) {
         .eq('id', kitId)
         .eq('user_id', user.id)
         .single();
-      
+
       if (!data) return NextResponse.json({ error: 'Study kit not found' }, { status: 404 });
       existingKit = data;
       finalPrompt = data.source_content || prompt || '';
@@ -190,17 +309,29 @@ export async function POST(request: NextRequest) {
 
     const typesToGenerate = appendType ? [appendType] : contentTypes;
 
-    const results = await Promise.allSettled(
+        const results = await Promise.allSettled(
       typesToGenerate.map(async (type: ContentType) => {
-          const isAppend = !!appendType;
-          const result = await generateWithRetry({
-            prompt: buildPrompt(type, finalPrompt, isAppend, type === 'notes' ? customInstructions : ''),
-            systemPrompt: 'Output ONLY valid JSON with no extra text.',
-            temperature: 0.7,
-            maxTokens: type === 'notes' ? 6000 : 4000,
-          });
+        const isAppend = !!appendType;
+        const result = await generateWithRetry({
+          prompt: buildPrompt(type, finalPrompt, isAppend, type === 'notes' ? customInstructions : ''),
+          systemPrompt: type === 'notes'
+            ? `You are an expert academic note-taker. Create structured, detailed, and clear study notes in Markdown format.
 
-        const output = type === 'notes' ? result.text : extractJSON(result.text, type);
+CRITICAL RULES:
+1. Output ONLY Markdown text - NO JSON
+2. DO NOT use code blocks (backticks) unless the topic is specifically about programming
+3. For math/science topics, write formulas in plain text like "F = m × a" or "x^2 + 2x + 1"
+4. Use prose, tables, lists, and text formatting - NOT code examples
+5. If the topic is NOT programming-related, absolutely NO JavaScript/Python/code of any kind
+
+Start directly with the markdown heading. No preamble.`
+            : 'Output ONLY valid JSON with no extra text.',
+          temperature: 0.7,
+          maxTokens: type === 'notes' ? 6000 : 4000,
+          model: type === 'notes' ? 'versatile' : 'oss',
+        });
+
+        const output = type === 'notes' ? cleanMarkdown(result.text) : extractJSON(result.text, type);
         return { type, content: output };
       })
     );
@@ -218,7 +349,7 @@ export async function POST(request: NextRequest) {
 
     if (kitId && existingKit) {
       const updatedGeneratedContent = { ...existingKit.generated_content };
-      
+
       if (appendType) {
         const existingList = Array.isArray(updatedGeneratedContent[appendType]) ? updatedGeneratedContent[appendType] : [];
         const newList = Array.isArray(generatedContent[appendType]) ? generatedContent[appendType] : [];
@@ -239,10 +370,10 @@ export async function POST(request: NextRequest) {
         .select()
         .single();
 
-      return NextResponse.json({ 
-        success: true, 
-        id: updatedKit?.id, 
-        content: updatedGeneratedContent 
+      return NextResponse.json({
+        success: true,
+        id: updatedKit?.id,
+        content: updatedGeneratedContent
       });
     }
 
@@ -263,10 +394,10 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    return NextResponse.json({ 
-      success: true, 
-      id: studyKit?.id, 
-      content: generatedContent 
+    return NextResponse.json({
+      success: true,
+      id: studyKit?.id,
+      content: generatedContent
     });
 
   } catch (error: any) {
@@ -279,7 +410,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { data } = await supabase

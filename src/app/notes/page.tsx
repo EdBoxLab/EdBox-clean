@@ -17,6 +17,9 @@ import { useSubscription } from '@/lib/hooks/useSubscription';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneLight } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
 /* ================= TYPES ================= */
 
@@ -348,11 +351,57 @@ className="w-full min-h-[400px] p-4 border rounded-lg resize-none focus:outline-
 placeholder="Write your note…"
 />
 ) : (
-<div className="bg-white rounded-lg p-4 whitespace-pre-wrap">
-{selectedNote.content || (
-<span className="text-gray-400 italic">
-This note is empty
-</span>
+<div className="bg-white rounded-lg p-6 prose prose-slate max-w-none
+  prose-headings:text-gray-900 prose-headings:font-bold
+  prose-h1:text-2xl prose-h1:border-b prose-h1:border-gray-200 prose-h1:pb-3 prose-h1:mb-4
+  prose-h2:text-xl prose-h2:mt-6 prose-h2:mb-3 prose-h2:text-blue-800
+  prose-h3:text-lg prose-h3:mt-4 prose-h3:mb-2 prose-h3:text-gray-700
+  prose-p:text-gray-700 prose-p:leading-relaxed prose-p:my-3
+  prose-ul:my-3 prose-ul:space-y-1
+  prose-ol:my-3 prose-ol:space-y-1
+  prose-li:text-gray-700 prose-li:marker:text-blue-500
+  prose-strong:text-gray-900 prose-strong:font-semibold
+  prose-em:text-gray-600
+  prose-blockquote:border-l-4 prose-blockquote:border-blue-400 prose-blockquote:bg-blue-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:italic prose-blockquote:text-gray-600
+  prose-code:bg-gray-100 prose-code:text-pink-600 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono prose-code:before:content-none prose-code:after:content-none
+  prose-pre:bg-gray-50 prose-pre:border prose-pre:border-gray-200 prose-pre:rounded-lg prose-pre:p-0 prose-pre:my-4
+  prose-a:text-blue-600 prose-a:underline hover:prose-a:text-blue-800
+  prose-hr:border-gray-200 prose-hr:my-6
+">
+{selectedNote.content ? (
+  <ReactMarkdown
+    components={{
+      code({ node, className, children, ...props }) {
+        const match = /language-(\w+)/.exec(className || '');
+        const isInline = !match && !className;
+        return isInline ? (
+          <code className={className} {...props}>
+            {children}
+          </code>
+        ) : (
+          <SyntaxHighlighter
+            style={oneLight}
+            language={match ? match[1] : 'text'}
+            PreTag="div"
+            customStyle={{
+              margin: 0,
+              padding: '1rem',
+              fontSize: '0.875rem',
+              borderRadius: '0.5rem',
+            }}
+          >
+            {String(children).replace(/\n$/, '')}
+          </SyntaxHighlighter>
+        );
+      },
+    }}
+  >
+    {selectedNote.content}
+  </ReactMarkdown>
+) : (
+  <span className="text-gray-400 italic">
+    This note is empty
+  </span>
 )}
 </div>
 )}

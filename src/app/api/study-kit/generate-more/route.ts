@@ -181,6 +181,7 @@ export async function POST(request: NextRequest) {
       systemPrompt: contentType === 'notes' ? 'You are an expert study note creator. Output only Markdown formatted notes.' : 'Output ONLY valid JSON with no extra text.',
       temperature: 0.7,
       maxTokens: contentType === 'notes' ? 3000 : 4000,
+      model: contentType === 'notes' ? 'versatile' : 'oss',
     });
 
     let newContent;

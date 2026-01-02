@@ -19,6 +19,8 @@ export async function POST(request: NextRequest) {
 
     const { currentContent, instructions, isMore } = await request.json();
 
+    console.log('📝 NOTES GENERATION REQUEST:', { instructions, isMore, contentLength: currentContent?.length });
+
     const prompt = isMore 
       ? `Based on the following content, generate MORE detailed notes. 
          Follow these specific instructions: ${instructions || 'Expand on the key concepts.'}
@@ -34,12 +36,14 @@ export async function POST(request: NextRequest) {
          
          Format the notes clearly with headings and bullet points.`;
 
-    const result = await generateWithRetry({
-      prompt,
-      systemPrompt: 'You are an expert academic note-taker. Create structured, detailed, and clear study notes.',
-      temperature: 0.7,
-      maxTokens: 2000,
-    });
+      const result = await generateWithRetry({
+        prompt,
+        systemPrompt: 'You are an expert academic note-taker. Create structured, detailed, and clear study notes in Markdown format. DO NOT start your response with a code block. Start with a clear heading (# [Topic]).',
+        temperature: 0.7,
+        maxTokens: 2000,
+      });
+
+    console.log('🤖 AI RETURNED FOR NOTES:', result.text);
 
     return NextResponse.json({ content: result.text });
   } catch (error) {

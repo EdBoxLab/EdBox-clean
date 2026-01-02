@@ -3,6 +3,9 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { 
 Brain, 
 Zap, 
@@ -19,7 +22,9 @@ Info,
 Plus,
 Sparkles,
 Crown,
-Send
+Send,
+Copy,
+Check
 } from 'lucide-react';
 import ShareButton from '@/components/ShareButton';
 import ShareModal, { useShareModal } from '@/components/ShareModal';
@@ -1043,11 +1048,17 @@ const { isPremium } = useSubscription();
                                                 );
                                             })()}
                                             
-                                            {/* Generate More Quizzes Button - Pro Only */}
-                                            {studyKit && isPremium && (
+                                            {/* Generate More Quizzes Button - Always Visible */}
+                                            {studyKit && (
                                                 <div className="mt-6 flex justify-center">
                                                     <button
-                                                        onClick={() => handleGenerateMore('quizzes')}
+                                                        onClick={() => {
+                                                            if (isPremium) {
+                                                                handleGenerateMore('quizzes');
+                                                            } else {
+                                                                router.push('/pricing');
+                                                            }
+                                                        }}
                                                         disabled={isGeneratingMore}
                                                         className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-sm transition-all shadow-lg"
                                                     >
@@ -1063,18 +1074,6 @@ const { isPremium } = useSubscription();
                                                                 Generate 10 More Quizzes
                                                             </>
                                                         )}
-                                                    </button>
-                                                </div>
-                                            )}
-                                            {studyKit && !isPremium && (
-                                                <div className="mt-6 p-4 bg-zinc-800/50 border border-zinc-700 rounded-xl text-center">
-                                                    <p className="text-sm text-zinc-400 mb-2">Want more quizzes?</p>
-                                                    <button
-                                                        onClick={() => router.push('/pricing')}
-                                                        className="flex items-center gap-2 mx-auto px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-lg text-sm font-medium transition"
-                                                    >
-                                                        <Crown className="w-4 h-4" />
-                                                        Upgrade to Pro
                                                     </button>
                                                 </div>
                                             )}
@@ -1098,11 +1097,17 @@ const { isPremium } = useSubscription();
                                             })()}
                                             </div>
                                             
-                                            {/* Generate More Flashcards Button - Pro Only */}
-                                            {studyKit && isPremium && (
+                                            {/* Generate More Flashcards Button - Always Visible */}
+                                            {studyKit && (
                                                 <div className="mt-6 flex justify-center">
                                                     <button
-                                                        onClick={() => handleGenerateMore('flashcards')}
+                                                        onClick={() => {
+                                                            if (isPremium) {
+                                                                handleGenerateMore('flashcards');
+                                                            } else {
+                                                                router.push('/pricing');
+                                                            }
+                                                        }}
                                                         disabled={isGeneratingMore}
                                                         className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-sm transition-all shadow-lg"
                                                     >
@@ -1121,238 +1126,103 @@ const { isPremium } = useSubscription();
                                                     </button>
                                                 </div>
                                             )}
-                                            {studyKit && !isPremium && (
-                                                <div className="mt-6 p-4 bg-zinc-800/50 border border-zinc-700 rounded-xl text-center">
-                                                    <p className="text-sm text-zinc-400 mb-2">Want more flashcards?</p>
-                                                    <button
-                                                        onClick={() => router.push('/pricing')}
-                                                        className="flex items-center gap-2 mx-auto px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-lg text-sm font-medium transition"
-                                                    >
-                                                        <Crown className="w-4 h-4" />
-                                                        Upgrade to Pro
-                                                    </button>
-                                                </div>
-                                            )}
                                         </div>
                                     )}
 
-{activeTab === 'notes' && generatedContent.notes && (
-                                          <div>
-                                              <div className="bg-gray-800 border border-zinc-700 rounded-2xl p-8 lg:p-12 shadow-2xl">
-                                                  <div className="prose prose-invert prose-indigo max-w-none">
-                                                      {(() => {
-                                                          let notesContent = generatedContent.notes;
-                                                          if (typeof notesContent === 'object' && !Array.isArray(notesContent)) {
-                                                              notesContent = notesContent.notes || JSON.stringify(notesContent, null, 2);
-                                                          } else if (Array.isArray(notesContent)) {
-                                                              notesContent = notesContent.join('\n\n');
-                                                          }
-
-                                                          if (typeof notesContent !== 'string') return <div className="text-zinc-400">Invalid notes format</div>;
-
-                                                          const renderInlineFormatting = (text: string, keyPrefix: string) => {
-                                                              const parts: React.ReactNode[] = [];
-                                                              let remaining = text;
-                                                              let partIndex = 0;
-                                                              
-                                                              while (remaining.length > 0) {
-                                                                  const inlineCodeMatch = remaining.match(/`([^`]+)`/);
-                                                                  const boldMatch = remaining.match(/\*\*([^*]+)\*\*/);
-                                                                  
-                                                                  let firstMatch: { index: number; length: number; content: string; type: 'code' | 'bold' } | null = null;
-                                                                  
-                                                                  if (inlineCodeMatch && inlineCodeMatch.index !== undefined) {
-                                                                      firstMatch = { index: inlineCodeMatch.index, length: inlineCodeMatch[0].length, content: inlineCodeMatch[1], type: 'code' };
-                                                                  }
-                                                                  if (boldMatch && boldMatch.index !== undefined) {
-                                                                      if (!firstMatch || boldMatch.index < firstMatch.index) {
-                                                                          firstMatch = { index: boldMatch.index, length: boldMatch[0].length, content: boldMatch[1], type: 'bold' };
-                                                                      }
-                                                                  }
-                                                                  
-                                                                  if (firstMatch) {
-                                                                      if (firstMatch.index > 0) {
-                                                                          parts.push(<span key={`${keyPrefix}-${partIndex++}`}>{remaining.substring(0, firstMatch.index)}</span>);
-                                                                      }
-                                                                      if (firstMatch.type === 'code') {
-                                                                          parts.push(<code key={`${keyPrefix}-${partIndex++}`} className="bg-zinc-900 text-indigo-300 px-1.5 py-0.5 rounded text-sm font-mono">{firstMatch.content}</code>);
-                                                                      } else if (firstMatch.type === 'bold') {
-                                                                          parts.push(<strong key={`${keyPrefix}-${partIndex++}`} className="text-white font-semibold">{firstMatch.content}</strong>);
-                                                                      }
-                                                                      remaining = remaining.substring(firstMatch.index + firstMatch.length);
-                                                                  } else {
-                                                                      parts.push(<span key={`${keyPrefix}-${partIndex++}`}>{remaining}</span>);
-                                                                      break;
-                                                                  }
-                                                              }
-                                                              return parts.length > 0 ? parts : text;
-                                                          };
-
-                                                          const lines = notesContent.split('\n');
-                                                          const elements: React.ReactNode[] = [];
-                                                          let i = 0;
-                                                          let codeBlock: string[] = [];
-                                                          let inCodeBlock = false;
-                                                          let codeLanguage = '';
-                                                          let tableRows: string[][] = [];
-                                                          let inTable = false;
-
-                                                          while (i < lines.length) {
-                                                              const line = lines[i];
-                                                              
-                                                              if (line.startsWith('```')) {
-                                                                  if (!inCodeBlock) {
-                                                                      inCodeBlock = true;
-                                                                      codeLanguage = line.slice(3).trim() || 'text';
-                                                                      codeBlock = [];
-                                                                  } else {
-                                                                      elements.push(
-                                                                          <div key={`code-${i}`} className="my-6 rounded-xl overflow-hidden border border-zinc-700">
-                                                                              <div className="bg-zinc-900 px-4 py-2 text-xs text-zinc-400 font-mono border-b border-zinc-700 flex items-center justify-between">
-                                                                                  <span>{codeLanguage}</span>
-                                                                                  <button
-                                                                                      onClick={() => navigator.clipboard.writeText(codeBlock.join('\n'))}
-                                                                                      className="text-zinc-500 hover:text-white transition"
-                                                                                  >
-                                                                                      Copy
-                                                                                  </button>
-                                                                              </div>
-                                                                              <pre className="bg-zinc-950 p-4 overflow-x-auto">
-                                                                                  <code className="text-sm font-mono text-indigo-200 whitespace-pre">
-                                                                                      {codeBlock.join('\n')}
-                                                                                  </code>
-                                                                              </pre>
-                                                                          </div>
-                                                                      );
-                                                                      inCodeBlock = false;
-                                                                      codeBlock = [];
-                                                                  }
-                                                                  i++;
-                                                                  continue;
-                                                              }
-                                                              
-                                                              if (inCodeBlock) {
-                                                                  codeBlock.push(line);
-                                                                  i++;
-                                                                  continue;
-                                                              }
-
-                                                              if (line.startsWith('|') && line.endsWith('|')) {
-                                                                  if (!inTable) {
-                                                                      inTable = true;
-                                                                      tableRows = [];
-                                                                  }
-                                                                  const cells = line.split('|').slice(1, -1).map(c => c.trim());
-                                                                  if (!cells.every(c => /^[-:]+$/.test(c))) {
-                                                                      tableRows.push(cells);
-                                                                  }
-                                                                  i++;
-                                                                  continue;
-                                                              } else if (inTable) {
-                                                                  elements.push(
-                                                                      <div key={`table-${i}`} className="my-6 overflow-x-auto">
-                                                                          <table className="w-full border-collapse">
-                                                                              <thead>
-                                                                                  <tr className="bg-zinc-900">
-                                                                                      {tableRows[0]?.map((cell, ci) => (
-                                                                                          <th key={ci} className="border border-zinc-700 px-4 py-2 text-left text-indigo-300 font-semibold">{renderInlineFormatting(cell, `th-${i}-${ci}`)}</th>
-                                                                                      ))}
-                                                                                  </tr>
-                                                                              </thead>
-                                                                              <tbody>
-                                                                                  {tableRows.slice(1).map((row, ri) => (
-                                                                                      <tr key={ri} className={ri % 2 === 0 ? 'bg-zinc-800/50' : 'bg-zinc-800/30'}>
-                                                                                          {row.map((cell, ci) => (
-                                                                                              <td key={ci} className="border border-zinc-700 px-4 py-2 text-zinc-300">{renderInlineFormatting(cell, `td-${i}-${ri}-${ci}`)}</td>
-                                                                                          ))}
-                                                                                      </tr>
-                                                                                  ))}
-                                                                              </tbody>
-                                                                          </table>
-                                                                      </div>
-                                                                  );
-                                                                  inTable = false;
-                                                                  tableRows = [];
-                                                              }
-
-                                                              if (line.startsWith('# ')) {
-                                                                  elements.push(<h1 key={i} className="text-4xl font-bold text-white mb-6 border-b border-zinc-800 pb-4">{renderInlineFormatting(line.slice(2), `h1-${i}`)}</h1>);
-                                                              } else if (line.startsWith('## ')) {
-                                                                  elements.push(<h2 key={i} className="text-2xl font-bold text-indigo-400 mt-10 mb-4">{renderInlineFormatting(line.slice(3), `h2-${i}`)}</h2>);
-                                                              } else if (line.startsWith('### ')) {
-                                                                  elements.push(<h3 key={i} className="text-xl font-bold text-white mt-8 mb-3">{renderInlineFormatting(line.slice(4), `h3-${i}`)}</h3>);
-                                                              } else if (line.startsWith('#### ')) {
-                                                                  elements.push(<h4 key={i} className="text-lg font-semibold text-zinc-200 mt-6 mb-2">{renderInlineFormatting(line.slice(5), `h4-${i}`)}</h4>);
-                                                              } else if (line.match(/^(\d+)\.\s/)) {
-                                                                  const match = line.match(/^(\d+)\.\s(.*)$/);
-                                                                  if (match) {
-                                                                      elements.push(
-                                                                          <div key={i} className="flex gap-3 ml-4 my-1">
-                                                                              <span className="text-indigo-400 font-semibold min-w-[20px]">{match[1]}.</span>
-                                                                              <span className="text-zinc-300">{renderInlineFormatting(match[2], `ol-${i}`)}</span>
-                                                                          </div>
-                                                                      );
-                                                                  }
-                                                              } else if (line.startsWith('- ') || line.startsWith('* ')) {
-                                                                  elements.push(
-                                                                      <div key={i} className="flex gap-3 ml-4 my-1">
-                                                                          <span className="text-indigo-400 mt-1.5">•</span>
-                                                                          <span className="text-zinc-300">{renderInlineFormatting(line.slice(2), `li-${i}`)}</span>
-                                                                      </div>
-                                                                  );
-                                                              } else if (line.startsWith('> ')) {
-                                                                  elements.push(
-                                                                      <blockquote key={i} className="border-l-4 border-indigo-500 pl-4 my-4 italic text-zinc-400 bg-zinc-900/50 py-2 rounded-r">
-                                                                          {renderInlineFormatting(line.slice(2), `bq-${i}`)}
-                                                                      </blockquote>
-                                                                  );
-                                                              } else if (line.trim() === '---') {
-                                                                  elements.push(<hr key={i} className="border-zinc-700 my-8" />);
-                                                              } else if (line.trim() === '') {
-                                                                  elements.push(<div key={i} className="h-2" />);
-                                                              } else {
-                                                                  elements.push(<p key={i} className="text-zinc-300 my-2">{renderInlineFormatting(line, `p-${i}`)}</p>);
-                                                              }
-                                                              i++;
-                                                          }
-
-                                                          if (inTable && tableRows.length > 0) {
-                                                              elements.push(
-                                                                  <div key="table-end" className="my-6 overflow-x-auto">
-                                                                      <table className="w-full border-collapse">
-                                                                          <thead>
-                                                                              <tr className="bg-zinc-900">
-                                                                                  {tableRows[0]?.map((cell, ci) => (
-                                                                                      <th key={ci} className="border border-zinc-700 px-4 py-2 text-left text-indigo-300 font-semibold">{renderInlineFormatting(cell, `th-end-${ci}`)}</th>
-                                                                                  ))}
-                                                                              </tr>
-                                                                          </thead>
-                                                                          <tbody>
-                                                                              {tableRows.slice(1).map((row, ri) => (
-                                                                                  <tr key={ri} className={ri % 2 === 0 ? 'bg-zinc-800/50' : 'bg-zinc-800/30'}>
-                                                                                      {row.map((cell, ci) => (
-                                                                                          <td key={ci} className="border border-zinc-700 px-4 py-2 text-zinc-300">{renderInlineFormatting(cell, `td-end-${ri}-${ci}`)}</td>
-                                                                                      ))}
-                                                                                  </tr>
-                                                                              ))}
-                                                                          </tbody>
-                                                                      </table>
-                                                                  </div>
-                                                              );
-                                                          }
-
-                                                          return <div className="text-zinc-200 leading-relaxed space-y-1">{elements}</div>;
-                                                      })()}
-                                                  </div>
-                                              </div>
+                                    {activeTab === 'notes' && generatedContent.notes && (
+                                        <div className="space-y-6">
+                                            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 sm:p-10 shadow-2xl relative">
+                                                <div className="flex justify-end mb-4 sticky top-0 z-10">
+                                                    <button
+                                                        onClick={() => {
+                                                            const notesText = typeof generatedContent.notes === 'string' 
+                                                                ? generatedContent.notes 
+                                                                : JSON.stringify(generatedContent.notes, null, 2);
+                                                            navigator.clipboard.writeText(notesText);
+                                                        }}
+                                                        className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-xs font-medium text-zinc-300 transition-all"
+                                                    >
+                                                        <Copy className="w-3.5 h-3.5" />
+                                                        Copy All Notes
+                                                    </button>
+                                                </div>
+                                                <div className="prose prose-invert prose-indigo max-w-none 
+                                                    prose-headings:font-bold prose-headings:text-white 
+                                                    prose-h1:text-4xl prose-h1:mb-8 prose-h1:pb-4 prose-h1:border-b prose-h1:border-zinc-800
+                                                    prose-h2:text-2xl prose-h2:text-indigo-400 prose-h2:mt-12 prose-h2:mb-6
+                                                    prose-h3:text-xl prose-h3:text-zinc-100 prose-h3:mt-8 prose-h3:mb-4
+                                                    prose-p:text-zinc-300 prose-p:leading-relaxed prose-p:my-4
+                                                    prose-li:text-zinc-300 prose-li:my-1
+                                                    prose-strong:text-white prose-strong:font-semibold
+                                                    prose-code:text-indigo-300 prose-code:bg-zinc-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none
+                                                    prose-table:border prose-table:border-zinc-800
+                                                    prose-th:bg-zinc-800 prose-th:px-4 prose-th:py-2 prose-th:text-indigo-300
+                                                    prose-td:border prose-td:border-zinc-800 prose-td:px-4 prose-td:py-2
+                                                    prose-blockquote:border-l-4 prose-blockquote:border-indigo-500 prose-blockquote:bg-zinc-800/30 prose-blockquote:py-2 prose-blockquote:px-6 prose-blockquote:rounded-r prose-blockquote:italic prose-blockquote:text-zinc-400
+                                                ">
+                                                    <ReactMarkdown
+                                                        components={{
+                                                            code({ node, inline, className, children, ...props }: any) {
+                                                                const match = /language-(\w+)/.exec(className || '');
+                                                                const language = match ? match[1] : '';
+                                                                const content = String(children).replace(/\n$/, '');
+                                                                
+                                                                if (!inline && language) {
+                                                                    return (
+                                                                        <div className="relative group my-6 rounded-xl overflow-hidden border border-zinc-700">
+                                                                            <div className="bg-zinc-900 px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500 font-bold border-b border-zinc-700 flex items-center justify-between">
+                                                                                <span>{language}</span>
+                                                                                <button
+                                                                                    onClick={() => navigator.clipboard.writeText(content)}
+                                                                                    className="text-zinc-500 hover:text-white transition flex items-center gap-1"
+                                                                                >
+                                                                                    <Copy className="w-3 h-3" />
+                                                                                    Copy
+                                                                                </button>
+                                                                            </div>
+                                                                            <SyntaxHighlighter
+                                                                                style={vscDarkPlus}
+                                                                                language={language}
+                                                                                PreTag="div"
+                                                                                className="!bg-zinc-950 !p-4 !m-0 custom-scrollbar"
+                                                                                {...props}
+                                                                            >
+                                                                                {content}
+                                                                            </SyntaxHighlighter>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                
+                                                                return (
+                                                                    <code className={className} {...props}>
+                                                                        {children}
+                                                                    </code>
+                                                                );
+                                                            }
+                                                        }}
+                                                    >
+                                                        {typeof generatedContent.notes === 'string' 
+                                                            ? generatedContent.notes 
+                                                            : Array.isArray(generatedContent.notes)
+                                                                ? generatedContent.notes.join('\n\n')
+                                                                : JSON.stringify(generatedContent.notes, null, 2)}
+                                                    </ReactMarkdown>
+                                                </div>
+                                            </div>
                                             
-                                            {/* Custom Notes Section - Pro Only */}
-                                            {studyKit && isPremium && (
+                                            {/* Custom Notes Section - Always Visible */}
+                                            {studyKit && (
                                                 <div className="mt-6">
                                                     {!showNotesModal ? (
                                                         <div className="flex justify-center">
                                                             <button
-                                                                onClick={() => setShowNotesModal(true)}
+                                                                onClick={() => {
+                                                                    if (isPremium) {
+                                                                        setShowNotesModal(true);
+                                                                    } else {
+                                                                        router.push('/pricing');
+                                                                    }
+                                                                }}
                                                                 className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-xl font-bold text-sm transition-all shadow-lg"
                                                             >
                                                                 <Crown className="w-4 h-4" />
@@ -1409,18 +1279,6 @@ const { isPremium } = useSubscription();
                                                             </div>
                                                         </motion.div>
                                                     )}
-                                                </div>
-                                            )}
-                                            {studyKit && !isPremium && (
-                                                <div className="mt-6 p-4 bg-zinc-800/50 border border-zinc-700 rounded-xl text-center">
-                                                    <p className="text-sm text-zinc-400 mb-2">Want custom notes tailored to your needs?</p>
-                                                    <button
-                                                        onClick={() => router.push('/pricing')}
-                                                        className="flex items-center gap-2 mx-auto px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-lg text-sm font-medium transition"
-                                                    >
-                                                        <Crown className="w-4 h-4" />
-                                                        Upgrade to Pro
-                                                    </button>
                                                 </div>
                                             )}
                                         </div>

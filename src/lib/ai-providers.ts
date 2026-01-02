@@ -95,6 +95,7 @@ export interface GenerateOptions {
     mimeType: string;
     data: string; // base64
   }[];
+  model?: 'versatile' | 'oss';
 }
 
 export interface GenerateResult {
@@ -130,13 +131,21 @@ export function cleanJsonResponse(text: string): string {
  * Generate AI content with prioritized Groq (as requested by user)
  */
 export async function generateWithFallback(options: GenerateOptions): Promise<GenerateResult> {
-  const { prompt, systemPrompt, schema, temperature = 1.0, maxTokens = 4000, attachments = [] } = options;
+  const { prompt, systemPrompt, schema, temperature = 1.0, maxTokens = 4000, attachments = [], model = 'oss' } = options;
 
   const hasImages = attachments.some(a => a.mimeType.startsWith('image/'));
 
+  // Determine model: vision for images, versatile for notes, oss for JSON tasks
+  let groqModel = 'openai/gpt-oss-120b';
+  if (hasImages) {
+    groqModel = 'llama-3.2-11b-vision-preview';
+  } else if (model === 'versatile') {
+    groqModel = 'llama-3.3-70b-versatile';
+  }
+
   // Try Groq FIRST (User preference: "let's not use gemini for now just groq")
   try {
-    console.log('🟢 Attempting Groq generation...');
+    console.log(`🟢 Attempting Groq generation with model: ${groqModel}...`);
     const Groq = (await import('groq-sdk')).default;
     const groq = new Groq({ apiKey: getNextGroqKey() });
 
@@ -167,7 +176,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
     }
 
     const response = await groq.chat.completions.create({
-      model: hasImages ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'openai/gpt-oss-120b',
+      model: groqModel,
       messages,
       temperature,
       max_tokens: maxTokens,
@@ -175,7 +184,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
     });
 
     const text = response.choices[0]?.message?.content || '';
-    console.log('✅ Groq successful');
+    console.log('✅ Groq successful. Output sample:', text.substring(0, 100) + '...');
 
     return {
       text,

@@ -9,8 +9,11 @@ import { useToast } from '@/components/ui/use-toast';
 
 export function PricingClient() {
   const [currency, setCurrency] = useState<Currency>('USD');
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [loading, setLoading] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const plans = PRICING_PLANS[currency].filter(p => p.id === 'free' || p.interval === billingInterval);
 
   const handleSubscribe = async (planId: string) => {
     if (planId === 'free') {
@@ -63,25 +66,49 @@ export function PricingClient() {
           Unlock the full power of EdBox with Premium. Personalized, unlimited, and designed for your success.
         </p>
 
-        <div className="flex items-center justify-center mt-8 gap-4">
-          <span className={`text-sm ${currency === 'USD' ? 'font-bold' : 'text-muted-foreground'}`}>Global (USD)</span>
-          <button
-            onClick={() => setCurrency(currency === 'USD' ? 'NGN' : 'USD')}
-            className="relative w-12 h-6 bg-primary/20 rounded-full p-1 transition-colors"
-          >
-            <div
-              className={`w-4 h-4 bg-primary rounded-full transition-transform ${
-                currency === 'NGN' ? 'translate-x-6' : 'translate-x-0'
+        <div className="flex flex-col items-center mt-8 gap-6">
+          <div className="flex items-center gap-4">
+            <span className={`text-sm ${currency === 'USD' ? 'font-bold' : 'text-muted-foreground'}`}>Global (USD)</span>
+            <button
+              onClick={() => setCurrency(currency === 'USD' ? 'NGN' : 'USD')}
+              className="relative w-12 h-6 bg-primary/20 rounded-full p-1 transition-colors"
+            >
+              <div
+                className={`w-4 h-4 bg-primary rounded-full transition-transform ${
+                  currency === 'NGN' ? 'translate-x-6' : 'translate-x-0'
+                }`}
+              />
+            </button>
+            <span className={`text-sm ${currency === 'NGN' ? 'font-bold' : 'text-muted-foreground'}`}>Nigeria (NGN)</span>
+          </div>
+
+          <div className="flex items-center gap-4 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">
+            <button
+              onClick={() => setBillingInterval('monthly')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                billingInterval === 'monthly' ? 'bg-primary text-primary-foreground shadow-lg' : 'text-zinc-400 hover:text-white'
               }`}
-            />
-          </button>
-          <span className={`text-sm ${currency === 'NGN' ? 'font-bold' : 'text-muted-foreground'}`}>Nigeria (NGN)</span>
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setBillingInterval('yearly')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                billingInterval === 'yearly' ? 'bg-primary text-primary-foreground shadow-lg' : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              Yearly
+              <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-bold">
+                -15%
+              </span>
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-        {PRICING_PLANS[currency].map((plan) => (
-          <Card key={plan.id} className={`flex flex-col ${plan.id === 'premium' ? 'border-primary shadow-lg scale-105' : ''}`}>
+        {plans.map((plan) => (
+          <Card key={plan.id} className={`flex flex-col ${plan.id.includes('premium') ? 'border-primary shadow-lg scale-105' : ''}`}>
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div>
@@ -90,7 +117,7 @@ export function PricingClient() {
                     {plan.id === 'free' ? 'Essential tools to get started' : 'Everything you need to excel'}
                   </CardDescription>
                 </div>
-                {plan.id === 'premium' && (
+                {plan.id.includes('premium') && (
                   <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                     <Zap className="w-3 h-3" /> RECOMMENDED
                   </div>
@@ -100,7 +127,12 @@ export function PricingClient() {
             <CardContent className="flex-grow">
               <div className="mb-6">
                 <span className="text-4xl font-bold">{formatPrice(plan.price, plan.currency)}</span>
-                <span className="text-muted-foreground">/{plan.interval}</span>
+                <span className="text-muted-foreground">/{plan.interval === 'monthly' ? 'mo' : 'yr'}</span>
+                {plan.interval === 'yearly' && (
+                  <p className="text-xs text-green-500 font-medium mt-1">
+                    Equivalent to {formatPrice(plan.price / 12, plan.currency)}/mo
+                  </p>
+                )}
               </div>
               <ul className="space-y-4">
                 {plan.features.map((feature, i) => (
@@ -114,7 +146,7 @@ export function PricingClient() {
             <CardFooter>
               <Button
                 className="w-full h-12 text-lg"
-                variant={plan.id === 'premium' ? 'default' : 'outline'}
+                variant={plan.id.includes('premium') ? 'default' : 'outline'}
                 onClick={() => handleSubscribe(plan.id)}
                 disabled={loading !== null}
               >

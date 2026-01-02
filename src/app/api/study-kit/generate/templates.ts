@@ -48,55 +48,53 @@ Format as a JSON array:
 export const NOTES_TEMPLATE = `
 Generate comprehensive, professionally structured study notes that are DETAILED and HIGHLY USEFUL for students.
 
-CRITICAL: These notes must be SUBSTANTIAL and THOROUGH - at least 2000 words minimum. Do NOT generate basic, surface-level summaries.
+CRITICAL: These notes must be SUBSTANTIAL and THOROUGH - at least 2500 words minimum. Do NOT generate basic, surface-level summaries.
 
 Use Markdown formatting. Structure as follows:
 
 # [Topic Title]
 
 ## Overview
-Provide a comprehensive introduction (2-3 paragraphs) explaining what this topic is, why it matters, and how it connects to broader concepts. Include real-world relevance.
+Provide a comprehensive introduction (3-4 paragraphs) explaining what this topic is, why it matters, and how it connects to broader concepts. Include real-world relevance and historical context if applicable.
 
 ## Core Concepts
 For EACH major concept:
 ### [Concept Name]
-- **Definition**: Clear, precise explanation
-- **Key Points**: Detailed breakdown with multiple bullet points
-- **How It Works**: Step-by-step explanation where applicable
-- **Example**: Concrete illustration with code snippets (use \`\`\`language) if relevant
+- **Definition**: Clear, precise explanation.
+- **Detailed Breakdown**: Use multiple bullet points to explain nuances.
+- **How It Works**: Step-by-step explanation of processes or mechanisms.
+- **Formulas/Notation**: Use clear text or LaTeX-style formatting for mathematical expressions.
+- **Example**: Concrete illustration. ONLY include code snippets (use \`\`\`language) if the topic is specifically about programming, software development, or if a simulation is highly relevant.
 
 ## Examples & Use Cases
-Provide 3-5 detailed, practical examples that show the concept in action. Include:
-- Real-world scenarios
-- Code examples with explanations (properly formatted in code blocks)
-- Step-by-step walkthroughs
+Provide 4-6 detailed, practical examples that show the concept in action. Include:
+- Real-world scenarios.
+- Detailed walkthroughs of how to solve related problems.
+- Visual descriptions or diagrams represented in text.
 
 ## Deep Dive
 Advanced details including:
-- Edge cases and exceptions
-- Performance considerations
-- Best practices and patterns
-- How experts approach this topic
-- Related advanced concepts
+- Edge cases and exceptions.
+- Performance considerations (if technical) or advanced theoretical implications.
+- Best practices and expert-level insights.
+- Related advanced concepts and future trends.
 
 ## Common Pitfalls / Misconceptions
-List at least 5 common mistakes with:
-| Pitfall | Why It Happens | How to Avoid |
-|---------|----------------|--------------|
-Create a detailed table format.
+List at least 7-10 common mistakes with a detailed table:
+| Pitfall | Why It Happens | How to Avoid / Correct Understanding |
+|---------|----------------|-------------------------------------|
 
 ## Key Takeaways
-- Comprehensive bulleted summary (8-12 key points)
-- Each takeaway should be actionable and specific
+- Comprehensive bulleted summary (10-15 key points).
+- Each takeaway should be actionable, specific, and memorable.
 
-## Quick Reference
-Provide a cheat-sheet style summary with the most important syntax, formulas, or concepts in an easy-to-scan format.
+## Quick Reference & Cheat Sheet
+Provide a summary of the most important formulas, terms, or syntax in an easy-to-scan format.
 
-IMPORTANT: 
-- Be thorough and detailed - students should be able to learn the topic entirely from these notes
-- Include code examples in proper code blocks when relevant
-- Use tables for structured comparisons
-- Do NOT be superficial or generic
+IMPORTANT RULES:
+- **NO BOGUS CODE**: Do NOT include Python/Java/etc. code for non-programming topics (like Kepler's Law, History, etc.) unless explicitly useful for a simulation.
+- **THOROUGHNESS**: Expand on every point. Be the ultimate resource for this topic.
+- **FORMATTING**: Use headers, bold text, lists, and tables effectively.
 `;
 
 export const MINDMAP_TEMPLATE = `

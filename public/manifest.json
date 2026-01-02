@@ -7,41 +7,41 @@
   "background_color": "#000000",
   "theme_color": "#3b82f6",
   "orientation": "portrait-primary",
-  "icons": [
-    {
-      "src": "/logo.ico",
-      "sizes": "32x32",
-      "type": "image/x-icon"
-    },
-    {
-      "src": "/logo.jpg",
-      "sizes": "512x512",
-      "type": "image/jpeg",
-      "purpose": "any maskable"
-    }
-  ],
-  "categories": ["education", "productivity"],
-  "shortcuts": [
-    {
-      "name": "Create Course",
-      "short_name": "New Course",
-      "description": "Start creating a new course",
-      "url": "/creator",
-      "icons": [{ "src": "/logo.ico", "sizes": "32x32" }]
-    },
-    {
-      "name": "Study Circles",
-      "short_name": "Circles",
-      "description": "View your study circles",
-      "url": "/socials/study-circles",
-      "icons": [{ "src": "/logo.ico", "sizes": "32x32" }]
-    },
-    {
-      "name": "Tools",
-      "short_name": "Tools",
-      "description": "Access learning tools",
-      "url": "/tools",
-      "icons": [{ "src": "/logo.ico", "sizes": "32x32" }]
-    }
-  ]
+    "icons": [
+      {
+        "src": "/logo_new.ico",
+        "sizes": "32x32",
+        "type": "image/x-icon"
+      },
+      {
+        "src": "/logo_new.jpg",
+        "sizes": "512x512",
+        "type": "image/jpeg",
+        "purpose": "any maskable"
+      }
+    ],
+    "categories": ["education", "productivity"],
+    "shortcuts": [
+      {
+        "name": "Create Course",
+        "short_name": "New Course",
+        "description": "Start creating a new course",
+        "url": "/creator",
+        "icons": [{ "src": "/logo_new.ico", "sizes": "32x32" }]
+      },
+      {
+        "name": "Study Circles",
+        "short_name": "Circles",
+        "description": "View your study circles",
+        "url": "/socials/study-circles",
+        "icons": [{ "src": "/logo_new.ico", "sizes": "32x32" }]
+      },
+      {
+        "name": "Tools",
+        "short_name": "Tools",
+        "description": "Access learning tools",
+        "url": "/tools",
+        "icons": [{ "src": "/logo_new.ico", "sizes": "32x32" }]
+      }
+    ]
 }

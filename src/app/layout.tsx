@@ -93,8 +93,8 @@ export default function RootLayout({
         <meta name="google-site-verification" content="YzGOxq7ul48yIOan9gd3sigS4kTp-9aiimYHo01po0s" />
         <meta name="theme-color" content="#3b82f6" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" href="/logo.jpg" />
-        <link rel="icon" type="image/x-icon" href="/logo.ico" />
+        <link rel="apple-touch-icon" href="/logo_new.jpg" />
+        <link rel="icon" type="image/x-icon" href="/logo_new.ico" />
         <OrganizationSchema />
         <WebsiteSchema />
         <SoftwareApplicationSchema />

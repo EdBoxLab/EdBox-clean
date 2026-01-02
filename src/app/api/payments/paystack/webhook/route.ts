@@ -20,35 +20,46 @@ export async function POST(req: Request) {
     const event = JSON.parse(body);
     const supabase = createRouteHandlerClient({ cookies });
 
-    switch (event.event) {
-      case 'charge.success':
-        // Handle successful charge
-        const { user_id, plan_id } = event.data.metadata;
-        await supabase
-          .from('user_subscriptions')
-          .upsert({
-            user_id,
-            plan_id,
-            status: 'active',
-            paystack_customer_code: event.data.customer.customer_code,
-            currency: event.data.currency,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'user_id' });
-        break;
+      switch (event.event) {
+        case 'charge.success':
+        case 'subscription.create':
+        case 'invoice.payment_succeeded':
+          // Handle successful charge, subscription creation, or renewal
+          const { user_id, plan_id } = event.data.metadata || {};
+          
+          if (!user_id) {
+            console.error('No user_id in metadata');
+            return new NextResponse('Missing user_id', { status: 400 });
+          }
 
-      case 'subscription.create':
-        // Handle subscription creation
-        break;
+          await supabase
+            .from('user_subscriptions')
+            .upsert({
+              user_id,
+              plan_id: plan_id || 'premium',
+              status: 'active',
+              paystack_customer_code: event.data.customer?.customer_code,
+              paystack_subscription_code: event.data.subscription_code || null,
+              currency: event.data.currency,
+              current_period_end: event.data.next_payment_date 
+                ? new Date(event.data.next_payment_date).toISOString()
+                : new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString(),
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id' });
+          break;
 
-      case 'subscription.disable':
-        // Handle subscription cancellation
-        const customerCode = event.data.customer.customer_code;
-        await supabase
-          .from('user_subscriptions')
-          .update({ status: 'cancelled' })
-          .eq('paystack_customer_code', customerCode);
-        break;
-    }
+        case 'subscription.disable':
+        case 'subscription.not_renew':
+          // Handle subscription cancellation or non-renewal
+          const customerCode = event.data.customer?.customer_code;
+          if (customerCode) {
+            await supabase
+              .from('user_subscriptions')
+              .update({ status: 'cancelled' })
+              .eq('paystack_customer_code', customerCode);
+          }
+          break;
+      }
 
     return new NextResponse('OK', { status: 200 });
   } catch (error) {

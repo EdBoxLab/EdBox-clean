@@ -127,12 +127,12 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: subscription } = await supabase
-      .from('subscriptions')
-      .select('plan_type, status')
+      .from('user_subscriptions')
+      .select('plan_id, status')
       .eq('user_id', user.id)
       .single();
 
-    const isPremium = subscription?.plan_type === 'premium' && subscription?.status === 'active';
+    const isPremium = subscription?.plan_id === 'premium' && subscription?.status === 'active';
     
     if (!isPremium) {
       return NextResponse.json({ error: 'Premium subscription required' }, { status: 403 });

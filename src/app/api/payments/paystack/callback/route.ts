@@ -18,7 +18,7 @@ export async function GET(req: Request) {
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/pricing?error=payment_failed`);
     }
 
-    const { user_id, plan_id } = result.data.metadata;
+    const { user_id, plan_id } = result.data.metadata || {};
     const supabase = createRouteHandlerClient({ cookies });
 
     // Update user subscription in database
@@ -26,12 +26,14 @@ export async function GET(req: Request) {
       .from('user_subscriptions')
       .upsert({
         user_id,
-        plan_id,
+        plan_id: plan_id || 'premium',
         status: 'active',
-        paystack_customer_code: result.data.customer.customer_code,
-        paystack_subscription_code: result.data.plan_object?.plan_code || null,
+        paystack_customer_code: result.data.customer?.customer_code,
+        paystack_subscription_code: result.data.plan_object?.plan_code || result.data.subscription_code || null,
         currency: result.data.currency,
-        current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now for monthly
+        current_period_end: result.data.next_payment_date 
+          ? new Date(result.data.next_payment_date).toISOString()
+          : new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString(),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' });
 

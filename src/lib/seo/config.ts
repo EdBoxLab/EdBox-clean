@@ -102,7 +102,7 @@ export const structuredDataBase = {
   '@type': 'EducationalOrganization',
   name: seoConfig.siteName,
   url: seoConfig.siteUrl,
-  logo: `${seoConfig.siteUrl}/icons/icon-512x512.png`,
+  logo: `${seoConfig.siteUrl}/logo_new.jpg`,
   description: seoConfig.defaultDescription,
   sameAs: seoConfig.organization.sameAs,
   foundingDate: seoConfig.organization.foundingDate,

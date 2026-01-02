@@ -25,18 +25,15 @@ function extractJSON(text: string, type: ContentType) {
   try {
     let cleaned = text.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '');
     
-    // Preliminary cleaning to handle common AI JSON artifacts
     cleaned = cleaned
-      .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
-      .replace(/\\n/g, ' ')           // Convert escaped newlines to spaces
-      .replace(/\r?\n/g, ' ');        // Convert actual newlines to spaces
+      .replace(/[\x00-\x1F\x7F]/g, '')
+      .replace(/\\n/g, ' ')
+      .replace(/\r?\n/g, ' ');
     
-    // Find the actual JSON structure
     const start = cleaned.indexOf(type === 'mindmaps' ? '{' : '[');
     const end = cleaned.lastIndexOf(type === 'mindmaps' ? '}' : ']');
     
     if (start === -1 || end === -1) {
-      // Fallback: if we're looking for an array but found an object (common AI mistake)
       if (type !== 'mindmaps') {
         const altStart = cleaned.indexOf('{');
         const altEnd = cleaned.lastIndexOf('}');
@@ -44,38 +41,25 @@ function extractJSON(text: string, type: ContentType) {
           const possibleObj = cleaned.substring(altStart, altEnd + 1);
           try {
             const parsedObj = JSON.parse(possibleObj);
-            // If it has a property that looks like our array, use that
             const arrayKey = Object.keys(parsedObj).find(key => Array.isArray(parsedObj[key]));
             if (arrayKey) return parsedObj[arrayKey];
-          } catch (e) { /* ignore and throw original error */ }
+          } catch (e) { }
         }
       }
       throw new Error('No valid JSON structure found in AI response');
     }
     
     cleaned = cleaned.substring(start, end + 1);
-    
-    // Remove trailing commas before closing brackets/braces
     cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
     
     let parsed;
     try {
       parsed = JSON.parse(cleaned);
     } catch (parseError) {
-      // More aggressive cleaning for math-heavy content
-      cleaned = cleaned
-        // Escape all backslashes that aren't already escaping a quote or backslash
-        // This is crucial for LaTeX/Math symbols like \sqrt, \frac, etc.
-        .replace(/\\(?!"|\\)/g, '\\\\')
-        // Remove any remaining control characters
-        .replace(/[\u0000-\u001F]/g, '');
-      
+      cleaned = cleaned.replace(/\\(?!["\\])/g, '\\\\').replace(/[\u0000-\u001F]/g, '');
       try {
         parsed = JSON.parse(cleaned);
       } catch (secondError) {
-        console.error(`❌ Second JSON parse attempt failed for ${type}:`, secondError);
-        // Last ditch effort: try to fix missing quotes around keys or other common issues
-        // but for now, we'll throw to trigger retry or failure
         throw secondError;
       }
     }
@@ -104,30 +88,63 @@ function extractJSON(text: string, type: ContentType) {
     
     return parsed;
   } catch (error) {
-    console.error(`❌ JSON extraction failed for ${type}:`, error, 'Raw text sample:', text.substring(0, 500));
     throw new Error(`Failed to parse ${type}: ${error}`);
   }
 }
 
-function buildPrompt(type: ContentType, prompt: string) {
+function buildPrompt(type: ContentType, prompt: string, isAppend: boolean = false, customInstructions: string = '') {
   const base = `Topic/Content Source: "${prompt}"\n\n`;
+  const count = isAppend ? 10 : 15;
   
   switch (type) {
     case 'quizzes':
-      return base + `${QUIZ_TEMPLATE}
+      return base + `Generate ${count} high-quality multiple-choice questions.
+
+CRITICAL REQUIREMENTS:
+- correctAnswer MUST be 0, 1, 2, or 3 (NOT 1-4!)
+- 0 = first option
+- 1 = second option  
+- 2 = third option
+- 3 = fourth option
+
+IMPORTANT FOR MATH/SCIENCE TOPICS:
+- Write mathematical expressions in plain text (e.g., "x^2 + 2x + 1" instead of LaTeX)
+- Use words for operations when clearer (e.g., "the square root of 16" or "sqrt(16)")
+- Avoid special Unicode math symbols that may break JSON
+- For fractions, use "/" notation (e.g., "3/4" or "three-fourths")
+- Keep all text ASCII-safe
 
 CRITICAL: correctAnswer is 0-indexed (0=first option, 3=fourth option)
 Output ONLY JSON array:
 [{"question":"...","options":["A","B","C","D"],"correctAnswer":0,"explanation":"...","difficulty":"Easy"}]`;
 
     case 'flashcards':
-      return base + FLASHCARD_TEMPLATE + '\nOutput ONLY JSON array.';
+      return base + `Generate ${count} professional flashcards that focus on key concepts, terminology, and critical insights.
+Avoid one-word answers; provide clear, descriptive definitions.
+Each card should include:
+- Front: The concept or question.
+- Back: The detailed explanation or answer.
+- Hint: A subtle clue to help the learner.
+
+Format as a JSON array:
+[
+  {
+    "front": "string",
+    "back": "string",
+    "hint": "string"
+  }
+]
+\nOutput ONLY JSON array.`;
 
     case 'mindmaps':
       return base + MINDMAP_TEMPLATE + '\nOutput ONLY JSON object.';
 
     case 'notes':
-      return base + NOTES_TEMPLATE;
+      let notesPrompt = base + NOTES_TEMPLATE;
+      if (customInstructions) {
+        notesPrompt += `\n\nCUSTOM INSTRUCTIONS FOR THESE NOTES: ${customInstructions}\nIMPORTANT: Please follow these details strictly.`;
+      }
+      return notesPrompt;
   }
 }
 
@@ -139,34 +156,45 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { prompt, contentTypes, fileName, fileContent, fileType } = body;
+    const { prompt, contentTypes, fileName, fileContent, fileType, kitId, appendType, customInstructions } = body;
 
-    if ((!prompt && !fileContent) || !contentTypes?.length) {
+    let finalPrompt = prompt || '';
+    let existingKit = null;
+
+    if (kitId) {
+      const { data } = await supabase
+        .from('study_kit_content')
+        .select('*')
+        .eq('id', kitId)
+        .eq('user_id', user.id)
+        .single();
+      
+      if (!data) return NextResponse.json({ error: 'Study kit not found' }, { status: 404 });
+      existingKit = data;
+      finalPrompt = data.source_content || prompt || '';
+    }
+
+    if ((!finalPrompt && !fileContent) && !kitId) {
       return NextResponse.json({ error: 'Missing data' }, { status: 400 });
     }
 
-    // Process file if provided
-    let finalPrompt = prompt || '';
-    if (fileContent) {
+    if (fileContent && !kitId) {
       try {
-        console.log(`📄 Processing file in study kit: ${fileName} (${fileType})`);
         const extractedText = await processFileContent(fileContent, fileType || '', fileName || '');
-        
-        // NEW: Extract meaningful context instead of sending raw text
         const contextSummary = await extractContextFromText(extractedText);
-        
         finalPrompt = `Based on the following extracted document context (${fileName}):\n\n${contextSummary}\n\nUser Context: ${prompt || 'Generate study materials'}\n\nIMPORTANT: Only generate content that is relevant to the provided document context.`;
-        console.log(`✅ File processed and context extracted, total prompt length: ${finalPrompt.length}`);
       } catch (err) {
-        console.error('❌ File processing failed in study kit:', err);
-        // Fallback to prompt only
+        console.error('❌ File processing failed:', err);
       }
     }
 
+    const typesToGenerate = appendType ? [appendType] : contentTypes;
+
     const results = await Promise.allSettled(
-      contentTypes.map(async (type: ContentType) => {
+      typesToGenerate.map(async (type: ContentType) => {
+          const isAppend = !!appendType;
           const result = await generateWithRetry({
-            prompt: buildPrompt(type, finalPrompt),
+            prompt: buildPrompt(type, finalPrompt, isAppend, type === 'notes' ? customInstructions : ''),
             systemPrompt: 'Output ONLY valid JSON with no extra text.',
             temperature: 0.7,
             maxTokens: type === 'notes' ? 3000 : 4000,
@@ -185,10 +213,39 @@ export async function POST(request: NextRequest) {
     });
 
     if (Object.keys(generatedContent).length === 0) {
-      return NextResponse.json({ error: 'All failed' }, { status: 500 });
+      return NextResponse.json({ error: 'Generation failed' }, { status: 500 });
     }
 
-    // Generate a better title if it was a file
+    if (kitId && existingKit) {
+      const updatedGeneratedContent = { ...existingKit.generated_content };
+      
+      if (appendType) {
+        const existingList = Array.isArray(updatedGeneratedContent[appendType]) ? updatedGeneratedContent[appendType] : [];
+        const newList = Array.isArray(generatedContent[appendType]) ? generatedContent[appendType] : [];
+        updatedGeneratedContent[appendType] = [...existingList, ...newList];
+      } else {
+        Object.keys(generatedContent).forEach(key => {
+          updatedGeneratedContent[key] = generatedContent[key];
+        });
+      }
+
+      const { data: updatedKit } = await supabase
+        .from('study_kit_content')
+        .update({
+          generated_content: updatedGeneratedContent,
+          content_types: Array.from(new Set([...(existingKit.content_types || []), ...Object.keys(generatedContent)]))
+        })
+        .eq('id', kitId)
+        .select()
+        .single();
+
+      return NextResponse.json({ 
+        success: true, 
+        id: updatedKit?.id, 
+        content: updatedGeneratedContent 
+      });
+    }
+
     let title = prompt?.slice(0, 100) || fileName?.split('.')[0] || 'Study Kit';
     if (title.length < 3) title = 'My Study Kit';
 
@@ -198,7 +255,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         title: title,
         source_type: fileName ? 'file' : 'text',
-        source_content: finalPrompt.substring(0, 5000), // Store partial context for reference
+        source_content: finalPrompt.substring(0, 5000),
         file_name: fileName,
         content_types: Object.keys(generatedContent),
         generated_content: generatedContent,

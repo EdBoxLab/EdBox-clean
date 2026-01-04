@@ -171,6 +171,8 @@ export function PricingClient() {
         </div>
         <p className="text-sm">
           Secure payments powered by Paystack. Cancel anytime.
+          <br />
+          <span className="text-xs opacity-70">* Prices do not include additional transaction fees.</span>
         </p>
       </div>
     </div>

@@ -10,30 +10,51 @@ export async function GET(
   try {
     const { circleId } = await context.params;
     const numericCircleId = parseInt(circleId, 10);
-    
+
     const supabase = createServerSupabaseClient();
-    
-    const { data, error } = await supabase
+
+    // First, get member user IDs
+    const { data: memberData, error: memberError } = await supabase
       .from('circle_members')
-      .select(`
-        user_id,
-        joined_at,
-        profiles (
-          id,
-          full_name,
-          avatar_url
-        )
-      `)
+      .select('user_id, joined_at')
       .eq('circle_id', numericCircleId);
 
-    if (error) throw error;
+    if (memberError) throw memberError;
 
-    const members = data.map((m: any) => ({
-      id: m.user_id,
-      full_name: m.profiles?.full_name || 'Anonymous',
-      avatar_url: m.profiles?.avatar_url,
-      joined_at: m.joined_at
-    }));
+    if (!memberData || memberData.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    // Get user IDs
+    const userIds = memberData.map(m => m.user_id);
+
+    // Then fetch profiles for those users
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url')
+      .in('id', userIds);
+
+    if (profileError) {
+      console.error('Error fetching profiles:', profileError);
+      // Continue without profiles if they fail to fetch
+    }
+
+    // Create a map of profiles by user ID
+    const profileMap = new Map();
+    if (profileData) {
+      profileData.forEach(p => profileMap.set(p.id, p));
+    }
+
+    // Combine member data with profiles
+    const members = memberData.map((m: any) => {
+      const profile = profileMap.get(m.user_id);
+      return {
+        id: m.user_id,
+        full_name: profile?.full_name || 'Anonymous',
+        avatar_url: profile?.avatar_url,
+        joined_at: m.joined_at
+      };
+    });
 
     return NextResponse.json(members);
   } catch (error) {

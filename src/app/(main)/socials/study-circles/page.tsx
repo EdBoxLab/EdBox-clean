@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Session, AuthChangeEvent } from '@supabase/supabase-js';
-import { Users, Plus, MessageCircle, Video, Phone, Search, Send, Sparkles, ArrowLeft, MoreVertical, Share2, UserPlus, Clock, BookOpen, GraduationCap, X, AtSign, Link, Copy, Check, Hash, Settings, ChevronDown, Menu } from 'lucide-react';
+import { Users, Plus, MessageCircle, Video, Phone, Search, Send, Sparkles, ArrowLeft, MoreVertical, Share2, UserPlus, Clock, BookOpen, GraduationCap, X, AtSign, Link, Copy, Check, Hash, Settings, ChevronDown, Menu, Trash } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useSearchParams, useRouter } from 'next/navigation';
 import posthog from 'posthog-js';
@@ -12,31 +12,34 @@ import posthog from 'posthog-js';
 const SharedContentCard = ({ content }: { content: any }) => {
   const router = useRouter();
   const isStudyKit = content.type === 'study-kit';
-  
+  const isCourse = content.type === 'course';
+
   const handleClick = () => {
     if (isStudyKit && content.id) {
       router.push(`/tools/study-kit?id=${content.id}`);
+    } else if (isCourse && content.id) {
+      router.push(`/courses/${content.id}`);
     }
   };
-  
-    return (
-      <div 
-        onClick={handleClick}
-        className="mt-2 bg-[#1e1f22] border border-[#2b2d31] rounded-xl overflow-hidden hover:bg-[#35373c] transition-colors group cursor-pointer max-w-full sm:max-w-sm"
-      >
+
+  return (
+    <div
+      onClick={handleClick}
+      className="mt-2 bg-[#1e1f22] border border-[#2b2d31] rounded-xl overflow-hidden hover:bg-[#35373c] transition-colors group cursor-pointer max-w-full sm:max-w-sm"
+    >
 
       <div className="flex gap-3 p-3">
-        <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[#5865f2]/10 text-[#5865f2]">
-          <BookOpen className="w-6 h-6" />
+        <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ${isCourse ? 'bg-purple-500/10 text-purple-400' : 'bg-[#5865f2]/10 text-[#5865f2]'}`}>
+          {isCourse ? <GraduationCap className="w-6 h-6" /> : <BookOpen className="w-6 h-6" />}
         </div>
         <div className="min-w-0">
           <h4 className="text-sm font-bold text-gray-100 truncate">{content.title}</h4>
-          <p className="text-xs text-gray-400 line-clamp-1">{content.description || 'Study Kit'}</p>
+          <p className="text-xs text-gray-400 line-clamp-1">{content.description || 'Shared Content'}</p>
           <div className="mt-2 flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#5865f2]/20 text-[#5865f2]">
-              Study Kit
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${isCourse ? 'bg-purple-500/20 text-purple-400' : 'bg-[#5865f2]/20 text-[#5865f2]'}`}>
+              {isCourse ? 'Course' : 'Study Kit'}
             </span>
-            <span className="text-[10px] font-bold text-[#5865f2] group-hover:text-blue-300">Tap to Open</span>
+            <span className={`text-[10px] font-bold group-hover:underline ${isCourse ? 'text-purple-400' : 'text-[#5865f2]'}`}>Tap to Open</span>
           </div>
         </div>
       </div>
@@ -50,7 +53,7 @@ const SharedContentCard = ({ content }: { content: any }) => {
 const ShareCircleModal = ({ circle, onClose }: { circle: any; onClose: () => void }) => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
-  
+
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
   const shareLink = `${baseUrl.replace(/\/$/, '')}/socials/study-circles?join=${circle.invite_code}`;
 
@@ -91,19 +94,18 @@ const ShareCircleModal = ({ circle, onClose }: { circle: any; onClose: () => voi
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={shareLink}
                 readOnly
                 className="flex-1 bg-[#1e1f22] border border-[#1e1f22] rounded-lg px-3 py-2 text-sm text-gray-300 truncate outline-none focus:border-[#5865f2]/50"
               />
               <button
                 onClick={copyLink}
-                className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all ${
-                  copiedLink 
-                    ? 'bg-green-500 text-white' 
-                    : 'bg-[#5865f2] hover:bg-[#4752c4] text-white'
-                }`}
+                className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all ${copiedLink
+                  ? 'bg-green-500 text-white'
+                  : 'bg-[#5865f2] hover:bg-[#4752c4] text-white'
+                  }`}
               >
                 {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 {copiedLink ? 'Copied!' : 'Copy'}
@@ -127,11 +129,10 @@ const ShareCircleModal = ({ circle, onClose }: { circle: any; onClose: () => voi
               </div>
               <button
                 onClick={copyCode}
-                className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all ${
-                  copiedCode 
-                    ? 'bg-green-500 text-white' 
-                    : 'bg-purple-600 hover:bg-purple-500 text-white'
-                }`}
+                className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all ${copiedCode
+                  ? 'bg-green-500 text-white'
+                  : 'bg-purple-600 hover:bg-purple-500 text-white'
+                  }`}
               >
                 {copiedCode ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 {copiedCode ? 'Copied!' : 'Copy'}
@@ -227,13 +228,13 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }: {
                 </h2>
               </div>
             </div>
-            
+
             <div className="flex-1 max-w-md mx-6 hidden md:block">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#949ba4]" />
-                <input 
-                  type="text" 
-                  placeholder="Find a circle..." 
+                <input
+                  type="text"
+                  placeholder="Find a circle..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full bg-[#1e1f22] border border-transparent focus:border-[#5865f2]/50 rounded-xl py-2 pl-10 pr-4 text-sm outline-none transition-all"
@@ -267,7 +268,7 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }: {
             <div className="h-px flex-1 bg-[#1e1f22]" />
           </div>
           <div className="flex overflow-x-auto gap-6 pb-4 no-scrollbar">
-            <button 
+            <button
               onClick={onNewCircle}
               className="flex flex-col items-center gap-3 group">
               <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-[#4e5058] flex items-center justify-center bg-[#2b2d31] group-hover:bg-[#35373c] group-hover:border-[#5865f2]/50 transition-all">
@@ -317,8 +318,8 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }: {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredCircles.map((circle: any) => (
-                <div 
-                  key={circle.id} 
+                <div
+                  key={circle.id}
                   className="bg-[#2b2d31] rounded-2xl border border-[#1e1f22] overflow-hidden hover:bg-[#313338] transition-all group flex flex-col h-full shadow-lg hover:border-[#5865f2]/30"
                 >
                   <div className="p-6 flex-1">
@@ -326,7 +327,7 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }: {
                       <div className="w-14 h-14 rounded-2xl bg-[#1e1f22] border border-[#2b2d31] flex items-center justify-center text-2xl font-black text-[#5865f2] group-hover:bg-[#5865f2] group-hover:text-white transition-all">
                         {circle.name[0]}
                       </div>
-                      <button 
+                      <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedCircleForInvite(circle);
@@ -430,9 +431,9 @@ const CirclesDashboard = ({ circles, onSelectCircle, onNewCircle, session }: {
       )}
 
       {showInviteModal && selectedCircleForInvite && (
-        <ShareCircleModal 
-          circle={selectedCircleForInvite} 
-          onClose={() => setShowInviteModal(false)} 
+        <ShareCircleModal
+          circle={selectedCircleForInvite}
+          onClose={() => setShowInviteModal(false)}
         />
       )}
     </div>
@@ -459,13 +460,13 @@ const CircleChat = ({ circle, onBack, session }: {
   const [mentionSearch, setMentionSearch] = useState('');
   const [isLeaving, setIsLeaving] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleLeaveCircle = async () => {
     if (!window.confirm('Are you sure you want to leave this circle?')) return;
-    
+
     setIsLeaving(true);
     try {
       const response = await fetch(`/api/study-circles/${circle.id}/members`, {
@@ -508,10 +509,16 @@ const CircleChat = ({ circle, onBack, session }: {
         const memData = await memRes.json();
         setMembers(Array.isArray(memData) ? memData : []);
 
-        const kitsRes = await fetch('/api/study-kit/list');
+        const [kitsRes, coursesRes] = await Promise.all([
+          fetch('/api/study-kit/list'),
+          fetch('/api/courses')
+        ]);
+
         const kitsData = await kitsRes.json();
+        const coursesData = await coursesRes.json();
+
         setUserContent({
-          courses: [],
+          courses: Array.isArray(coursesData) ? coursesData : [],
           kits: Array.isArray(kitsData.studyKits) ? kitsData.studyKits : []
         });
 
@@ -559,7 +566,7 @@ const CircleChat = ({ circle, onBack, session }: {
       const search = textBeforeCursor.slice(lastAtSymbol + 1);
       if (!search.includes(' ')) {
         setMentionSearch(search);
-        setFilteredMembers(members.filter(m => 
+        setFilteredMembers(members.filter(m =>
           m.full_name.toLowerCase().includes(search.toLowerCase())
         ));
         setShowMentionSuggestions(true);
@@ -574,7 +581,7 @@ const CircleChat = ({ circle, onBack, session }: {
     const textBeforeAt = newMessage.slice(0, newMessage.lastIndexOf('@', cursorPosition - 1));
     const textAfterMention = newMessage.slice(cursorPosition);
     const updatedMessage = `${textBeforeAt}@${member.full_name} ${textAfterMention}`;
-    
+
     setNewMessage(updatedMessage);
     setShowMentionSuggestions(false);
     inputRef.current?.focus();
@@ -598,12 +605,44 @@ const CircleChat = ({ circle, onBack, session }: {
       .map(m => ({ id: m.id, name: m.full_name }));
 
     try {
+      // Step 1: Share each attachment first
+      let sharedContentIds: string[] = [];
+
+      for (const attachment of selectedAttachments) {
+        try {
+          const shareRes = await fetch('/api/shared-content/share', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contentType: attachment.type === 'study-kit' ? 'study_kit' : 'course',
+              contentId: attachment.id,
+              circleId: circle.id,
+              message: null
+            }),
+          });
+
+          if (shareRes.ok) {
+            const data = await shareRes.json();
+            if (data.sharedContent && data.sharedContent.id) {
+              sharedContentIds.push(data.sharedContent.id);
+            }
+          } else {
+            console.error('Failed to share:', attachment.title);
+          }
+        } catch (err) {
+          console.error('Error sharing attachment:', err);
+        }
+      }
+
+      // Step 2: Send message with share IDs AND legacy shared_content for immediate display
       await fetch(`/api/study-circles/${circle.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content: newMessage,
           username: session?.user?.user_metadata?.full_name || session?.user?.email || 'Anonymous',
+          shared_content_ids: sharedContentIds,
+          // Also send legacy shared_content for backward compat display
           shared_content: selectedAttachments.length > 0 ? selectedAttachments : null,
           mentions: mentions.length > 0 ? mentions : null
         }),
@@ -612,6 +651,7 @@ const CircleChat = ({ circle, onBack, session }: {
       posthog.capture('message_sent', {
         circle_id: circle.id,
         circle_name: circle.name,
+        has_attachments: sharedContentIds.length > 0
       });
 
       setNewMessage('');
@@ -622,9 +662,32 @@ const CircleChat = ({ circle, onBack, session }: {
     }
   };
 
+  const handleDeleteMessage = async (messageId: string) => {
+    try {
+      if (!confirm('Are you sure you want to delete this message?')) return;
+
+      const res = await fetch(`/api/study-circles/${circle.id}/messages?messageId=${messageId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        // Remove locally
+        // Optimistic update logic if needed, but real-time subscription (if exists) or re-fetch would handle it
+        // For now, let's just trigger a re-fetch or rely on polling if implemented, 
+        // or manually remove from state for instant feedback:
+        setMessages(prev => prev.filter(m => m.id !== messageId));
+      } else {
+        console.error("Failed to delete message");
+        alert("Failed to delete message");
+      }
+    } catch (error) {
+      console.error("Error deleting message:", error);
+    }
+  };
+
   const renderMessageContent = (content: string, mentions: any[]) => {
     if (!mentions || mentions.length === 0) return content;
-    
+
     let parts = [content];
     mentions.forEach(mention => {
       const mentionText = `@${mention.name}`;
@@ -639,8 +702,8 @@ const CircleChat = ({ circle, onBack, session }: {
           newParts.push(s);
           if (i < split.length - 1) {
             newParts.push(
-              <span 
-                key={mention.id + i} 
+              <span
+                key={mention.id + i}
                 className="bg-[#5865f2]/20 text-[#5865f2] px-1 rounded font-bold cursor-pointer hover:bg-[#5865f2] hover:text-white transition-colors"
               >
                 @{mention.name}
@@ -658,7 +721,7 @@ const CircleChat = ({ circle, onBack, session }: {
     <div className="fixed inset-0 bg-[#313338] text-[#dbdee1] flex z-50">
       {/* Mobile Sidebar Overlay */}
       {showMobileSidebar && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
           onClick={() => setShowMobileSidebar(false)}
         />
@@ -676,14 +739,14 @@ const CircleChat = ({ circle, onBack, session }: {
             </button>
             <h2 className="font-bold text-white truncate text-sm uppercase tracking-wide">{circle.name}</h2>
           </div>
-          <button 
+          <button
             onClick={() => setShowMobileSidebar(false)}
             className="md:hidden p-1.5 hover:bg-[#3f4147] rounded-lg transition-colors text-gray-400 hover:text-white"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
-        
+
         <div className="p-4 border-b border-[#1e1f22]">
           <div className="flex items-center gap-2 text-[#949ba4] text-xs font-black uppercase tracking-widest">
             <Hash className="w-4 h-4" />
@@ -728,8 +791,8 @@ const CircleChat = ({ circle, onBack, session }: {
       <div className="flex-1 flex flex-col min-w-0 bg-[#313338]">
         <header className="h-14 px-4 flex items-center justify-between border-b border-[#1e1f22] bg-[#313338]/95 backdrop-blur-sm sticky top-0 z-30">
           <div className="flex items-center gap-2 min-w-0">
-            <button 
-              onClick={() => setShowMobileSidebar(true)} 
+            <button
+              onClick={() => setShowMobileSidebar(true)}
               className="md:hidden p-2 hover:bg-[#3f4147] rounded-lg transition-colors text-gray-400 hover:text-white"
             >
               <Menu className="w-6 h-6" />
@@ -741,7 +804,7 @@ const CircleChat = ({ circle, onBack, session }: {
               {circle.description || 'Study circle chat hub'}
             </span>
           </div>
-          
+
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => setShowInviteModal(true)}
@@ -750,7 +813,7 @@ const CircleChat = ({ circle, onBack, session }: {
             >
               <UserPlus className="w-5 h-5" />
             </button>
-            <button 
+            <button
               onClick={() => setShowMobileSidebar(true)}
               className="p-2 hover:bg-[#3f4147] rounded-lg transition-colors text-[#b5bac1] hover:text-white md:hidden"
             >
@@ -781,19 +844,18 @@ const CircleChat = ({ circle, onBack, session }: {
                 const isUser = msg.user_id === session?.user?.id;
                 const isAI = msg.username?.toLowerCase().includes('ai') || msg.username?.toLowerCase().includes('bot');
                 const prevMsg = messages[idx - 1];
-                const showHeader = !prevMsg || prevMsg.user_id !== msg.user_id || 
+                const showHeader = !prevMsg || prevMsg.user_id !== msg.user_id ||
                   (new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime() > 5 * 60 * 1000);
 
                 return (
-                  <div 
-                    key={msg.id || idx} 
+                  <div
+                    key={msg.id || idx}
                     className={`group hover:bg-[#2e3035] rounded-lg px-2 sm:px-4 py-1 transition-colors relative ${showHeader ? 'mt-6 pt-2' : ''}`}
                   >
                     {showHeader ? (
                       <div className="flex items-start gap-3 sm:gap-4">
-                        <div className={`w-10 h-10 shrink-0 rounded-2xl flex items-center justify-center font-bold text-sm shadow-lg transition-transform group-hover:scale-105 ${
-                          isAI ? 'bg-gradient-to-br from-purple-500 to-indigo-600' : isUser ? 'bg-[#5865f2]' : 'bg-[#ed4245]'
-                        }`}>
+                        <div className={`w-10 h-10 shrink-0 rounded-2xl flex items-center justify-center font-bold text-sm shadow-lg transition-transform group-hover:scale-105 ${isAI ? 'bg-gradient-to-br from-purple-500 to-indigo-600' : isUser ? 'bg-[#5865f2]' : 'bg-[#ed4245]'
+                          }`}>
                           {isAI ? <Sparkles className="w-5 h-5 text-white" /> : <span className="text-white">{msg.username?.[0]?.toUpperCase()}</span>}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -807,12 +869,21 @@ const CircleChat = ({ circle, onBack, session }: {
                               </span>
                             )}
                             <span className="text-[11px] text-[#949ba4] font-medium">
-                              {new Date(msg.created_at).toLocaleString([], { 
-                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                              {new Date(msg.created_at).toLocaleString([], {
+                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                               })}
                             </span>
                           </div>
-                            <div className="text-[#dbdee1] mt-0.5 break-words [overflow-wrap:anywhere] leading-relaxed text-[15px] selection:bg-[#5865f2]/30">
+                          {isUser && (
+                            <button
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className="absolute top-2 right-2 p-1.5 bg-[#2b2d31] rounded-lg text-[#f23f42] opacity-0 group-hover:opacity-100 hover:bg-[#232428] transition-all shadow-sm"
+                              title="Delete message"
+                            >
+                              <Trash className="w-4 h-4" />
+                            </button>
+                          )}
+                          <div className="text-[#dbdee1] mt-0.5 break-words [overflow-wrap:anywhere] leading-relaxed text-[15px] selection:bg-[#5865f2]/30">
 
                             {renderMessageContent(msg.content, msg.mentions)}
                           </div>
@@ -832,7 +903,16 @@ const CircleChat = ({ circle, onBack, session }: {
                             {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
                           </span>
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 relative">
+                          {isUser && (
+                            <button
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className="absolute -top-1 right-2 p-1 bg-[#2b2d31] rounded-lg text-[#f23f42] opacity-0 group-hover:opacity-100 hover:bg-[#232428] transition-all shadow-sm scale-90"
+                              title="Delete message"
+                            >
+                              <Trash className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           <div className="text-[#dbdee1] break-words leading-relaxed text-[15px] selection:bg-[#5865f2]/30">
                             {renderMessageContent(msg.content, msg.mentions)}
                           </div>
@@ -893,28 +973,65 @@ const CircleChat = ({ circle, onBack, session }: {
                 </button>
               </div>
               <div className="p-3 max-h-72 overflow-y-auto custom-scrollbar">
+
+                {/* Courses Section */}
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#949ba4] mb-3 ml-2">Your Courses</div>
+                {userContent.courses.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-4 text-center px-4 mb-4">
+                    <GraduationCap className="w-6 h-6 text-[#4e5058] mb-2" />
+                    <p className="text-xs text-[#949ba4] font-medium">No courses found.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-1.5 mb-6">
+                    {userContent.courses.map(course => (
+                      <div
+                        key={course.id}
+                        onClick={() => toggleAttachment(course, 'course')}
+                        className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all border ${selectedAttachments.find(a => a.id === course.id)
+                          ? 'bg-purple-500/10 border-purple-500/50'
+                          : 'bg-[#1e1f22]/30 border-transparent hover:bg-[#35373c] hover:border-[#1e1f22]'
+                          }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${selectedAttachments.find(a => a.id === course.id) ? 'bg-purple-500 text-white' : 'bg-[#2b2d31] text-purple-500'
+                            }`}>
+                            <GraduationCap className="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-sm font-bold text-gray-100 block truncate">{course.title}</span>
+                            <span className="text-[10px] text-gray-500 font-medium">Updated recently</span>
+                          </div>
+                        </div>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${selectedAttachments.find(a => a.id === course.id) ? 'bg-purple-500 border-purple-500' : 'border-[#4e5058]'
+                          }`}>
+                          {selectedAttachments.find(a => a.id === course.id) && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Study Kits Section */}
                 <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#949ba4] mb-3 ml-2">Your Study Kits</div>
                 {userContent.kits.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center px-4">
-                    <BookOpen className="w-8 h-8 text-[#4e5058] mb-3" />
-                    <p className="text-sm text-[#949ba4] font-medium">No study kits found. Create one in Tools!</p>
+                  <div className="flex flex-col items-center justify-center py-4 text-center px-4">
+                    <BookOpen className="w-6 h-6 text-[#4e5058] mb-2" />
+                    <p className="text-xs text-[#949ba4] font-medium">No study kits found. Create one in Tools!</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-1.5">
                     {userContent.kits.map(kit => (
-                      <div 
+                      <div
                         key={kit.id}
                         onClick={() => toggleAttachment(kit, 'study-kit')}
-                        className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all border ${
-                          selectedAttachments.find(a => a.id === kit.id)
-                            ? 'bg-[#5865f2]/10 border-[#5865f2]/50'
-                            : 'bg-[#1e1f22]/30 border-transparent hover:bg-[#35373c] hover:border-[#1e1f22]'
-                        }`}
+                        className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all border ${selectedAttachments.find(a => a.id === kit.id)
+                          ? 'bg-[#5865f2]/10 border-[#5865f2]/50'
+                          : 'bg-[#1e1f22]/30 border-transparent hover:bg-[#35373c] hover:border-[#1e1f22]'
+                          }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                            selectedAttachments.find(a => a.id === kit.id) ? 'bg-[#5865f2] text-white' : 'bg-[#2b2d31] text-[#5865f2]'
-                          }`}>
+                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${selectedAttachments.find(a => a.id === kit.id) ? 'bg-[#5865f2] text-white' : 'bg-[#2b2d31] text-[#5865f2]'
+                            }`}>
                             <BookOpen className="w-5 h-5" />
                           </div>
                           <div className="min-w-0">
@@ -922,9 +1039,8 @@ const CircleChat = ({ circle, onBack, session }: {
                             <span className="text-[10px] text-gray-500 font-medium">Updated 2d ago</span>
                           </div>
                         </div>
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                          selectedAttachments.find(a => a.id === kit.id) ? 'bg-[#5865f2] border-[#5865f2]' : 'border-[#4e5058]'
-                        }`}>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${selectedAttachments.find(a => a.id === kit.id) ? 'bg-[#5865f2] border-[#5865f2]' : 'border-[#4e5058]'
+                          }`}>
                           {selectedAttachments.find(a => a.id === kit.id) && <Check className="w-3 h-3 text-white" />}
                         </div>
                       </div>
@@ -958,22 +1074,20 @@ const CircleChat = ({ circle, onBack, session }: {
               </div>
             )}
 
-            <form 
-              onSubmit={handleSendMessage} 
-              className={`flex items-center gap-2 sm:gap-3 bg-[#383a40] px-3 sm:px-4 py-1 shadow-2xl transition-all border-2 border-transparent focus-within:border-[#5865f2]/30 ${
-                selectedAttachments.length > 0 ? 'rounded-b-2xl rounded-t-none border-t-[#1e1f22]' : 'rounded-2xl'
-              }`}
+            <form
+              onSubmit={handleSendMessage}
+              className={`flex items-center gap-2 sm:gap-3 bg-[#383a40] px-3 sm:px-4 py-1 shadow-2xl transition-all border-2 border-transparent focus-within:border-[#5865f2]/30 ${selectedAttachments.length > 0 ? 'rounded-b-2xl rounded-t-none border-t-[#1e1f22]' : 'rounded-2xl'
+                }`}
             >
               <button
                 type="button"
                 onClick={() => setShowAttachMenu(!showAttachMenu)}
-                className={`p-2 rounded-xl transition-all shrink-0 ${
-                  showAttachMenu ? 'bg-[#5865f2] text-white rotate-45' : 'text-[#b5bac1] hover:text-white hover:bg-[#4e5058]'
-                }`}
+                className={`p-2 rounded-xl transition-all shrink-0 ${showAttachMenu ? 'bg-[#5865f2] text-white rotate-45' : 'text-[#b5bac1] hover:text-white hover:bg-[#4e5058]'
+                  }`}
               >
                 <Plus className="w-5 h-5" />
               </button>
-              
+
               <div className="flex-1 relative min-w-0">
                 <input
                   ref={inputRef}
@@ -1002,17 +1116,17 @@ const CircleChat = ({ circle, onBack, session }: {
               </div>
             </form>
           </div>
-          
+
           <p className="mt-2 text-[10px] text-[#949ba4] text-center font-medium hidden sm:block">
             Pro tip: type <span className="text-[#5865f2] font-bold">@</span> to mention someone or use the <span className="text-[#5865f2] font-bold">+</span> to share study kits.
           </p>
         </footer>
-      </div>
+      </div >
 
       {showInviteModal && (
         <ShareCircleModal circle={circle} onClose={() => setShowInviteModal(false)} />
       )}
-    </div>
+    </div >
   );
 };
 

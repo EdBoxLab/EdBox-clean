@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase/admin';
 
 export async function GET(
     request: NextRequest,
@@ -7,7 +8,8 @@ export async function GET(
 ) {
     try {
         const { id } = await context.params;
-        const supabase = await createSupabaseServerClient();
+        // Use admin client to bypass RLS - allows viewing shared study kits
+        const supabase = createServerSupabaseClient();
 
         const { data: studyKit, error } = await supabase
             .from('study_kit_content')

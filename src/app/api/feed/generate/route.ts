@@ -31,10 +31,16 @@ async function generateMadFeed(
         ...interestsList
     ].filter(Boolean);
 
-    const contextSeeds = allTopics.length > 0 ? allTopics : [
-        'Quantum Computing', 'sports', 'music', 'Behavioral Economics', 'Neuroscience',
-        'Space Exploration', 'psychology', 'Cryptography', 'Philosophy of Mind'
+    const discoveryTopics = [
+        'Quantum Computing', 'Behavioral Economics', 'Neuroscience', 'Space Exploration',
+        'Cryptography', 'Philosophy of Mind', 'Biohacking', 'Artificial Intelligence',
+        'Ancient History', 'Futurism', 'Psychology', 'Astrophysics', 'Game Theory'
     ];
+
+    // Mix user topics with discovery topics (70% user, 30% discovery)
+    const contextSeeds = allTopics.length > 0
+        ? [...allTopics, ...discoveryTopics.sort(() => 0.5 - Math.random()).slice(0, Math.max(2, Math.floor(allTopics.length * 0.3)))]
+        : discoveryTopics;
 
     const blacklist = seenTitles.slice(-100).join(' | ');
     const primaryTopic = contextSeeds[Math.floor(Math.random() * contextSeeds.length)];
@@ -118,8 +124,12 @@ CRITICAL:
 1. Use session seed "${randomSeed}" to ensure completely unique angles
 2. Never repeat topics from blacklist
 3. Include simple, concrete "image_keywords" for each item (2-3 words that work on image searches)
-4. GENERATE CONTENT RELEVANT TO THE USER'S COURSES, STUDY KITS, AND INTERESTS ABOVE
-5. If user has study kits or courses, at least 5 items should be directly related to those topics
+4. GENERATE A MIX (EXACTLY 8 ITEMS):
+   - 2 items based on user's COURSES (30%)
+   - 2 items based on user's STUDY KITS (25%)
+   - 3 items based on user's INTERESTS (35%)
+   - 1 "WILDCARD" item from a completely unrelated field (10%)
+5. Make sure the content is DIVERSE and not repetitive.
 
 Return a JSON object with an "items" array.`;
 
@@ -361,7 +371,7 @@ export const POST = async (request: NextRequest) => {
                 title: item.title,
                 content: item
             }));
-            
+
             try {
                 const { error } = await supabase.from('feed_items_history').insert(historyItems);
                 if (error) {

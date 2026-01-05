@@ -17,7 +17,7 @@ export default function AuthCallbackPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         // 👇 Redirect to your actual homepage
-        router.replace('/'); // if homepage is app/page.tsx
+        router.replace('/dashboard');
         // or router.replace('/home'); if homepage is app/home/page.tsx
       } else {
         router.replace('/login');

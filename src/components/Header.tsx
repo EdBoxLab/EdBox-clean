@@ -34,8 +34,8 @@ export const Header = () => {
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
               </button>
             )}
-            <Link href="/" className="flex items-center">
-              <Image src="/Logo.jpg" style={{ borderRadius: '500px' }} alt="EdBox Logo" width={40} height={40} className="h-10 w-10 mr-2" />
+            <Link href="/dashboard" className="flex items-center">
+              <Image src="/logo.jpg" style={{ borderRadius: '500px' }} alt="EdBox Logo" width={40} height={40} className="h-10 w-10 mr-2" />
               <span className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 dark:text-white truncate">EdBox</span>
             </Link>
           </div>

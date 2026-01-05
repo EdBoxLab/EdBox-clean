@@ -192,7 +192,7 @@ const NotesMockup = () => (
 );
 
 const CourseMockup = () => (
-    <AppWindow className="h-full bg-[#0F0F10] border-gray-800">
+    <AppWindow className="h-full bg-[#0F0F10] border-gray-800" showControls={true}>
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

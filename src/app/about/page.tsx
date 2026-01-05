@@ -1,38 +1,53 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import {
   Sparkles, Zap, Users, Target, MessageCircle, Clock,
   ArrowRight, Check, Star, Trophy, Flame, Video, X,
-  PlayCircle, PauseCircle, Repeat, BookOpen, Brain,
-  Gamepad2, Award, GraduationCap, Globe, TrendingUp
+  PauseCircle, Repeat, Brain, AlertCircle,
+  GraduationCap, TrendingUp
 } from 'lucide-react';
 
 export default function AboutPageRedesigned() {
-  const [hoveredFeature, setHoveredFeature] = useState(null);
+  const [hoveredFeature, setHoveredFeature] = useState<number | null>(null);
+  const [betaStatus, setBetaStatus] = useState<{
+    currentCount: number;
+    isFull: boolean;
+    remainingSpots: number;
+  } | null>(null);
+
+  // Fetch beta status
+  useEffect(() => {
+    fetch('/api/beta-status')
+      .then(res => res.json())
+      .then(data => setBetaStatus(data))
+      .catch(console.error);
+  }, []);
 
   // Hero stats with animation
   const stats = [
     { value: '100K+', label: 'Active Learners', icon: <Users className="w-5 h-5" /> },
-    { value: '500K+', label: 'Practice Sets Created', icon: <Target className="w-5 h-5" /> },
-    { value: '2M+', label: 'Questions Answered', icon: <Brain className="w-5 h-5" /> },
-    { value: '10hrs', label: 'Saved Per Week', icon: <Clock className="w-5 h-5" /> }
+    { value: '500K+', label: 'Practice Sets', icon: <Target className="w-5 h-5" /> },
+    { value: '2M+', label: 'Questions Solved', icon: <Brain className="w-5 h-5" /> },
+    { value: '10hrs', label: 'Saved Weekly', icon: <Clock className="w-5 h-5" /> }
   ];
 
   // The Big Problem Section
   const oldWay = [
-    { icon: <Video className="w-5 h-5" />, text: 'Watch 3-hour video lectures', bad: true },
-    { icon: <PauseCircle className="w-5 h-5" />, text: 'Forget 90% by next day', bad: true },
-    { icon: <Repeat className="w-5 h-5" />, text: 'Rewatch when exam comes', bad: true },
-    { icon: <Clock className="w-5 h-5" />, text: 'Waste hours making study materials', bad: true }
+    { icon: <Video className="w-5 h-5" />, text: 'Watch 3-hour video lectures' },
+    { icon: <PauseCircle className="w-5 h-5" />, text: 'Forget 90% by next day' },
+    { icon: <Repeat className="w-5 h-5" />, text: 'Rewatch when exam comes' },
+    { icon: <Clock className="w-5 h-5" />, text: 'Waste hours making study materials' }
   ];
 
   const newWay = [
-    { icon: <Zap className="w-5 h-5" />, text: 'Learn by doing, not watching', good: true },
-    { icon: <Brain className="w-5 h-5" />, text: 'AI adapts to how YOU learn', good: true },
-    { icon: <Target className="w-5 h-5" />, text: 'Instant practice materials', good: true },
-    { icon: <Trophy className="w-5 h-5" />, text: 'Study with friends, stay accountable', good: true }
+    { icon: <Zap className="w-5 h-5" />, text: 'Learn by doing, not watching' },
+    { icon: <Brain className="w-5 h-5" />, text: 'AI adapts to how YOU learn' },
+    { icon: <Target className="w-5 h-5" />, text: 'Instant practice materials' },
+    { icon: <Trophy className="w-5 h-5" />, text: 'Study with friends, stay accountable' }
   ];
 
   // Core Features - The Real Value Props
@@ -111,28 +126,69 @@ export default function AboutPageRedesigned() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-800/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-white" />
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl overflow-hidden">
+                <Image 
+                  src="/logo.ico" 
+                  alt="EdBox Logo" 
+                  width={40} 
+                  height={40}
+                  className="w-full h-full object-cover"
+                />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
                 EdBox
               </span>
-            </div>
+            </Link>
             <div className="flex items-center gap-3">
-              <button className="px-4 py-2 text-sm font-medium text-zinc-300 hover:text-white transition">
+              <Link
+                href="/login"
+                className="px-4 py-2 text-sm font-medium text-zinc-300 hover:text-white transition"
+              >
                 Log In
-              </button>
-              <button className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-lg text-sm font-semibold transition shadow-lg shadow-indigo-500/30">
-                Start Free
-              </button>
+              </Link>
+              <Link
+                href="/signup"
+                className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-lg text-sm font-semibold transition shadow-lg shadow-indigo-500/30"
+              >
+                Sign Up Free
+              </Link>
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section - The Big Promise */}
-      <section className="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+      {/* Beta Access Alert */}
+      {betaStatus && !betaStatus.isFull && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 w-full max-w-2xl px-4">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 backdrop-blur-xl border border-amber-500/30 rounded-2xl p-4 shadow-2xl"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-white">Beta Access Open!</h3>
+                <p className="text-sm text-zinc-300">
+                  Only <span className="font-bold text-amber-400">{betaStatus.remainingSpots}</span> spots remaining out of 100
+                </p>
+              </div>
+              <Link
+                href="/signup"
+                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-lg text-sm font-bold transition shadow-lg whitespace-nowrap"
+              >
+                Claim Spot →
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Hero Section - Instant Value in 5 Seconds */}
+      <section className="relative pt-32 pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-1/2 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl animate-pulse" />
           <div className="absolute top-1/2 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
@@ -142,47 +198,92 @@ export default function AboutPageRedesigned() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.4 }}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-full mb-6">
-              <Zap className="w-4 h-4 text-indigo-400" />
-              <span className="text-sm text-indigo-300 font-medium">The Learning OS for Gen Z</span>
-            </div>
-
+            {/* Instant Value Headline */}
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
-              <span className="text-white">Stop Watching.</span>
+              <span className="text-white">Stop Watching Videos.</span>
               <br />
               <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                Start Doing.
+                Start Learning by Doing.
               </span>
             </h1>
 
-            <p className="text-xl sm:text-2xl text-zinc-400 max-w-3xl mx-auto mb-8">
-              EdBox turns any topic into <span className="text-white font-semibold">interactive practice</span>, 
-              generates <span className="text-white font-semibold">study materials instantly</span>, and keeps you 
-              <span className="text-white font-semibold"> accountable with friends</span>.
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-              <button className="group flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl text-lg font-semibold transition shadow-2xl shadow-indigo-500/50">
-                Start Learning Free
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" />
-              </button>
-              <button className="px-8 py-4 bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 rounded-xl text-lg font-semibold transition">
-                See How It Works
-              </button>
+            {/* Core Value Props - Scannable in 3 seconds */}
+            <div className="flex flex-wrap items-center justify-center gap-4 mb-8 text-base sm:text-lg">
+              <div className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/30 rounded-full">
+                <Brain className="w-5 h-5 text-indigo-400" />
+                <span className="text-white font-semibold">AI Courses</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/30 rounded-full">
+                <Zap className="w-5 h-5 text-purple-400" />
+                <span className="text-white font-semibold">Auto Study Kits</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 bg-pink-500/10 border border-pink-500/30 rounded-full">
+                <Users className="w-5 h-5 text-pink-400" />
+                <span className="text-white font-semibold">Study Circles</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 bg-orange-500/10 border border-orange-500/30 rounded-full">
+                <Clock className="w-5 h-5 text-orange-400" />
+                <span className="text-white font-semibold">Save 10hrs/week</span>
+              </div>
             </div>
 
-            <div className="flex items-center justify-center gap-2 text-sm text-zinc-400">
-              <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-              <span>Free forever • No credit card • Save 10+ hours/week</span>
+            {/* Beta Status Indicator */}
+            {betaStatus && (
+              <div className="mb-8">
+                {!betaStatus.isFull ? (
+                  <div className="inline-flex items-center gap-2 px-5 py-3 bg-green-500/10 border border-green-500/30 rounded-full">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    <span className="text-base text-green-300 font-semibold">
+                      {betaStatus.remainingSpots} / 100 Beta Spots Left
+                    </span>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-2 px-5 py-3 bg-amber-500/10 border border-amber-500/30 rounded-full">
+                    <AlertCircle className="w-5 h-5 text-amber-400" />
+                    <span className="text-base text-amber-300 font-semibold">
+                      Beta Full - Join Waitlist
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Primary CTA - Unmissable */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+              <Link
+                href="/signup"
+                className="group flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl text-xl font-bold transition shadow-2xl shadow-indigo-500/50 hover:scale-105 transform"
+              >
+                {betaStatus?.isFull ? 'Join Waitlist Now' : 'Start Learning Free'}
+                <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition" />
+              </Link>
+            </div>
+
+            {/* Trust Signals */}
+            <div className="flex items-center justify-center gap-3 text-sm text-zinc-400">
+              <div className="flex items-center gap-1">
+                <Check className="w-4 h-4 text-green-400" />
+                <span>Free Forever</span>
+              </div>
+              <span className="text-zinc-600">•</span>
+              <div className="flex items-center gap-1">
+                <Check className="w-4 h-4 text-green-400" />
+                <span>No Credit Card</span>
+              </div>
+              <span className="text-zinc-600">•</span>
+              <div className="flex items-center gap-1">
+                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                <span>100K+ Students</span>
+              </div>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* Stats Bar */}
-      <section className="py-12 px-4 sm:px-6 lg:px-8 border-y border-zinc-800/50 bg-zinc-900/30">
+      {/* Stats Bar - Social Proof */}
+      <section className="py-10 px-4 sm:px-6 lg:px-8 border-y border-zinc-800/50 bg-zinc-900/30">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {stats.map((stat, index) => (
@@ -190,6 +291,7 @@ export default function AboutPageRedesigned() {
                 key={index}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
                 className="text-center"
               >
@@ -217,7 +319,7 @@ export default function AboutPageRedesigned() {
               </span>
             </h2>
             <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
-              You've tried it. Hours of videos you forget, notes you never review, and zero accountability.
+              Hours of videos you forget. Notes you never review. Zero accountability.
             </p>
           </div>
 
@@ -291,6 +393,7 @@ export default function AboutPageRedesigned() {
                 key={index}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
                 onMouseEnter={() => setHoveredFeature(index)}
                 onMouseLeave={() => setHoveredFeature(null)}
@@ -392,12 +495,13 @@ export default function AboutPageRedesigned() {
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* Final CTA Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
             className="relative bg-gradient-to-br from-indigo-900/50 to-purple-900/50 backdrop-blur-xl border border-indigo-500/30 rounded-3xl p-12 text-center overflow-hidden"
           >
             <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
@@ -409,10 +513,13 @@ export default function AboutPageRedesigned() {
               <p className="text-xl text-zinc-300 mb-8 max-w-2xl mx-auto">
                 Join 100,000+ students already learning smarter with EdBox
               </p>
-              <button className="group flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl text-lg font-semibold transition shadow-2xl shadow-indigo-500/50 mx-auto">
-                Get Started Free
+              <Link
+                href="/signup"
+                className="group inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl text-lg font-semibold transition shadow-2xl shadow-indigo-500/50 hover:scale-105 transform"
+              >
+                {betaStatus?.isFull ? 'Join Waitlist Now' : 'Get Started Free'}
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" />
-              </button>
+              </Link>
               <div className="flex items-center justify-center gap-2 mt-6 text-sm text-zinc-400">
                 <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                 <span>No credit card • Save 10+ hours per week</span>
@@ -431,4 +538,3 @@ export default function AboutPageRedesigned() {
     </div>
   );
 }
-        

@@ -1,7 +1,7 @@
 export const seoConfig = {
   siteName: 'EdBox',
-  siteUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://edbox.com',
-  defaultTitle: 'EdBox - AI-Powered Learning Platform | Best Alternative to Coursera, Udemy & Khan Academy',
+  siteUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://edbox.app',
+  defaultTitle: 'EdBox - The only learning platform that values you learning',
   defaultDescription: 'EdBox is the #1 AI-powered education platform for personalized learning. Create custom courses, interactive study sets, take adaptive challenges, and master any subject with AI tutors. The best free alternative to Coursera, Udemy, Khan Academy, and Duolingo.',
   defaultKeywords: [
     'learning platform',
@@ -26,16 +26,16 @@ export const seoConfig = {
     'learning management system',
     'e-learning platform',
   ],
-  ogImage: '/og-image.png',
+  ogImage: '/logo.png',
   twitterHandle: '@edbox',
   author: {
     name: 'EdBox Team',
-    url: 'https://edbox.com/about',
+    url: 'https://edbox.com/,
   },
   organization: {
     name: 'EdBox',
     legalName: 'EdBox Inc.',
-    foundingDate: '2024',
+    foundingDate: '2025',
     founders: [
       {
         '@type': 'Person',

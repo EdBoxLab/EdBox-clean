@@ -2,7 +2,7 @@ export const seoConfig = {
   siteName: 'EdBox',
   siteUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://edbox.app',
   defaultTitle: 'EdBox - The only learning platform that values you learning',
-  defaultDescription: 'EdBox is the #1 AI-powered education platform for personalized learning. Create custom courses, interactive study sets, take adaptive challenges, and master any subject with AI tutors. The best free alternative to Coursera, Udemy, Khan Academy, and Duolingo.',
+  defaultDescription: 'EdBox is the #1 AI-powered education platform for personalized learning. Create custom courses, interactive study sets, take adaptive challenges, and master any subject with AI tutors. The only learning app that makes you truly learn.',
   defaultKeywords: [
     'learning platform',
     'online education',

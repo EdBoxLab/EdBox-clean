@@ -21,7 +21,7 @@ export const HeroSection = () => {
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#8B5CF6]/30 bg-[#8B5CF6]/10 backdrop-blur-sm mb-8 shadow-lg shadow-[#8B5CF6]/20"
                 >
                     <span className="flex h-2.5 w-2.5 rounded-full bg-[#8B5CF6] animate-pulse"></span>
-                    <span className="text-sm font-semibold text-white tracking-wide">EDBOX 2.0 IS LIVE</span>
+                    <span className="text-sm font-semibold text-white tracking-wide">REAL LEARNING ONLY</span>
                 </motion.div>
 
                 {/* NEW HEADLINE - Emphasizes "Doing" */}

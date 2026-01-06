@@ -44,7 +44,7 @@ export const HeroSection = () => {
                     transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
                     className="text-lg md:text-xl text-[#9CA3AF] max-w-3xl mx-auto mb-8 leading-relaxed"
                 >
-                    I built EdBox because watching tutorials taught me nothing. 
+                    I built EdBox because watching tutorials taught me nothing and I hate juggling different apps just to learn something. 
                     Now you learn by actually doing—write code, solve problems, build projects. 
                     <span className="text-white font-medium"> No more passive watching.</span>
                 </motion.p>

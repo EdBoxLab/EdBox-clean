@@ -30,7 +30,7 @@ export const seoConfig = {
   twitterHandle: '@edbox',
   author: {
     name: 'EdBox Team',
-    url: 'https://edbox.com/,
+    url: 'https://edbox.com/',
   },
   organization: {
     name: 'EdBox',

@@ -57,10 +57,10 @@ function FeedPageContent() {
 
   if (loading) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900">
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-black">
         <Loader2 className="w-12 h-12 animate-spin text-purple-500 mb-4" />
         <h2 className="text-xl font-light tracking-wide text-white/50">
-          Loading...
+          Loading your feed...
         </h2>
       </div>
     );
@@ -71,7 +71,7 @@ function FeedPageContent() {
   }
 
   return (
-    <NavigationTracker title="Daily Feed">
+    <NavigationTracker title="Feed">
       <Feed preferences={preferences} />
     </NavigationTracker>
   );
@@ -80,7 +80,7 @@ function FeedPageContent() {
 export default function FeedPage() {
   return (
     <Suspense fallback={
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900">
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-black">
         <Loader2 className="w-12 h-12 animate-spin text-purple-500 mb-4" />
       </div>
     }>

@@ -1,47 +1,43 @@
 {
-  "name": "EdBox - ACTUAL LEARNING",
+  "name": "EdBox - Learning That Actually Works",
   "short_name": "EdBox",
-  "description": "Only learningplatformthat cares if YOU truly learn",
-  "start_url": "/dashboard",
+  "description": "AI courses that adapt to you. Practice that builds understanding.",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#3b82f6",
+  "background_color": "#0F172A",
+  "theme_color": "#3B82F6",
   "orientation": "portrait-primary",
-    "icons": [
-      {
-        "src": "/logo_new.ico",
-        "sizes": "32x32",
-        "type": "image/x-icon"
-      },
-      {
-        "src": "/logo_new.jpg",
-        "sizes": "512x512",
-        "type": "image/jpeg",
-        "purpose": "any maskable"
-      }
-    ],
-    "categories": ["education", "productivity"],
-    "shortcuts": [
-      {
-        "name": "Create Course",
-        "short_name": "New Course",
-        "description": "Start creating a new course",
-        "url": "/creator",
-        "icons": [{ "src": "/logo_new.ico", "sizes": "32x32" }]
-      },
-      {
-        "name": "Study Circles",
-        "short_name": "Circles",
-        "description": "View your study circles",
-        "url": "/socials/study-circles",
-        "icons": [{ "src": "/logo_new.ico", "sizes": "32x32" }]
-      },
-      {
-        "name": "Tools",
-        "short_name": "Tools",
-        "description": "Access learning tools",
-        "url": "/tools",
-        "icons": [{ "src": "/logo_new.ico", "sizes": "32x32" }]
-      }
-    ]
+  "icons": [
+    {
+      "src": "/logo_new.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Create Course",
+      "short_name": "New Course",
+      "description": "Generate AI course instantly",
+      "url": "/creator",
+      "icons": [{ "src": "/logo_new.ico", "sizes": "32x32", "type": "image/x-icon" }]
+    },
+    {
+      "name": "Study Circles",
+      "short_name": "Circles",
+      "description": "Join study circles",
+      "url": "/socials/study-circles",
+      "icons": [{ "src": "/logo_new.ico", "sizes": "32x32", "type": "image/x-icon" }]
+    },
+    {
+      "name": "Learning Tools",
+      "short_name": "Tools",
+      "description": "Access flashcards, quizzes, mind maps",
+      "url": "/tools",
+      "icons": [{ "src": "/logo_new.ico", "sizes": "32x32", "type": "image/x-icon" }]
+    }
+  ]
 }

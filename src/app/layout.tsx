@@ -107,8 +107,9 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="EdBox" />
         
-        {/* Icons - Using Your Existing Files */}
-        <link rel="apple-touch-icon" href="/logo_new.jpg" />
+        {/* Icons - Using EdBoxLogo.png */}
+        <link rel="apple-touch-icon" href="/EdBoxLogo.png" />
+        <link rel="icon" type="image/png" href="/EdBoxLogo.png" />
         <link rel="icon" type="image/x-icon" href="/logo_new.ico" />
         
         {/* Verification */}

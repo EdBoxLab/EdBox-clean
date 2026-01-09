@@ -10,9 +10,9 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/logo_new.jpg",
+      "src": "/EdBoxLogo.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ],
@@ -23,21 +23,21 @@
       "short_name": "New Course",
       "description": "Generate AI course instantly",
       "url": "/creator",
-      "icons": [{ "src": "/logo_new.ico", "sizes": "32x32", "type": "image/x-icon" }]
+      "icons": [{ "src": "/EdBoxLogo.png", "sizes": "96x96", "type": "image/png" }]
     },
     {
       "name": "Study Circles",
       "short_name": "Circles",
       "description": "Join study circles",
       "url": "/socials/study-circles",
-      "icons": [{ "src": "/logo_new.ico", "sizes": "32x32", "type": "image/x-icon" }]
+      "icons": [{ "src": "/EdBoxLogo.png", "sizes": "96x96", "type": "image/png" }]
     },
     {
       "name": "Learning Tools",
       "short_name": "Tools",
       "description": "Access flashcards, quizzes, mind maps",
       "url": "/tools",
-      "icons": [{ "src": "/logo_new.ico", "sizes": "32x32", "type": "image/x-icon" }]
+      "icons": [{ "src": "/EdBoxLogo.png", "sizes": "96x96", "type": "image/png" }]
     }
   ]
 }

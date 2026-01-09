@@ -2,7 +2,7 @@
   "name": "EdBox - Learning That Actually Works",
   "short_name": "EdBox",
   "description": "AI courses that adapt to you. Practice that builds understanding.",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0F172A",

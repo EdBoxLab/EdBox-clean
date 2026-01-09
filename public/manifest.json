@@ -2,7 +2,7 @@
   "name": "EdBox - Learn Smarter",
   "short_name": "EdBox",
   "description": "Your AI-powered education platform for personalized learning",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#3b82f6",

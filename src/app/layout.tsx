@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
 import "./globals.css";
@@ -7,15 +7,22 @@ import { seoConfig } from "@/lib/seo/config";
 import { OrganizationSchema, WebsiteSchema, SoftwareApplicationSchema } from "@/lib/seo/structured-data";
 import ClientLayout from "./ClientLayout";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-primary",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// EdBox Brand System - Single Source of Truth
+const EDBOX_BRAND = {
+  colors: {
+    primary: "#3B82F6",       // Primary blue - clarity, learning, trust
+    secondary: "#8B5CF6",     // Purple - intelligence, AI
+    bgLight: "#FFFFFF",       // Clean white
+    bgDark: "#0F172A",        // Dark mode background
+  }
+} as const;
 
 export const metadata: Metadata = {
   metadataBase: new URL(seoConfig.siteUrl),
@@ -51,7 +58,7 @@ export const metadata: Metadata = {
         url: seoConfig.ogImage,
         width: 1200,
         height: 630,
-        alt: `${seoConfig.siteName} - AI-Powered Learning Platform`,
+        alt: `${seoConfig.siteName} - Learning That Actually Works`,
       },
     ],
   },
@@ -80,6 +87,7 @@ export const metadata: Metadata = {
   verification: {
     google: 'YzGOxq7ul48yIOan9gd3sigS4kTp-9aiimYHo01po0s',
   },
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
@@ -88,36 +96,64 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
-        <meta name="google-site-verification" content="YzGOxq7ul48yIOan9gd3sigS4kTp-9aiimYHo01po0s" />
-        <meta name="theme-color" content="#3b82f6" />
-        <link rel="manifest" href="/manifest.json" />
+        {/* PWA Theme Colors - EdBox Brand */}
+        <meta name="theme-color" content={EDBOX_BRAND.colors.primary} media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content={EDBOX_BRAND.colors.bgDark} media="(prefers-color-scheme: dark)" />
+        
+        {/* Apple PWA - Enhanced */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="EdBox" />
+        
+        {/* Icons - Using Your Existing Files */}
         <link rel="apple-touch-icon" href="/logo_new.jpg" />
         <link rel="icon" type="image/x-icon" href="/logo_new.ico" />
+        
+        {/* Verification */}
+        <meta name="google-site-verification" content="YzGOxq7ul48yIOan9gd3sigS4kTp-9aiimYHo01po0s" />
+        
+        {/* Structured Data - EdBox Brand */}
         <OrganizationSchema />
         <WebsiteSchema />
         <SoftwareApplicationSchema />
+        
+        {/* Dark Mode Flash Prevention - EdBox Branded */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              try {
-                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                  document.documentElement.classList.add('dark');
-                } else {
-                  document.documentElement.classList.remove('dark');
-                }
-              } catch (e) {}
+              (function() {
+                try {
+                  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  const root = document.documentElement;
+                  
+                  if (prefersDark) {
+                    root.classList.add('dark');
+                    root.style.backgroundColor = '${EDBOX_BRAND.colors.bgDark}';
+                    root.style.color = '#FFFFFF';
+                  } else {
+                    root.classList.remove('dark');
+                    root.style.backgroundColor = '${EDBOX_BRAND.colors.bgLight}';
+                    root.style.color = '#0F172A';
+                  }
+                  
+                  // Dynamic theme-color update
+                  const meta = document.querySelector('meta[name="theme-color"]');
+                  if (meta) {
+                    meta.setAttribute('content', prefersDark ? '${EDBOX_BRAND.colors.bgDark}' : '${EDBOX_BRAND.colors.primary}');
+                  }
+                } catch (e) {}
+              })();
             `,
           }}
         />
       </head>
-      <body
-
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${inter.variable} font-primary antialiased bg-white dark:bg-slate-900 text-slate-900 dark:text-white transition-colors duration-200`}>
         <ClientLayout>{children}</ClientLayout>
         <Analytics />
+        
+        {/* AdSense - Lazy Loaded */}
         <Script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7134321558578802"

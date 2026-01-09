@@ -31,7 +31,7 @@ export class SkillProgressionIntegration {
     try {
       // Check if user can access this skill
       const skillState = await skillProgressionManager.getSkillState(userId, skillId, skillGraph);
-      
+
       if (skillState === 'locked') {
         const unlockStatus = await skillProgressionManager.getSkillUnlockStatus(userId, skillId, skillGraph);
         return {
@@ -80,7 +80,7 @@ export class SkillProgressionIntegration {
     try {
       // Analyze user performance to determine appropriate difficulty
       const difficulty = this.calculateAdaptiveDifficulty(userHistory);
-      
+
       const request: ChallengeGenerationRequest = {
         skillId,
         difficultyLevel: difficulty,
@@ -101,11 +101,11 @@ export class SkillProgressionIntegration {
     try {
       // Pre-generate challenges for newly unlocked skill
       await challengeGenerator.ensurePoolSize(skillId, undefined, 3);
-      
+
       // Generate varied challenges for different difficulty levels
       await challengeGenerator.generateVariedChallenges(skillId, 2, 'Easy');
       await challengeGenerator.generateVariedChallenges(skillId, 2, 'Medium');
-      
+
       console.log(`Prepared challenges for newly unlocked skill: ${skillId}`);
     } catch (error) {
       console.error(`Failed to prepare challenges for unlocked skill ${skillId}:`, error);
@@ -155,6 +155,43 @@ export class SkillProgressionIntegration {
       };
     } catch (error) {
       console.error(`Failed to record challenge attempt for user ${userId}, skill ${skillId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Simplified method for interactive course sessions to report progress
+   * Doesn't require skill graph - useful for Genie chat sessions
+   */
+  async recordInteractiveChallengeAttempt(
+    userId: string,
+    skillId: string,
+    challengeId: string,
+    success: boolean,
+    options: {
+      timeSpent?: number;
+      hintsUsed?: number;
+      submissionCode?: string;
+      feedback?: string;
+      difficultyLevel?: DifficultyLevel;
+    } = {}
+  ): Promise<ChallengeResult> {
+    try {
+      // Record the attempt directly to the progress tracker
+      // This bypasses skill graph requirements for simpler integration
+      const result = await progressTracker.recordChallengeAttempt(
+        userId,
+        skillId,
+        challengeId,
+        success,
+        options
+      );
+
+      console.log(`[SKILL_PROGRESSION] Recorded interactive session attempt: userId=${userId}, skillId=${skillId}, success=${success}`);
+
+      return result;
+    } catch (error) {
+      console.error(`Failed to record interactive challenge attempt for user ${userId}, skill ${skillId}:`, error);
       throw error;
     }
   }
@@ -256,10 +293,10 @@ export class SkillProgressionIntegration {
   ): Promise<{ skillId: string; challenge: GeneratedChallenge }[]> {
     try {
       const recommendations: { skillId: string; challenge: GeneratedChallenge }[] = [];
-      
+
       // Get all skill states for the user
       const skillStates = await skillProgressionManager.getAllSkillStates(userId, skillGraph);
-      
+
       // Find unlocked skills that aren't mastered
       const availableSkills = Array.from(skillStates.entries())
         .filter(([_, state]) => state === 'unlocked')
@@ -270,7 +307,7 @@ export class SkillProgressionIntegration {
         try {
           await challengeGenerator.ensurePoolSize(skillId, undefined, 1);
           const challenges = await challengeGenerator.getChallengePool(skillId);
-          
+
           if (challenges.length > 0) {
             recommendations.push({
               skillId,

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { createSupabaseServerClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { generateWithRetry } from '@/lib/ai-providers';
 import { LearningGoal } from '@/types/interactive-course';
+import { skillProgressionIntegration } from '@/lib/services/skill-progression-integration';
 
 // ============================================
 // BEHAVIORAL PATTERN DETECTION
@@ -30,25 +31,25 @@ function detectBehavioralPatterns(userMessage: string, conversationHistory: any[
     const msg = userMessage.toLowerCase();
 
     // Detect quiz completion with success
-    const quizSuccess = msg.includes('correctly answered') || 
-        msg.includes('quiz: correct') || 
+    const quizSuccess = msg.includes('correctly answered') ||
+        msg.includes('quiz: correct') ||
         (msg.includes('quiz') && msg.includes('correct'));
-    
+
     // Detect quiz completion with failure
-    const quizFail = (msg.includes('struggled with the quiz') || 
+    const quizFail = (msg.includes('struggled with the quiz') ||
         (msg.includes('quiz') && msg.includes('struggled')));
 
     // Detect challenge completion with success
-    const challengeSuccess = msg.includes('successfully mastered the challenge') || 
-        msg.includes('challenge completed') || 
+    const challengeSuccess = msg.includes('successfully mastered the challenge') ||
+        msg.includes('challenge completed') ||
         msg.includes('mastered the challenge') ||
         (msg.includes('challenge') && msg.includes('mastered'));
-    
+
     // Detect challenge completion with failure
-    const challengeFail = (msg.includes('struggled with the challenge') || 
+    const challengeFail = (msg.includes('struggled with the challenge') ||
         (msg.includes('challenge') && msg.includes('need more practice')));
 
-    return {
+    const patterns = {
         showsUnderstanding: explicitUnderstanding.some(phrase => msg.includes(phrase)) || quizSuccess || challengeSuccess,
         showsConfusion: explicitConfusion.some(phrase => msg.includes(phrase)) || quizFail || challengeFail,
         wantsChallenge: challengeRequest.some(phrase => msg.includes(phrase)),
@@ -62,6 +63,8 @@ function detectBehavioralPatterns(userMessage: string, conversationHistory: any[
         challengeFailed: challengeFail,
         quizFailed: quizFail
     };
+
+    return patterns;
 }
 
 // ============================================
@@ -71,7 +74,7 @@ function extractJSON(text: string): any {
     try {
         const firstBrace = text.indexOf('{');
         const lastBrace = text.lastIndexOf('}');
-        
+
         if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
             let jsonStr = text.substring(firstBrace, lastBrace + 1).trim();
             jsonStr = jsonStr.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
@@ -301,15 +304,61 @@ export async function POST(request: NextRequest) {
             return new Response(JSON.stringify({ error: 'Missing params' }), { status: 400 });
         }
 
+        // Service-role client for DB operations (bypasses RLS)
         const persistenceClient = await createServerSupabaseClient();
-        const currentTopic = skillTitle || currentSkillId || 'this topic';
+        // SSR client for auth (has user session from cookies)
+        const authClient = await createSupabaseServerClient();
+        let currentTopic = skillTitle || currentSkillId || 'this topic';
 
         // 1. Fetch current session state
-        const { data: sessionData } = await persistenceClient
+        const { data: sessionData, error: sessionError } = await persistenceClient
             .from('interactive_course_sessions')
-            .select('learning_context, progress_state')
+            .select('*') // Select all fields to get course_id
             .eq('id', sessionId)
             .single();
+
+        // 1b. RESOLVE ACTUAL SKILL ID FROM GRAPH (Fix for 0% progress bug)
+        // logic: If the session belongs to a course (which might be a skill graph),
+        // we should try to find the actual Node ID that matches the current topic.
+        let resolvedSkillId = currentSkillId;
+
+        if (sessionData?.course_id) {
+            // Check if this course_id corresponds to a skill graph
+            const { data: graphData } = await persistenceClient
+                .from('skill_graphs')
+                .select('nodes')
+                .eq('id', sessionData.course_id)
+                .single();
+
+            if (graphData?.nodes && Array.isArray(graphData.nodes)) {
+                // Try to find a node that matches the current topic
+                const normalizedTopic = currentTopic.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+                // 1. Precise match on ID (if currentTopic IS the ID)
+                let matchedNode = graphData.nodes.find((n: any) => n.id === currentTopic || n.id === currentSkillId);
+
+                // 2. Fuzzy match on Title
+                if (!matchedNode) {
+                    matchedNode = graphData.nodes.find((n: any) => {
+                        const normalizedTitle = n.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+                        return normalizedTitle.includes(normalizedTopic) || normalizedTopic.includes(normalizedTitle);
+                    });
+                }
+
+                if (matchedNode) {
+                    console.log(`[SKILL_RESOLUTION] Resolved topic "${currentTopic}" to Node ID: ${matchedNode.id}`);
+                    resolvedSkillId = matchedNode.id;
+                    // Also update currentTopic to be precise title if reasonable
+                    if (!skillTitle) currentTopic = matchedNode.title;
+                } else {
+                    console.log(`[SKILL_RESOLUTION] No matching node found in graph for topic "${currentTopic}"`);
+                }
+            }
+        }
+
+        // Use the resolved ID if available, otherwise fallback to existing logic
+        const targetSkillId = resolvedSkillId || sessionData?.course_id || 'unknown_skill';
+
 
         const currentContext = sessionData?.learning_context || learningContext;
         const currentProgress = sessionData?.progress_state || {
@@ -327,7 +376,8 @@ export async function POST(request: NextRequest) {
         // 2. Detect patterns and analyze comprehension
         const patterns = detectBehavioralPatterns(userMessage, conversationHistory || []);
         const aiAnalysis = await analyzeUnderstanding(userMessage, conversationHistory || [], currentTopic, goals);
-        
+
+
         // 3. Update goals based on analysis
         if (aiAnalysis?.updatedGoals) {
             goals = goals.map(g => {
@@ -360,12 +410,18 @@ export async function POST(request: NextRequest) {
         // 4b. Apply progress updates from decision (quiz/challenge completion)
         if (decision.progressUpdate && goals.length > 0) {
             const boost = decision.progressUpdate.boost || 0;
-            // Find the first in_progress goal to update
-            const inProgressGoalIndex = goals.findIndex(g => g.status === 'in_progress');
-            if (inProgressGoalIndex >= 0) {
-                const g = goals[inProgressGoalIndex];
+            // Find the most appropriate goal to update:
+            // 1. Current in_progress goal
+            // 2. Or the first pending goal (starting it)
+            let targetGoalIndex = goals.findIndex(g => g.status === 'in_progress');
+            if (targetGoalIndex === -1) {
+                targetGoalIndex = goals.findIndex(g => g.status === 'pending');
+            }
+
+            if (targetGoalIndex >= 0) {
+                const g = goals[targetGoalIndex];
                 const newConfidence = Math.max(0, Math.min(100, (g.confidence || 0) + boost));
-                goals[inProgressGoalIndex] = {
+                goals[targetGoalIndex] = {
                     ...g,
                     confidence: newConfidence,
                     status: newConfidence >= 80 ? 'mastered' : (newConfidence > 0 ? 'in_progress' : 'pending'),
@@ -400,6 +456,67 @@ export async function POST(request: NextRequest) {
                 last_interaction: new Date().toISOString()
             })
             .eq('id', sessionId);
+
+        // ============================================
+        // BRIDGE TO GLOBAL SKILL PROGRESSION SYSTEM
+        // This ensures progress bars outside of Genie chat are updated
+        // ============================================
+        // Use authClient (SSR) for getting user, not persistenceClient (service-role)
+        const { data: { user: authUser }, error: authError } = await authClient.auth.getUser();
+
+        if (authUser && targetSkillId) {
+            try {
+                // 1. New Event Handling (Real-time)
+                // Report quiz completion to global tracker
+                if (patterns.justFinishedQuiz) {
+                    await skillProgressionIntegration.recordInteractiveChallengeAttempt(
+                        authUser.id,
+                        targetSkillId,
+                        `quiz-${sessionId}-${Date.now()}`,
+                        !patterns.quizFailed, // success = not failed
+                        { difficultyLevel: 'Medium' } // Removed 'feedback' as column missing
+                    );
+
+                    // ALSO: Record in understanding_assessments table
+                    // We look for the last quiz data in history to associate it
+                    try {
+                        const lastQuizMsg = [...(conversationHistory || [])].reverse().find((m: any) => m.type === 'quiz' || m.metadata?.quizData);
+                        const quizData = lastQuizMsg?.metadata?.quizData || lastQuizMsg?.metadata || {};
+
+                        await persistenceClient.rpc('record_understanding_assessment', {
+                            p_session_id: sessionId,
+                            p_concept: currentTopic, // Using resolved topic name
+                            p_question_type: 'multiple_choice',
+                            p_question_data: quizData,
+                            p_learner_response: userMessage,
+                            p_is_correct: !patterns.quizFailed,
+                            p_comprehension_level: !patterns.quizFailed ? 1.0 : 0.3,
+                            p_feedback: !patterns.quizFailed ? "Correct!" : "Struggled with this question"
+                        });
+                        console.log('[GENIE_SYNC] Recorded assessment result in DB');
+                    } catch (err) {
+                        console.warn('[GENIE_SYNC] Failed to record assessment result:', err);
+                    }
+                }
+                // Report challenge completion to global tracker
+                if (patterns.justFinishedChallenge) {
+                    await skillProgressionIntegration.recordInteractiveChallengeAttempt(
+                        authUser.id,
+                        targetSkillId,
+                        `challenge-${sessionId}-${Date.now()}`,
+                        !patterns.challengeFailed, // success = not failed
+                        { difficultyLevel: 'Medium' } // Removed 'feedback' as column missing
+                    );
+                    console.log('[GENIE_SYNC] Reported challenge completion to skill progression');
+                }
+
+                // 2. Retroactive Sync moved to stream start() to access controller
+
+            } catch (syncError) {
+                console.error('[GENIE_SYNC] Failed to sync with skill progression:', syncError);
+                // Non-blocking: don't fail the request if sync fails
+            }
+        }
 
         // 6. Construct system prompt
         const courseContext = `CONTEXT: You are teaching "${currentTopic}". The learner is currently in the ${effectiveStage} phase.`;
@@ -470,13 +587,58 @@ RULES:
                     });
 
                     // Send metadata update
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
-                        type: 'goals_updated', 
+                    // DEBUG: Log what we're sending to frontend
+                    console.log('[DEBUG_STREAM] Sending goals_updated to frontend:', JSON.stringify({
+                        goalsCount: goals.length,
+                        goals: goals.map(g => ({ id: g.id, status: g.status, confidence: g.confidence }))
+                    }));
+
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                        type: 'goals_updated',
                         goals,
                         comprehensionLevel: aiAnalysis?.confidence || currentContext.comprehensionLevel || 0.5
                     })}\n\n`));
 
-                    const finalPrompt = effectiveStage === 'GOALS' 
+                    // 2. Retroactive Sync (Self-Healing) - NON-BLOCKING
+                    // Now safely inside start() so we can access usage controller
+                    (async () => {
+                        try {
+                            if (!authUser) return;
+                            const { skillProgressionDb } = await import('@/lib/services/skill-progression-db');
+                            const globalProgress = await skillProgressionDb.getSkillProgress(authUser.id, targetSkillId);
+
+                            const localAssessments = (updatedProgress.assessmentsCompleted || 0);
+                            const localChallenges = (updatedProgress.challengesCompleted || 0);
+                            const localTotal = localAssessments + localChallenges;
+                            const globalTotal = globalProgress.challengesCompleted || 0;
+
+                            const missingAttempts = localTotal - globalTotal;
+
+                            if (missingAttempts > 0) {
+                                console.log(`[GENIE_SYNC_REPAIR] Backfilling ${missingAttempts} attempts...`);
+                                for (let i = 0; i < missingAttempts; i++) {
+                                    await skillProgressionIntegration.recordInteractiveChallengeAttempt(
+                                        authUser.id,
+                                        targetSkillId,
+                                        `retro-sync-${sessionId}-${Date.now()}-${i}`,
+                                        true,
+                                        { difficultyLevel: 'Medium', timeSpent: 60 }
+                                    );
+                                }
+
+                                // Signal UI to refresh - controller is available via closure!
+                                try {
+                                    const syncEvent = { type: 'progress_synced' };
+                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(syncEvent)}\n\n`));
+                                } catch (e) { console.log('[GENIE_SYNC] Stream closed during backfill signal'); }
+                            }
+                        } catch (repairError) {
+                            console.warn('[GENIE_SYNC_REPAIR] Failed:', repairError);
+                        }
+                    })();
+
+                    const finalPrompt = effectiveStage === 'GOALS'
+
                         ? `Generate a 3-step learning roadmap for ${currentTopic}. Return only the JSON block.`
                         : userMessage;
 
@@ -485,6 +647,7 @@ RULES:
                         systemPrompt,
                         temperature: effectiveStage === 'EXPLAIN' ? 0.7 : 0.1,
                         maxTokens: 1000,
+                        model: 'versatile'
                     });
 
                     const genieResponse = aiResult.text || "I'm here to help! What's next?";
@@ -504,6 +667,38 @@ RULES:
                                 p_message_type: 'summary',
                                 p_metadata: { roadmapData }
                             });
+
+                            // CRITICAL FIX: Persist roadmap items as goals to the session!
+                            // This was missing - roadmap items never got saved to learning_context.goals
+                            if (roadmapData.items && Array.isArray(roadmapData.items)) {
+                                const newGoals = roadmapData.items.map((item: any, idx: number) => ({
+                                    id: item.id || `goal-${idx}`,
+                                    text: item.text,
+                                    description: item.description || '',
+                                    confidence: item.confidence || 0,
+                                    status: idx === 0 ? 'in_progress' : 'pending', // First goal starts in progress
+                                    timestamp: new Date().toISOString()
+                                }));
+
+                                // Update session with the new goals
+                                await persistenceClient
+                                    .from('interactive_course_sessions')
+                                    .update({
+                                        learning_context: {
+                                            ...currentContext,
+                                            goals: newGoals
+                                        }
+                                    })
+                                    .eq('id', sessionId);
+
+                                console.log('[ROADMAP_PERSIST] Saved', newGoals.length, 'goals to session');
+
+                                // Also send updated goals to frontend
+                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                                    type: 'goals_updated',
+                                    goals: newGoals
+                                })}\n\n`));
+                            }
                         }
                     } else if (genieResponse.includes('[QUIZ]') || (extractedData && extractedData.question)) {
                         const parts = genieResponse.split('[QUIZ]');
@@ -519,6 +714,8 @@ RULES:
                                 p_message_type: 'assessment',
                                 p_metadata: quizData
                             });
+                            // Not recording understanding_assessment here anymore to avoid empty rows
+                            // Recording will happen when the user answers
                         }
                     } else if (genieResponse.includes('[CHALLENGE]') || (extractedData && extractedData.description && !extractedData.items)) {
                         const parts = genieResponse.split('[CHALLENGE]');
@@ -545,9 +742,9 @@ RULES:
                         });
                     }
                     controller.close();
-                } catch (e) { 
+                } catch (e) {
                     console.error('Stream Error:', e);
-                    controller.close(); 
+                    controller.close();
                 }
             }
         });

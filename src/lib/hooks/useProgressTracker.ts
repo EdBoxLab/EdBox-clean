@@ -187,10 +187,10 @@ export function useProgressTracker(skillId?: string, skillTitle?: string) {
         throw new Error(data.error || 'Failed to get progress display data');
       }
 
-      setState(prev => ({ 
-        ...prev, 
-        loading: false, 
-        progressData: data.displayData 
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        progressData: data.displayData
       }));
 
       return data.displayData;
@@ -263,8 +263,8 @@ export function useProgressTracker(skillId?: string, skillTitle?: string) {
         throw new Error(data.error || 'Failed to get total XP');
       }
 
-      setState(prev => ({ 
-        ...prev, 
+      setState(prev => ({
+        ...prev,
         loading: false,
         totalXP: data.totalXP,
         xpRank: data.rank
@@ -373,8 +373,8 @@ export function useMultipleSkillsProgress(skillGraph?: SkillGraph) {
         throw new Error(data.error || 'Failed to get progress data');
       }
 
-      setState(prev => ({ 
-        ...prev, 
+      setState(prev => ({
+        ...prev,
         loading: false,
         progressData: data.progressData
       }));
@@ -389,6 +389,15 @@ export function useMultipleSkillsProgress(skillGraph?: SkillGraph) {
       loadProgressData();
     }
   }, [memoizedSkillGraph]); // Removed loadProgressData from dependencies
+
+  // NEW: Listen for global progress update events (e.g., from Genie session)
+  useEffect(() => {
+    const handleProgressUpdate = () => {
+      loadProgressData();
+    };
+    window.addEventListener('skill-progress-updated', handleProgressUpdate);
+    return () => window.removeEventListener('skill-progress-updated', handleProgressUpdate);
+  }, [loadProgressData]);
 
   return {
     loading: state.loading,

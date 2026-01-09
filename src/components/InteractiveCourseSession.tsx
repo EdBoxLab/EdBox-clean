@@ -10,7 +10,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const StepProgress = ({ goals }: { goals: any[] }) => {
   if (!goals || goals.length === 0) return null;
-  
+
   return (
     <div className="flex items-center gap-3 p-4 bg-gray-950/80 backdrop-blur-xl border-b border-gray-800 sticky top-0 z-30 overflow-x-auto no-scrollbar shadow-2xl">
       <div className="flex-shrink-0 mr-2">
@@ -22,41 +22,38 @@ const StepProgress = ({ goals }: { goals: any[] }) => {
         {goals.map((goal, idx) => (
           <React.Fragment key={goal.id}>
             <div className="flex items-center gap-2">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black transition-all duration-500 ${
-                goal.status === 'mastered' ? 'bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.4)]' : 
-                goal.status === 'in_progress' ? 'bg-purple-600 text-white animate-pulse shadow-[0_0_15px_rgba(147,51,234,0.4)]' : 
-                'bg-gray-800 text-gray-500 border border-gray-700'
-              }`}>
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black transition-all duration-500 ${goal.status === 'mastered' ? 'bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.4)]' :
+                goal.status === 'in_progress' ? 'bg-purple-600 text-white animate-pulse shadow-[0_0_15px_rgba(147,51,234,0.4)]' :
+                  'bg-gray-800 text-gray-500 border border-gray-700'
+                }`}>
                 {goal.status === 'mastered' ? <Check className="w-4 h-4" strokeWidth={3} /> : idx + 1}
               </div>
               <div className="flex flex-col">
-                <span className={`text-[9px] font-black uppercase tracking-wider truncate max-w-[80px] ${
-                  goal.status === 'mastered' ? 'text-green-400' : 
-                  goal.status === 'in_progress' ? 'text-purple-400' : 
-                  'text-gray-500'
-                }`}>
+                <span className={`text-[9px] font-black uppercase tracking-wider truncate max-w-[80px] ${goal.status === 'mastered' ? 'text-green-400' :
+                  goal.status === 'in_progress' ? 'text-purple-400' :
+                    'text-gray-500'
+                  }`}>
                   {goal.text}
                 </span>
                 <div className="h-0.5 w-full bg-gray-800 rounded-full mt-0.5 overflow-hidden">
-                   <motion.div 
+                  <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${goal.confidence || 0}%` }}
                     className={`h-full ${goal.status === 'mastered' ? 'bg-green-500' : 'bg-purple-500'}`}
-                   />
+                  />
                 </div>
               </div>
             </div>
             {idx < goals.length - 1 && (
-              <div className={`h-[1px] w-6 flex-shrink-0 ${
-                goals[idx+1].status !== 'pending' ? 'bg-purple-500/50' : 'bg-gray-800'
-              }`} />
+              <div className={`h-[1px] w-6 flex-shrink-0 ${goals[idx + 1].status !== 'pending' ? 'bg-purple-500/50' : 'bg-gray-800'
+                }`} />
             )}
           </React.Fragment>
         ))}
       </div>
     </div>
   );
-};import {
+}; import {
   InteractiveCourseSession as SessionType,
   QuickCheckQuestion
 } from '@/types/interactive-course';
@@ -96,10 +93,10 @@ function RoadmapWelcome({
           <div className="p-3 bg-purple-500/20 rounded-2xl border border-purple-500/30">
             <BookOpen className="w-8 h-8 text-purple-400" />
           </div>
-            <div>
-              <h2 className="text-2xl font-black text-white tracking-tight">{title}</h2>
-            </div>
+          <div>
+            <h2 className="text-2xl font-black text-white tracking-tight">{title}</h2>
           </div>
+        </div>
         <p className="text-gray-300 leading-relaxed text-sm lg:text-base font-medium">
           {description}
         </p>
@@ -366,6 +363,9 @@ export default function InteractiveCourseSession({
               } else if (data.type === 'goals_updated') {
                 // Real-time Goal Update!
                 const newGoals = data.goals;
+                // Dispatch global event to refresh skill graph
+                window.dispatchEvent(new Event('skill-progress-updated'));
+
                 // Track skill mastered events for newly mastered goals
                 if (session?.learningContext?.goals) {
                   const previousGoals = session.learningContext.goals;
@@ -402,10 +402,10 @@ export default function InteractiveCourseSession({
     } catch (error) {
       console.error(error);
       setMessages(prev => prev.map(msg =>
-        msg.id === genieMessageId ? { 
-          ...msg, 
+        msg.id === genieMessageId ? {
+          ...msg,
           type: 'error' as any,
-          content: "I encountered an issue while processing your request." 
+          content: "I encountered an issue while processing your request."
         } : msg
       ));
     } finally {
@@ -493,56 +493,56 @@ export default function InteractiveCourseSession({
                   <div className="p-2.5 bg-purple-600/20 rounded-xl border border-purple-500/20">
                     <Brain className="w-5 h-5 text-purple-400" />
                   </div>
-                    <div>
-                      <h2 className="font-bold text-sm tracking-tight">Quest Log</h2>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-widest">Cognitive Ascent</p>
-                    </div>
+                  <div>
+                    <h2 className="font-bold text-sm tracking-tight">Quest Log</h2>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest">Cognitive Ascent</p>
                   </div>
-                  <button
-                    onClick={() => setIsSidebarOpen(false)}
-                    className="p-2 text-gray-500 hover:text-white transition-colors"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
                 </div>
-  
-                  <div className="flex-1 overflow-y-auto">
-                    {session?.learningContext?.goals && (
-                      <div className="space-y-4">
-                        <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest">Growth Pulse</h3>
-                        <GoalTracker goals={session.learningContext.goals || []} />
-                      </div>
-                    )}
-                </div>
+                <button
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="p-2 text-gray-500 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
 
-                <div className="pt-6 border-t border-gray-800">
-                </div>
-              </motion.div>
+              <div className="flex-1 overflow-y-auto">
+                {session?.learningContext?.goals && (
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest">Growth Pulse</h3>
+                    <GoalTracker goals={session.learningContext.goals || []} />
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-6 border-t border-gray-800">
+              </div>
             </motion.div>
-          )}
-        </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        {/* Sidebar with Sticky Goal Tracker (Desktop) */}
-        <aside className="hidden lg:flex w-[320px] bg-gray-900 border-r border-gray-800 flex-col p-6 gap-6 overflow-y-auto shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-600/20 rounded-xl border border-purple-500/20">
-              <Brain className="w-5 h-5 text-purple-400" />
-            </div>
-              <div>
-                <h2 className="text-lg font-bold">{courseTitle}</h2>
-              </div>
-            </div>
-
-            {/* Real-Time Goal Tracker */}
-            {session?.learningContext?.goals && session.learningContext.goals.length > 0 && (
-              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
-                <GoalTracker goals={session.learningContext.goals || []} />
-              </div>
-            )}
-
-          <div className="mt-auto pt-6 border-t border-gray-800">
+      {/* Sidebar with Sticky Goal Tracker (Desktop) */}
+      <aside className="hidden lg:flex w-[320px] bg-gray-900 border-r border-gray-800 flex-col p-6 gap-6 overflow-y-auto shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-purple-600/20 rounded-xl border border-purple-500/20">
+            <Brain className="w-5 h-5 text-purple-400" />
           </div>
-        </aside>
+          <div>
+            <h2 className="text-lg font-bold">{courseTitle}</h2>
+          </div>
+        </div>
+
+        {/* Real-Time Goal Tracker */}
+        {session?.learningContext?.goals && session.learningContext.goals.length > 0 && (
+          <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+            <GoalTracker goals={session.learningContext.goals || []} />
+          </div>
+        )}
+
+        <div className="mt-auto pt-6 border-t border-gray-800">
+        </div>
+      </aside>
 
       {/* Main Chat Area */}
       <main className="flex-1 flex flex-col min-h-0 relative">
@@ -557,8 +557,8 @@ export default function InteractiveCourseSession({
               const progress = session?.progressState?.overallCourseProgress || 0;
               return (
                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${progress <= 30 ? 'bg-red-500/10 border-red-500/30 text-red-400' :
-                    progress <= 69 ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
-                      'bg-green-500/10 border-green-500/30 text-green-400'
+                  progress <= 69 ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
+                    'bg-green-500/10 border-green-500/30 text-green-400'
                   }`}>
                   <div className="flex flex-col items-end">
                     <span className="text-[8px] font-black uppercase tracking-tighter leading-none opacity-60">Mastery</span>
@@ -569,8 +569,8 @@ export default function InteractiveCourseSession({
                       initial={{ height: 0 }}
                       animate={{ height: `${progress}%` }}
                       className={`w-full rounded-full ${progress <= 30 ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' :
-                          progress <= 69 ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]' :
-                            'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'
+                        progress <= 69 ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]' :
+                          'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'
                         }`}
                     />
                   </div>
@@ -581,11 +581,11 @@ export default function InteractiveCourseSession({
               );
             })()}
           </div>
-          </header>
+        </header>
 
-          <StepProgress goals={session?.learningContext?.goals || []} />
+        <StepProgress goals={session?.learningContext?.goals || []} />
 
-          {/* Message List */}
+        {/* Message List */}
         <div className="flex-1 overflow-y-auto scroll-smooth">
           <div className="w-full px-4 lg:px-6 py-8 space-y-8">
             <AnimatePresence>
@@ -597,10 +597,10 @@ export default function InteractiveCourseSession({
                   className={`flex ${message.role === 'learner' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`max-w-[95%] lg:max-w-[90%] ${message.role === 'learner'
-                      ? 'bg-purple-600 text-white px-5 py-3.5 rounded-2xl rounded-tr-sm shadow-lg shadow-purple-500/10'
-                      : message.type === 'roadmap' || message.type === 'quiz' || message.type === 'challenge_trigger'
-                        ? 'w-full'
-                        : 'bg-gray-800/80 border border-gray-700/50 px-5 py-3.5 rounded-2xl rounded-tl-sm backdrop-blur-sm'
+                    ? 'bg-purple-600 text-white px-5 py-3.5 rounded-2xl rounded-tr-sm shadow-lg shadow-purple-500/10'
+                    : message.type === 'roadmap' || message.type === 'quiz' || message.type === 'challenge_trigger'
+                      ? 'w-full'
+                      : 'bg-gray-800/80 border border-gray-700/50 px-5 py-3.5 rounded-2xl rounded-tl-sm backdrop-blur-sm'
                     }`}>
                     {message.type === 'roadmap' && message.roadmapData ? (
                       <RoadmapWelcome
@@ -652,39 +652,39 @@ export default function InteractiveCourseSession({
                           Accept Challenge
                         </button>
                       </div>
-                      ) : message.type === 'error' ? (
-                          <div className="flex flex-col items-center gap-4 p-6 bg-red-500/10 border border-red-500/20 rounded-2xl">
-                            <div className="p-3 bg-red-500/20 rounded-full">
-                              <AlertCircle className="w-6 h-6 text-red-500" />
-                            </div>
-                            <div className="text-center">
-                              <p className="text-sm font-medium text-red-200 mb-1">I encountered a little hiccup!</p>
-                              <p className="text-xs text-red-400/60">Don't worry, just tap below to get back on track.</p>
-                            </div>
-                          <button
-                            onClick={() => {
-                              // Remove the error message and its preceding user message, then retry
-                              setMessages(prev => {
-                                const newMessages = [...prev];
-                                const errorIdx = newMessages.findIndex(m => m.id === message.id);
-                                if (errorIdx > 0) {
-                                  const lastUserMsg = newMessages[errorIdx - 1];
-                                  newMessages.splice(errorIdx - 1, 2);
-                                  setTimeout(() => handleSendMessage(lastUserMsg.content, true), 100);
-                                }
-                                return newMessages;
-                              });
-                            }}
-                            className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-black rounded-xl transition-all active:scale-95 shadow-lg shadow-red-900/20"
-                          >
-                            Let's Start!
-                          </button>
+                    ) : message.type === 'error' ? (
+                      <div className="flex flex-col items-center gap-4 p-6 bg-red-500/10 border border-red-500/20 rounded-2xl">
+                        <div className="p-3 bg-red-500/20 rounded-full">
+                          <AlertCircle className="w-6 h-6 text-red-500" />
                         </div>
-                      ) : (
-                        <div className="prose prose-invert max-w-none text-sm leading-relaxed">
-                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        <div className="text-center">
+                          <p className="text-sm font-medium text-red-200 mb-1">I encountered a little hiccup!</p>
+                          <p className="text-xs text-red-400/60">Don't worry, just tap below to get back on track.</p>
                         </div>
-                      )}
+                        <button
+                          onClick={() => {
+                            // Remove the error message and its preceding user message, then retry
+                            setMessages(prev => {
+                              const newMessages = [...prev];
+                              const errorIdx = newMessages.findIndex(m => m.id === message.id);
+                              if (errorIdx > 0) {
+                                const lastUserMsg = newMessages[errorIdx - 1];
+                                newMessages.splice(errorIdx - 1, 2);
+                                setTimeout(() => handleSendMessage(lastUserMsg.content, true), 100);
+                              }
+                              return newMessages;
+                            });
+                          }}
+                          className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-black rounded-xl transition-all active:scale-95 shadow-lg shadow-red-900/20"
+                        >
+                          Let's Start!
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="prose prose-invert max-w-none text-sm leading-relaxed">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               ))}
@@ -746,14 +746,19 @@ export default function InteractiveCourseSession({
               </motion.div>
             )}
           </AnimatePresence>
-          
+
           <div className="w-full flex gap-3">
             <input
               ref={inputRef}
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage(inputMessage)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSendMessage(inputMessage);
+                }
+              }}
               placeholder="Ask anything..."
               className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
             />

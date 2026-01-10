@@ -17,7 +17,7 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, isActive }) 
     const [showAnswer, setShowAnswer] = useState(false);
 
     return (
-        <div className="w-full text-center flex flex-col justify-center items-center h-full px-6 relative overflow-hidden">
+        <div className="w-full text-center flex flex-col justify-center items-center px-6 relative overflow-hidden">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -30,10 +30,10 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, isActive }) 
                 </div>
 
                 <span className="text-[10px] font-black text-orange-400 uppercase tracking-[0.3em] mb-2 block">Mental Challenge</span>
-                <h3 className="text-2xl font-black text-white mb-6 leading-tight">{item.title}</h3>
+                <h3 className="text-xl sm:text-2xl font-black text-white mb-4 sm:mb-6 leading-tight">{item.title}</h3>
 
-                <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-3xl mb-6 shadow-2xl">
-                    <p className="text-lg text-white/90 font-medium leading-relaxed italic">
+                <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-4 sm:p-6 rounded-3xl mb-4 sm:mb-6 shadow-2xl">
+                    <p className="text-base sm:text-lg text-white/90 font-medium leading-relaxed italic">
                         "{item.question}"
                     </p>
                 </div>
@@ -47,13 +47,13 @@ export const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, isActive }) 
                             exit={{ opacity: 0, scale: 0.9 }}
                             className="space-y-4"
                         >
-                            <div className="flex items-center justify-center gap-2 text-white/40 text-xs font-bold bg-white/5 py-2 px-4 rounded-full w-fit mx-auto">
+                            <div className="flex items-center justify-center gap-2 text-white/40 text-[10px] font-bold bg-white/5 py-2 px-4 rounded-full w-fit mx-auto">
                                 <Lightbulb className="w-3 h-3" />
                                 <span>HINT: {item.hint}</span>
                             </div>
                             <button
                                 onClick={() => setShowAnswer(true)}
-                                className="w-full py-4 bg-orange-500 text-white font-black rounded-2xl shadow-xl hover:bg-orange-400 transition-all active:scale-95 flex items-center justify-center gap-2"
+                                className="relative z-50 w-full py-4 bg-orange-500 text-white font-black rounded-2xl shadow-xl hover:bg-orange-400 transition-all active:scale-95 flex items-center justify-center gap-2"
                             >
                                 REVEAL SOLUTION
                                 <ChevronRight className="w-5 h-5" />

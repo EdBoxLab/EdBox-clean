@@ -5,7 +5,7 @@
 
 import { ShareableContent } from '@/lib/services/sharing-service';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://edbox-weld.vercel.app/';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://edbox.app';
 const APP_NAME = 'EdBox';
 const DEFAULT_IMAGE = `${APP_URL}/og-image.png`;
 
@@ -24,7 +24,7 @@ export interface OGMetaTags {
  */
 export function generateOGTags(content: ShareableContent, customUrl?: string): OGMetaTags {
   const baseUrl = APP_URL.endsWith('/') ? APP_URL.slice(0, -1) : APP_URL;
-  
+
   // Generate content URL
   let contentUrl = customUrl;
   if (!contentUrl) {
@@ -44,8 +44,8 @@ export function generateOGTags(content: ShareableContent, customUrl?: string): O
   }
 
   // Generate title
-  const typeLabel = content.type === 'course' ? 'Course' : 
-                    content.type === 'studylist' ? 'Study List' : 'Learning Path';
+  const typeLabel = content.type === 'course' ? 'Course' :
+    content.type === 'studylist' ? 'Study List' : 'Learning Path';
   const title = `${content.title} - ${typeLabel} on ${APP_NAME}`;
 
   // Generate description
@@ -76,7 +76,7 @@ export function generateOGTags(content: ShareableContent, customUrl?: string): O
  */
 export function generateTwitterTags(content: ShareableContent, customUrl?: string) {
   const ogTags = generateOGTags(content, customUrl);
-  
+
   return {
     card: 'summary_large_image',
     site: '@EdBoxLearning', // Replace with your Twitter handle
@@ -93,7 +93,7 @@ export function generateTwitterTags(content: ShareableContent, customUrl?: strin
  */
 export function generateStructuredData(content: ShareableContent, customUrl?: string) {
   const ogTags = generateOGTags(content, customUrl);
-  
+
   const baseStructure: any = {
     '@context': 'https://schema.org',
     '@type': content.type === 'course' ? 'Course' : 'CreativeWork',

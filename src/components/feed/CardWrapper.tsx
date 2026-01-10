@@ -12,17 +12,17 @@ interface CardWrapperProps {
     onFeedback: (id: string, feedback: Feedback) => void;
 }
 
-export const CardWrapper: React.FC<CardWrapperProps> = ({ 
-    item, 
-    isActive, 
-    onSwipe, 
-    children, 
-    onFeedback 
+export const CardWrapper: React.FC<CardWrapperProps> = ({
+    item,
+    isActive,
+    onSwipe,
+    children,
+    onFeedback
 }) => {
     const handleShare = async () => {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
         const shareUrl = `${baseUrl.replace(/\/$/, '')}/feed?id=${item.id}`;
-        
+
         const shareData = {
             title: item.title,
             text: `Check out this ${item.type} on EdBox: ${item.title}`,
@@ -47,7 +47,7 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({
 
     const handleSave = async () => {
         onFeedback(item.id, 'save');
-        
+
         try {
             const response = await fetch('/api/feed/save', {
                 method: 'POST',
@@ -58,7 +58,7 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({
                     content: item
                 })
             });
-            
+
             if (!response.ok) throw new Error('Failed to save');
         } catch (err) {
             console.error('Error saving item:', err);
@@ -71,31 +71,32 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({
 
     return (
         <div
-            className={`relative h-full w-full flex flex-col bg-black rounded-3xl overflow-hidden transition-all duration-500 ${
-                isActive 
-                    ? 'border border-white/10 shadow-2xl' 
-                    : 'scale-[0.98] opacity-60'
-            }`}
+            className={`relative h-full w-full flex flex-col bg-black rounded-3xl overflow-hidden transition-all duration-500 ${isActive
+                ? 'border border-white/10 shadow-2xl'
+                : 'scale-[0.98] opacity-80' /* Increased opacity for inactive cards */
+                }`}
         >
             {/* Background Image */}
             <div className="absolute inset-0 z-0">
-                <CardImage 
-                    generationState={item.imageGenerationState || 'ready'} 
-                    imageUrl={item.imageUrl} 
-                    altText={item.title} 
+                <CardImage
+                    generationState={item.imageGenerationState || 'ready'}
+                    imageUrl={item.imageUrl}
+                    altText={item.title}
                 />
-                {/* Strong gradient for text readability */}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/30 to-black z-10" />
+                {/* Stronger gradient for text readability and less transparency feel */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black z-10" />
             </div>
 
-            {/* Main Content - Centered, Full Height */}
-            <div className="relative flex-1 flex items-center justify-center z-20 px-4 sm:px-6">
+            {/* Main Content - Padded aggressively on mobile (pb-48) to clear metadata bar */}
+            {/* Increased Z-INDEX to z-30 to ensure it's above the metadata bar (z-10) */}
+            <div className={`relative flex-1 flex items-center justify-center z-30 px-4 sm:px-6 ${isMediaType ? '' : 'pb-48 sm:pb-32'}`}>
                 {children}
             </div>
 
-            {/* Bottom Metadata Bar - SMALL, AT VERY BOTTOM */}
-            <div className="absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black via-black/95 to-transparent backdrop-blur-sm">
-                <div className="px-4 sm:px-6 pb-4 pt-6">
+            {/* Bottom Metadata Bar - Lower z-index than content (z-10) */}
+            {/* Entire container is pointer-events-none to prevent blocking main content clicks */}
+            <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black via-black/95 to-transparent backdrop-blur-sm pointer-events-none">
+                <div className="px-4 sm:px-6 pb-6 pt-10 pointer-events-none">
                     {/* Course Reference Tag (if exists) */}
                     {item.courseReference && (
                         <div className="flex items-center gap-2 px-2.5 py-1 bg-purple-500/20 border border-purple-500/30 rounded-full w-fit mb-2">
@@ -117,24 +118,23 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({
                     </div>
 
                     {/* Action Buttons Row - Horizontal, Small */}
-                    <div className="flex items-center justify-between">
+                    {/* Only buttons have pointer-events-auto */}
+                    <div className="flex items-center justify-between pointer-events-none">
                         <div className="flex items-center gap-3">
                             {/* Like */}
                             <button
                                 onClick={() => onFeedback(item.id, 'like')}
-                                className="flex items-center gap-1.5 group"
+                                className="flex items-center gap-1.5 group pointer-events-auto"
                             >
-                                <div className={`p-2 rounded-full transition-colors ${
-                                    isLiked 
-                                        ? 'bg-purple-500/20 border border-purple-500/40' 
-                                        : 'bg-white/5 border border-white/10 hover:bg-white/10'
-                                }`}>
-                                    <ThumbsUp 
-                                        className={`w-4 h-4 transition-all ${
-                                            isLiked 
-                                                ? 'text-purple-400 fill-purple-400' 
-                                                : 'text-white/70 group-hover:text-white'
-                                        }`}
+                                <div className={`p-2 rounded-full transition-colors ${isLiked
+                                    ? 'bg-purple-500/20 border border-purple-500/40'
+                                    : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                                    }`}>
+                                    <ThumbsUp
+                                        className={`w-4 h-4 transition-all ${isLiked
+                                            ? 'text-purple-400 fill-purple-400'
+                                            : 'text-white/70 group-hover:text-white'
+                                            }`}
                                     />
                                 </div>
                                 {item.likes > 0 && (
@@ -147,19 +147,17 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({
                             {/* Save */}
                             <button
                                 onClick={handleSave}
-                                className="group"
+                                className="group pointer-events-auto"
                             >
-                                <div className={`p-2 rounded-full transition-colors ${
-                                    isSaved 
-                                        ? 'bg-blue-500/20 border border-blue-500/40' 
-                                        : 'bg-white/5 border border-white/10 hover:bg-white/10'
-                                }`}>
-                                    <Bookmark 
-                                        className={`w-4 h-4 transition-all ${
-                                            isSaved 
-                                                ? 'text-blue-400 fill-blue-400' 
-                                                : 'text-white/70 group-hover:text-white'
-                                        }`}
+                                <div className={`p-2 rounded-full transition-colors ${isSaved
+                                    ? 'bg-blue-500/20 border border-blue-500/40'
+                                    : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                                    }`}>
+                                    <Bookmark
+                                        className={`w-4 h-4 transition-all ${isSaved
+                                            ? 'text-blue-400 fill-blue-400'
+                                            : 'text-white/70 group-hover:text-white'
+                                            }`}
                                     />
                                 </div>
                             </button>
@@ -167,7 +165,7 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({
                             {/* Share */}
                             <button
                                 onClick={handleShare}
-                                className="group"
+                                className="group pointer-events-auto"
                             >
                                 <div className="p-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
                                     <Share2 className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" />
@@ -176,7 +174,7 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({
                         </div>
 
                         {/* XP Badge + More Options */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 pointer-events-auto">
                             {item.xp_reward > 0 && (
                                 <div className="px-2.5 py-1 bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 rounded-full">
                                     <span className="text-xs font-bold text-purple-300">
@@ -184,7 +182,7 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({
                                     </span>
                                 </div>
                             )}
-                            
+
                             <button className="p-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
                                 <MoreHorizontal className="w-4 h-4 text-white/50" />
                             </button>

@@ -78,7 +78,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
           .from('saved_feed_items')
           .select('feed_item_id')
           .eq('user_id', user.id);
-        
+
         if (data) {
           setSavedItemIds(new Set(data.map((d: { feed_item_id: string }) => d.feed_item_id)));
         }
@@ -98,7 +98,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
 
     try {
       const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: undefined } }));
-      
+
       let initialItems: FeedItem[] = [];
 
       if (initial && targetId) {
@@ -107,7 +107,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
           .select('content')
           .eq('id', targetId)
           .single();
-        
+
         if (sharedItem?.content) {
           initialItems.push(sharedItem.content as FeedItem);
         }
@@ -117,13 +117,13 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       const currentSeenIds = Array.from(seenIds);
 
       const itemBatch = await generateFeedBatch(
-        preferences.interests, 
-        likedTopics, 
+        preferences.interests,
+        likedTopics,
         [],
         currentSeenIds,
         currentSeenTitles
       );
-      
+
       const uniqueNewItems = itemBatch.filter(newItem => {
         const isIdSeen = seenIds.has(newItem.id) || (initial && targetId === newItem.id);
         const isTitleSeen = currentSeenTitles.some(t => t.toLowerCase() === newItem.title.toLowerCase());
@@ -186,7 +186,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
           setCurrentBatch(prev => prev + 1);
         }
       }
-      
+
       if (uniqueNewItems.length > 0) {
         await persistFeedItems(uniqueNewItems, user?.id);
       }
@@ -210,7 +210,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
         const intersectingEntry = entries.find(entry => entry.isIntersecting && entry.intersectionRatio > 0.5);
         if (intersectingEntry) {
           const newActiveId = intersectingEntry.target.id;
-          
+
           const item = items.find(i => i.id === newActiveId);
           if (item) {
             setSeenIds(prev => new Set([...prev, newActiveId]));
@@ -231,7 +231,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
           });
         }
       },
-      { threshold: 0.6, root: feedRef.current }
+      { threshold: 0.5, root: feedRef.current }
     );
 
     const currentFeedRef = feedRef.current;
@@ -250,7 +250,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
     if (feedback === 'save') {
       const isCurrentlySaved = item.isSavedByUser;
       setItems(prev => prev.map(i => i.id === id ? { ...i, isSavedByUser: !isCurrentlySaved } : i));
-      
+
       const { data: { user } } = await supabase.auth.getUser();
       if (user) await trackInteraction(user.id, id, 'save');
       return;
@@ -295,7 +295,7 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
   const renderCardContent = (item: FeedItem, isActive: boolean) => {
     switch (item.type) {
       case 'quiz':
-        return <QuizCard item={item as QuizFeedItem} isActive={isActive} onCorrect={() => {}} onIncorrect={() => {}} onSwipe={handleSwipe} />;
+        return <QuizCard item={item as QuizFeedItem} isActive={isActive} onCorrect={() => { }} onIncorrect={() => { }} onSwipe={handleSwipe} />;
       case 'video':
         return <VideoCard item={item as any} isActive={isActive} />;
       case 'insight':
@@ -316,10 +316,10 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       case 'media':
         return <MediaCard item={item as MediaFeedItem} isActive={isActive} onSwipe={handleSwipe} onFeedback={handleFeedback} />;
       case 'ad':
-        return <AdCard 
-          adClient={(item as AdFeedItem).adClient} 
-          adSlot={(item as AdFeedItem).adSlot} 
-          onSkip={() => handleSwipe(item.id, 'skip')} 
+        return <AdCard
+          adClient={(item as AdFeedItem).adClient}
+          adSlot={(item as AdFeedItem).adSlot}
+          onSkip={() => handleSwipe(item.id, 'skip')}
         />;
       default:
         return null;
@@ -331,8 +331,8 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-black text-white relative overflow-hidden">
         {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-blue-500/10" />
-        
-        <motion.div 
+
+        <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           className="z-10 flex flex-col items-center"
@@ -358,14 +358,12 @@ const Feed: React.FC<FeedProps> = ({ preferences }) => {
 
       {/* XP/Streak Display - Top, Transparent, Doesn't Block */}
       <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-        <div className="bg-black/40 backdrop-blur-md rounded-full px-4 py-2 border border-white/10">
-          <XPStreakDisplay showCompact={true} />
-        </div>
+        <XPStreakDisplay showCompact={true} />
       </div>
 
       {/* Feed Container - True Fullscreen Snap */}
-      <div 
-        className="w-full h-screen snap-y snap-mandatory overflow-y-auto scroll-smooth no-scrollbar" 
+      <div
+        className="w-full h-screen snap-y snap-mandatory overflow-y-auto scroll-smooth no-scrollbar"
         ref={feedRef}
       >
         {items.map((item, index) => (

@@ -40,6 +40,7 @@ export default function AIGenie() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Fetch chats on open
   useEffect(() => {
@@ -112,12 +113,12 @@ export default function AIGenie() {
   const deleteChat = async (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Delete this chat?')) return;
-    
+
     try {
       const response = await fetch(`/api/chat?conversationId=${chatId}`, {
         method: 'DELETE'
       });
-      
+
       if (response.ok) {
         setChats(prev => prev.filter(c => c.id !== chatId));
         if (currentChatId === chatId) {
@@ -138,7 +139,7 @@ export default function AIGenie() {
   const saveRename = async (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!editingTitle.trim()) return;
-    
+
     try {
       const response = await fetch(`/api/chat`, {
         method: 'PATCH',
@@ -148,9 +149,9 @@ export default function AIGenie() {
           title: editingTitle
         })
       });
-      
+
       if (response.ok) {
-        setChats(prev => prev.map(c => 
+        setChats(prev => prev.map(c =>
           c.id === chatId ? { ...c, title: editingTitle } : c
         ));
         setEditingChatId(null);
@@ -214,7 +215,7 @@ export default function AIGenie() {
             reader.readAsDataURL(file);
           });
         }
-        
+
         // For text/PDFs, read as text or base64
         return new Promise((resolve) => {
           const reader = new FileReader();
@@ -226,7 +227,7 @@ export default function AIGenie() {
               content: reader.result as string
             });
           };
-          
+
           if (file.type === 'text/plain') {
             reader.readAsText(file);
           } else {
@@ -235,7 +236,7 @@ export default function AIGenie() {
         });
       })
     );
-    
+
     return processedFiles;
   };
 
@@ -244,7 +245,7 @@ export default function AIGenie() {
 
     const userMsgContent = input || '📎 Sent files';
     const currentFiles = [...attachedFiles];
-    
+
     setInput('');
     setAttachedFiles([]);
     setIsSending(true);
@@ -396,7 +397,7 @@ export default function AIGenie() {
                 <h4 className="text-sm font-semibold text-white">Chat History</h4>
                 <p className="text-xs text-zinc-400 mt-0.5">{chats.length} conversation{chats.length !== 1 ? 's' : ''}</p>
               </div>
-              
+
               {isLoadingChats ? (
                 <div className="p-6 text-center">
                   <Loader2 className="w-6 h-6 text-indigo-500 animate-spin mx-auto" />
@@ -413,9 +414,8 @@ export default function AIGenie() {
                   {chats.map(chat => (
                     <div
                       key={chat.id}
-                      className={`group relative hover:bg-zinc-800/50 transition ${
-                        chat.id === currentChatId ? 'bg-zinc-800/70' : ''
-                      }`}
+                      className={`group relative hover:bg-zinc-800/50 transition ${chat.id === currentChatId ? 'bg-zinc-800/70' : ''
+                        }`}
                     >
                       <button
                         onClick={() => { setCurrentChatId(chat.id); setShowChatList(false); }}
@@ -434,8 +434,8 @@ export default function AIGenie() {
                           <>
                             <p className="text-sm font-medium text-white truncate pr-2">{chat.title}</p>
                             <p className="text-xs text-zinc-500 mt-1">
-                              {new Date(chat.created_at).toLocaleDateString('en-US', { 
-                                month: 'short', 
+                              {new Date(chat.created_at).toLocaleDateString('en-US', {
+                                month: 'short',
                                 day: 'numeric',
                                 year: new Date(chat.created_at).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
                               })}
@@ -443,7 +443,7 @@ export default function AIGenie() {
                           </>
                         )}
                       </button>
-                      
+
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         {editingChatId === chat.id ? (
                           <button
@@ -501,7 +501,7 @@ export default function AIGenie() {
                     : 'bg-zinc-800/90 text-zinc-100 border border-zinc-700/50'
                     } backdrop-blur-sm rounded-2xl px-4 py-2.5`}>
                     <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-                    
+
                     {/* Show attachments */}
                     {message.attachments && message.attachments.length > 0 && (
                       <div className="mt-2 pt-2 border-t border-white/10 space-y-1">
@@ -514,7 +514,7 @@ export default function AIGenie() {
                         ))}
                       </div>
                     )}
-                    
+
                     <p className="text-[10px] opacity-60 mt-1.5 text-right">
                       {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
@@ -568,13 +568,12 @@ export default function AIGenie() {
               </div>
             </div>
           )}
-
           {/* Input Area */}
           <div className="p-4 bg-zinc-900/98 backdrop-blur-sm border-t border-zinc-700/50 shrink-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 items-end">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="p-2.5 rounded-lg transition shrink-0 bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                className="p-2.5 rounded-lg transition shrink-0 bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 h-[40px] flex items-center justify-center"
                 title="Attach files"
               >
                 <Paperclip className="w-4 h-4" />
@@ -585,31 +584,44 @@ export default function AIGenie() {
                 className={`p-2.5 rounded-lg transition shrink-0 ${isVoiceMode
                   ? 'bg-indigo-600 text-white'
                   : 'bg-zinc-800 text-zinc-400 hover:text-white'
-                  }`}
+                  } h-[40px] flex items-center justify-center`}
               >
                 {isVoiceMode ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
               </button>
 
               {isVoiceMode ? (
-                <div className="flex-1 flex items-center justify-center gap-2 bg-zinc-800/90 backdrop-blur-sm rounded-lg px-4 py-2.5">
+                <div className="flex-1 flex items-center justify-center gap-2 bg-zinc-800/90 backdrop-blur-sm rounded-lg px-4 py-2.5 h-[40px]">
                   <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-red-500 animate-pulse' : 'bg-zinc-600'}`} />
                   <span className="text-xs text-zinc-400">Voice mode active (demo)</span>
                 </div>
               ) : (
-                <input
-                  type="text"
+                <textarea
+                  ref={textareaRef}
+                  rows={1}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 150)}px`;
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                      if (textareaRef.current) {
+                        textareaRef.current.style.height = 'auto';
+                      }
+                    }
+                  }}
                   placeholder={attachedFiles.length > 0 ? `Ask about ${attachedFiles.length} file(s)...` : "Ask me anything..."}
-                  className="flex-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700/50 rounded-lg px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition"
+                  className="flex-1 bg-zinc-800/90 backdrop-blur-sm border border-zinc-700/50 rounded-lg px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition-all resize-none min-h-[40px] max-h-[150px]"
                 />
               )}
 
               <button
                 onClick={handleSend}
                 disabled={(!input.trim() && attachedFiles.length === 0) || isSending}
-                className="p-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-zinc-700 disabled:to-zinc-700 disabled:cursor-not-allowed rounded-lg transition shrink-0"
+                className="p-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-zinc-700 disabled:to-zinc-700 disabled:cursor-not-allowed rounded-lg transition shrink-0 h-[40px] flex items-center justify-center"
               >
                 {isSending ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <Send className="w-4 h-4 text-white" />}
               </button>

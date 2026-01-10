@@ -21,6 +21,7 @@ export const LandingHeader = () => {
                             alt="EdBox Logo"
                             fill
                             className="object-cover"
+                            priority
                         />
                     </div>
                     <span className="font-bold text-lg tracking-tight text-white group-hover:text-gray-200 transition-colors">EdBox</span>
@@ -48,10 +49,10 @@ export const LandingHeader = () => {
                 </Link>
                 <Link
                     href="/signup"
-                    className="group flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-semibold hover:bg-gray-100 transition-all hover:pr-5"
+                    className="group flex items-center gap-2 bg-[#8B5CF6] text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#7C3AED] transition-all hover:pr-5 shadow-lg shadow-purple-500/20"
                 >
                     Start for free
-                    <ArrowRight className="w-4 h-4 text-black/60 group-hover:text-black transition-colors" />
+                    <ArrowRight className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" />
                 </Link>
             </div>
         </motion.header>

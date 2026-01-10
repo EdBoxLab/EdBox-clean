@@ -20,7 +20,7 @@ function xpForNextLevel(level: number): number {
   return level * level * 100;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -28,6 +28,23 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { searchParams } = new URL(request.url);
+    // Use localDate from client if available, otherwise fallback to UTC
+    const localDateProp = searchParams.get('localDate');
+    const today = localDateProp || new Date().toISOString().split('T')[0];
+
+    // Calculate yesterday based on the specific "today"
+    const todayDate = new Date(today);
+    const yesterdayDate = new Date(todayDate);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterday = yesterdayDate.toISOString().split('T')[0];
+
+    // Calculate start of current week (Sunday) for history
+    const dayOfWeek = todayDate.getDay(); // 0 is Sunday
+    const startOfWeek = new Date(todayDate);
+    startOfWeek.setDate(todayDate.getDate() - dayOfWeek);
+    const startOfWeekStr = startOfWeek.toISOString().split('T')[0];
 
     const { data: streakData } = await supabase
       .from('user_streaks')
@@ -48,10 +65,43 @@ export async function GET() {
       .order('created_at', { ascending: false })
       .limit(10);
 
+    // Fetch checks-ins for the current week to populate the dashboard view
+    const { data: weeklyActivity } = await supabase
+      .from('xp_transactions')
+      .select('created_at')
+      .eq('user_id', user.id)
+      .gte('created_at', `${startOfWeekStr}T00:00:00`)
+      .or('action_type.eq.daily_login,action_type.eq.check_in');
+
+    const history: Record<number, boolean> = {};
+    if (weeklyActivity) {
+      weeklyActivity.forEach((activity: any) => {
+        const activityDateStr = new Date(activity.created_at).toISOString().split('T')[0];
+        // Find which day index this corresponds to
+        for (let i = 0; i < 7; i++) {
+          const tempDate = new Date(startOfWeek);
+          tempDate.setDate(startOfWeek.getDate() + i);
+          const tempDateStr = tempDate.toISOString().split('T')[0];
+          if (tempDateStr === activityDateStr) {
+            history[i] = true;
+          }
+        }
+      });
+    }
+
     const totalXp = xpData?.total_xp || 0;
     const level = xpData?.level || calculateLevel(totalXp);
-    const currentStreak = streakData?.current_streak || 0;
+
+    // Calculate display streak
+    let currentStreak = streakData?.current_streak || 0;
     const longestStreak = streakData?.longest_streak || 0;
+    const lastActivityDate = streakData?.last_activity_date;
+
+    // Check if streak is broken (visually/effectively)
+    // If last activity is BEFORE yesterday, streak is broken.
+    if (lastActivityDate && lastActivityDate < yesterday) {
+      currentStreak = 0;
+    }
 
     return NextResponse.json({
       streak: {
@@ -59,6 +109,7 @@ export async function GET() {
         longest: longestStreak,
         lastActivityDate: streakData?.last_activity_date,
         streakStartedAt: streakData?.streak_started_at,
+        history,
       },
       xp: {
         total: totalXp,
@@ -84,9 +135,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { action } = await request.json();
+    const { action, localDate } = await request.json();
 
-    const today = new Date().toISOString().split('T')[0];
+    // Use localDate from client if available, otherwise fallback to UTC
+    const today = localDate || new Date().toISOString().split('T')[0];
 
     const { data: streakData } = await supabase
       .from('user_streaks')
@@ -117,9 +169,11 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      // Calculate yesterday based on local "today"
+      const todayDate = new Date(today);
+      const yesterdayDate = new Date(todayDate);
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
 
       if (lastActivityDate === yesterdayStr) {
         currentStreak += 1;

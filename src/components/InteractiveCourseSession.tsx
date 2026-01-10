@@ -174,7 +174,7 @@ export default function InteractiveCourseSession({
   const [isOnline, setIsOnline] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const initializingRef = useRef(false);
 
   useEffect(() => {
@@ -747,25 +747,32 @@ export default function InteractiveCourseSession({
             )}
           </AnimatePresence>
 
-          <div className="w-full flex gap-3">
-            <input
+          <div className="w-full flex gap-3 items-end">
+            <textarea
               ref={inputRef}
-              type="text"
+              rows={1}
               value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
+              onChange={(e) => {
+                setInputMessage(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+              }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   handleSendMessage(inputMessage);
+                  if (inputRef.current) {
+                    inputRef.current.style.height = 'auto';
+                  }
                 }
               }}
               placeholder="Ask anything..."
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none min-h-[48px] max-h-[200px] transition-all"
             />
             <button
               onClick={() => handleSendMessage(inputMessage)}
               disabled={isLoading}
-              className="p-3 bg-purple-600 rounded-xl hover:bg-purple-500 transition-colors disabled:opacity-50"
+              className="p-3 bg-purple-600 rounded-xl hover:bg-purple-500 transition-colors disabled:opacity-50 h-[48px] shrink-0"
             >
               <Send className="w-5 h-5" />
             </button>

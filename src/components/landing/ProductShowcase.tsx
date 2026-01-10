@@ -253,7 +253,7 @@ const CourseMockup = () => (
                     </div>
                 </div>
 
-                <button className="flex items-center justify-center w-full py-4 rounded-lg bg-white text-black font-bold hover:bg-gray-200 transition-colors">
+                <button className="flex items-center justify-center w-full py-4 rounded-lg bg-[#8B5CF6] text-white font-bold hover:bg-[#7C3AED] transition-colors shadow-lg shadow-purple-500/20">
                     Continue to Lesson 2 <ChevronRight className="w-4 h-4 ml-2" />
                 </button>
             </div>

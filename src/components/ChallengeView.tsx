@@ -130,7 +130,7 @@ export default function ChallengeView({
             // Send answer to chat for Genie to see - Format cleanly
             if (onSendToChat) {
                 // Just send the answer text contextually
-                const submissionMsg = imageUrl 
+                const submissionMsg = imageUrl
                     ? `I've completed the challenge with an image submission!\n\n${answer}\n\n[Image Submission](${imageUrl})`
                     : `I've completed the challenge! Here is my submission:\n\n${answer}`;
                 onSendToChat(submissionMsg);
@@ -273,9 +273,13 @@ export default function ChallengeView({
                         <div className="relative group">
                             <textarea
                                 value={answer}
-                                onChange={(e) => setAnswer(e.target.value)}
+                                onChange={(e) => {
+                                    setAnswer(e.target.value);
+                                    e.target.style.height = 'auto';
+                                    e.target.style.height = `${Math.max(192, e.target.scrollHeight)}px`;
+                                }}
                                 placeholder="Type your answer, code, or explanation here..."
-                                className="w-full h-48 bg-gray-950 border border-gray-700 rounded-2xl p-6 text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all resize-none shadow-inner"
+                                className="w-full min-h-[192px] bg-gray-950 border border-gray-700 rounded-2xl p-6 text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all resize-none shadow-inner"
                                 disabled={status !== 'idle' || isSubmitting}
                             />
 
@@ -303,9 +307,9 @@ export default function ChallengeView({
 
                                 {imageUrl && (
                                     <div className="relative group/img">
-                                        <img 
-                                            src={imageUrl} 
-                                            alt="Submission" 
+                                        <img
+                                            src={imageUrl}
+                                            alt="Submission"
                                             className="h-24 w-24 object-cover rounded-xl border border-purple-500/50"
                                         />
                                         <button

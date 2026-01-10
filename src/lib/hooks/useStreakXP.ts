@@ -7,6 +7,7 @@ interface StreakData {
   longest: number;
   lastActivityDate: string | null;
   streakStartedAt: string | null;
+  history?: Record<number, boolean>;
 }
 
 interface XPData {
@@ -40,7 +41,7 @@ interface StreakXPState {
 
 export function useStreakXP() {
   const [state, setState] = useState<StreakXPState>({
-    streak: { current: 0, longest: 0, lastActivityDate: null, streakStartedAt: null },
+    streak: { current: 0, longest: 0, lastActivityDate: null, streakStartedAt: null, history: {} },
     xp: { total: 0, level: 1, xpForCurrentLevel: 0, xpForNextLevel: 100, progress: 0 },
     loading: true,
     error: null,
@@ -51,7 +52,9 @@ export function useStreakXP() {
 
   const fetchStreakXP = useCallback(async () => {
     try {
-      const response = await fetch('/api/streaks');
+      // Pass localDate to help server compute visual reset if needed
+      const localDate = new Date().toLocaleDateString('en-CA');
+      const response = await fetch(`/api/streaks?localDate=${localDate}`);
       if (!response.ok) {
         if (response.status === 401) {
           setState(prev => ({ ...prev, loading: false }));
@@ -78,10 +81,11 @@ export function useStreakXP() {
 
   const checkIn = useCallback(async () => {
     try {
+      const localDate = new Date().toLocaleDateString('en-CA');
       const response = await fetch('/api/streaks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'daily_login' }),
+        body: JSON.stringify({ action: 'daily_login', localDate }),
       });
 
       if (!response.ok) throw new Error('Failed to check in');
@@ -89,7 +93,7 @@ export function useStreakXP() {
       const data = await response.json();
 
       if (data.alreadyCheckedIn) {
-        setState(prev => ({ ...prev, lastCheckIn: new Date().toISOString().split('T')[0] }));
+        setState(prev => ({ ...prev, lastCheckIn: localDate }));
         return { alreadyCheckedIn: true };
       }
 
@@ -105,7 +109,7 @@ export function useStreakXP() {
           total: data.xp.total,
           level: data.xp.level,
         },
-        lastCheckIn: new Date().toISOString().split('T')[0],
+        lastCheckIn: localDate,
         showCelebration: data.xp.gained > 0,
         celebrationData: {
           xpGained: data.xp.gained,

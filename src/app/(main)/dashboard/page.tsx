@@ -33,7 +33,7 @@ const Dashboard: React.FC = () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          router.push('/about');
+          router.push('/login');
           return;
         }
         setUser(user);

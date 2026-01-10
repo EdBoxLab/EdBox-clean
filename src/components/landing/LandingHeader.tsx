@@ -31,7 +31,7 @@ export const LandingHeader = () => {
                     {['About', 'Blog', 'Twitter', 'Email Us'].map((item) => (
                         <Link
                             key={item}
-                            href="#"
+                            href="/about"
                             className="text-sm font-medium text-[#9CA3AF] hover:text-white transition-colors"
                         >
                             {item}

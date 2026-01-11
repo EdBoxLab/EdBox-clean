@@ -115,12 +115,27 @@ export default function RootLayout({
           {/* Verification */}
           <meta name="google-site-verification" content="YzGOxq7ul48yIOan9gd3sigS4kTp-9aiimYHo01po0s" />
           
-          {/* AdSense - For Verification */}
-          <script
-            async
-            src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7134321558578802"
-            crossOrigin="anonymous"
-          />
+            {/* AdSense - For Verification */}
+            <script
+              async
+              src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7134321558578802"
+              crossOrigin="anonymous"
+            />
+
+            {/* OneSignal */}
+            <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.OneSignalDeferred = window.OneSignalDeferred || [];
+                  OneSignalDeferred.push(async function(OneSignal) {
+                    await OneSignal.init({
+                      appId: "f06bf079-3707-45e5-a6a7-8a4f698d7a77",
+                    });
+                  });
+                `
+              }}
+            />
 
           {/* Structured Data - EdBox Brand */}
           <OrganizationSchema />

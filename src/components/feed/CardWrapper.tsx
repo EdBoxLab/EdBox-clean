@@ -93,10 +93,9 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({
                 {children}
             </div>
 
-            {/* Bottom Metadata Bar - Lower z-index than content (z-10) */}
-            {/* Entire container is pointer-events-none to prevent blocking main content clicks */}
-            <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black via-black/95 to-transparent backdrop-blur-sm pointer-events-none">
-                <div className="px-4 sm:px-6 pb-6 pt-10 pointer-events-none">
+            {/* Bottom Metadata Bar - Higher z-index for clickable buttons */}
+            <div className="absolute bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-black via-black/95 to-transparent backdrop-blur-sm">
+                <div className="px-4 sm:px-6 pb-6 pt-10">
                     {/* Course Reference Tag (if exists) */}
                     {item.courseReference && (
                         <div className="flex items-center gap-2 px-2.5 py-1 bg-purple-500/20 border border-purple-500/30 rounded-full w-fit mb-2">
@@ -117,14 +116,13 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({
                         </p>
                     </div>
 
-                    {/* Action Buttons Row - Horizontal, Small */}
-                    {/* Only buttons have pointer-events-auto */}
-                    <div className="flex items-center justify-between pointer-events-none">
-                        <div className="flex items-center gap-3">
-                            {/* Like */}
-                            <button
-                                onClick={() => onFeedback(item.id, 'like')}
-                                className="flex items-center gap-1.5 group pointer-events-auto"
+                {/* Action Buttons Row - Horizontal, Small */}
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                {/* Like */}
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onFeedback(item.id, 'like'); }}
+                                    className="flex items-center gap-1.5 group"
                             >
                                 <div className={`p-2 rounded-full transition-colors ${isLiked
                                     ? 'bg-purple-500/20 border border-purple-500/40'
@@ -145,9 +143,9 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({
                             </button>
 
                             {/* Save */}
-                            <button
-                                onClick={handleSave}
-                                className="group pointer-events-auto"
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleSave(); }}
+                                    className="group"
                             >
                                 <div className={`p-2 rounded-full transition-colors ${isSaved
                                     ? 'bg-blue-500/20 border border-blue-500/40'
@@ -163,9 +161,9 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({
                             </button>
 
                             {/* Share */}
-                            <button
-                                onClick={handleShare}
-                                className="group pointer-events-auto"
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleShare(); }}
+                                    className="group"
                             >
                                 <div className="p-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
                                     <Share2 className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" />
@@ -174,7 +172,7 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({
                         </div>
 
                         {/* XP Badge + More Options */}
-                        <div className="flex items-center gap-2 pointer-events-auto">
+                            <div className="flex items-center gap-2">
                             {item.xp_reward > 0 && (
                                 <div className="px-2.5 py-1 bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 rounded-full">
                                     <span className="text-xs font-bold text-purple-300">

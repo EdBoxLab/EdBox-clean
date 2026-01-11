@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { type User } from '@supabase/supabase-js';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Share2, Copy, TrendingUp, MessageSquare, BookOpen, Award, Calendar, BarChart3, Settings2, Sparkles, Brain, Target, Plus, X, Check } from 'lucide-react';
+import { Share2, Copy, TrendingUp, MessageSquare, BookOpen, Award, Calendar, BarChart3, Settings2, Sparkles, Brain, Target, Plus, X, Check, ThumbsUp, HelpCircle, Lightbulb, Play, FileText, Zap, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
   interface StudyAnalytics {
@@ -620,45 +620,109 @@ import { motion, AnimatePresence } from 'framer-motion';
                 className="mb-4"
               />
 
-              {savedLoading ? (
-                <p>Loading...</p>
-              ) : paginatedItems.length === 0 ? (
-                <p>No saved items found.</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {paginatedItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="border rounded-lg p-4 space-y-2"
-                    >
-                      <h2 className="font-bold">
-                        {item.content?.title}
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        {item.content?.type}
-                      </p>
-
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="secondary"
+                {savedLoading ? (
+                  <p>Loading...</p>
+                ) : paginatedItems.length === 0 ? (
+                  <p>No saved items found.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {paginatedItems.map((item) => {
+                      const type = item.content?.type?.toLowerCase();
+                      const iconMap: Record<string, React.ReactNode> = {
+                        'quiz': <HelpCircle className="w-4 h-4 text-purple-400" />,
+                        'fact': <Lightbulb className="w-4 h-4 text-yellow-400" />,
+                        'article': <FileText className="w-4 h-4 text-blue-400" />,
+                        'poll': <BarChart3 className="w-4 h-4 text-green-400" />,
+                        'meme': <Sparkles className="w-4 h-4 text-pink-400" />,
+                        'lesson': <BookOpen className="w-4 h-4 text-indigo-400" />,
+                        'debate': <MessageSquare className="w-4 h-4 text-orange-400" />,
+                        'insight': <Brain className="w-4 h-4 text-cyan-400" />,
+                        'media': <Play className="w-4 h-4 text-red-400" />,
+                        'challenge': <Zap className="w-4 h-4 text-amber-400" />,
+                      };
+                      const typeIcon = iconMap[type] || <Bookmark className="w-4 h-4 text-zinc-400" />;
+                      
+                      return (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="group relative border rounded-xl overflow-hidden bg-card hover:border-primary/30 transition-all cursor-pointer"
                           onClick={() => setPreviewItem(item)}
                         >
-                          Preview
-                        </Button>
-
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                          {/* Image Header */}
+                          {item.content?.imageUrl && (
+                            <div className="relative h-32 bg-zinc-900">
+                              <img 
+                                src={item.content.imageUrl} 
+                                alt={item.content.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                              <div className="absolute bottom-2 left-2 right-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="px-2 py-0.5 bg-black/50 backdrop-blur-sm rounded-full text-[10px] font-medium uppercase text-white/80 flex items-center gap-1">
+                                    {typeIcon}
+                                    {item.content?.type}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Content */}
+                          <div className="p-4 space-y-2">
+                            {!item.content?.imageUrl && (
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="p-1.5 bg-secondary rounded-lg">
+                                  {typeIcon}
+                                </span>
+                                <span className="text-[10px] font-medium uppercase text-muted-foreground">
+                                  {item.content?.type}
+                                </span>
+                              </div>
+                            )}
+                            
+                            <h3 className="font-semibold text-sm line-clamp-2 group-hover:text-primary transition-colors">
+                              {item.content?.title}
+                            </h3>
+                            
+                            {item.content?.topic && (
+                              <p className="text-xs text-purple-400 font-medium">
+                                @{item.content.topic.toLowerCase().replace(/\s+/g, '')}
+                              </p>
+                            )}
+                            
+                            <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                {item.content?.xp_reward > 0 && (
+                                  <span className="flex items-center gap-1 text-purple-400">
+                                    <Zap className="w-3 h-3" /> {item.content.xp_reward}
+                                  </span>
+                                )}
+                                {item.saved_at && (
+                                  <span>{new Date(item.saved_at).toLocaleDateString()}</span>
+                                )}
+                              </div>
+                              
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(item.id);
+                                }}
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
 
               {/* Pagination Controls */}
               {totalPages > 1 && (
@@ -886,23 +950,217 @@ import { motion, AnimatePresence } from 'framer-motion';
 
       </Tabs>
 
-      {/* PREVIEW MODAL */}
-      <Dialog open={!!previewItem} onOpenChange={() => setPreviewItem(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{previewItem?.content?.title}</DialogTitle>
-            <DialogDescription>
-              {previewItem?.content?.type}
-            </DialogDescription>
-          </DialogHeader>
+      {/* PREVIEW MODAL - Enhanced Card View */}
+        <Dialog open={!!previewItem} onOpenChange={() => setPreviewItem(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                {(() => {
+                  const type = previewItem?.content?.type?.toLowerCase();
+                  const iconMap: Record<string, React.ReactNode> = {
+                    'quiz': <HelpCircle className="w-5 h-5 text-purple-400" />,
+                    'fact': <Lightbulb className="w-5 h-5 text-yellow-400" />,
+                    'article': <FileText className="w-5 h-5 text-blue-400" />,
+                    'poll': <BarChart3 className="w-5 h-5 text-green-400" />,
+                    'meme': <Sparkles className="w-5 h-5 text-pink-400" />,
+                    'lesson': <BookOpen className="w-5 h-5 text-indigo-400" />,
+                    'debate': <MessageSquare className="w-5 h-5 text-orange-400" />,
+                    'insight': <Brain className="w-5 h-5 text-cyan-400" />,
+                    'media': <Play className="w-5 h-5 text-red-400" />,
+                    'challenge': <Zap className="w-5 h-5 text-amber-400" />,
+                  };
+                  return iconMap[type] || <Bookmark className="w-5 h-5 text-zinc-400" />;
+                })()}
+                {previewItem?.content?.title || 'Saved Item'}
+              </DialogTitle>
+              <DialogDescription className="flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-medium uppercase">
+                  {previewItem?.content?.type || 'Content'}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Saved {previewItem?.saved_at ? new Date(previewItem.saved_at).toLocaleDateString() : ''}
+                </span>
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="mt-4 text-sm max-h-96 overflow-y-auto">
-            <pre className="whitespace-pre-wrap">
-              {JSON.stringify(previewItem?.content, null, 2)}
-            </pre>
-          </div>
-        </DialogContent>
-      </Dialog>
+            <div className="mt-4 space-y-4">
+              {/* Image if available */}
+              {previewItem?.content?.imageUrl && (
+                <div className="relative rounded-xl overflow-hidden aspect-video bg-zinc-900">
+                  <img 
+                    src={previewItem.content.imageUrl} 
+                    alt={previewItem.content.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                </div>
+              )}
+
+              {/* Topic */}
+              {previewItem?.content?.topic && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-purple-400">@{previewItem.content.topic.toLowerCase().replace(/\s+/g, '')}</span>
+                </div>
+              )}
+
+              {/* Main Content based on type */}
+              <div className="bg-secondary/50 rounded-xl p-4 space-y-3">
+                {/* Quiz type */}
+                {previewItem?.content?.type?.toLowerCase() === 'quiz' && previewItem?.content?.question && (
+                  <div>
+                    <p className="font-medium mb-2">{previewItem.content.question}</p>
+                    {previewItem.content.options && (
+                      <div className="space-y-2">
+                        {previewItem.content.options.map((opt: string, i: number) => (
+                          <div 
+                            key={i} 
+                            className={`px-3 py-2 rounded-lg text-sm ${i === previewItem.content.correctAnswer ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-zinc-800/50 text-zinc-400'}`}
+                          >
+                            {opt}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {previewItem.content.explanation && (
+                      <p className="text-sm text-muted-foreground mt-3 italic">{previewItem.content.explanation}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Fact/Insight type */}
+                {(previewItem?.content?.type?.toLowerCase() === 'fact' || previewItem?.content?.type?.toLowerCase() === 'insight') && (
+                  <div>
+                    <p className="text-sm leading-relaxed">{previewItem.content.content || previewItem.content.description}</p>
+                    {previewItem.content.source && (
+                      <p className="text-xs text-muted-foreground mt-2">Source: {previewItem.content.source}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Article/Lesson type */}
+                {(previewItem?.content?.type?.toLowerCase() === 'article' || previewItem?.content?.type?.toLowerCase() === 'lesson') && (
+                  <div>
+                    {previewItem.content.description && (
+                      <p className="text-sm text-muted-foreground mb-2">{previewItem.content.description}</p>
+                    )}
+                    {previewItem.content.content && (
+                      <p className="text-sm leading-relaxed">{typeof previewItem.content.content === 'string' ? previewItem.content.content.slice(0, 500) + '...' : ''}</p>
+                    )}
+                    {previewItem.content.keyPoints && (
+                      <div className="mt-3">
+                        <p className="text-xs font-semibold text-primary mb-1">Key Points:</p>
+                        <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                          {previewItem.content.keyPoints.slice(0, 3).map((point: string, i: number) => (
+                            <li key={i}>{point}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Poll type */}
+                {previewItem?.content?.type?.toLowerCase() === 'poll' && (
+                  <div>
+                    <p className="font-medium mb-2">{previewItem.content.question || previewItem.content.title}</p>
+                    {previewItem.content.options && (
+                      <div className="space-y-2">
+                        {previewItem.content.options.map((opt: any, i: number) => (
+                          <div key={i} className="px-3 py-2 bg-zinc-800/50 rounded-lg text-sm flex justify-between">
+                            <span>{typeof opt === 'string' ? opt : opt.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Challenge type */}
+                {previewItem?.content?.type?.toLowerCase() === 'challenge' && (
+                  <div>
+                    <p className="text-sm leading-relaxed">{previewItem.content.description || previewItem.content.content}</p>
+                    {previewItem.content.difficulty && (
+                      <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        previewItem.content.difficulty === 'Hard' ? 'bg-red-500/20 text-red-400' :
+                        previewItem.content.difficulty === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                        'bg-green-500/20 text-green-400'
+                      }`}>
+                        {previewItem.content.difficulty}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Meme type */}
+                {previewItem?.content?.type?.toLowerCase() === 'meme' && (
+                  <div className="text-center">
+                    {previewItem.content.caption && (
+                      <p className="text-lg font-bold">{previewItem.content.caption}</p>
+                    )}
+                    {previewItem.content.punchline && (
+                      <p className="text-sm text-muted-foreground mt-2">{previewItem.content.punchline}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Debate type */}
+                {previewItem?.content?.type?.toLowerCase() === 'debate' && (
+                  <div>
+                    <p className="font-medium mb-2">{previewItem.content.topic || previewItem.content.title}</p>
+                    {previewItem.content.positions && (
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        {previewItem.content.positions.map((pos: any, i: number) => (
+                          <div key={i} className="px-3 py-2 bg-zinc-800/50 rounded-lg text-sm">
+                            <span className="font-semibold text-xs uppercase text-primary">{pos.side}</span>
+                            <p className="text-muted-foreground text-xs mt-1">{pos.argument}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Generic fallback for other types */}
+                {!['quiz', 'fact', 'insight', 'article', 'lesson', 'poll', 'challenge', 'meme', 'debate'].includes(previewItem?.content?.type?.toLowerCase() || '') && (
+                  <div>
+                    {previewItem?.content?.description && (
+                      <p className="text-sm leading-relaxed">{previewItem.content.description}</p>
+                    )}
+                    {previewItem?.content?.content && typeof previewItem.content.content === 'string' && (
+                      <p className="text-sm leading-relaxed mt-2">{previewItem.content.content.slice(0, 300)}...</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* XP and Stats */}
+              <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border">
+                <div className="flex items-center gap-3">
+                  {previewItem?.content?.xp_reward > 0 && (
+                    <span className="flex items-center gap-1 text-purple-400 font-medium">
+                      <Zap className="w-3 h-3" /> +{previewItem.content.xp_reward} XP
+                    </span>
+                  )}
+                  {previewItem?.content?.likes > 0 && (
+                    <span className="flex items-center gap-1">
+                      <ThumbsUp className="w-3 h-3" /> {previewItem.content.likes}
+                    </span>
+                  )}
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="destructive"
+                  onClick={() => {
+                    handleDelete(previewItem.id);
+                    setPreviewItem(null);
+                  }}
+                >
+                  <X className="w-3 h-3 mr-1" /> Remove
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
       {/* SHARE DIALOG */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>

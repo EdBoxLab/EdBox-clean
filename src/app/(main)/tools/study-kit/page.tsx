@@ -1201,6 +1201,68 @@ function StudyKitContent() {
                                     </Button>
                                 </div>
                             )}
+                            {/* Generate More / Ad Buttons - Top of Content */}
+                            {studyKit && (
+                                <div className="mb-6 p-4 bg-gradient-to-r from-zinc-900/80 to-zinc-800/50 border border-zinc-700/50 rounded-2xl">
+                                    <div className="flex flex-wrap items-center justify-center gap-3">
+                                        <span className="text-sm text-zinc-400 mr-2">Add more content:</span>
+                                        {isPremium ? (
+                                            <>
+                                                <button
+                                                    onClick={() => handleGenerateMore('quizzes')}
+                                                    disabled={isGeneratingMore}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-xs transition-all"
+                                                >
+                                                    {isGeneratingMore ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                                                    10 Quizzes
+                                                </button>
+                                                <button
+                                                    onClick={() => handleGenerateMore('flashcards')}
+                                                    disabled={isGeneratingMore}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-xs transition-all"
+                                                >
+                                                    {isGeneratingMore ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                                                    10 Flashcards
+                                                </button>
+                                                <button
+                                                    onClick={() => setShowNotesModal(true)}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl font-bold text-xs transition-all"
+                                                >
+                                                    <Sparkles className="w-3 h-3" />
+                                                    Custom Notes
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button
+                                                    onClick={() => handleWatchAd('quizzes')}
+                                                    disabled={isGeneratingMore}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-xs transition-all"
+                                                >
+                                                    {isGeneratingMore ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                                    Ad for 10 Quizzes
+                                                </button>
+                                                <button
+                                                    onClick={() => handleWatchAd('flashcards')}
+                                                    disabled={isGeneratingMore}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-xs transition-all"
+                                                >
+                                                    {isGeneratingMore ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                                    Ad for 10 Flashcards
+                                                </button>
+                                                <button
+                                                    onClick={() => handleWatchAd('notes')}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-xl font-bold text-xs transition-all"
+                                                >
+                                                    <Sparkles className="w-3 h-3" />
+                                                    Ad for Custom Notes
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             <AnimatePresence mode="wait">
 
                                 <motion.div

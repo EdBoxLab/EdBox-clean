@@ -24,6 +24,9 @@ export const AdCard: React.FC<AdProps> = ({
 
     return (
         <div className="relative h-full w-full flex flex-col justify-center items-center bg-black overflow-hidden rounded-2xl border border-white/10 p-4">
+            {/* AdSense Script - Local ensures it's loaded for the unit */}
+            <script async src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adClient}`} crossOrigin="anonymous"></script>
+            
             {/* Sponsored Badge */}
             <div className="absolute top-6 left-6 z-20 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />

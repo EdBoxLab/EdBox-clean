@@ -1910,6 +1910,10 @@ function StudyKitContent() {
                                 Watch a short ad to generate more {adContentType === 'notes' ? 'custom notes' : adContentType}
                             </p>
                             
+                            {/* AdSense Script for Verification */}
+                            <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7134321558578802"
+                                crossOrigin="anonymous"></script>
+
                             {/* Simulated Ad Placeholder */}
                             <div className="bg-gradient-to-br from-indigo-900/50 to-purple-900/50 border border-indigo-500/30 rounded-2xl p-6 mb-6">
                                 <div className="text-xs uppercase tracking-widest text-indigo-400 mb-3">Sponsored</div>

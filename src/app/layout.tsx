@@ -112,11 +112,18 @@ export default function RootLayout({
         <link rel="icon" type="image/png" href="/EdBoxLogo.png" />
         <link rel="icon" type="image/x-icon" href="/logo_new.ico" />
         
-        {/* Verification */}
-        <meta name="google-site-verification" content="YzGOxq7ul48yIOan9gd3sigS4kTp-9aiimYHo01po0s" />
-        
-        {/* Structured Data - EdBox Brand */}
-        <OrganizationSchema />
+          {/* Verification */}
+          <meta name="google-site-verification" content="YzGOxq7ul48yIOan9gd3sigS4kTp-9aiimYHo01po0s" />
+          
+          {/* AdSense - For Verification */}
+          <script
+            async
+            src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7134321558578802"
+            crossOrigin="anonymous"
+          />
+
+          {/* Structured Data - EdBox Brand */}
+          <OrganizationSchema />
         <WebsiteSchema />
         <SoftwareApplicationSchema />
         
@@ -150,18 +157,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${inter.variable} font-primary antialiased bg-white dark:bg-slate-900 text-slate-900 dark:text-white transition-colors duration-200`}>
-        <ClientLayout>{children}</ClientLayout>
-        <Analytics />
-        
-        {/* AdSense - Lazy Loaded */}
-        <Script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7134321558578802"
-          crossOrigin="anonymous"
-          strategy="lazyOnload"
-        />
-      </body>
+        <body className={`${inter.variable} font-primary antialiased bg-white dark:bg-slate-900 text-slate-900 dark:text-white transition-colors duration-200`}>
+          <ClientLayout>{children}</ClientLayout>
+          <Analytics />
+        </body>
     </html>
   );
 }

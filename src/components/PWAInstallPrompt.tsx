@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Zap, Download, Brain, Rocket } from 'lucide-react';
+import { X } from 'lucide-react';
+import { Zap } from 'lucide-react';
+import { Download } from 'lucide-react';
+import { Brain } from 'lucide-react';
+import { Rocket } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { SkillNode, Challenge } from '@/lib/courseCreation/types';
@@ -39,26 +39,30 @@ export default function ImmersiveEngineView({
     const [viewState, setViewState] = useState<'interactive' | 'engine' | 'success'>('interactive');
     const [showGenie, setShowGenie] = useState(false);
     const [user, setUser] = useState<any>(null);
+
+    // ✅ FIX: Use ref to track if user has been fetched
+    const userFetchedRef = useRef(false);
     const supabase = createSupabaseBrowserClient();
 
-    // Get user for interactive session
+    // ✅ FIX: Only fetch user ONCE on mount
     useEffect(() => {
+        if (userFetchedRef.current) return;
+
         const getUser = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             setUser(user);
+            userFetchedRef.current = true;
         };
         getUser();
-    }, []);
+    }, []); // ✅ Empty deps - only run once
 
     // Switch to engine after interactive learning
     const handleInteractiveComplete = () => {
         console.log('Skipping to challenges...', { activeChallengeIndex, sessionChallenges: sessionChallenges.length });
-        
-        // Always switch to engine view first
+
         setViewState('engine');
         setShowGenie(true);
-        
-        // If we have challenges and we're at the intro (-1), move to first challenge
+
         if (activeChallengeIndex === -1 && sessionChallenges.length > 0) {
             setTimeout(() => {
                 onChallengeSelect(0);
@@ -70,7 +74,6 @@ export default function ImmersiveEngineView({
     const handleChallengeComplete = async (success: boolean) => {
         if (success) {
             setViewState('success');
-            // Delay the actual completion call to let animation play
             setTimeout(() => onChallengeComplete(true), 2500);
         } else {
             await onChallengeComplete(false);
@@ -82,7 +85,6 @@ export default function ImmersiveEngineView({
         if (activeChallengeIndex === -1) {
             setViewState('interactive');
         } else if (viewState !== 'success') {
-            // Stay in 'success' if we just finished, otherwise go to engine
             setViewState('engine');
         }
     }, [activeChallengeIndex, viewState]);
@@ -90,8 +92,8 @@ export default function ImmersiveEngineView({
     if (!selectedSkill) return null;
 
     const skillTitle = selectedSkill.title || (selectedSkill as any).name || 'this skill';
-    const totalSteps = sessionChallenges.length + 1; // +1 for interactive learning
-    const currentStep = activeChallengeIndex + 1; // interactive is 0, first challenge is 1...
+    const totalSteps = sessionChallenges.length + 1;
+    const currentStep = activeChallengeIndex + 1;
     const progressPercent = Math.max(0, Math.min(100, (currentStep / totalSteps) * 100));
 
     const renderEngine = () => {

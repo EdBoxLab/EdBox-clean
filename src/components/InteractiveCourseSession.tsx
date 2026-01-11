@@ -131,6 +131,7 @@ function RoadmapWelcome({
 
       <div className="p-6 bg-gray-900/50 border-t border-gray-800">
         <button
+          type="button"
           onClick={onStart}
           className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-2xl font-black text-lg shadow-xl shadow-purple-500/20 transition-all active:scale-95 flex items-center justify-center gap-3"
         >
@@ -189,8 +190,19 @@ export default function InteractiveCourseSession({
   }, []);
 
   useEffect(() => {
+    if (!userId || !courseId) return;
     initializeSessionWithIntro();
-  }, [courseId, userId]);
+  }, []);
+
+  useEffect(() => {
+    console.log('🔵 SESSION COMPONENT MOUNTED');
+    console.log('Session state:', session);
+    console.log('Messages count:', messages.length);
+
+    return () => {
+      console.log('🔴 SESSION COMPONENT UNMOUNTED - THIS SHOULD NOT HAPPEN');
+    };
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
@@ -361,10 +373,12 @@ export default function InteractiveCourseSession({
                   msg.id === genieMessageId ? { ...msg, type: 'challenge_trigger', challengeData: data.challengeData, content: data.challengeData.description } : msg
                 ));
               } else if (data.type === 'goals_updated') {
-                // Real-time Goal Update!
+                // Real-time Goal Update - update locally without triggering parent re-renders
                 const newGoals = data.goals;
-                // Dispatch global event to refresh skill graph
-                window.dispatchEvent(new Event('skill-progress-updated'));
+                // NOTE: Removed window.dispatchEvent('skill-progress-updated') 
+                // This was causing the parent SkillGraphRenderer to refetch and re-render,
+                // which caused the interactive session to remount/refresh.
+                // Progress will be synced when the session closes instead.
 
                 // Track skill mastered events for newly mastered goals
                 if (session?.learningContext?.goals) {
@@ -499,6 +513,7 @@ export default function InteractiveCourseSession({
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setIsSidebarOpen(false)}
                   className="p-2 text-gray-500 hover:text-white transition-colors"
                 >
@@ -646,6 +661,7 @@ export default function InteractiveCourseSession({
                         </h3>
                         <p className="text-white/80 mb-4 text-sm leading-relaxed">{message.challengeData.description}</p>
                         <button
+                          type="button"
                           onClick={() => handleChallengeTrigger(message.id, message.challengeData)}
                           className="w-full py-3 bg-white text-purple-700 font-bold rounded-xl hover:bg-gray-100 transition-all active:scale-95"
                         >
@@ -662,6 +678,7 @@ export default function InteractiveCourseSession({
                           <p className="text-xs text-red-400/60">Don't worry, just tap below to get back on track.</p>
                         </div>
                         <button
+                          type="button"
                           onClick={() => {
                             // Remove the error message and its preceding user message, then retry
                             setMessages(prev => {
@@ -706,6 +723,7 @@ export default function InteractiveCourseSession({
                 className="flex gap-2 overflow-x-auto pb-2 no-scrollbar"
               >
                 <button
+                  type="button"
                   onClick={() => {
                     setLearningStage('QUIZ');
                     handleSendMessage("Quiz me on what we've learned!", true, 'QUIZ');
@@ -716,6 +734,7 @@ export default function InteractiveCourseSession({
                   Quiz Me
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     setLearningStage('CHALLENGE');
                     handleSendMessage("I'm ready for a challenge!", true, 'CHALLENGE');
@@ -726,6 +745,7 @@ export default function InteractiveCourseSession({
                   Challenge Me
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     handleSendMessage("Tell me more about this topic", true);
                   }}
@@ -736,6 +756,7 @@ export default function InteractiveCourseSession({
                 </button>
                 {onStartChallenge && (
                   <button
+                    type="button"
                     onClick={onStartChallenge}
                     className="flex items-center gap-2 px-4 py-2.5 bg-green-600/20 hover:bg-green-600/40 border border-green-500/30 text-green-300 rounded-xl text-sm font-semibold whitespace-nowrap transition-all active:scale-95"
                   >
@@ -770,6 +791,7 @@ export default function InteractiveCourseSession({
               className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none min-h-[48px] max-h-[200px] transition-all"
             />
             <button
+              type="button"
               onClick={() => handleSendMessage(inputMessage)}
               disabled={isLoading}
               className="p-3 bg-purple-600 rounded-xl hover:bg-purple-500 transition-colors disabled:opacity-50 h-[48px] shrink-0"

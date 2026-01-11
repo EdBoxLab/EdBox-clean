@@ -320,8 +320,13 @@ export function useProgressTracker(skillId?: string, skillTitle?: string) {
 
 /**
  * Hook for managing multiple skills progress
+ * @param skillGraph - The skill graph to track progress for
+ * @param options - Optional configuration
+ * @param options.paused - If true, the hook will not listen to global progress update events
  */
-export function useMultipleSkillsProgress(skillGraph?: SkillGraph) {
+export function useMultipleSkillsProgress(skillGraph?: SkillGraph, options?: { paused?: boolean }) {
+  const { paused = false } = options || {};
+
   const [state, setState] = useState<{
     loading: boolean;
     error: string | null;
@@ -390,14 +395,17 @@ export function useMultipleSkillsProgress(skillGraph?: SkillGraph) {
     }
   }, [memoizedSkillGraph]); // Removed loadProgressData from dependencies
 
-  // NEW: Listen for global progress update events (e.g., from Genie session)
+  // Listen for global progress update events (e.g., from Genie session close)
+  // When paused, we don't respond to events to prevent mid-session refreshes
   useEffect(() => {
+    if (paused) return; // Don't listen when paused
+
     const handleProgressUpdate = () => {
       loadProgressData();
     };
     window.addEventListener('skill-progress-updated', handleProgressUpdate);
     return () => window.removeEventListener('skill-progress-updated', handleProgressUpdate);
-  }, [loadProgressData]);
+  }, [loadProgressData, paused]);
 
   return {
     loading: state.loading,

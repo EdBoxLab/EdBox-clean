@@ -14,7 +14,7 @@ import { Users } from 'lucide-react';
 export default function CoursePlayerPage() {
     const params = useParams();
     const courseId = params.courseId as string;
-    const supabase = createSupabaseBrowserClient();
+    const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
     const { isOpen, content, openShareModal, closeShareModal } = useShareModal();
 
     const [user, setUser] = React.useState<any>(null);

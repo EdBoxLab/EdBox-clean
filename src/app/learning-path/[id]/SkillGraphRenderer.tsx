@@ -78,7 +78,8 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
     };
   }, [graph.id]); // Changed from [graph]
 
-  const { progressData, loading: progressLoading, error: progressError, refreshProgress: refreshGraphProgress } = useMultipleSkillsProgress(progressionGraph);
+  // Pause progress event listening while the engine view is open to prevent mid-session refreshes
+  const { progressData, loading: progressLoading, error: progressError, refreshProgress: refreshGraphProgress } = useMultipleSkillsProgress(progressionGraph, { paused: selectedSkill !== null });
   const { recordChallengeAttempt } = useProgressTracker(selectedSkill?.id, selectedSkill?.title);
 
   useEffect(() => {
@@ -196,6 +197,10 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
   const handleCloseEngine = () => {
     setSelectedSkill(null);
     setCurrentChallenge(null);
+    // Sync progress to parent after closing the interactive session
+    // This is deferred so we don't cause re-renders during the active session
+    refreshGraphProgress();
+    window.dispatchEvent(new Event('skill-progress-updated'));
   };
 
   const handleSkillClick = async (skillId: string) => {

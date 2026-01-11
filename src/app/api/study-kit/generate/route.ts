@@ -74,7 +74,7 @@ Format as a strict JSON object with a central node and branches:
     {
       "topic": "Major Category",
       "subtopics": ["Sub-point 1", "Sub-point 2", "Sub-point 3"],
-      "details": "Brief summary of this category"
+      "details": "Extremely detailed information about this category, including definitions, examples, and key insights that appear when the user clicks this node."
     }
   ]
 }
@@ -201,15 +201,17 @@ function isProgrammingTopic(prompt: string): boolean {
   return programmingKeywords.some(keyword => lowerPrompt.includes(keyword));
 }
 
-function buildPrompt(type: ContentType, prompt: string, isAppend: boolean = false, customInstructions: string = '') {
+function buildPrompt(type: ContentType, prompt: string, isAppend: boolean = false, customInstructions: string = '', itemCount?: number, notesDepth?: string) {
   const base = `Topic/Content Source: "${prompt}"\n\n`;
-  const count = isAppend ? 10 : 15;
+  const count = itemCount || (isAppend ? 10 : 15);
 
   switch (type) {
     case 'quizzes':
-      return base + `Generate ${count} high-quality multiple-choice questions.
+      return base + `Generate EXACTLY ${count} high-quality multiple-choice questions.
 
 CRITICAL REQUIREMENTS:
+- Generate EXACTLY ${count} questions. No more, no less.
+- The output must be a single continuous set of ${count} questions.
 - correctAnswer MUST be 0, 1, 2, or 3 (NOT 1-4!)
 - 0 = first option
 - 1 = second option  
@@ -228,7 +230,9 @@ Output ONLY JSON array:
 [{"question":"...","options":["A","B","C","D"],"correctAnswer":0,"explanation":"...","difficulty":"Easy"}]`;
 
     case 'flashcards':
-      return base + `Generate ${count} professional flashcards that focus on key concepts, terminology, and critical insights.
+      return base + `Generate EXACTLY ${count} professional flashcards that focus on key concepts, terminology, and critical insights.
+Generate EXACTLY ${count} flashcards. No more, no less.
+The output must be a single continuous set of ${count} flashcards.
 Avoid one-word answers; provide clear, descriptive definitions.
 Each card should include:
 - Front: The concept or question.
@@ -250,7 +254,26 @@ Format as a JSON array:
 
     case 'notes':
       const isCodeRelated = isProgrammingTopic(prompt);
-      let notesPrompt = base + NOTES_TEMPLATE;
+      let depthInstructions = '';
+      
+      switch(notesDepth) {
+        case 'summary':
+          depthInstructions = 'Focus: High-level overview. Provide a concise but comprehensive summary of the key points.';
+          break;
+        case 'deepdive':
+          depthInstructions = 'Focus: Deep Dive. Provide detailed explanations, intricate nuances, and in-depth analysis of every aspect.';
+          break;
+        case 'coverage':
+          depthInstructions = 'Focus: Balanced mix of breadth and depth. Ensure all major topics are covered with sufficient detail.';
+          break;
+        case 'shi':
+          depthInstructions = 'Focus: SHI Mode (Experimental). Provide a creative, unconventional, and highly engaging perspective. Use analogies, storytelling, and unique insights while maintaining academic accuracy.';
+          break;
+        default:
+          depthInstructions = 'Focus: Comprehensive coverage.';
+      }
+
+      let notesPrompt = base + depthInstructions + '\n\n' + NOTES_TEMPLATE;
 
       if (!isCodeRelated) {
         notesPrompt += `\n\n**EXTRA CRITICAL REMINDER FOR THIS TOPIC:**
@@ -275,7 +298,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { prompt, contentTypes, fileName, fileContent, fileType, kitId, appendType, customInstructions } = body;
+    const { prompt, contentTypes, fileName, fileContent, fileType, kitId, appendType, customInstructions, itemCount, notesDepth } = body;
 
     let finalPrompt = prompt || '';
     let existingKit = null;
@@ -309,11 +332,39 @@ export async function POST(request: NextRequest) {
 
     const typesToGenerate = appendType ? [appendType] : contentTypes;
 
-        const results = await Promise.allSettled(
+    const results = await Promise.allSettled(
       typesToGenerate.map(async (type: ContentType) => {
         const isAppend = !!appendType;
+        
+        // Parallel batching for Quizzes and Flashcards (batches of 10)
+        if ((type === 'quizzes' || type === 'flashcards') && itemCount && itemCount > 10) {
+          const batchSize = 10;
+          const numBatches = Math.ceil(itemCount / batchSize);
+          const batchPromises = [];
+          
+          for (let i = 0; i < numBatches; i++) {
+            const currentBatchCount = Math.min(batchSize, itemCount - i * batchSize);
+            batchPromises.push((async () => {
+              const result = await generateWithRetry({
+                prompt: buildPrompt(type, finalPrompt, isAppend, '', currentBatchCount, notesDepth),
+                systemPrompt: 'Output ONLY valid JSON with no extra text.',
+                temperature: 0.7,
+                maxTokens: 4000,
+                model: 'oss',
+              });
+              return extractJSON(result.text, type);
+            })());
+          }
+          
+          const batchResults = await Promise.all(batchPromises);
+          // Combine all batches into a single array
+          const combinedContent = batchResults.flat();
+          return { type, content: combinedContent };
+        }
+
+        // Standard generation for other types or single batch
         const result = await generateWithRetry({
-          prompt: buildPrompt(type, finalPrompt, isAppend, type === 'notes' ? customInstructions : ''),
+          prompt: buildPrompt(type, finalPrompt, isAppend, type === 'notes' ? customInstructions : '', itemCount, notesDepth),
           systemPrompt: type === 'notes'
             ? `You are an expert academic note-taker. Create structured, detailed, and clear study notes in Markdown format.
 

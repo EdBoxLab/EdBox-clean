@@ -4,6 +4,8 @@ import { generateWithRetry } from '@/lib/ai-providers';
 
 type ContentType = 'quizzes' | 'flashcards' | 'notes';
 
+const BATCH_SIZE = 10;
+
 function sanitizeMathText(text: string): string {
   if (typeof text !== 'string') return String(text || '');
   return text
@@ -126,6 +128,9 @@ export async function POST(request: NextRequest) {
     
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const body = await request.json();
+    const { studyKitId, contentType, existingContent, customPrompt, notesSpecification, isAdReward } = body;
+
     const { data: subscription } = await supabase
       .from('user_subscriptions')
       .select('plan_id, status')
@@ -134,62 +139,74 @@ export async function POST(request: NextRequest) {
 
     const isPremium = subscription?.plan_id === 'premium' && subscription?.status === 'active';
     
-    if (!isPremium) {
-      return NextResponse.json({ error: 'Premium subscription required' }, { status: 403 });
+    if (!isPremium && !isAdReward) {
+      return NextResponse.json({ error: 'Premium subscription or ad reward required' }, { status: 403 });
     }
-
-    const body = await request.json();
-    const { studyKitId, contentType, existingContent, customPrompt, notesSpecification } = body;
 
     if (!studyKitId || !contentType) {
       return NextResponse.json({ error: 'Missing data' }, { status: 400 });
     }
 
-    const { data: studyKit } = await supabase
-      .from('study_kit_content')
-      .select('*')
-      .eq('id', studyKitId)
-      .eq('user_id', user.id)
-      .single();
+      const { data: studyKit } = await supabase
+        .from('study_kit_content')
+        .select('*')
+        .eq('id', studyKitId)
+        .eq('user_id', user.id)
+        .single();
 
-    if (!studyKit) {
-      return NextResponse.json({ error: 'Study kit not found' }, { status: 404 });
-    }
-
-    let prompt = '';
-    let template = '';
-
-    if (contentType === 'quizzes') {
-      const existingQuestions = existingContent?.map((q: any) => q.question).join('\n- ') || '';
-      prompt = `Topic: ${studyKit.title}\n\nAlready covered questions (DO NOT repeat these):\n- ${existingQuestions}\n\n${MORE_QUIZ_TEMPLATE}`;
-      template = MORE_QUIZ_TEMPLATE;
-    } else if (contentType === 'flashcards') {
-      const existingCards = existingContent?.map((c: any) => c.front).join('\n- ') || '';
-      prompt = `Topic: ${studyKit.title}\n\nAlready covered concepts (DO NOT repeat these):\n- ${existingCards}\n\n${MORE_FLASHCARD_TEMPLATE}`;
-      template = MORE_FLASHCARD_TEMPLATE;
-    } else if (contentType === 'notes') {
-      if (!notesSpecification) {
-        return NextResponse.json({ error: 'Notes specification required' }, { status: 400 });
+      if (!studyKit) {
+        return NextResponse.json({ error: 'Study kit not found' }, { status: 404 });
       }
-      prompt = `Topic: ${studyKit.title}\n\nUser's Specific Requirements:\n${notesSpecification}\n\n${CUSTOM_NOTES_TEMPLATE}`;
-    } else {
-      return NextResponse.json({ error: 'Invalid content type' }, { status: 400 });
-    }
 
-    const result = await generateWithRetry({
-      prompt,
-      systemPrompt: contentType === 'notes' ? 'You are an expert study note creator. Output only Markdown formatted notes.' : 'Output ONLY valid JSON with no extra text.',
-      temperature: 0.7,
-      maxTokens: contentType === 'notes' ? 3000 : 4000,
-      model: contentType === 'notes' ? 'versatile' : 'oss',
-    });
+      const sourceContext = studyKit.source_content || studyKit.title;
+      const hasFileContext = !!studyKit.source_content;
 
-    let newContent;
-    if (contentType === 'notes') {
-      newContent = result.text;
-    } else {
-      newContent = extractJSON(result.text, contentType as 'quizzes' | 'flashcards');
-    }
+      let newContent: any;
+
+      if (contentType === 'quizzes' || contentType === 'flashcards') {
+        const existingItems = existingContent?.map((item: any) => 
+          contentType === 'quizzes' ? item.question : item.front
+        ).join('\n- ') || '';
+
+        const template = contentType === 'quizzes' ? MORE_QUIZ_TEMPLATE : MORE_FLASHCARD_TEMPLATE;
+        const contextPrefix = hasFileContext 
+          ? `SOURCE MATERIAL (generate content STRICTLY from this):\n${sourceContext}\n\n`
+          : `Topic: ${studyKit.title}\n\n`;
+
+        const basePrompt = `${contextPrefix}Already covered (DO NOT repeat these):\n- ${existingItems}\n\n${template}`;
+
+        const result = await generateWithRetry({
+          prompt: basePrompt,
+          systemPrompt: 'Output ONLY valid JSON with no extra text.',
+          temperature: 0.7,
+          maxTokens: 4000,
+          model: 'oss',
+        });
+
+        newContent = extractJSON(result.text, contentType);
+      } else if (contentType === 'notes') {
+        if (!notesSpecification) {
+          return NextResponse.json({ error: 'Notes specification required' }, { status: 400 });
+        }
+
+        const contextPrefix = hasFileContext 
+          ? `SOURCE MATERIAL (base notes STRICTLY on this):\n${sourceContext}\n\n`
+          : `Topic: ${studyKit.title}\n\n`;
+
+        const prompt = `${contextPrefix}User's Specific Requirements:\n${notesSpecification}\n\n${CUSTOM_NOTES_TEMPLATE}`;
+
+        const result = await generateWithRetry({
+          prompt,
+          systemPrompt: 'You are an expert study note creator. Output only Markdown formatted notes.',
+          temperature: 0.7,
+          maxTokens: 3000,
+          model: 'versatile',
+        });
+
+        newContent = result.text;
+      } else {
+        return NextResponse.json({ error: 'Invalid content type' }, { status: 400 });
+      }
 
     const updatedGeneratedContent = { ...studyKit.generated_content };
     

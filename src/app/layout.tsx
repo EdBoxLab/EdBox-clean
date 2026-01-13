@@ -122,20 +122,7 @@ export default function RootLayout({
               crossOrigin="anonymous"
             />
 
-            {/* OneSignal */}
-            <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer />
-            <script
-              dangerouslySetInnerHTML={{
-                __html: `
-                  window.OneSignalDeferred = window.OneSignalDeferred || [];
-                  OneSignalDeferred.push(async function(OneSignal) {
-                    await OneSignal.init({
-                      appId: "f06bf079-3707-45e5-a6a7-8a4f698d7a77",
-                    });
-                  });
-                `
-              }}
-            />
+            
 
           {/* Structured Data - EdBox Brand */}
           <OrganizationSchema />

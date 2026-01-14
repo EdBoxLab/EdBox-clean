@@ -40,7 +40,7 @@
     "lucide-react": "^0.554.0",
     "marked": "^17.0.0",
     "next": "^16.0.10",
-    "office-text-extractor": "^3.0.3",
+    "office-text-extractor": "^4.0.0",
     "pdf-parse": "^1.1.1",
     "posthog-js": "^1.310.1",
     "posthog-node": "^5.18.0",
@@ -51,6 +51,7 @@
     "react-select-country-list": "^2.2.3",
     "react-syntax-highlighter": "^16.1.0",
     "recharts": "^3.4.1",
+    "resend": "^6.7.0",
     "tailwind-merge": "^3.4.0",
     "zod": "^3.23.8"
   },

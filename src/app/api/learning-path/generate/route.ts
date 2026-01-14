@@ -12,25 +12,6 @@ import { LearningContext, EngineType } from './types/enums';
 import { MicroSkill, SkillPath, SkillGraph, MiniProject } from './types/skillGraph';
 import { LearnerState } from './types/learnerState';
 
-// EMERGENCY DOMMatrix TYPE FIX – SAFE FOR SERVER
-declare global {
-  // eslint-disable-next-line no-var
-  var DOMMatrix: any;
-  // eslint-disable-next-line no-var
-  var DOMMatrixReadOnly: any;
-}
-
-if (typeof window === 'undefined') {
-  (global as any).DOMMatrix = function () {
-    return {
-      multiply: (x: any) => x,
-      invertSelf: () => this,
-      a: 1, b: 0, c: 0, d: 1, e: 0, f: 0
-    };
-  };
-
-  (global as any).DOMMatrixReadOnly = (global as any).DOMMatrix;
-}
 // ============= RETRY WITH EXPONENTIAL BACKOFF =============
 
 async function retryWithBackoff<T>(

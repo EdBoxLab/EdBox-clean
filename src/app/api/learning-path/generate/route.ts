@@ -12,6 +12,13 @@ import { LearningContext, EngineType } from './types/enums';
 import { MicroSkill, SkillPath, SkillGraph, MiniProject } from './types/skillGraph';
 import { LearnerState } from './types/learnerState';
 
+// EMERGENCY DOMMatrix FIX - REMOVE AFTER LAUNCH
+if (typeof window === 'undefined') {
+  global.DOMMatrix = class DOMMatrix {
+    constructor() { return { multiply: (x) => x, invertSelf: () => this, a:1,b:0,c:0,d:1,e:0,f:0 } as any }
+  };
+  global.DOMMatrixReadOnly = global.DOMMatrix;
+}
 // ============= RETRY WITH EXPONENTIAL BACKOFF =============
 
 async function retryWithBackoff<T>(

@@ -3,9 +3,7 @@
  * File processing utilities optimized for Groq AI
  * Handles: PDF, DOCX, PPTX, TXT, MD, Images
  * Zero native dependencies, Vercel-compatible
- */
-
-import { extractText } from 'unpdf';
+ 
 import { getTextExtractor } from 'office-text-extractor';
 
 // ============= CONSTANTS =============
@@ -20,11 +18,9 @@ export function isImageType(mimeType: string): boolean {
   return SUPPORTED_IMAGE_TYPES.includes(mimeType.toLowerCase());
 }
 
-export function isPDFType(mimeType: string, fileName?: string): boolean {
-  return (
-    mimeType === 'application/pdf' || 
-    (!!fileName && fileName.toLowerCase().endsWith('.pdf'))
-  );
+// 2. PDFs - TEMPORARILY DISABLED FOR LAUNCH
+if (isPDFType(mimeType, fileName) || buffer.slice(0, 4).toString() === '%PDF') {
+  return '[PDF upload temporarily disabled. Please convert to DOCX or paste text directly. PDF support returning very  soon.]';
 }
 
 export function isDOCXType(mimeType: string, fileName?: string): boolean {

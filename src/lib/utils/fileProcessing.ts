@@ -101,7 +101,7 @@ export function bufferToBase64(buffer: Buffer): string {
 /**
  * Extract text from PDF using unpdf (optimized for Groq)
  */
-async function extractTextFromPDF(buffer: Buffer): Promise<string> {
+export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
     const { text, totalPages } = await extractText(buffer, { 
       mergePages: true,
@@ -125,7 +125,7 @@ async function extractTextFromPDF(buffer: Buffer): Promise<string> {
 /**
  * Extract text from DOCX using mammoth (better quality than office-text-extractor for DOCX)
  */
-async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
+export async function  extractTextFromDOCX(buffer: Buffer): Promise<string> {
   try {
     // Dynamic import to avoid bundling if not needed
     const mammoth = await import('mammoth');
@@ -149,7 +149,7 @@ async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
 /**
  * Extract text from PPTX using office-text-extractor
  */
-async function extractTextFromPPTX(buffer: Buffer): Promise<string> {
+export async function extractTextFromPPTX(buffer: Buffer): Promise<string> {
   try {
     const extractor = getTextExtractor();
     const text = await extractor.extractText({ input: buffer, type: 'buffer' });
@@ -172,7 +172,7 @@ async function extractTextFromPPTX(buffer: Buffer): Promise<string> {
 /**
  * Process plain text files
  */
-function extractTextFromPlainText(buffer: Buffer, fileName: string): string {
+export function extractTextFromPlainText(buffer: Buffer, fileName: string): string {
   try {
     let text = buffer.toString('utf-8');
     
@@ -198,7 +198,7 @@ function extractTextFromPlainText(buffer: Buffer, fileName: string): string {
  * Optimize image for Groq Vision API
  * Groq supports: PNG, JPEG, WEBP, GIF (max 20MB, but smaller is faster)
  */
-function processImageForGroq(buffer: Buffer, mimeType: string, fileName: string): {
+export function processImageForGroq(buffer: Buffer, mimeType: string, fileName: string): {
   base64: string;
   mimeType: string;
   metadata: { originalSize: number; fileName: string };

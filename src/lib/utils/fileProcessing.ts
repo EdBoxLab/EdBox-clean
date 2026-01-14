@@ -1,9 +1,9 @@
 // src/lib/utils/fileProcessing.ts
 /**
  * File processing utilities optimized for Groq AI
- * Handles: PDF, DOCX, PPTX, TXT, MD, Images
+ * Handles: DOCX, PPTX, TXT, MD, Images (PDF temporarily disabled)
  * Zero native dependencies, Vercel-compatible
- **/
+ */
 
 import { getTextExtractor } from 'office-text-extractor';
 
@@ -57,87 +57,47 @@ export function isTextType(mimeType: string, fileName?: string): boolean {
 
 // ============= BUFFER UTILITIES =============
 
-/**
- * Converts content to Buffer, handling various input formats
- */
 function toBuffer(content: string): Buffer {
-  // Data URI format: data:mime/type;base64,xxxxx
   if (content.startsWith('data:')) {
     const base64 = content.split(',')[1];
     if (!base64) throw new Error('Invalid data URI format');
     return Buffer.from(base64, 'base64');
   }
   
-  // Raw PDF binary check
   if (content.startsWith('%PDF')) {
     return Buffer.from(content, 'binary');
   }
   
-  // Check if it's base64 (alphanumeric + +/= only)
   const isBase64 = /^[A-Za-z0-9+/=\n\r\s]+$/.test(content.slice(0, 300));
   if (isBase64) {
     try {
       return Buffer.from(content.replace(/[\n\r\s]/g, ''), 'base64');
     } catch {
-      // Fallback to UTF-8 if base64 decode fails
       return Buffer.from(content, 'utf-8');
     }
   }
   
-  // Default: treat as UTF-8 text
   return Buffer.from(content, 'utf-8');
 }
 
-/**
- * Converts Buffer to base64 string
- */
 export function bufferToBase64(buffer: Buffer): string {
   return buffer.toString('base64');
 }
 
 // ============= TEXT EXTRACTION FUNCTIONS =============
 
-/**
- * Extract text from PDF using unpdf (optimized for Groq)
- */
-
-/*
-
-export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
-  try {
-    const { text, totalPages } = await extractText(buffer, { 
-      mergePages: true,
-    });
-    
-    console.log(`📄 PDF: Extracted ${text.length} chars from ${totalPages} pages`);
-    
-    // Clean up excessive whitespace for Groq
-    const cleaned = text
-      .replace(/\s+/g, ' ')  // Normalize whitespace
-      .replace(/\n{3,}/g, '\n\n')  // Max 2 consecutive newlines
-      .trim();
-    
-    return cleaned;
-  } catch (error) {
-    console.error('❌ PDF extraction failed:', error);
-    throw new Error(`PDF extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
+// PDF extraction temporarily disabled - see extractTextFromPDF stub below
+export async function extractTextFromPDF(_buffer: Buffer): Promise<string> {
+  return '[PDF processing temporarily disabled. Please use DOCX or paste text directly.]';
 }
 
-*/
-
-/**
- * Extract text from DOCX using mammoth (better quality than office-text-extractor for DOCX)
- */
-export async function  extractTextFromDOCX(buffer: Buffer): Promise<string> {
+export async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
   try {
-    // Dynamic import to avoid bundling if not needed
     const mammoth = await import('mammoth');
     const result = await mammoth.extractRawText({ buffer });
     
     console.log(`📝 DOCX: Extracted ${result.value.length} chars`);
     
-    // Clean up for Groq
     const cleaned = result.value
       .replace(/\s+/g, ' ')
       .replace(/\n{3,}/g, '\n\n')
@@ -150,9 +110,6 @@ export async function  extractTextFromDOCX(buffer: Buffer): Promise<string> {
   }
 }
 
-/**
- * Extract text from PPTX using office-text-extractor
- */
 export async function extractTextFromPPTX(buffer: Buffer): Promise<string> {
   try {
     const extractor = getTextExtractor();
@@ -160,7 +117,6 @@ export async function extractTextFromPPTX(buffer: Buffer): Promise<string> {
     
     console.log(`📊 PPTX: Extracted ${text.length} chars`);
     
-    // Clean up for Groq
     const cleaned = text
       .replace(/\s+/g, ' ')
       .replace(/\n{3,}/g, '\n\n')
@@ -173,14 +129,10 @@ export async function extractTextFromPPTX(buffer: Buffer): Promise<string> {
   }
 }
 
-/**
- * Process plain text files
- */
 export function extractTextFromPlainText(buffer: Buffer, fileName: string): string {
   try {
     let text = buffer.toString('utf-8');
     
-    // Special handling for JSON - pretty print for better AI understanding
     if (fileName.toLowerCase().endsWith('.json')) {
       try {
         const parsed = JSON.parse(text);
@@ -198,10 +150,6 @@ export function extractTextFromPlainText(buffer: Buffer, fileName: string): stri
   }
 }
 
-/**
- * Optimize image for Groq Vision API
- * Groq supports: PNG, JPEG, WEBP, GIF (max 20MB, but smaller is faster)
- */
 export function processImageForGroq(buffer: Buffer, mimeType: string, fileName: string): {
   base64: string;
   mimeType: string;
@@ -212,7 +160,6 @@ export function processImageForGroq(buffer: Buffer, mimeType: string, fileName: 
   
   console.log(`🖼️  IMAGE: ${fileName} (${sizeKB.toFixed(2)}KB, ${mimeType})`);
   
-  // Warn if image is very large (>5MB)
   if (buffer.length > 5 * 1024 * 1024) {
     console.warn(`⚠️  Large image detected (${sizeKB.toFixed(2)}KB). Consider compressing for faster processing.`);
   }
@@ -229,15 +176,6 @@ export function processImageForGroq(buffer: Buffer, mimeType: string, fileName: 
 
 // ============= MAIN PROCESSING FUNCTION =============
 
-/**
- * Process any file type and extract content optimized for Groq AI
- * 
- * Returns either:
- * - Plain text (for PDFs, DOCX, PPTX, TXT, etc.)
- * - Image data object (for images to pass to Groq Vision)
- * 
- * @throws Error if processing fails
- */
 export async function processFileContent(
   content: string,
   mimeType: string,
@@ -246,7 +184,6 @@ export async function processFileContent(
   console.log(`\n🔄 Processing: ${fileName} (${mimeType})`);
   
   try {
-    // Convert content to Buffer
     let buffer: Buffer;
     try {
       buffer = toBuffer(content);
@@ -254,29 +191,20 @@ export async function processFileContent(
       throw new Error(`Failed to parse file content: ${error instanceof Error ? error.message : 'Invalid format'}`);
     }
     
-    // Route to appropriate extractor based on file type
-    
-    // 1. IMAGES - Return metadata for Groq Vision API
+    // 1. IMAGES
     if (isImageType(mimeType)) {
       const imageData = processImageForGroq(buffer, mimeType, fileName);
-      // Return a special format that calling code can detect
       return JSON.stringify({
         type: 'image',
         ...imageData
       });
     }
     
-    // 2. PDFs
-if (isPDFType(mimeType, fileName) || buffer.slice(0, 4).toString() === '%PDF') {
-  return '[PDF upload temporarily disabled. Please convert to DOCX or paste text directly.]';
-}
-
-/* temporarily disabled 
+    // 2. PDFs - TEMPORARILY DISABLED
     if (isPDFType(mimeType, fileName) || buffer.slice(0, 4).toString() === '%PDF') {
-      const text = await extractTextFromPDF(buffer);
-      return truncateText(text, MAX_TEXT_LENGTH, fileName);
+      return '[PDF upload temporarily disabled. Please convert to DOCX or paste text directly. PDF support returning soon.]';
     }
- */
+    
     // 3. DOCX files
     if (isDOCXType(mimeType, fileName)) {
       const text = await extractTextFromDOCX(buffer);
@@ -289,7 +217,7 @@ if (isPDFType(mimeType, fileName) || buffer.slice(0, 4).toString() === '%PDF') {
       return truncateText(text, MAX_TEXT_LENGTH, fileName);
     }
     
-    // 5. Plain text files (TXT, MD, CSV, JSON, code files, etc.)
+    // 5. Plain text files
     if (isTextType(mimeType, fileName)) {
       const text = extractTextFromPlainText(buffer, fileName);
       return truncateText(text, MAX_TEXT_LENGTH, fileName);
@@ -297,20 +225,15 @@ if (isPDFType(mimeType, fileName) || buffer.slice(0, 4).toString() === '%PDF') {
     
     // 6. Unsupported file type
     console.warn(`⚠️  Unsupported file type: ${mimeType} (${fileName})`);
-    return `[Unsupported file type: ${fileName}. Supported formats: PDF, DOCX, PPTX, TXT, MD, CSV, JSON, and images (PNG, JPEG, WEBP, GIF)]`;
+    return `[Unsupported file type: ${fileName}. Supported: DOCX, PPTX, TXT, MD, CSV, JSON, Images]`;
     
   } catch (error) {
     console.error(`❌ File processing error for ${fileName}:`, error);
-    
-    // Return user-friendly error message
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     return `[Error processing ${fileName}: ${errorMsg}]`;
   }
 }
 
-/**
- * Truncate text to fit within Groq's context limits
- */
 function truncateText(text: string, maxLength: number, fileName: string): string {
   if (text.length <= maxLength) {
     return text;
@@ -324,17 +247,13 @@ function truncateText(text: string, maxLength: number, fileName: string): string
 
 // ============= VALIDATION UTILITIES =============
 
-/**
- * Validate file before processing
- */
 export function validateFile(file: { 
   type: string; 
   size: number; 
   name: string 
 }): { valid: boolean; error?: string } {
-  const MAX_SIZE = 20 * 1024 * 1024; // 20MB (Groq's limit)
+  const MAX_SIZE = 20 * 1024 * 1024;
   
-  // Check file size
   if (file.size > MAX_SIZE) {
     return { 
       valid: false, 
@@ -342,7 +261,6 @@ export function validateFile(file: {
     };
   }
   
-  // Check if file type is supported
   const isSupported = 
     isImageType(file.type) ||
     isPDFType(file.type, file.name) ||
@@ -353,16 +271,13 @@ export function validateFile(file: {
   if (!isSupported) {
     return { 
       valid: false, 
-      error: `Unsupported file type: ${file.type}. Supported: PDF, DOCX, PPTX, TXT, MD, CSV, JSON, PNG, JPEG, WEBP, GIF` 
+      error: `Unsupported file type: ${file.type}. Supported: DOCX, PPTX, TXT, MD, CSV, JSON, Images` 
     };
   }
   
   return { valid: true };
 }
 
-/**
- * Get user-friendly file type description
- */
 export function getFileTypeDescription(mimeType: string, fileName: string): string {
   if (isImageType(mimeType)) return 'Image';
   if (isPDFType(mimeType, fileName)) return 'PDF Document';

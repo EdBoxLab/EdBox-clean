@@ -3,7 +3,8 @@
  * File processing utilities optimized for Groq AI
  * Handles: PDF, DOCX, PPTX, TXT, MD, Images
  * Zero native dependencies, Vercel-compatible
- 
+ **/
+
 import { getTextExtractor } from 'office-text-extractor';
 
 // ============= CONSTANTS =============
@@ -18,9 +19,11 @@ export function isImageType(mimeType: string): boolean {
   return SUPPORTED_IMAGE_TYPES.includes(mimeType.toLowerCase());
 }
 
-// 2. PDFs - TEMPORARILY DISABLED FOR LAUNCH
-if (isPDFType(mimeType, fileName) || buffer.slice(0, 4).toString() === '%PDF') {
-  return '[PDF upload temporarily disabled. Please convert to DOCX or paste text directly. PDF support returning very  soon.]';
+export function isPDFType(mimeType: string, fileName?: string): boolean {
+  return (
+    mimeType === 'application/pdf' || 
+    (!!fileName && fileName.toLowerCase().endsWith('.pdf'))
+  );
 }
 
 export function isDOCXType(mimeType: string, fileName?: string): boolean {
@@ -97,6 +100,9 @@ export function bufferToBase64(buffer: Buffer): string {
 /**
  * Extract text from PDF using unpdf (optimized for Groq)
  */
+
+/*
+
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
     const { text, totalPages } = await extractText(buffer, { 
@@ -117,6 +123,8 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
     throw new Error(`PDF extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
+
+*/
 
 /**
  * Extract text from DOCX using mammoth (better quality than office-text-extractor for DOCX)
@@ -259,11 +267,16 @@ export async function processFileContent(
     }
     
     // 2. PDFs
+if (isPDFType(mimeType, fileName) || buffer.slice(0, 4).toString() === '%PDF') {
+  return '[PDF upload temporarily disabled. Please convert to DOCX or paste text directly.]';
+}
+
+/* temporarily disabled 
     if (isPDFType(mimeType, fileName) || buffer.slice(0, 4).toString() === '%PDF') {
       const text = await extractTextFromPDF(buffer);
       return truncateText(text, MAX_TEXT_LENGTH, fileName);
     }
-    
+ */
     // 3. DOCX files
     if (isDOCXType(mimeType, fileName)) {
       const text = await extractTextFromDOCX(buffer);

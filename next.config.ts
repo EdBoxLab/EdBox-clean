@@ -2,11 +2,10 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
-  // Enable React Compiler (Next.js 15+ feature, check if you are on 15 or 16)
-  experimental: {
-    reactCompiler: true,
-  },
-  
+  // MOVED: React Compiler is now a top-level option in Next.js 16
+  // We cast to any to avoid type errors if your @types/next package lags behind the runtime
+  ...({ reactCompiler: true } as any),
+
   productionBrowserSourceMaps: process.env.NODE_ENV === 'development',
 
   // PostHog reverse proxy configuration
@@ -28,7 +27,7 @@ const nextConfig: NextConfig = {
 
   // Merged Webpack Configuration
   webpack: (config, { isServer, dev }) => {
-    // 1. Fix for PDF/Canvas processing on the server (from your first snippet)
+    // 1. Fix for PDF/Canvas processing on the server
     if (isServer) {
       config.externals = config.externals || [];
       config.externals.push({
@@ -38,7 +37,7 @@ const nextConfig: NextConfig = {
       });
     }
 
-    // 2. DevTools and Source Maps (from your second snippet)
+    // 2. DevTools and Source Maps
     if (dev) {
       config.devtool = 'eval-cheap-module-source-map';
     } else {

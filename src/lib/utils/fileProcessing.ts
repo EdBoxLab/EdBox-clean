@@ -83,15 +83,3 @@ export async function processFileContent(
   // Default to text (truncate to MAX_TEXT_LENGTH)
   return buffer.toString('utf-8').slice(0, MAX_TEXT_LENGTH);
 }
-
-/**
- * Explicit named exports ensure the module surface is clear to the compiler/bundler.
- */
-export {
-  bufferToBase64,
-  isImageType,
-  extractTextFromPDF,
-  extractTextFromPPTX,
-  extractTextFromDOCX,
-  processFileContent,
-};

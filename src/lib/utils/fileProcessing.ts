@@ -5,18 +5,20 @@
 
 const MAX_TEXT_LENGTH = 100000;
 
-// === EXPORTED UTILS FOR API ROUTES ===
-
+/**
+ * Utilities
+ */
 export function bufferToBase64(buffer: Buffer): string {
   return buffer.toString('base64');
 }
 
-export function isImageType(mimeType: string): boolean {
-  return ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(mimeType?.toLowerCase());
+export function isImageType(mimeType?: string): boolean {
+  return ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes((mimeType || '').toLowerCase());
 }
 
-// === STUBS TO SATISFY TYPESCRIPT COMPILER ===
-
+/**
+ * Stubs / processors
+ */
 export async function extractTextFromPDF(_buffer: Buffer): Promise<string> {
   return "[PDF Support temporarily disabled for stability. Use DOCX or Text.]";
 }
@@ -35,17 +37,29 @@ export async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
   }
 }
 
-// === MAIN PROCESSING ENGINE ===
-
+/**
+ * Main processing engine
+ */
 export async function processFileContent(
   content: string,
   mimeType: string,
   fileName: string
 ): Promise<string> {
-  // Handle Base64 vs Raw
-  const buffer = content.startsWith('data:') 
-    ? Buffer.from(content.split(',')[1], 'base64') 
-    : Buffer.from(content, 'utf-8');
+  // Determine buffer:
+  // - If data URI: data:<mime>;base64,<data>
+  // - If mimeType is image and content looks like base64, decode as base64
+  // - Otherwise treat content as UTF-8 text
+  let buffer: Buffer;
+
+  if (content.startsWith('data:')) {
+    const parts = content.split(',');
+    buffer = Buffer.from(parts[1] || '', 'base64');
+  } else if (isImageType(mimeType) && /^[A-Za-z0-9+/=\s]+$/.test(content)) {
+    // Heuristic: looks like base64 (may contain newlines/spaces)
+    buffer = Buffer.from(content.replace(/\s+/g, ''), 'base64');
+  } else {
+    buffer = Buffer.from(content, 'utf-8');
+  }
 
   if (isImageType(mimeType)) {
     return JSON.stringify({
@@ -56,7 +70,7 @@ export async function processFileContent(
     });
   }
 
-  const name = fileName.toLowerCase();
+  const name = (fileName || '').toLowerCase();
 
   if (name.endsWith('.docx')) {
     return await extractTextFromDOCX(buffer);
@@ -66,6 +80,18 @@ export async function processFileContent(
     return `[File ${fileName} is currently locked. Use DOCX or TXT.]`;
   }
 
-  // Default to text
+  // Default to text (truncate to MAX_TEXT_LENGTH)
   return buffer.toString('utf-8').slice(0, MAX_TEXT_LENGTH);
 }
+
+/**
+ * Explicit named exports ensure the module surface is clear to the compiler/bundler.
+ */
+export {
+  bufferToBase64,
+  isImageType,
+  extractTextFromPDF,
+  extractTextFromPPTX,
+  extractTextFromDOCX,
+  processFileContent,
+};

@@ -54,7 +54,7 @@ export async function sendReengagementEmail(
 ) {
   try {
     const { data, error } = await resend.emails.send({
-      from: 'Inioluwa at EdBox <ini@edbox.app>',
+      from: 'Inioluwa at EdBox <inioluwa@edbox.app>',
       to: to,
       subject: 'Your learning streak is waiting',
       html: `

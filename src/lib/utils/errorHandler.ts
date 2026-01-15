@@ -11,7 +11,7 @@ export interface ErrorLog {
 
 const SUPPORT_CONTACTS = {
   whatsapp: ['+2348167906554', '+2349134139043', '+2349057170553'],
-  emails: ['support@edbox.app', 'inioluwa@edbox.app, 'malik@edbox.app']
+  emails: ['support@edbox.app', 'inioluwa@edbox.app', 'malik@edbox.app']
 };
 
 export async function logErrorToSupport(errorLog: ErrorLog): Promise<void> {

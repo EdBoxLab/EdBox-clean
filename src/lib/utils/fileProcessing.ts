@@ -1,131 +1,89 @@
-import { getTextExtractor } from 'office-text-extractor';
-import pdf from 'pdf-parse';
+/**
+ * EdBox File Processing - STABLE LAUNCH VERSION
+ * No Canvas, No DOMMatrix, No Bullshit.
+ */
+
+const MAX_TEXT_LENGTH = 100000;
 
 /**
- * Converts a Buffer to a base64 string
+ * Utilities
  */
 export function bufferToBase64(buffer: Buffer): string {
-    return buffer.toString('base64');
+  return buffer.toString('base64');
+}
+
+export function isImageType(mimeType?: string): boolean {
+  return ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes((mimeType || '').toLowerCase());
+}
+
+export function isPDFType(mimeType?: string): boolean {
+  return (mimeType || '').toLowerCase() === 'application/pdf';
 }
 
 /**
- * Extracts text from a PPTX file buffer
+ * Stubs / processors
  */
-export async function extractTextFromPPTX(buffer: Buffer): Promise<string> {
-    try {
-        const extractor = getTextExtractor();
-        const text = await extractor.extractText({ input: buffer, type: 'buffer' });
-        return text;
-    } catch (error) {
-        console.error('Error extracting text from PPTX:', error);
-        throw new Error('Failed to extract text from PowerPoint file');
-    }
+export async function extractTextFromPDF(_buffer: Buffer): Promise<string> {
+  return "[PDF Support temporarily disabled for stability. Use DOCX or Text.]";
+}
+
+export async function extractTextFromPPTX(_buffer: Buffer): Promise<string> {
+  return "[PPTX Support coming soon. Please convert to DOCX.]";
+}
+
+export async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
+  try {
+    const mammoth = await import('mammoth');
+    const { value } = await mammoth.extractRawText({ buffer });
+    return value.replace(/\s+/g, ' ').trim();
+  } catch (e) {
+    return "[Error processing Word Document]";
+  }
 }
 
 /**
- * Extracts text from a PDF file buffer
+ * Main processing engine
  */
-export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
-    try {
-        const data = await pdf(buffer);
-        return data.text;
-    } catch (error) {
-        console.error('Error extracting text from PDF:', error);
-        throw new Error('Failed to extract text from PDF file');
-    }
-}
+export async function processFileContent(
+  content: string,
+  mimeType: string,
+  fileName: string
+): Promise<string> {
+  // Determine buffer:
+  // - If data URI: data:<mime>;base64,<data>
+  // - If mimeType is image and content looks like base64, decode as base64
+  // - Otherwise treat content as UTF-8 text
+  let buffer: Buffer;
 
-/**
- * Determines if a mime type is an image supported by Groq/Gemini
- */
-export function isImageType(mimeType: string): boolean {
-    const imageTypes = [
-        'image/png',
-        'image/jpeg',
-        'image/webp',
-    ];
-    return imageTypes.includes(mimeType);
-}
+  if (content.startsWith('data:')) {
+    const parts = content.split(',');
+    buffer = Buffer.from(parts[1] || '', 'base64');
+  } else if (isImageType(mimeType) && /^[A-Za-z0-9+/=\s]+$/.test(content)) {
+    // Heuristic: looks like base64 (may contain newlines/spaces)
+    buffer = Buffer.from(content.replace(/\s+/g, ''), 'base64');
+  } else {
+    buffer = Buffer.from(content, 'utf-8');
+  }
 
-/**
- * Determines if a mime type is a PDF
- */
-export function isPDFType(mimeType: string, fileName?: string): boolean {
-    return mimeType === 'application/pdf' || (!!fileName && fileName.toLowerCase().endsWith('.pdf'));
-}
+  if (isImageType(mimeType)) {
+    return JSON.stringify({
+      type: 'image',
+      base64: buffer.toString('base64'),
+      mimeType,
+      fileName
+    });
+  }
 
-/**
- * Determines if a mime type is a PowerPoint file
- */
-export function isPPTXType(mimeType: string, fileName?: string): boolean {
-    const types = [
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        'application/vnd.ms-powerpoint'
-    ];
-    return types.includes(mimeType) || (!!fileName && (fileName.toLowerCase().endsWith('.pptx') || fileName.toLowerCase().endsWith('.ppt')));
-}
+  const name = (fileName || '').toLowerCase();
 
-/**
- * Processes a base64 string or text content based on mime type
- */
-export async function processFileContent(content: string, mimeType: string, fileName: string): Promise<string> {
-    // If it's already plain text (or we don't have a mime type that suggests it's binary)
-    if (mimeType.startsWith('text/') || fileName.endsWith('.txt') || fileName.endsWith('.md') || fileName.endsWith('.csv')) {
-        // Content might be base64 or plain text depending on how the client sent it
-        if (content.startsWith('data:')) {
-            const base64 = content.split(',')[1];
-            return Buffer.from(base64, 'base64').toString('utf-8');
-        }
-        
-        // Safety: check if it looks like raw PDF binary even if mislabeled
-        if (content.startsWith('%PDF')) {
-            return await extractTextFromPDF(Buffer.from(content, 'binary'));
-        }
-        
-        return content;
-    }
+  if (name.endsWith('.docx')) {
+    return await extractTextFromDOCX(buffer);
+  }
 
-    let buffer: Buffer;
-    if (content.startsWith('data:')) {
-        const base64 = content.split(',')[1];
-        buffer = Buffer.from(base64, 'base64');
-    } else if (content.startsWith('%PDF')) {
-        // If it starts with %PDF, it's raw PDF binary content already
-        buffer = Buffer.from(content, 'binary');
-    } else {
-        // Assume it's a raw base64 string if it doesn't have the data: prefix but isn't text
-        try {
-            // Check if it's likely base64 (only alphanumeric, +, /, and =)
-            const isLikelyBase64 = /^[A-Za-z0-9+/= \n\r]+$/.test(content.slice(0, 200));
-            if (isLikelyBase64 && !content.startsWith('%PDF')) {
-                buffer = Buffer.from(content.replace(/[\n\r\s]/g, ''), 'base64');
-            } else {
-                buffer = Buffer.from(content, 'binary');
-            }
-        } catch {
-            return "[Error: Could not process file content]";
-        }
-    }
+  if (name.endsWith('.pdf') || name.endsWith('.pptx')) {
+    return `[File ${fileName} is currently locked. Use DOCX or TXT.]`;
+  }
 
-    // Secondary check for PDF content in buffer
-    if (buffer.slice(0, 4).toString() === '%PDF' || isPDFType(mimeType, fileName)) {
-        return await extractTextFromPDF(buffer);
-    }
-
-    if (isPPTXType(mimeType, fileName)) {
-        return await extractTextFromPPTX(buffer);
-    }
-
-    // For images, we can't extract text easily here without OCR
-    if (isImageType(mimeType)) {
-        return `[Image File: ${fileName}]`;
-    }
-
-    // Final fallback: if it's small and looks like text, return it, otherwise empty
-    const textSample = buffer.slice(0, 100).toString('utf-8');
-    if (/^[ -~\n\r\t]*$/.test(textSample)) {
-        return buffer.toString('utf-8');
-    }
-
-    return "[Binary Content: " + fileName + "]"; 
+  // Default to text (truncate to MAX_TEXT_LENGTH)
+  return buffer.toString('utf-8').slice(0, MAX_TEXT_LENGTH);
 }

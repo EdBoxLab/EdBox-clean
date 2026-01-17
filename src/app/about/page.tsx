@@ -25,7 +25,7 @@ function AboutPageStructuredData() {
             {
                 "@type": "Person",
                 "name": "Malik",
-                "jobTitle": "Co-Founder & CTO",
+                "jobTitle": "Co-Founder ",
                 "description": "Turned frustration with passive learning into active AI-powered education"
             },
             {

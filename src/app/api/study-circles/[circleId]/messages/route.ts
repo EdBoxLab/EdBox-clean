@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { createServerSupabaseClient } from '@/lib/supabase/admin';
+import { sendStudyCircleNotification } from '@/lib/email/resend';
 
 // GET - Get all messages for a circle
 export async function GET(
@@ -114,14 +115,13 @@ export async function GET(
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }
-
 // POST - Post a new message to a circle
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ circleId: string }> }
 ) {
-  const supabaseAuth = await createSupabaseServerClient();  // For auth
-  const supabaseAdmin = createServerSupabaseClient();       // For queries (bypasses RLS)
+  const supabaseAuth = await createSupabaseServerClient();
+  const supabaseAdmin = createServerSupabaseClient();
 
   const { circleId } = await context.params;
   const numericCircleId = Number(circleId);
@@ -132,74 +132,89 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify membership using admin client
-    const { data: memberCheck, error: memberError } = await supabaseAdmin
+    // 1. Verify membership
+    const { data: memberCheck } = await supabaseAdmin
       .from('circle_members')
       .select('user_id')
       .eq('circle_id', numericCircleId)
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (memberError) {
-      console.error('Member check error:', memberError);
-      return NextResponse.json({ error: 'Failed to verify membership' }, { status: 500 });
-    }
-
-    if (!memberCheck) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    if (!memberCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const { content, username, shared_content, shared_content_ids, mentions } = await request.json();
 
-    if (!content && !shared_content && !shared_content_ids) {
-      return NextResponse.json({ error: 'Message content or shared content is required' }, { status: 400 });
-    }
-
-    if (!username) {
-      return NextResponse.json({ error: 'Username is required' }, { status: 400 });
-    }
-
-    // Use admin client for insert
+    // 2. Insert the message
     const messageData: any = {
       content: content || '',
       user_id: user.id,
       circle_id: numericCircleId,
       username
     };
+    if (shared_content_ids) messageData.shared_content_ids = shared_content_ids;
+    if (shared_content) messageData.shared_content = shared_content;
+    if (mentions) messageData.mentions = mentions;
 
-    // Add shared content ids if provided
-    if (shared_content_ids) {
-      messageData.shared_content_ids = shared_content_ids;
-    }
-
-    // Add legacy shared content if provided (for backward compat if needed, though we prefer IDs)
-    if (shared_content) {
-      messageData.shared_content = shared_content;
-    }
-
-    // Add mentions if provided
-    if (mentions) {
-      messageData.mentions = mentions;
-    }
-
-    const { data, error } = await supabaseAdmin
+    const { data: newMessage, error: insertError } = await supabaseAdmin
       .from('messages')
       .insert([messageData])
       .select()
       .single();
 
-    if (error) {
-      console.error('Insert message error:', error);
-      throw error;
-    }
+    if (insertError) throw insertError;
 
-    return NextResponse.json(data, { status: 201 });
+    // --- EMAIL NOTIFICATION LOGIC ---
+    // We run this in the background (no 'await' on the whole block or move to a helper)
+    (async () => {
+      try {
+        // 3. Get total message count for this circle
+        const { count: totalMessages } = await supabaseAdmin
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('circle_id', numericCircleId);
+
+        // 4. Trigger email every 5 messages
+        if (totalMessages && totalMessages % 5 === 0) {
+          // Get circle name
+          const { data: circle } = await supabaseAdmin
+            .from('circles')
+            .select('name')
+            .eq('id', numericCircleId)
+            .single();
+
+          // Get all members except the sender to notify them
+          const { data: members } = await supabaseAdmin
+            .from('circle_members')
+            .select('user_id, profiles(email, full_name)')
+            .eq('circle_id', numericCircleId)
+            .neq('user_id', user.id);
+
+          if (members && circle) {
+            for (const member of members) {
+              const profile = (member.profiles as any);
+              if (profile?.email) {
+                await sendStudyCircleNotification(
+                  profile.email,
+                  profile.full_name || 'Scholar',
+                  circle.name,
+                  totalMessages
+                );
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Email trigger background error:', err);
+      }
+    })();
+    // --------------------------------
+
+    return NextResponse.json(newMessage, { status: 201 });
   } catch (error) {
     console.error('Post message error:', error);
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }
-
 // DELETE - Delete a message (user can only delete their own messages)
 export async function DELETE(
   request: NextRequest,

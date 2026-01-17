@@ -22,7 +22,7 @@ export default function LoginPage() {
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) router.push('/auth/callback');
+      if (user) router.push('/dashboard');
     };
     checkUser();
   }, [router, supabase]);
@@ -52,7 +52,7 @@ export default function LoginPage() {
     if (data.user) {
       posthog.identify(data.user.id, { email: data.user.email });
       posthog.capture('user_logged_in', { method: 'email' });
-      router.push('/auth/callback');
+      router.push('/dashboard');
     }
   };
 
@@ -204,22 +204,22 @@ export default function LoginPage() {
             </Button>
           </motion.form>
 
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="text-center text-sm text-gray-500 space-y-2"
-            >
-              <Link href="/forgot-password" className="block text-[#8B5CF6] hover:text-[#A78BFA] font-medium transition-colors">
-                Forgot your password?
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="text-center text-sm text-gray-500 space-y-2"
+          >
+            <Link href="/forgot-password" className="block text-[#8B5CF6] hover:text-[#A78BFA] font-medium transition-colors">
+              Forgot your password?
+            </Link>
+            <p>
+              Don't have an account?{' '}
+              <Link href="/signup" className="text-[#8B5CF6] hover:text-[#A78BFA] font-medium transition-colors">
+                Sign up
               </Link>
-              <p>
-                Don't have an account?{' '}
-                <Link href="/signup" className="text-[#8B5CF6] hover:text-[#A78BFA] font-medium transition-colors">
-                  Sign up
-                </Link>
-              </p>
-            </motion.div>
+            </p>
+          </motion.div>
         </div>
       </div>
     </div>

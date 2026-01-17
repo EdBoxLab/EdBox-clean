@@ -12,6 +12,19 @@ function AuthCallbackContent() {
 
   useEffect(() => {
     const handleAuth = async () => {
+      const code = searchParams.get('code');
+
+      // If no code is present, check if we already have a session
+      if (!code) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          router.replace('/dashboard');
+        } else {
+          router.replace('/login');
+        }
+        return;
+      }
+
       const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href);
 
       if (error) {

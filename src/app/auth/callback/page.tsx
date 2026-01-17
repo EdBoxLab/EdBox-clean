@@ -1,31 +1,48 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { Suspense } from 'react';
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const supabase = createSupabaseBrowserClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     const handleAuth = async () => {
-      // Exchange code for session
-      await supabase.auth.exchangeCodeForSession(window.location.href);
+      const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href);
 
-      // Check user
+      if (error) {
+        router.replace('/login');
+        return;
+      }
+
+      const type = searchParams.get('type');
+      if (type === 'recovery') {
+        router.replace('/reset-password');
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // 👇 Redirect to your actual homepage
         router.replace('/dashboard');
-        // or router.replace('/home'); if homepage is app/home/page.tsx
       } else {
         router.replace('/login');
       }
     };
 
     handleAuth();
-  }, [router, supabase]);
+  }, [router, supabase, searchParams]);
 
-  return <p>Confirming your account…</p>;
+  return <p className="text-center mt-20 text-gray-400">Confirming your account...</p>;
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={<p className="text-center mt-20 text-gray-400">Loading...</p>}>
+      <AuthCallbackContent />
+    </Suspense>
+  );
 }

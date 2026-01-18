@@ -88,9 +88,11 @@ setIsGenerating(false);
     const fetchNotes = async () => {
       try {
         const res = await fetch('/api/notes');
-        if (!res.ok) throw new Error();
-        const data: Note[] = await res.json();
-        if (active) setNotes(data);
+if (!res.ok) throw new Error();
+const data = await res.json();
+// Handle both array and object response
+const notesData = Array.isArray(data) ? data : (data.notes || []);
+if (active) setNotes(notesData);
       } catch {
         if (active) setError('Failed to load notes');
       } finally {

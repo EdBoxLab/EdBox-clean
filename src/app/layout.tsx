@@ -2,7 +2,6 @@ import '@/lib/polyfills';
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import Script from "next/script";
 import "./globals.css";
 import { seoConfig } from "@/lib/seo/config";
 import { OrganizationSchema, WebsiteSchema, SoftwareApplicationSchema } from "@/lib/seo/structured-data";
@@ -99,9 +98,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* PWA Theme Colors - EdBox Brand */}
-        <meta name="theme-color" content={EDBOX_BRAND.colors.primary} media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content={EDBOX_BRAND.colors.bgDark} media="(prefers-color-scheme: dark)" />
+        {/* PWA Theme Colors - Dark Mode Only */}
+        <meta name="theme-color" content={EDBOX_BRAND.colors.bgDark} />
         
         {/* Apple PWA - Enhanced */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -113,57 +111,25 @@ export default function RootLayout({
         <link rel="icon" type="image/png" href="/EdBoxLogo.png" />
         <link rel="icon" type="image/x-icon" href="/logo_new.ico" />
         
-          {/* Verification */}
-          <meta name="google-site-verification" content="YzGOxq7ul48yIOan9gd3sigS4kTp-9aiimYHo01po0s" />
-          
-            {/* AdSense - For Verification */}
-            <script
-              async
-              src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7134321558578802"
-              crossOrigin="anonymous"
-            />
+        {/* Verification */}
+        <meta name="google-site-verification" content="YzGOxq7ul48yIOan9gd3sigS4kTp-9aiimYHo01po0s" />
+        
+        {/* AdSense - For Verification */}
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7134321558578802"
+          crossOrigin="anonymous"
+        />
 
-            
-
-          {/* Structured Data - EdBox Brand */}
-          <OrganizationSchema />
+        {/* Structured Data - EdBox Brand */}
+        <OrganizationSchema />
         <WebsiteSchema />
         <SoftwareApplicationSchema />
-        
-        {/* Dark Mode Flash Prevention - EdBox Branded */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  const root = document.documentElement;
-                  
-                  if (prefersDark) {
-                    root.classList.add('dark');
-                    root.style.backgroundColor = '${EDBOX_BRAND.colors.bgDark}';
-                    root.style.color = '#FFFFFF';
-                  } else {
-                    root.classList.remove('dark');
-                    root.style.backgroundColor = '${EDBOX_BRAND.colors.bgLight}';
-                    root.style.color = '#0F172A';
-                  }
-                  
-                  // Dynamic theme-color update
-                  const meta = document.querySelector('meta[name="theme-color"]');
-                  if (meta) {
-                    meta.setAttribute('content', prefersDark ? '${EDBOX_BRAND.colors.bgDark}' : '${EDBOX_BRAND.colors.primary}');
-                  }
-                } catch (e) {}
-              })();
-            `,
-          }}
-        />
       </head>
-        <body className={`${inter.variable} font-primary antialiased bg-white dark:bg-slate-900 text-slate-900 dark:text-white transition-colors duration-200`}>
-          <ClientLayout>{children}</ClientLayout>
-          <Analytics />
-        </body>
+      <body className={`${inter.variable} font-primary antialiased bg-slate-900 text-white`}>
+        <ClientLayout>{children}</ClientLayout>
+        <Analytics />
+      </body>
     </html>
   );
 }

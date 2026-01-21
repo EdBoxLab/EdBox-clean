@@ -55,7 +55,7 @@ export default function SignUpPage() {
 
       if (signUpError) throw signUpError;
 
-      if (data.user) {
+      /*if (data.user) {
         posthog.identify(data.user.id, { email, name: fullName });
         posthog.capture('user_signed_up', { method: 'email' });
         
@@ -63,7 +63,7 @@ export default function SignUpPage() {
         
         // If email confirmation is disabled in Supabase, we can redirect immediately:
         // router.push('/onboarding');
-      }
+      }*/
     } catch (err: any) {
       setError(err.message);
     } finally {

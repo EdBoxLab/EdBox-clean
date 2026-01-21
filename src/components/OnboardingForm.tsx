@@ -16,7 +16,10 @@ export default function OnboardingForm({ onComplete }: { onComplete?: (profile: 
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // 1. Added full_name to state
   const [formData, setFormData] = useState({
+    full_name: '', 
     country: '',
     education: '',
     age: '',
@@ -57,6 +60,14 @@ export default function OnboardingForm({ onComplete }: { onComplete?: (profile: 
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+
+      // 2. Pre-fill name if it exists in metadata (e.g. from Google)
+      if (user) {
+        const metaName = user.user_metadata?.full_name || user.user_metadata?.name;
+        if (metaName) {
+          setFormData(prev => ({ ...prev, full_name: metaName }));
+        }
+      }
     };
     fetchUser();
   }, [supabase]);
@@ -78,7 +89,6 @@ export default function OnboardingForm({ onComplete }: { onComplete?: (profile: 
   };
 
   const handleGoalSelect = (selectedGoal: string) => {
-    // ✅ FIXED: Just update the state, don't auto-submit
     setFormData(prev => ({ ...prev, goal: selectedGoal }));
   };
 
@@ -102,7 +112,9 @@ export default function OnboardingForm({ onComplete }: { onComplete?: (profile: 
         .eq('id', user.id)
         .single();
 
+      // 3. Prepare data INCLUDING full_name
       const profileData = {
+        full_name: formData.full_name, // Fixes the NOT NULL constraint
         country: formData.country,
         education: formData.education,
         age: parseInt(formData.age, 10),
@@ -120,58 +132,59 @@ export default function OnboardingForm({ onComplete }: { onComplete?: (profile: 
           .eq('id', user.id)
           .select();
       } else {
+        // Safe insert handling
         result = await supabase
           .from('profiles')
           .insert({
             id: user.id,
+            email: user.email, // Good practice to include email
             ...profileData
           })
           .select();
       }
 
-if (result.error) {
-          console.error('Database error:', result.error);
-          alert(`Failed to save profile: ${result.error.message}`);
-          setIsSubmitting(false);
-        } else {
-            await supabase
-              .from('user_preferences')
-              .upsert({
-                id: user.id,
-                interests: formData.interests,
-                learning_style: 'visual',
-                onboarded: true,
-                updated_at: new Date().toISOString()
-              }, { onConflict: 'id' });
-
-          // Track onboarding completed event
-          posthog.capture('onboarding_completed', {
-            country: formData.country,
-            education: formData.education,
-            age: parseInt(formData.age, 10),
+      if (result.error) {
+        console.error('Database error:', result.error);
+        alert(`Failed to save profile: ${result.error.message}`);
+        setIsSubmitting(false);
+      } else {
+        await supabase
+          .from('user_preferences')
+          .upsert({
+            id: user.id,
             interests: formData.interests,
-            goal: formData.goal,
-          });
+            learning_style: 'visual',
+            onboarded: true,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'id' });
 
-            // Update user properties in PostHog
-            posthog.identify(user.id, {
-              country: formData.country,
-              education: formData.education,
-              interests: formData.interests,
-              goal: formData.goal,
-            });
+        posthog.capture('onboarding_completed', {
+          full_name: formData.full_name,
+          country: formData.country,
+          education: formData.education,
+          age: parseInt(formData.age, 10),
+          interests: formData.interests,
+          goal: formData.goal,
+        });
 
-            if (onComplete) {
-              onComplete({ ...profileData, id: user.id });
-            } else {
-              router.push('/');
-              router.refresh();
-              // Fallback to hard refresh if navigation doesn't trigger update
-              setTimeout(() => {
-                window.location.href = '/';
-              }, 500);
-            }
-          }
+        posthog.identify(user.id, {
+          name: formData.full_name, // Update PostHog profile too
+          country: formData.country,
+          education: formData.education,
+          interests: formData.interests,
+          goal: formData.goal,
+        });
+
+        if (onComplete) {
+          onComplete({ ...profileData, id: user.id });
+        } else {
+          router.push('/');
+          router.refresh();
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 500);
+        }
+      }
     } catch (err) {
       console.error('Unexpected error:', err);
       alert('An unexpected error occurred. Please try again.');
@@ -182,7 +195,14 @@ if (result.error) {
   const isStepValid = () => {
     switch (step) {
       case 1:
-        return formData.country.trim() !== '' && formData.age !== '' && parseInt(formData.age) >= 10 && parseInt(formData.age) <= 100;
+        // 4. Validate name is present and sane length
+        return (
+          formData.full_name.trim().length > 1 &&
+          formData.country.trim() !== '' && 
+          formData.age !== '' && 
+          parseInt(formData.age) >= 10 && 
+          parseInt(formData.age) <= 100
+        );
       case 2:
         return formData.education !== '';
       case 3:
@@ -195,21 +215,17 @@ if (result.error) {
   };
 
   return (
-    // ✅ FIXED: Better scroll handling for mobile
     <div className="fixed inset-0 bg-gradient-to-br from-zinc-950 via-indigo-950 to-zinc-950 flex flex-col items-center p-4 overflow-y-auto overscroll-contain scroll-smooth z-[100]">
-      {/* Animated background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
         <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-indigo-500/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
 
-      {/* ✅ FIXED: Proper scroll container structure - removed max-h and added my-auto for centering */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="relative w-full max-w-2xl bg-zinc-900/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-zinc-800/50 flex flex-col my-auto shrink-0 mb-8"
       >
-        {/* Progress bar - Fixed position */}
         <div className="h-1.5 bg-zinc-800 flex-shrink-0">
           <motion.div
             className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
@@ -219,10 +235,8 @@ if (result.error) {
           />
         </div>
 
-        {/* ✅ FIXED: Scrollable content area */}
         <div className="overflow-y-auto flex-1 overscroll-contain">
           <div className="p-6 sm:p-8 md:p-12">
-            {/* Header */}
             <div className="text-center mb-8">
               <motion.div
                 initial={{ scale: 0 }}
@@ -239,7 +253,6 @@ if (result.error) {
               </p>
             </div>
 
-            {/* Step indicators */}
             <div className="flex justify-center gap-2 mb-8">
               {[1, 2, 3, 4].map((s) => (
                 <div
@@ -253,7 +266,6 @@ if (result.error) {
               ))}
             </div>
 
-            {/* Step content */}
             <AnimatePresence mode="wait">
               <motion.div
                 key={step}
@@ -265,61 +277,63 @@ if (result.error) {
               >
                 {step === 1 && (
                   <div className="space-y-6">
-                      <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-3">
-                          <MapPin className="w-4 h-4 text-indigo-400" />
-                          Where are you from?
-                        </label>
-                        <Select
-                          options={countryOptions}
-                          value={countryOptions.find((option: { label: string; value: string }) => option.label === formData.country)}
-                          onChange={(value) => setFormData({ ...formData, country: value?.label || '' })}
-                          placeholder="Select your country"
-                          classNamePrefix="react-select"
-                          styles={{
-                            control: (base) => ({
-                              ...base,
-                              backgroundColor: 'rgba(39, 39, 42, 0.5)',
-                              borderColor: '#3f3f46',
-                              borderRadius: '0.75rem',
-                              padding: '2px',
-                              color: 'white',
-                              boxShadow: 'none',
-                              '&:hover': {
-                                borderColor: '#52525b'
-                              }
-                            }),
-                            menu: (base) => ({
-                              ...base,
-                              backgroundColor: '#18181b',
-                              border: '1px solid #3f3f46',
-                              borderRadius: '0.75rem',
-                              zIndex: 100
-                            }),
-                            option: (base, state) => ({
-                              ...base,
-                              backgroundColor: state.isFocused ? '#27272a' : 'transparent',
-                              color: 'white',
-                              cursor: 'pointer',
-                              '&:active': {
-                                backgroundColor: '#3f3f46'
-                              }
-                            }),
-                            singleValue: (base) => ({
-                              ...base,
-                              color: 'white'
-                            }),
-                            input: (base) => ({
-                              ...base,
-                              color: 'white'
-                            }),
-                            placeholder: (base) => ({
-                              ...base,
-                              color: '#71717a'
-                            })
-                          }}
-                        />
-                      </div>
+                    {/* 5. NEW: Full Name Input Field */}
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-3">
+                        <User className="w-4 h-4 text-indigo-400" />
+                        What should we call you?
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.full_name}
+                        onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                        placeholder="Your full name"
+                        className="w-full bg-zinc-800/50 border border-zinc-700 rounded-xl px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-3">
+                        <MapPin className="w-4 h-4 text-indigo-400" />
+                        Where are you from?
+                      </label>
+                      <Select
+                        options={countryOptions}
+                        value={countryOptions.find((option: { label: string; value: string }) => option.label === formData.country)}
+                        onChange={(value) => setFormData({ ...formData, country: value?.label || '' })}
+                        placeholder="Select your country"
+                        classNamePrefix="react-select"
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            backgroundColor: 'rgba(39, 39, 42, 0.5)',
+                            borderColor: '#3f3f46',
+                            borderRadius: '0.75rem',
+                            padding: '2px',
+                            color: 'white',
+                            boxShadow: 'none',
+                            '&:hover': { borderColor: '#52525b' }
+                          }),
+                          menu: (base) => ({
+                            ...base,
+                            backgroundColor: '#18181b',
+                            border: '1px solid #3f3f46',
+                            borderRadius: '0.75rem',
+                            zIndex: 100
+                          }),
+                          option: (base, state) => ({
+                            ...base,
+                            backgroundColor: state.isFocused ? '#27272a' : 'transparent',
+                            color: 'white',
+                            cursor: 'pointer',
+                            '&:active': { backgroundColor: '#3f3f46' }
+                          }),
+                          singleValue: (base) => ({ ...base, color: 'white' }),
+                          input: (base) => ({ ...base, color: 'white' }),
+                          placeholder: (base) => ({ ...base, color: '#71717a' })
+                        }}
+                      />
+                    </div>
                     <div>
                       <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-3">
                         <Calendar className="w-4 h-4 text-indigo-400" />
@@ -439,7 +453,6 @@ if (result.error) {
           </div>
         </div>
 
-        {/* ✅ FIXED: Navigation buttons - Fixed at bottom */}
         <div className="border-t border-zinc-800 p-4 sm:p-6 bg-zinc-900/50 flex-shrink-0">
           <div className="flex gap-3">
             {step > 1 && (

@@ -19,7 +19,7 @@
     "@octokit/rest": "^22.0.1",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.15",
-    "unpdf": "^1.4.0",  "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-toast": "^1.2.15",
@@ -37,7 +37,10 @@
     "firebase": "^12.6.0",
     "framer-motion": "^12.23.24",
     "groq-sdk": "^0.37.0",
+    "llama-cloud-services": "^0.5.3",
+    "llamaindex": "^0.12.1",
     "lucide-react": "^0.554.0",
+    "mammoth": "^1.11.0",
     "marked": "^17.0.0",
     "next": "^16.0.10",
     "office-text-extractor": "^4.0.0",
@@ -53,6 +56,7 @@
     "recharts": "^3.4.1",
     "resend": "^6.7.0",
     "tailwind-merge": "^3.4.0",
+    "unpdf": "^1.4.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

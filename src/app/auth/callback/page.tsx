@@ -10,44 +10,46 @@ function AuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  useEffect(() => {
-    const handleAuth = async () => {
-      const code = searchParams.get('code');
-
-      // If no code is present, check if we already have a session
-      if (!code) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
+    useEffect(() => {
+      const handleAuth = async () => {
+        const code = searchParams.get('code');
+  
+        // If no code is present, check if we already have a session
+        if (!code) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            router.replace('/dashboard');
+          } else {
+            // Avoid loop if already at login
+            router.replace('/login');
+          }
+          return;
+        }
+  
+        try {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+    
+          if (error) {
+            console.error('Auth error:', error);
+            router.replace('/login?error=auth_failed');
+            return;
+          }
+    
+          const type = searchParams.get('type');
+          if (type === 'recovery') {
+            router.replace('/reset-password');
+            return;
+          }
+    
           router.replace('/dashboard');
-        } else {
+        } catch (err) {
+          console.error('Unexpected auth error:', err);
           router.replace('/login');
         }
-        return;
-      }
-
-      const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href);
-
-      if (error) {
-        router.replace('/login');
-        return;
-      }
-
-      const type = searchParams.get('type');
-      if (type === 'recovery') {
-        router.replace('/reset-password');
-        return;
-      }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        router.replace('/dashboard');
-      } else {
-        router.replace('/login');
-      }
-    };
-
-    handleAuth();
-  }, [router, supabase, searchParams]);
+      };
+  
+      handleAuth();
+    }, [router, supabase, searchParams]);
 
   return <p className="text-center mt-20 text-gray-400">Confirming your account...</p>;
 }

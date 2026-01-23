@@ -64,6 +64,31 @@ const GROQ_API_KEYS = [
   process.env.GROQ_API_KEY_38,
 ].filter(Boolean) as string[];
 
+// src/lib/ai-providers.ts
+
+/**
+ * STRATEGY: Round-Robin Key Rotation
+ * REASON: Prevents rate-limiting during heavy "Boardroom Level" usage.
+ */
+const LLAMA_CLOUD_KEYS = [
+  process.env.LLAMA_CLOUD_KEY_1,
+  process.env.LLAMA_CLOUD_KEY_2,
+  process.env.LLAMA_CLOUD_KEY_3,
+  process.env.LLAMA_CLOUD_KEY_4,
+  process.env.LLAMA_CLOUD_KEY_5,
+].filter(Boolean) as string[];
+
+let currentKeyIndex = 0;
+
+export const getLlamaCloudKey = () => {
+  if (LLAMA_CLOUD_KEYS.length === 0) {
+    throw new Error("CRITICAL: No LlamaCloud Keys found in environment variables.");
+  }
+  const key = LLAMA_CLOUD_KEYS[currentKeyIndex];
+  // Rotate to next key for the next request
+  currentKeyIndex = (currentKeyIndex + 1) % LLAMA_CLOUD_KEYS.length;
+  return key;
+};
 // ============= KEY ROTATION =============
 
 let geminiKeyIndex = 0;

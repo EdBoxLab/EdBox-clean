@@ -164,7 +164,7 @@ export default function NotesPage() {
     };
 
     return (
-        <div className="h-[calc(100vh-64px-5rem)] lg:h-[calc(100vh-64px)] overflow-hidden bg-[#09090b] text-zinc-100 flex relative -mb-20 lg:mb-0">
+        <div className="h-[calc(100vh-64px)] lg:h-screen overflow-hidden bg-background text-zinc-100 flex relative">
             
             <AnimatePresence mode="wait">
                 {(!isMobile || mobileView === 'list') && (
@@ -292,10 +292,10 @@ export default function NotesPage() {
                         initial={isMobile ? { x: 300, opacity: 0 } : false}
                         animate={{ x: 0, opacity: 1 }}
                         exit={{ x: 300, opacity: 0 }}
-                        className="flex-1 flex flex-col h-full bg-[#09090b] relative z-10"
+                        className="flex-1 flex flex-col h-full bg-background relative z-10"
                     >
                         {/* Editor Header */}
-                        <div className="h-20 md:h-24 border-b border-zinc-800/50 flex items-center justify-between px-4 md:px-10 bg-[#09090b]/80 backdrop-blur-md sticky top-0">
+                        <div className="h-20 md:h-24 border-b border-zinc-800/50 flex items-center justify-between px-4 md:px-10 bg-background/80 backdrop-blur-md sticky top-0">
                             <div className="flex items-center gap-3 md:gap-6 flex-1 min-w-0">
                                 {isMobile && (
                                     <button

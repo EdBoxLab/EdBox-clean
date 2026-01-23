@@ -96,7 +96,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         {/* PWA Theme Colors - Dark Mode Only */}
         <meta name="theme-color" content={EDBOX_BRAND.colors.bgDark} />

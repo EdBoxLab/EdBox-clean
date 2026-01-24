@@ -130,6 +130,23 @@ export interface GenerateResult {
 }
 
 /**
+ * Generate embedding for a given text
+ */
+export async function embedText(text: string): Promise<number[]> {
+  try {
+    const { GoogleGenAI } = await import("@google/genai");
+    const ai = new GoogleGenAI({ apiKey: getNextGeminiKey() });
+    const model = ai.getGenerativeModel({ model: "embedding-001" });
+    
+    const result = await model.embedContent(text);
+    return result.embedding.values;
+  } catch (error) {
+    console.error('❌ Embedding failed:', error);
+    throw error;
+  }
+}
+
+/**
  * Clean AI response by removing markdown code blocks and extracting JSON
  */
 export function cleanJsonResponse(text: string): string {

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { conversationEngine } from '@/lib/services/conversation-engine';
+import { KnowledgeManager } from '@/lib/genie/brain/knowledge';
+import { SessionManager } from '@/lib/genie/brain/session';
+import { VectorBrain } from '@/lib/genie/brain/vector';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, courseId } = await request.json();
+    const { userId, courseId, content } = await request.json();
 
     if (!userId || !courseId) {
       return NextResponse.json(
@@ -12,20 +15,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Initialize new interactive course session
-    const session = await conversationEngine.initializeSession(courseId, userId);
+    // 1. Extract Hierarchical Knowledge Graph (HKG)
+    // If content is not provided, fetch it from study_kit_content
+    let courseContent = content;
+    if (!courseContent) {
+      const supabase = await createSupabaseServerClient();
+      const { data: kit } = await supabase
+        .from('study_kit_content')
+        .select('source_content')
+        .eq('id', courseId)
+        .single();
+      courseContent = kit?.source_content;
+    }
+
+    if (!courseContent) {
+      return NextResponse.json({ error: 'Course content not found' }, { status: 404 });
+    }
+
+    const nodes = await KnowledgeManager.extractHKG(courseId, courseContent);
+
+    // 2. Index nodes for vector search
+    for (const node of nodes) {
+      await VectorBrain.indexNode(node.id, `${node.title}: ${node.description}\n\n${node.content}`);
+    }
+
+    // 3. Initialize session
+    const session = await SessionManager.getOrCreateSession(userId, courseId);
     
-    // Get initial messages (welcome message should be added by initializeSession)
-    const messages: any[] = []; // In production, this would fetch from database
+    // 4. Set initial node
+    if (nodes.length > 0) {
+      await SessionManager.updateCurrentNode(session.id, nodes[0].id);
+    }
 
     return NextResponse.json({
       success: true,
-      session,
-      messages
+      sessionId: session.id,
+      nodes_count: nodes.length
     });
 
   } catch (error) {
-    console.error('Failed to create interactive course session:', error);
+    console.error('Failed to create interactive course:', error);
     return NextResponse.json(
       { error: 'Failed to create session' },
       { status: 500 }

@@ -32,6 +32,13 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { useSubscription } from '@/lib/hooks/useSubscription';
 import posthog from 'posthog-js';
 import { Button } from '@/components/ui/button';
+import { 
+    CustomEdBoxTable, 
+    CustomEdBoxThead, 
+    CustomEdBoxTr, 
+    CustomEdBoxTh, 
+    CustomEdBoxTd 
+} from '@/components/ui/CustomEdBoxTable';
 
 const contentTypes = [
 
@@ -1592,11 +1599,25 @@ function StudyKitContent() {
                                                                         <span>{children}</span>
                                                                     </li>
                                                                 ),
-                                                                table: ({ children }) => (
-                                                                    <div className="overflow-x-auto my-8 rounded-xl border border-zinc-800">
-                                                                        <table className="w-full">{children}</table>
-                                                                    </div>
-                                                                ),
+                                                                  table: ({ children }) => (
+                                                                      <CustomEdBoxTable>{children}</CustomEdBoxTable>
+                                                                  ),
+                                                                  thead: ({ children }) => (
+                                                                      <CustomEdBoxThead>{children}</CustomEdBoxThead>
+                                                                  ),
+                                                                  tbody: ({ children }) => (
+                                                                      <tbody className="divide-y divide-zinc-800/50">{children}</tbody>
+                                                                  ),
+                                                                  tr: ({ children }) => (
+                                                                      <CustomEdBoxTr>{children}</CustomEdBoxTr>
+                                                                  ),
+                                                                  th: ({ children }) => (
+                                                                      <CustomEdBoxTh>{children}</CustomEdBoxTh>
+                                                                  ),
+                                                                  td: ({ children }) => (
+                                                                      <CustomEdBoxTd>{children}</CustomEdBoxTd>
+                                                                  ),
+
                                                                 code({ node, inline, className, children, ...props }: any) {
                                                                     const match = /language-(\w+)/.exec(className || '');
                                                                     const language = match ? match[1] : '';

@@ -1,3 +1,4 @@
+import "@/lib/polyfills";
 /**
  * EdBox File Processing Engine - PRODUCTION GRADE
  * 
@@ -20,13 +21,13 @@ import { getTextExtractor } from "office-text-extractor";
 
 const FORCE_LOG = (level: string, ...args: any[]) => {
   const timestamp = new Date().toISOString();
-  const message = `[${timestamp}] [EDBOX-${level}] ${args.map(a => 
+  const message = `[${timestamp}] [EDBOX-${level}] ${args.map(a =>
     typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)
   ).join(' ')}`;
-  
+
   console.log(message);
   console.error(message); // Duplicate to stderr for redundancy
-  
+
   return message;
 };
 
@@ -98,13 +99,13 @@ function validateFileSignature(buffer: Buffer, fileName: string): void {
       { expected: Array.from(expectedSignature), actual: firstBytes }
     );
   }
-  
+
   FORCE_LOG('DEBUG', `Signature validated for .${ext}`);
 }
 
 function validateFileSize(buffer: Buffer, fileName: string): void {
   FORCE_LOG('DEBUG', `Validating file size: ${buffer.length} bytes`);
-  
+
   if (buffer.length > CONFIG.MAX_FILE_SIZE) {
     throw new FileProcessingError(
       `File exceeds ${CONFIG.MAX_FILE_SIZE / 1024 / 1024}MB limit`,
@@ -121,7 +122,7 @@ function validateFileSize(buffer: Buffer, fileName: string): void {
       fileName
     );
   }
-  
+
   FORCE_LOG('DEBUG', 'File size validation passed');
 }
 
@@ -131,17 +132,17 @@ function validateFileSize(buffer: Buffer, fileName: string): void {
 
 function normalizeToBuffer(content: string, mimeType: string, fileName: string): Buffer {
   FORCE_LOG('INFO', `normalizeToBuffer: fileName=${fileName}, mimeType=${mimeType}, contentLength=${content?.length || 0}`);
-  
+
   try {
     // Path 1: Data URI
     if (content.startsWith('data:')) {
       FORCE_LOG('DEBUG', 'Detected Data URI format');
       const parts = content.split(',');
-      
+
       if (parts.length < 2 || !parts[1]) {
         throw new Error('Malformed data URI - missing base64 payload');
       }
-      
+
       const buffer = Buffer.from(parts[1], 'base64');
       FORCE_LOG('INFO', `Data URI decoded successfully: ${buffer.length} bytes`);
       return buffer;
@@ -150,12 +151,12 @@ function normalizeToBuffer(content: string, mimeType: string, fileName: string):
     // Path 2: Pure Base64
     if (content.length > 100) {
       const trimmed = content.replace(/\s+/g, '');
-      
+
       // Strict base64 validation
       if (trimmed.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(trimmed)) {
         try {
           const decoded = Buffer.from(trimmed, 'base64');
-          
+
           // Sanity check: decoded should be smaller than input
           if (decoded.length > 0 && decoded.length < content.length) {
             FORCE_LOG('INFO', `Base64 decoded successfully: ${decoded.length} bytes`);
@@ -193,12 +194,12 @@ async function parseWithLlamaParse(
   mimeType: string
 ): Promise<string> {
   FORCE_LOG('INFO', `=== LLAMAPARSE START: ${fileName} ===`);
-  
+
   let apiKey: string;
   try {
     apiKey = getLlamaCloudKey();
     FORCE_LOG('DEBUG', `API Key retrieved: ${apiKey ? 'YES' : 'NO'} (length=${apiKey?.length || 0})`);
-    
+
     if (!apiKey) {
       throw new Error('API key is empty/undefined');
     }
@@ -219,7 +220,7 @@ async function parseWithLlamaParse(
   const parsePromise = (async () => {
     try {
       FORCE_LOG('DEBUG', 'Initializing LlamaParseReader...');
-      
+
       const reader = new LlamaParseReader({
         apiKey,
         resultType: "markdown",
@@ -229,7 +230,7 @@ async function parseWithLlamaParse(
 
       const ext = fileName.split('.').pop()?.toLowerCase() || 'bin';
       FORCE_LOG('DEBUG', `Calling loadDataAsContent(buffer, "upload.${ext}")`);
-      
+
       const documents = await reader.loadDataAsContent(buffer, `upload.${ext}`);
       FORCE_LOG('DEBUG', `LlamaParse returned ${documents?.length || 0} document(s)`);
 
@@ -240,14 +241,14 @@ async function parseWithLlamaParse(
       const result = documents
         .map((doc: any, idx: number) => {
           // Handle different document formats
-          const text = doc.text || 
-                      (typeof doc.getContent === 'function' ? doc.getContent() : '') ||
-                      (doc.content) || 
-                      '';
-          
+          const text = doc.text ||
+            (typeof doc.getContent === 'function' ? doc.getContent() : '') ||
+            (doc.content) ||
+            '';
+
           const textLength = text?.length || 0;
           FORCE_LOG('DEBUG', `Document ${idx + 1}/${documents.length}: ${textLength} chars`);
-          
+
           return `--- PAGE ${idx + 1} ---\n${(text || '').trim()}`;
         })
         .join('\n\n');
@@ -292,7 +293,7 @@ async function fallbackTextExtraction(buffer: Buffer, fileName: string): Promise
     try {
       FORCE_LOG('DEBUG', 'Attempting pdf-parse...');
       const data = await pdf(buffer);
-      
+
       if (data.text?.trim()) {
         FORCE_LOG('INFO', `pdf-parse SUCCESS: ${data.text.length} chars, ${data.numpages} pages`);
         return data.text.slice(0, CONFIG.FALLBACK_CHAR_LIMIT);
@@ -308,12 +309,12 @@ async function fallbackTextExtraction(buffer: Buffer, fileName: string): Promise
       FORCE_LOG('DEBUG', 'Attempting office-text-extractor...');
       const extractor = getTextExtractor();
       const result = await extractor.extractText({ input: buffer, type: 'buffer' });
-      
+
       // Handle multiple return formats
-      const text = typeof result === 'string' 
-        ? result 
+      const text = typeof result === 'string'
+        ? result
         : (result as any)?.text || '';
-      
+
       if (text?.trim()) {
         FORCE_LOG('INFO', `office-text-extractor SUCCESS: ${text.length} chars`);
         return text.slice(0, CONFIG.FALLBACK_CHAR_LIMIT);
@@ -337,7 +338,7 @@ async function fallbackTextExtraction(buffer: Buffer, fileName: string): Promise
           .replace(/[^\x20-\x7E\n]/g, ' ')
           .replace(/\s+/g, ' ')
           .trim();
-        
+
         if (chunk.length > 10) {
           textChunks.push(chunk);
         }
@@ -378,8 +379,8 @@ export function isImageType(mimeType: string): boolean {
 }
 
 export function isPDFType(mimeType: string): boolean {
-  return mimeType === "application/pdf" || 
-         mimeType.toLowerCase().includes("pdf");
+  return mimeType === "application/pdf" ||
+    mimeType.toLowerCase().includes("pdf");
 }
 
 export function bufferToBase64(buffer: Buffer): string {
@@ -423,7 +424,7 @@ export async function processFileContent(
   fileName: string
 ): Promise<string> {
   const startTime = Date.now();
-  
+
   FORCE_LOG('INFO', '╔═══════════════════════════════════════════════════╗');
   FORCE_LOG('INFO', '║  FILE PROCESSING START                            ║');
   FORCE_LOG('INFO', '╚═══════════════════════════════════════════════════╝');
@@ -454,7 +455,7 @@ export async function processFileContent(
         mimeType,
         fileName,
       });
-      
+
       const processingTime = Date.now() - startTime;
       FORCE_LOG('INFO', `✓ Image processed in ${processingTime}ms`);
       FORCE_LOG('INFO', '╚═══════════════════════════════════════════════════╝');
@@ -486,7 +487,7 @@ export async function processFileContent(
 
       const processingTime = Date.now() - startTime;
       FORCE_LOG('INFO', `[STEP 4/4] Formatting output...`);
-      
+
       const result = `<DOCUMENT_CONTEXT>
   <METADATA>
     <FILENAME>${fileName}</FILENAME>
@@ -511,7 +512,7 @@ ${markdown}
     // STEP 5: Process Plain Text/Code
     FORCE_LOG('INFO', '[STEP 3/4] Processing as PLAIN TEXT/CODE');
     const textContent = buffer.toString('utf-8');
-    
+
     const result = `<CODE_CONTEXT>
   <FILENAME>${fileName}</FILENAME>
   <TYPE>${mimeType}</TYPE>
@@ -556,15 +557,15 @@ ${textContent}
 
 export async function healthCheckLlamaParse(): Promise<boolean> {
   FORCE_LOG('INFO', 'Running LlamaParse health check...');
-  
+
   try {
     const apiKey = getLlamaCloudKey();
     const hasKey = !!apiKey;
-    
+
     FORCE_LOG('INFO', `Health Check Result: ${hasKey ? 'PASS' : 'FAIL'}`);
     FORCE_LOG('INFO', `API Key Present: ${hasKey}`);
     FORCE_LOG('INFO', `API Key Length: ${apiKey?.length || 0}`);
-    
+
     return hasKey;
   } catch (e) {
     FORCE_LOG('ERROR', 'Health check FAILED', e);

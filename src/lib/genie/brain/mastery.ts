@@ -21,7 +21,7 @@ export const MasteryTracker = {
 
   async updateMastery(userId: string, nodeId: string, score: number) {
     const status = score >= 80 ? 'mastered' : score > 0 ? 'in_progress' : 'not_started';
-    
+
     const { error } = await supabase
       .from('genie_user_mastery')
       .upsert({
@@ -33,19 +33,36 @@ export const MasteryTracker = {
       }, { onConflict: 'user_id,node_id' });
 
     if (error) throw error;
-    
+
     // Increment attempts count
     await supabase.rpc('increment_mastery_attempts', { p_user_id: userId, p_node_id: nodeId });
   },
 
-  async getEligibleNodes(userId: string, courseId: string): Promise<string[]> {
-    // Logic to find nodes where prerequisites are met but not yet mastered
-    const { data, error } = await supabase.rpc('get_eligible_genie_nodes', { 
-      p_user_id: userId, 
-      p_course_id: courseId 
-    });
+  async getNextNode(userId: string, courseId: string, currentNodeId: string): Promise<string | null> {
+    // 1. Get all nodes for the course ordered by index
+    const { data: nodes, error } = await supabase
+      .from('genie_knowledge_nodes')
+      .select('id, order_index, level')
+      .eq('course_id', courseId)
+      .order('order_index', { ascending: true });
 
-    if (error) throw error;
-    return data.map((n: any) => n.id);
+    if (error || !nodes) return null;
+
+    // 2. Find current node index
+    const currentIndex = nodes.findIndex((n: any) => n.id === currentNodeId);
+    if (currentIndex === -1) return nodes[0]?.id || null; // Fallback to start
+
+    // 3. Find next node
+    // We simply take the next one in the linear sequence
+    const nextNode = nodes[currentIndex + 1];
+    if (!nextNode) return null; // Course completed
+
+    return nextNode.id;
+  },
+
+  async getEligibleNodes(userId: string, courseId: string): Promise<string[]> {
+    // Placeholder for non-linear graph logic (graph traversal)
+    // For now, relies on getNextNode for linear
+    return [];
   }
 };

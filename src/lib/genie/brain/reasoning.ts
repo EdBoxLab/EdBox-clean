@@ -12,40 +12,61 @@ export const CognitiveReasoning = {
     mastery: MasteryRecord | null,
     relatedContext: any[]
   ) {
-    const systemPrompt = `You are the "Genie Brain", a cognitive reasoning engine for an interactive course. 
-    Analyze the user's response to the current concept.
+    const systemPrompt = `You are the "Genie Brain", a cognitive reasoning engine. 
+    Analyze the user's response and determining the optimal next pedagogical step.
     
     Current Node: ${currentNode.title}
-    Content: ${currentNode.content}
+    Content: ${currentNode.content.substring(0, 500)}...
     Mastery Status: ${mastery?.status || 'not_started'}
     Score: ${mastery?.mastery_score || 0}
     
-    Context from Knowledge Graph: ${JSON.stringify(relatedContext)}
+    Context from Graph: ${JSON.stringify(relatedContext)}
     
-    Your goal is to:
-    1. Evaluate the user's understanding (0-100).
-    2. Provide constructive feedback.
-    3. Decide if they should:
-       - 'advance': Move to the next node (mastery > 80).
-       - 're-explain': Explain the concept differently (mastery < 50).
-       - 'challenge': Ask a deeper question (mastery 50-80).
-       - 'remediate': Go back to a prerequisite node if they are struggling.
+    Pedagogical Rules:
+    - If mastery > 80: CHALLENGE (Apply knowledge).
+    - If mastery < 50: RE-EXPLAIN (Simpler terms).
+    - If mastery 50-80: QUIZ (Verify knowledge).
+    - If user explicitly asks for Quiz/Challenge: DO IT.
     
-    Return a JSON object.`;
+    Return a JSON object matching the Schema.`;
 
     const result = await generateWithRetry({
-      prompt: `User Response: "${userResponse}"`,
+      prompt: `User Message: "${userResponse}"`,
       systemPrompt,
       schema: {
         type: "object",
         properties: {
-          evaluation_score: { type: "number" },
-          feedback: { type: "string" },
-          next_action: { type: "string", enum: ["advance", "re-explain", "challenge", "remediate"] },
-          suggested_explanation: { type: "string" },
-          remediation_node_id: { type: "string" }
+          action: { type: "string", enum: ["explain", "quiz", "challenge", "remediate"] },
+          thought_process: { type: "string" },
+          content: {
+            type: "object",
+            properties: {
+              text: { type: "string", description: "Transition text for explanation or intro" },
+              quiz: {
+                type: "object",
+                properties: {
+                  question: { type: "string" },
+                  options: { type: "array", items: { type: "string" } },
+                  correctAnswer: { type: "string", description: "Exact string of the correct option" },
+                  explanation: { type: "string" }
+                },
+                required: ["question", "options", "correctAnswer"]
+              },
+              challenge: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  hint: { type: "string" },
+                  difficulty: { type: "string", enum: ["Easy", "Medium", "Hard"] },
+                  expectedOutcome: { type: "string" }
+                },
+                required: ["title", "description", "difficulty"]
+              }
+            }
+          }
         },
-        required: ["evaluation_score", "feedback", "next_action"]
+        required: ["action", "content"]
       }
     });
 

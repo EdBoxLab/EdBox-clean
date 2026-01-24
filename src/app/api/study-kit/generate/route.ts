@@ -1,5 +1,5 @@
 // @ts-ignore
-global.DOMMatrix = global.DOMMatrix || class { a=1; b=0; c=0; d=1; e=0; f=0; };
+global.DOMMatrix = global.DOMMatrix || class { a = 1; b = 0; c = 0; d = 1; e = 0; f = 0; };
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -51,10 +51,19 @@ Advanced details including:
 - Best practices and expert-level insights
 - Related advanced concepts and future trends
 
-## Common Pitfalls / Misconceptions
-List at least 7-10 common mistakes with a detailed table:
-| Pitfall | Why It Happens | How to Avoid / Correct Understanding |
-|---------|----------------|-------------------------------------|
+## High-Impact Study Tables
+Analyze the content and generate 2-3 deep-dive tables that aggregate dispersed information.
+Choose the most appropriate structure:
+- **Comparative Analysis**: [Concept A] vs [Concept B] (Criteria: Definition, Function, Key Differences)
+- **Chronological Breakdown**: Event | Date | Significance | Outcome
+- **Process Flow**: Step | Action | Technical Detail | Result
+- **Component Analysis**: Component | Function | Interactions | Key Properties
+
+CRITICAL: Tables must be dense with information, replacing the need to read paragraphs.
+Format as standard Markdown tables with aligned columns.
+| Header 1 | Header 2 | Header 3 |
+|----------|----------|----------|
+| Row 1    | Data     | Data     |
 
 ## Key Takeaways
 - Comprehensive bulleted summary (10-15 key points)
@@ -103,14 +112,14 @@ function sanitizeMathText(text: string): string {
  */
 function cleanMarkdown(text: string): string {
   let cleaned = text.trim();
-  
+
   // Remove wrapping markdown code blocks if present
   // Matches: ```markdown [content] ``` or ``` [content] ```
   const mdMatch = cleaned.match(/^```(?:markdown)?\n([\s\S]*?)\n```$/i);
   if (mdMatch && mdMatch[1]) {
     return mdMatch[1].trim();
   }
-  
+
   // Also handle cases where it might just start with ``` and end with ``` without newlines
   const mdMatchSimple = cleaned.match(/^```(?:markdown)?([\s\S]*?)```$/i);
   if (mdMatchSimple && mdMatchSimple[1]) {
@@ -258,8 +267,8 @@ Format as a JSON array:
     case 'notes':
       const isCodeRelated = isProgrammingTopic(prompt);
       let depthInstructions = '';
-      
-      switch(notesDepth) {
+
+      switch (notesDepth) {
         case 'summary':
           depthInstructions = 'Focus: High-level overview. Provide a concise but comprehensive summary of the key points.';
           break;
@@ -338,13 +347,13 @@ export async function POST(request: NextRequest) {
     const results = await Promise.allSettled(
       typesToGenerate.map(async (type: ContentType) => {
         const isAppend = !!appendType;
-        
+
         // Parallel batching for Quizzes and Flashcards (batches of 10)
         if ((type === 'quizzes' || type === 'flashcards') && itemCount && itemCount > 10) {
           const batchSize = 10;
           const numBatches = Math.ceil(itemCount / batchSize);
           const batchPromises = [];
-          
+
           for (let i = 0; i < numBatches; i++) {
             const currentBatchCount = Math.min(batchSize, itemCount - i * batchSize);
             batchPromises.push((async () => {
@@ -358,7 +367,7 @@ export async function POST(request: NextRequest) {
               return extractJSON(result.text, type);
             })());
           }
-          
+
           const batchResults = await Promise.all(batchPromises);
           // Combine all batches into a single array
           const combinedContent = batchResults.flat();

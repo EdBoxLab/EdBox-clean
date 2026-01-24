@@ -1,14 +1,10 @@
 /**
- * EdBox Cognitive Processor V3 - PRODUCTION HARDENED
+ * EMERGENCY DEBUG WRAPPER
  * 
- * Design Philosophy:
- * - Fail Fast, Fail Loud: No silent errors
- * - Defense in Depth: Validate at every boundary
- * - Graceful Degradation: Always return something useful
- * - Observable: Log everything that matters
+ * This wraps your file processing with aggressive logging
+ * that WILL show up even when everything else fails.
  * 
- * @author EdBox Engineering Team
- * @performance Target: 95th percentile < 8s for 50-page PDFs
+ * Deploy this, then check Vercel logs in 5 minutes.
  */
 
 import { LlamaParseReader } from "llama-cloud-services";
@@ -17,18 +13,26 @@ import { getLlamaCloudKey } from "@/lib/ai-providers";
 import pdf from "pdf-parse";
 import { getTextExtractor } from "office-text-extractor";
 
-// ---------------------------------------------------------------------------
-// CONSTANTS: BUSINESS RULES
-// ---------------------------------------------------------------------------
+// CRITICAL: Force logs to stdout (Vercel/Supabase Edge Functions capture this)
+const FORCE_LOG = (level: string, ...args: any[]) => {
+  const timestamp = new Date().toISOString();
+  const message = `[${timestamp}] [${level}] ${args.map(a => 
+    typeof a === 'object' ? JSON.stringify(a) : String(a)
+  ).join(' ')}`;
+  
+  console.log(message); // stdout
+  console.error(message); // stderr (captured by most platforms)
+  
+  return message;
+};
 
 const CONFIG = {
-  MAX_FILE_SIZE: 25 * 1024 * 1024, // 25MB (LlamaParse limit)
-  LLAMA_TIMEOUT: 120000, // 2 minutes
-  FALLBACK_CHAR_LIMIT: 100000, // Safety valve for raw text
-  PREMIUM_THRESHOLD: 10 * 1024 * 1024, // Use premium mode for files > 10MB
+  MAX_FILE_SIZE: 25 * 1024 * 1024,
+  LLAMA_TIMEOUT: 120000,
+  FALLBACK_CHAR_LIMIT: 100000,
+  PREMIUM_THRESHOLD: 10 * 1024 * 1024,
 } as const;
 
-// File signatures (magic numbers) for validation
 const FILE_SIGNATURES = {
   PDF: [0x25, 0x50, 0x44, 0x46] as const,
   PNG: [0x89, 0x50, 0x4E, 0x47] as const,
@@ -36,10 +40,6 @@ const FILE_SIGNATURES = {
   DOCX: [0x50, 0x4B, 0x03, 0x04] as const,
   PPTX: [0x50, 0x4B, 0x03, 0x04] as const,
 } as const;
-
-// ---------------------------------------------------------------------------
-// ERROR HANDLING: TYPED ERRORS FOR DEBUGGING
-// ---------------------------------------------------------------------------
 
 class FileProcessingError extends Error {
   constructor(
@@ -50,12 +50,9 @@ class FileProcessingError extends Error {
   ) {
     super(message);
     this.name = 'FileProcessingError';
+    FORCE_LOG('ERROR', `FileProcessingError: ${code} - ${message}`, details);
   }
 }
-
-// ---------------------------------------------------------------------------
-// VALIDATION LAYER
-// ---------------------------------------------------------------------------
 
 function validateFileSignature(buffer: Buffer, fileName: string): void {
   const ext = fileName.toLowerCase().split('.').pop() || '';
@@ -71,12 +68,12 @@ function validateFileSignature(buffer: Buffer, fileName: string): void {
   };
 
   const expectedSignature = signatureChecks[ext];
-  if (!expectedSignature) return; // Images/text don't need strict validation
+  if (!expectedSignature) return;
 
   const matches = expectedSignature.every((byte, i) => firstBytes[i] === byte);
   if (!matches) {
     throw new FileProcessingError(
-      `File signature mismatch: ${fileName} claims to be .${ext} but binary disagrees`,
+      `File signature mismatch`,
       'INVALID_FILE_SIGNATURE',
       fileName,
       { expected: expectedSignature, actual: firstBytes }
@@ -87,7 +84,7 @@ function validateFileSignature(buffer: Buffer, fileName: string): void {
 function validateFileSize(buffer: Buffer, fileName: string): void {
   if (buffer.length > CONFIG.MAX_FILE_SIZE) {
     throw new FileProcessingError(
-      `File exceeds maximum size (${CONFIG.MAX_FILE_SIZE / 1024 / 1024}MB)`,
+      `File too large`,
       'FILE_TOO_LARGE',
       fileName,
       { size: buffer.length }
@@ -95,48 +92,46 @@ function validateFileSize(buffer: Buffer, fileName: string): void {
   }
 
   if (buffer.length === 0) {
-    throw new FileProcessingError(
-      'File is empty',
-      'EMPTY_FILE',
-      fileName
-    );
+    throw new FileProcessingError('File is empty', 'EMPTY_FILE', fileName);
   }
 }
 
-// ---------------------------------------------------------------------------
-// BUFFER NORMALIZATION: HANDLE THE CHAOS
-// ---------------------------------------------------------------------------
-
 function normalizeToBuffer(content: string, mimeType: string, fileName: string): Buffer {
+  FORCE_LOG('DEBUG', `normalizeToBuffer START: ${fileName}, contentLength=${content.length}`);
+  
   try {
-    // Path 1: Data URI (browser upload)
     if (content.startsWith('data:')) {
-      const base64Data = content.split(',')[1];
-      if (!base64Data) {
-        throw new Error('Malformed data URI: missing base64 content');
+      FORCE_LOG('DEBUG', 'Detected Data URI format');
+      const parts = content.split(',');
+      if (parts.length < 2) {
+        throw new Error('Malformed data URI');
       }
-      return Buffer.from(base64Data, 'base64');
+      const buffer = Buffer.from(parts[1], 'base64');
+      FORCE_LOG('DEBUG', `Data URI decoded: ${buffer.length} bytes`);
+      return buffer;
     }
 
-    // Path 2: Pure Base64 (must be >100 chars and valid base64)
     if (content.length > 100) {
       const trimmed = content.replace(/\s+/g, '');
       if (trimmed.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(trimmed)) {
         try {
           const decoded = Buffer.from(trimmed, 'base64');
           if (decoded.length > 0 && decoded.length < content.length) {
+            FORCE_LOG('DEBUG', `Base64 decoded: ${decoded.length} bytes`);
             return decoded;
           }
-        } catch {
-          // Not actually base64
+        } catch (e) {
+          FORCE_LOG('WARN', 'Base64 decode failed, trying UTF-8');
         }
       }
     }
 
-    // Path 3: Raw binary or text
-    return Buffer.from(content, 'utf-8');
+    const buffer = Buffer.from(content, 'utf-8');
+    FORCE_LOG('DEBUG', `UTF-8 conversion: ${buffer.length} bytes`);
+    return buffer;
 
   } catch (error) {
+    FORCE_LOG('ERROR', 'normalizeToBuffer FAILED:', error);
     throw new FileProcessingError(
       'Failed to decode file content',
       'DECODE_ERROR',
@@ -146,118 +141,130 @@ function normalizeToBuffer(content: string, mimeType: string, fileName: string):
   }
 }
 
-// ---------------------------------------------------------------------------
-// LLAMAPARSE ENGINE: WITH TIMEOUT + RETRY
-// ---------------------------------------------------------------------------
-
 async function parseWithLlamaParse(
   buffer: Buffer,
   fileName: string,
   mimeType: string
 ): Promise<string> {
-  const apiKey = getLlamaCloudKey();
-  if (!apiKey) {
+  FORCE_LOG('INFO', `parseWithLlamaParse START: ${fileName}`);
+  
+  let apiKey: string;
+  try {
+    apiKey = getLlamaCloudKey();
+    FORCE_LOG('DEBUG', `API Key obtained: ${apiKey ? 'YES' : 'NO'}, length=${apiKey?.length || 0}`);
+  } catch (e) {
+    FORCE_LOG('ERROR', 'getLlamaCloudKey FAILED:', e);
     throw new FileProcessingError(
       'LlamaCloud API key not available',
       'NO_API_KEY',
-      fileName
+      fileName,
+      e
     );
   }
 
   const usesPremium = buffer.length > CONFIG.PREMIUM_THRESHOLD;
   const mode = usesPremium ? 'premium' : 'fast';
 
-  console.log(`[LlamaParse] Processing ${fileName} (${(buffer.length / 1024).toFixed(1)}KB) with ${mode} mode`);
+  FORCE_LOG('INFO', `LlamaParse mode=${mode}, bufferSize=${buffer.length}`);
 
   const parsePromise = (async () => {
-    const reader = new LlamaParseReader({
-      apiKey,
-      resultType: "markdown",
-      verbose: false,
-      parsingInstruction: `
-        Extract all text preserving document structure.
-        For tables: maintain column alignment using markdown tables.
-        For headers: use # markdown syntax.
-        For lists: use - or 1. syntax.
-        Preserve mathematical notation when present.
-      `.trim(),
-    });
+    try {
+      FORCE_LOG('DEBUG', 'Creating LlamaParseReader...');
+      const reader = new LlamaParseReader({
+        apiKey,
+        resultType: "markdown",
+        verbose: true, // ENABLE VERBOSE FOR DEBUGGING
+        parsingInstruction: `Extract all text preserving structure.`,
+      });
 
-    const ext = fileName.split('.').pop()?.toLowerCase() || 'bin';
-    const documents = await reader.loadDataAsContent(buffer, `upload.${ext}`);
+      const ext = fileName.split('.').pop()?.toLowerCase() || 'bin';
+      FORCE_LOG('DEBUG', `Calling loadDataAsContent with extension: ${ext}`);
+      
+      const documents = await reader.loadDataAsContent(buffer, `upload.${ext}`);
 
-    if (!documents || documents.length === 0) {
-      throw new Error('LlamaParse returned zero documents');
+      FORCE_LOG('DEBUG', `loadDataAsContent returned ${documents?.length || 0} documents`);
+
+      if (!documents || documents.length === 0) {
+        throw new Error('LlamaParse returned zero documents');
+      }
+
+      const result = documents
+        .map((doc: any, idx: number) => {
+          const text = doc.text || (typeof doc.getContent === 'function' ? doc.getContent() : '');
+          FORCE_LOG('DEBUG', `Doc ${idx}: text length=${text?.length || 0}`);
+          return `--- PAGE ${idx + 1} ---\n${(text || '').trim()}`;
+        })
+        .join('\n\n');
+
+      FORCE_LOG('INFO', `LlamaParse SUCCESS: ${result.length} chars`);
+      return result;
+
+    } catch (e) {
+      FORCE_LOG('ERROR', 'LlamaParse inner error:', e);
+      throw e;
     }
-
-    return documents
-      .map((doc: any, idx: number) => {
-        const pageNum = idx + 1;
-        const text = doc.text || (typeof doc.getContent === 'function' ? doc.getContent() : '');
-        return `--- PAGE ${pageNum} ---\n${(text || '').trim()}`;
-      })
-      .join('\n\n');
-
   })();
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(
-      () => reject(new Error(`LlamaParse timeout after ${CONFIG.LLAMA_TIMEOUT / 1000}s`)),
+      () => {
+        FORCE_LOG('ERROR', `LlamaParse TIMEOUT after ${CONFIG.LLAMA_TIMEOUT / 1000}s`);
+        reject(new Error(`LlamaParse timeout`));
+      },
       CONFIG.LLAMA_TIMEOUT
     );
   });
 
   try {
     const markdown = await Promise.race([parsePromise, timeoutPromise]);
-    console.log(`[LlamaParse] Success: ${markdown.length} chars extracted`);
     return markdown;
-
   } catch (error) {
-    console.error(`[LlamaParse] Failed for ${fileName}:`, error);
+    FORCE_LOG('ERROR', `parseWithLlamaParse FAILED:`, error);
     throw error;
   }
 }
 
-// ---------------------------------------------------------------------------
-// FALLBACK: ROBUST TEXT EXTRACTION (PDF-PARSE + OFFICE-EXTRACTOR)
-// ---------------------------------------------------------------------------
-
 async function fallbackTextExtraction(buffer: Buffer, fileName: string): Promise<string> {
-  console.warn(`[Fallback] Using robust extraction for ${fileName}`);
+  FORCE_LOG('WARN', `FALLBACK EXTRACTION START: ${fileName}`);
   const ext = fileName.toLowerCase().split('.').pop() || '';
 
-  // 1. PDF Path: Use pdf-parse
+  // PDF with pdf-parse
   if (ext === 'pdf') {
     try {
+      FORCE_LOG('DEBUG', 'Trying pdf-parse...');
       const data = await pdf(buffer);
       if (data.text?.trim()) {
-        console.log(`[Fallback] pdf-parse success: ${data.text.length} chars`);
+        FORCE_LOG('INFO', `pdf-parse SUCCESS: ${data.text.length} chars`);
         return data.text.slice(0, CONFIG.FALLBACK_CHAR_LIMIT);
       }
     } catch (e) {
-      console.error('[Fallback] pdf-parse failed:', e);
+      FORCE_LOG('ERROR', 'pdf-parse FAILED:', e);
     }
   }
 
-  // 2. Office Path: Use office-text-extractor
+  // Office documents
   if (['docx', 'pptx', 'xlsx'].includes(ext)) {
     try {
+      FORCE_LOG('DEBUG', 'Trying office-text-extractor...');
       const extractor = getTextExtractor();
-      const text = await extractor.extractText({ input: buffer, type: 'buffer' });
+      const result = await extractor.extractText({ input: buffer, type: 'buffer' });
+      const text = typeof result === 'string' ? result : (result as any)?.text || '';
+      
       if (text?.trim()) {
-        console.log(`[Fallback] office-text-extractor success: ${text.length} chars`);
+        FORCE_LOG('INFO', `office-text-extractor SUCCESS: ${text.length} chars`);
         return text.slice(0, CONFIG.FALLBACK_CHAR_LIMIT);
       }
     } catch (e) {
-      console.error('[Fallback] office-text-extractor failed:', e);
+      FORCE_LOG('ERROR', 'office-text-extractor FAILED:', e);
     }
   }
 
-  // 3. Raw PDF Scraping (Super Fallback)
+  // Raw PDF scraping
   if (ext === 'pdf') {
+    FORCE_LOG('DEBUG', 'Trying raw PDF scraping...');
     const text = buffer.toString('latin1');
+    const btPattern = /BT\s+([\s\S]*?)\s+ET/g;
     const textChunks: string[] = [];
-    const btPattern = new RegExp("BT\\s+([\\s\\S]*?)\\s+ET", "g");
     let match;
 
     while ((match = btPattern.exec(text)) !== null) {
@@ -269,31 +276,28 @@ async function fallbackTextExtraction(buffer: Buffer, fileName: string): Promise
     }
 
     if (textChunks.length > 0) {
-      return textChunks.join('\n\n').slice(0, CONFIG.FALLBACK_CHAR_LIMIT);
+      const result = textChunks.join('\n\n').slice(0, CONFIG.FALLBACK_CHAR_LIMIT);
+      FORCE_LOG('INFO', `Raw PDF scraping SUCCESS: ${result.length} chars`);
+      return result;
     }
   }
 
-  // 4. Default: UTF-8 Text
+  // Ultimate fallback
+  FORCE_LOG('WARN', 'All extraction methods failed, using UTF-8 fallback');
   const text = buffer.toString('utf-8').slice(0, CONFIG.FALLBACK_CHAR_LIMIT);
   const printableRatio = (text.match(/[\x20-\x7E]/g)?.length || 0) / text.length;
 
   if (printableRatio < 0.3) {
+    FORCE_LOG('ERROR', `Binary file detected: printableRatio=${printableRatio}`);
     return '[BINARY_FILE: Cannot extract text without proper parser]';
   }
 
   return text;
 }
 
-// ---------------------------------------------------------------------------
-// UTILITIES: EXPORTED FOR BACKWARD COMPATIBILITY
-// ---------------------------------------------------------------------------
-
+// UTILITIES
 export function isImageType(mimeType: string): boolean {
   return mimeType.startsWith("image/");
-}
-
-export function isPDFType(mimeType: string): boolean {
-  return mimeType === "application/pdf" || mimeType.toLowerCase().endsWith(".pdf");
 }
 
 export function bufferToBase64(buffer: Buffer): string {
@@ -305,7 +309,7 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
     const data = await pdf(buffer);
     return data.text || "";
   } catch (error) {
-    console.error("[PDF Extraction] Failed:", error);
+    FORCE_LOG('ERROR', 'extractTextFromPDF FAILED:', error);
     return "";
   }
 }
@@ -313,64 +317,80 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
 export async function extractTextFromPPTX(buffer: Buffer): Promise<string> {
   try {
     const extractor = getTextExtractor();
-    const text = await extractor.extractText({ input: buffer, type: "buffer" });
+    const result = await extractor.extractText({ input: buffer, type: "buffer" });
+    const text = typeof result === 'string' ? result : (result as any)?.text || '';
     return text || "";
   } catch (error) {
-    console.error("[PPTX Extraction] Failed:", error);
+    FORCE_LOG('ERROR', 'extractTextFromPPTX FAILED:', error);
     return "";
   }
 }
 
-// ---------------------------------------------------------------------------
-// MAIN PIPELINE: THE ORCHESTRATOR
-// ---------------------------------------------------------------------------
-
+// MAIN FUNCTION
 export async function processFileContent(
   content: string,
   mimeType: string,
   fileName: string
 ): Promise<string> {
   const startTime = Date.now();
+  
+  FORCE_LOG('INFO', `========== PROCESSING START ==========`);
+  FORCE_LOG('INFO', `File: ${fileName}, MIME: ${mimeType}, contentLength: ${content?.length || 0}`);
 
   try {
+    // Step 1: Normalize
+    FORCE_LOG('DEBUG', 'Step 1: Normalizing buffer...');
     const buffer = normalizeToBuffer(content, mimeType, fileName);
+    FORCE_LOG('INFO', `Buffer created: ${buffer.length} bytes`);
 
+    // Step 2: Validate
+    FORCE_LOG('DEBUG', 'Step 2: Validating...');
     validateFileSize(buffer, fileName);
     validateFileSignature(buffer, fileName);
+    FORCE_LOG('INFO', 'Validation passed');
 
     const ext = fileName.toLowerCase();
 
+    // Images
     if (mimeType.startsWith('image/')) {
-      console.log(`[Image] ${fileName} (${(buffer.length / 1024).toFixed(1)}KB)`);
-      return JSON.stringify({
+      FORCE_LOG('INFO', 'Detected IMAGE type');
+      const result = JSON.stringify({
         type: 'image',
         base64: buffer.toString('base64'),
         mimeType,
         fileName,
       });
+      FORCE_LOG('INFO', `Image JSON created: ${result.length} chars`);
+      return result;
     }
 
+    // Structured documents
     const isStructuredDoc =
       ext.endsWith('.pdf') ||
       ext.endsWith('.docx') ||
       ext.endsWith('.pptx') ||
+      ext.endsWith('.xlsx') ||
       ext.endsWith('.doc') ||
-      ext.endsWith('.ppt');
+      ext.endsWith('.ppt') ||
+      ext.endsWith('.xls');
 
     if (isStructuredDoc) {
+      FORCE_LOG('INFO', 'Detected STRUCTURED DOCUMENT');
       let markdown: string;
 
       try {
+        FORCE_LOG('DEBUG', 'Attempting LlamaParse...');
         markdown = await parseWithLlamaParse(buffer, fileName, mimeType);
+        FORCE_LOG('INFO', 'LlamaParse succeeded');
       } catch (parseError) {
-        console.warn(`[Fallback] LlamaParse failed, using robust extraction`);
+        FORCE_LOG('WARN', 'LlamaParse failed, using fallback');
         markdown = await fallbackTextExtraction(buffer, fileName);
       }
 
       const processingTime = Date.now() - startTime;
-      console.log(`[Success] ${fileName} processed in ${(processingTime / 1000).toFixed(2)}s`);
+      FORCE_LOG('INFO', `Processing complete in ${processingTime}ms`);
 
-      return `<DOCUMENT_CONTEXT>
+      const result = `<DOCUMENT_CONTEXT>
   <METADATA>
     <FILENAME>${fileName}</FILENAME>
     <TYPE>${mimeType}</TYPE>
@@ -383,14 +403,16 @@ ${markdown}
   </CONTENT>
 </DOCUMENT_CONTEXT>
 
-[INSTRUCTION TO AI: The above is structured markdown extracted from ${fileName}. 
-Headers are marked with #, tables use | syntax, lists use - or numbers.
-Treat this as authoritative study material.]`;
+[INSTRUCTION TO AI: The above is structured markdown extracted from ${fileName}.]`;
+
+      FORCE_LOG('INFO', `Final result: ${result.length} chars`);
+      return result;
     }
 
+    // Plain text
+    FORCE_LOG('INFO', 'Detected PLAIN TEXT/CODE');
     const textContent = buffer.toString('utf-8');
-
-    return `<CODE_CONTEXT>
+    const result = `<CODE_CONTEXT>
   <FILENAME>${fileName}</FILENAME>
   <TYPE>${mimeType}</TYPE>
   <CONTENT>
@@ -398,7 +420,14 @@ ${textContent}
   </CONTENT>
 </CODE_CONTEXT>`;
 
+    FORCE_LOG('INFO', `Text result: ${result.length} chars`);
+    return result;
+
   } catch (error) {
+    FORCE_LOG('ERROR', '========== PROCESSING FAILED ==========');
+    FORCE_LOG('ERROR', 'Error details:', error);
+    FORCE_LOG('ERROR', 'Stack:', (error as Error).stack);
+
     if (error instanceof FileProcessingError) {
       throw error;
     }
@@ -415,8 +444,11 @@ ${textContent}
 export async function healthCheckLlamaParse(): Promise<boolean> {
   try {
     const apiKey = getLlamaCloudKey();
-    return !!apiKey;
-  } catch {
+    const hasKey = !!apiKey;
+    FORCE_LOG('INFO', `Health check: API key present = ${hasKey}`);
+    return hasKey;
+  } catch (e) {
+    FORCE_LOG('ERROR', 'Health check FAILED:', e);
     return false;
   }
 }

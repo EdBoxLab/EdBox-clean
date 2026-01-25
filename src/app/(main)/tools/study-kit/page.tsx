@@ -41,6 +41,9 @@ import {
 } from '@/components/ui/CustomEdBoxTable';
 import remarkGfm from 'remark-gfm';
 import { RotateCcw } from 'lucide-react';
+import { NoteNavigation } from '@/components/NoteNavigation';
+import { TextSelectionTooltip } from '@/components/TextSelectionTooltip';
+import { GenieSidePanel } from '@/components/GenieSidePanel';
 
 // Hook for safe window size usage (prevents hydration mismatch)
 function useWindowSize() {
@@ -166,10 +169,17 @@ function StudyKitContent() {
     const [isConfirmed, setIsConfirmed] = useState(false);
     const [activeChapter, setActiveChapter] = useState(0);
     const [selectedNodeData, setSelectedNodeData] = useState<any>(null);
+    const [genieContext, setGenieContext] = useState('');
+    const [isGenieOpen, setIsGenieOpen] = useState(false);
     // -------------------------
 
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     const { isPremium } = useSubscription();
+
+    const handleAskGenie = (text: string) => {
+        setGenieContext(text);
+        setIsGenieOpen(true);
+    };
 
     // Fetch specific study kit if ID is present
     useEffect(() => {
@@ -1541,7 +1551,18 @@ function StudyKitContent() {
                                     )}
 
                                     {activeTab === 'notes' && generatedContent.notes && (
-                                        <div className="space-y-6">
+                                        <div className="space-y-6 relative">
+                                            {/* Note Navigation HUD */}
+                                            <NoteNavigation content={typeof generatedContent.notes === 'string' ? generatedContent.notes : ''} />
+
+                                            {/* Genie Interaction */}
+                                            <TextSelectionTooltip onAskGenie={handleAskGenie} />
+                                            <GenieSidePanel
+                                                isOpen={isGenieOpen}
+                                                onClose={() => setIsGenieOpen(false)}
+                                                contextText={genieContext}
+                                            />
+
                                             {/* Notes Header */}
                                             <div className="bg-gradient-to-br from-indigo-950/80 via-zinc-900 to-purple-950/50 border border-indigo-500/20 rounded-3xl p-6 sm:p-8">
                                                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

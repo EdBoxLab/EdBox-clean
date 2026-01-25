@@ -10,69 +10,56 @@ type ContentType = 'quizzes' | 'flashcards' | 'mindmaps' | 'notes';
 
 // Updated Templates
 const NOTES_TEMPLATE = `
-Generate comprehensive, professionally structured study notes that are DETAILED and HIGHLY USEFUL for students.
+Generate a **Strategic Mastery Guide** for this topic.
+Your goal is NOT to summarize. Your goal is to **replace the classroom** for a student who wants a perfect score but has zero time.
 
-CRITICAL: These notes must be SUBSTANTIAL and THOROUGH - at least 2500 words minimum. Do NOT generate basic, surface-level summaries.
+**THE "STRAIGHT A" PROTOCOL:**
+1.  **Density > Volume**: If the source is 10 pages, your output must be 1 page. Cut all fluff.
+2.  **Strategic Formatting**: Use heavy bolding for keywords. Use icons as visual anchors.
+3.  **Tone**: You are not a textbook. You are a high-performance coach. Be direct, tactical, and authoritative.
 
-**ABSOLUTELY CRITICAL - CODE RULES:**
-- NEVER include programming code (JavaScript, Python, Java, etc.) unless the topic is SPECIFICALLY about programming, software development, or computer science
-- For math/science/history/business topics: NO code examples, NO function definitions, NO React components
-- If you need to show a calculation, write it in plain text or mathematical notation, NOT as code
-- Example of what NOT to do for non-programming topics: \`\`\`javascript or function example()
-- Example of what TO do: "Calculate using the formula: x = (b ± √(b² - 4ac)) / 2a"
-
-Use Markdown formatting. Structure as follows:
+**OUTPUT STRUCTURE (Strict Markdown):**
 
 # [Topic Title]
 
-## Overview
-Provide a comprehensive introduction (3-4 paragraphs) explaining what this topic is, why it matters, and how it connects to broader concepts. Include real-world relevance and historical context if applicable.
+## 1. The "Missing Lecture" (Intuition)
+*What professors usually don't say out loud.*
+-   **The Core Mental Model**: ONE sentence that explains the entire concept using an analogy.
+-   **Why It Matters**: The practical or theoretical stakes.
+-   **The "Feynman Block"**: Explain the single most confusing part of this topic as if you were talking to a bright 12-year-old.
 
-## Core Concepts
-For EACH major concept:
-### [Concept Name]
-- **Definition**: Clear, precise explanation
-- **Detailed Breakdown**: Use multiple bullet points to explain nuances
-- **How It Works**: Step-by-step explanation of processes or mechanisms
-- **Formulas/Notation**: Use plain text mathematical expressions (e.g., "x^2 + 2x + 1" or "Force = mass × acceleration")
-- **Example**: Concrete illustration using prose and calculations, NOT code
+## 2. The Exam Predictor (High-Value Intel)
+*Where the points are hiding.*
+-   🛑 **The Trap**: Explicitly identify the most common student mistake. (e.g., "Students often confuse X with Y because...")
+-   🎯 **The Guaranteed Question**: Describe the specific type of problem that appears on 90% of exams.
+-   🔮 **The Curveball**: A rare but high-point-value edge case.
 
-## Examples & Use Cases
-Provide 4-6 detailed, practical examples that show the concept in action. Include:
-- Real-world scenarios
-- Detailed walkthroughs of how to solve related problems
-- Step-by-step calculations or reasoning (in plain text)
-- Visual descriptions or diagrams represented in text
+## 3. The Universal Algorithm (Procedural Mastery)
+*How to solve problems on autopilot.*
+Don't just define concepts. Provide a generic, step-by-step PROTOCOL to solve ANY problem of this type.
+-   **Step 1**: Identification (How to know to use this method).
+-   **Step 2**: The Setup (Formula/State).
+-   **Step 3**: The Execution (Process).
+-   **Step 4**: Sanity Check (How to know if your answer is wrong).
 
-## Deep Dive
-Advanced details including:
-- Edge cases and exceptions
-- Performance considerations or advanced theoretical implications
-- Best practices and expert-level insights
-- Related advanced concepts and future trends
+## 4. Cheat Code Tables (1:10 Density)
+*Pure signal, no noise.*
+Create 2-3 high-density comparison tables.
+-   **Rules**: NO sentences inside cells. Keywords only.
+-   **Examples**: "Mitosis vs Meiosis", "Market Structure A vs B".
 
-## High-Impact Study Tables
-Analyze the content and generate 2-3 deep-dive tables that aggregate dispersed information.
-Choose the most appropriate structure:
-- **Comparative Analysis**: [Concept A] vs [Concept B] (Criteria: Definition, Function, Key Differences)
-- **Chronological Breakdown**: Event | Date | Significance | Outcome
-- **Process Flow**: Step | Action | Technical Detail | Result
-- **Component Analysis**: Component | Function | Interactions | Key Properties
+## 5. High-Stakes Scenarios (Active Recall)
+Three "Scenario-Based" questions. Do not ask "What is X?". Ask:
+"You are a [Role]. [Situation] happens. What is the immediate risk and the correct specific action?"
+1.  [Scenario 1]
+2.  [Scenario 2]
+3.  [Scenario 3]
 
-CRITICAL: Tables must be dense with information, replacing the need to read paragraphs.
-Format as standard Markdown tables with aligned columns.
-| Header 1 | Header 2 | Header 3 |
-|----------|----------|----------|
-| Row 1    | Data     | Data     |
-
-## Key Takeaways
-- Comprehensive bulleted summary (10-15 key points)
-- Each takeaway should be actionable, specific, and memorable
-
-## Quick Reference & Cheat Sheet
-Provide a summary of the most important formulas, terms, or concepts in an easy-to-scan format. Use tables or lists, NOT code blocks.
-
-REMEMBER: Output pure Markdown text. NO code blocks unless the topic is programming-related!
+**FORMATTING RULES:**
+-   Use emojis as visual anchors (🛑, 🎯, 🔮, ⚡, 🧠).
+-   **Bold** every single key term.
+-   Use > Blockquotes for "The Anchor" (key takeaways).
+-   NO code blocks unless specifically requested for programming.
 `;
 
 const MINDMAP_TEMPLATE = `

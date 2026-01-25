@@ -215,6 +215,21 @@ export async function POST(request: NextRequest) {
                                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'content', content: chunk })}\n\n`));
                             }
 
+                            if (!fullExplanation.trim()) {
+                                // Increment retry count on generation failure
+                                await persistenceClient.rpc('increment_session_retry', { p_session_id: sessionId });
+                                
+                                const fallback = "I encountered an issue, please retry.";
+                                await streamText(fallback, controller, encoder);
+                                fullExplanation = fallback;
+                            } else {
+                                // Success - reset retry count
+                                await persistenceClient
+                                    .from('interactive_course_sessions')
+                                    .update({ retry_count: 0 })
+                                    .eq('id', sessionId);
+                            }
+
                             await persistenceClient.rpc('add_conversation_message', {
                                 p_session_id: sessionId,
                                 p_role: 'genie',
@@ -223,12 +238,6 @@ export async function POST(request: NextRequest) {
                             });
                         }
                     }
-
-                    // Reset retry count on success
-                    await persistenceClient
-                        .from('interactive_course_sessions')
-                        .update({ retry_count: 0 })
-                        .eq('id', sessionId);
 
                     controller.close();
                 } catch (e) {

@@ -14,19 +14,44 @@ export function normalizeSkillGraphData(data: any): {
   const rawMiniProjects = data.miniProjects || data.mini_projects || data.projects || [];
   const rawCapstoneProject = data.capstoneProject || data.capstone_project || data.final_project || null;
 
+  // --- ID MAPPING SYSTEM (V2 FIX) ---
+  // The AI returns semantic slugs (e.g. "skill_python_basics"). 
+  // The DB requires UUIDs. We must map them consistently so references (prereqs) still work.
+  const idMap = new Map<string, string>();
+
+  const getUUID = (slug: string | null | undefined): string => {
+    if (!slug) return crypto.randomUUID(); // No ID provided -> Generate new UUID
+
+    // If it's already a valid UUID, keep it.
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
+    if (isUUID) return slug;
+
+    // It's a slug. Check if we've seen it.
+    if (!idMap.has(slug)) {
+      idMap.set(slug, crypto.randomUUID());
+    }
+    return idMap.get(slug)!;
+  };
+
+  const mapIds = (ids: string[] | undefined): string[] => {
+    if (!ids || !Array.isArray(ids)) return [];
+    return ids.map(id => getUUID(id));
+  };
+  // ----------------------------------
+
   // Ensure skillPaths is an array and has skills
   const normalizedPaths = Array.isArray(rawSkillPaths) ? rawSkillPaths.map((path: any) => ({
-    id: path.id || crypto.randomUUID(),
+    id: getUUID(path.id),
     name: path.name || path.title || 'Unnamed Path',
     description: path.description || '',
     skills: Array.isArray(path.skills || path.micro_skills || path.microSkills)
       ? (path.skills || path.micro_skills || path.microSkills).map((skill: any) => ({
-        id: skill.id || crypto.randomUUID(),
+        id: getUUID(skill.id),
         name: skill.name || skill.title || 'Unnamed Skill',
         description: skill.description || '',
         engine: skill.engine || 'generic',
         estimatedMinutes: skill.estimatedMinutes || skill.estimated_minutes || 5,
-        prerequisites: Array.isArray(skill.prerequisites || skill.pre_reqs) ? (skill.prerequisites || skill.pre_reqs) : [],
+        prerequisites: mapIds(skill.prerequisites || skill.pre_reqs),
         masteryThreshold: skill.masteryThreshold || skill.mastery_threshold || {
           minChallenges: 3,
           minConfidence: 0.8,
@@ -42,12 +67,10 @@ export function normalizeSkillGraphData(data: any): {
 
   // Ensure miniProjects is an array
   const normalizedMiniProjects = Array.isArray(rawMiniProjects) ? rawMiniProjects.map((project: any) => ({
-    id: project.id || crypto.randomUUID(),
+    id: getUUID(project.id),
     name: project.name || project.title || 'Unnamed Project',
     description: project.description || '',
-    unlocksAfter: Array.isArray(project.unlocksAfter || project.unlocks_after)
-      ? (project.unlocksAfter || project.unlocks_after)
-      : [],
+    unlocksAfter: mapIds(project.unlocksAfter || project.unlocks_after),
     engine: project.engine || 'generic',
     estimatedMinutes: project.estimatedMinutes || project.estimated_minutes || 15,
     xpReward: project.xpReward || project.xp_reward || 250,
@@ -56,12 +79,10 @@ export function normalizeSkillGraphData(data: any): {
 
   // Ensure capstoneProject exists
   const normalizedCapstone = rawCapstoneProject ? {
-    id: rawCapstoneProject.id || crypto.randomUUID(),
+    id: getUUID(rawCapstoneProject.id),
     name: rawCapstoneProject.name || rawCapstoneProject.title || 'Capstone Project',
     description: rawCapstoneProject.description || '',
-    unlocksAfter: Array.isArray(rawCapstoneProject.unlocksAfter || rawCapstoneProject.unlocks_after)
-      ? (rawCapstoneProject.unlocksAfter || rawCapstoneProject.unlocks_after)
-      : [],
+    unlocksAfter: mapIds(rawCapstoneProject.unlocksAfter || rawCapstoneProject.unlocks_after),
     engine: rawCapstoneProject.engine || 'generic',
     estimatedMinutes: rawCapstoneProject.estimatedMinutes || rawCapstoneProject.estimated_minutes || 30,
     xpReward: rawCapstoneProject.xpReward || rawCapstoneProject.xp_reward || 500,

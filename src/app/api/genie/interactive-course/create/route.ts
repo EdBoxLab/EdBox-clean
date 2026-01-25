@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, courseId, content } = await request.json();
+    const { userId, courseId, content, timeLimit } = await request.json();
 
     if (!userId || !courseId) {
       return NextResponse.json(
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Course content not found' }, { status: 404 });
     }
 
-    const nodes = await KnowledgeManager.extractHKG(courseId, courseContent);
+    const nodes = await KnowledgeManager.extractHKG(courseId, courseContent, timeLimit);
 
     // 2. Index nodes for vector search
     for (const node of nodes) {

@@ -8,14 +8,24 @@ const supabase = createClient(
 );
 
 export const KnowledgeManager = {
-  /**
-   * Extracts a Hierarchical Knowledge Graph (HKG) from course content
-   */
-  async extractHKG(courseId: string, content: string): Promise<KnowledgeNode[]> {
-    const systemPrompt = `You are an expert curriculum designer. Break down the provided educational content into a Hierarchical Knowledge Graph (HKG). 
-    Each node represents a distinct concept or skill. 
-    Define prerequisite relationships and mastery levels (1-5).
-    Return a JSON object with a 'nodes' array.`;
+    /**
+     * Extracts a Hierarchical Knowledge Graph (HKG) from course content
+     */
+    async extractHKG(courseId: string, content: string, timeLimit?: string): Promise<KnowledgeNode[]> {
+      const systemPrompt = `You are an expert curriculum designer. Break down the provided educational content into a Hierarchical Knowledge Graph (HKG). 
+      Each node represents a distinct concept or skill. 
+      
+      TIME-BASED GRANULARITY (REVERSED):
+      - User has selected a time limit of: ${timeLimit || '15min'}.
+      - **Each node MUST be a small, atomic chunk that can be learned and mastered in AT MOST 5 minutes.**
+      - If the time limit is "5min", provide 20-30 ultra-atomic nodes (each ~15 seconds).
+      - If the time limit is "15min", provide 15-20 granular nodes (each ~1 minute).
+      - If the time limit is "1hour", provide 10-12 granular nodes (each ~5 minutes).
+      - HIGHER skill counts are required for SHORTER time limits to ensure maximum granularity and quick wins.
+      
+      Define prerequisite relationships and mastery levels (1-5).
+      Return a JSON object with a 'nodes' array.`;
+
 
     const result = await generateWithRetry({
       prompt: `Content to process:\n\n${content}\n\nCourse ID: ${courseId}`,

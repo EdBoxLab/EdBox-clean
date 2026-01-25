@@ -90,12 +90,15 @@ Goal: {Provide a JSON learning path analysis with 6 fields: parsedGoal, domain, 
   - **Motivation**: Design paths that feel exciting and rewarding.  
   - **JSON Enforcement**: Output strictly valid JSON, no extra commentary.  
   - **STRICT Context Primacy**: If a document or extracted context is provided, you MUST use it as the SOLE source of truth for the curriculum. DO NOT hallucinate external topics that are not in the document. If the user goal is vague but a document is present, the document defines the scope.
-  - **Level Calibration**: The course MUST be tailored to the ${level} level. Beginners need foundational concepts; advanced users need complex, deep-dive technical skills.
-  - **Duration Calibration**: 
-    - If time is ~5min: Focus on 1-3 atomic, high-impact micro-skills.
-    - If time is ~15min: Focus on 4-7 micro-skills with slightly more depth.
-    - If time is ~1hour: Design a comprehensive path with 12-15 micro-skills and projects.
-    - Set estimatedTotalHours exactly to the numeric value of the timeAvailable (e.g., 5 min = 0.083, 15 min = 0.25, 1 hour = 1.0).
+    - **Level Calibration**: The course MUST be tailored to the ${level} level. Beginners need foundational concepts; advanced users need complex, deep-dive technical skills.
+      - **Duration Calibration (REVERSED GRANULARITY)**: 
+      - If time is ~5min: Focus on 20-30 ultra-atomic, rapid-fire micro-skills (each 10-15 seconds).
+      - If time is ~15min: Focus on 15-20 highly granular micro-skills (each 45-60 seconds).
+      - If time is ~1hour: Focus on 10-12 granular micro-skills (each 5 minutes).
+      - Set estimatedTotalHours exactly to the numeric value of the timeAvailable (e.g., 5 min = 0.083, 15 min = 0.25, 1 hour = 1.0).
+      - **Granularity Requirement**: Every single skill must be a single, specific concept that a student can learn and practice in AT MOST 5 minutes. Shorter total durations require HIGHER skill counts to ensure maximum dopamine and progress visibility.
+
+
 
 Return: {Valid JSON object with keys: parsedGoal, domain, targetProficiency, estimatedTotalHours, recommendedEngine, adjustedDifficulty.}
 `;
@@ -202,19 +205,21 @@ ${uploadedFileContent.substring(0, 15000)}
   const durationRules = `
     DURATION RULES (STRICT COMPLIANCE REQUIRED):
     - **Total Duration Selected**: ${timeAvailable || 'unspecified'}
-    - If duration is **5 minutes**:
-      - Break skills into 1-2 minute atomic chunks.
-      - Limit total micro-skills to 2-4.
-      - Keep explanations extremely concise.
-      - Ensure the sum of all estimatedMinutes (including projects) is exactly 5 minutes.
-    - If duration is **15 minutes**:
-      - Include 5-8 micro-skills.
-      - Provide slightly deeper but still concise explanations.
-      - Ensure total estimated time across all elements is exactly 15 minutes.
-    - If duration is **1 hour**:
-      - Expand to 12-20 micro-skills.
-      - Include detailed explanations and specific practice opportunities.
-      - Ensure total estimated time across all elements is exactly 60 minutes.
+    - **ULTRA-GRANULARITY**: EACH individual micro-skill MUST be a single, focused concept completable in 2-5 minutes.
+    - **NO BULKY SKILLS**: If a topic is large, break it into multiple skills (e.g., "Intro to Variables" vs "Defining Variables" + "Variable Naming Rules").
+    
+    - If duration is 5 minutes (or "5min"):
+        - EXACTLY 20-30 ultra-atomic micro-skills.
+        - Total sum of minutes MUST be EXACTLY 5.
+      - If duration is 15 minutes (or "15min"):
+        - EXACTLY 15-20 micro-skills.
+        - Total sum of minutes MUST be EXACTLY 15.
+      - If duration is 1 hour (or "1hour"):
+        - EXACTLY 10-12 micro-skills.
+        - Total sum of minutes MUST be EXACTLY 60.
+
+    
+    If the content is too broad for the selected time, prioritize the most fundamental concepts that fit within the limit. Do not overflow.
   `;
 
   const basePrompt = `You are an expert curriculum designer for Gen Z learners.

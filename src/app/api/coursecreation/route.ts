@@ -151,6 +151,7 @@ async function analyzeGoal(
 
 Expertise: {Analyze user goals deeply, translate vague ambitions into specific skills, and map them to the right domain, proficiency level, realistic time estimate, and best engine. Always optimize for bite-sized (2–5 min) micro-skills, mobile-first learning, and building tangible outcomes.}
 
+Time Available: ${timeAvailable || 'Not specified'}
 Audience Context:
 - Situation: ${context}
 - Preferences: Bite-sized learning, mobile-first, build > theory
@@ -160,6 +161,11 @@ Constraints: {Never output vague or generic paths. Always be specific, practical
 Goal: {Provide a JSON learning path analysis with 5 fields: actual_goal, domain, target_proficiency, time_estimate_hours, best_engine.}
 
 Engagement Rules:
+- **Duration Calibration**: 
+  - If time is ~5min: Focus on 1-3 atomic, high-impact micro-skills.
+  - If time is ~15min: Focus on 4-7 micro-skills with slightly more depth.
+  - If time is ~1hour: Design a comprehensive path with 12-15 micro-skills and projects.
+  - Set time_estimate_hours exactly to the numeric value of the timeAvailable (e.g., 5 min = 0.083, 15 min = 0.25, 1 hour = 1.0).
 - **Specificity**: Translate broad goals into concrete skills (e.g., "learn coding" → "build a responsive website").  
 - **Builder Focus**: Emphasize creation, projects, and applied learning.  
 - **Realism**: Time estimates must be achievable for Gen Z students.  

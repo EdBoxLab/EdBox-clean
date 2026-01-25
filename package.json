@@ -55,6 +55,7 @@
     "react-select-country-list": "^2.2.3",
     "react-syntax-highlighter": "^16.1.0",
     "recharts": "^3.4.1",
+    "remark-gfm": "^4.0.1",
     "resend": "^6.7.0",
     "tailwind-merge": "^3.4.0",
     "unpdf": "^1.4.0",

@@ -16,37 +16,37 @@ export function normalizeSkillGraphData(data: any): {
 
   // Ensure skillPaths is an array and has skills
   const normalizedPaths = Array.isArray(rawSkillPaths) ? rawSkillPaths.map((path: any) => ({
-    id: path.id || `path_${Math.random().toString(36).substr(2, 9)}`,
+    id: path.id || crypto.randomUUID(),
     name: path.name || path.title || 'Unnamed Path',
     description: path.description || '',
-    skills: Array.isArray(path.skills || path.micro_skills || path.microSkills) 
+    skills: Array.isArray(path.skills || path.micro_skills || path.microSkills)
       ? (path.skills || path.micro_skills || path.microSkills).map((skill: any) => ({
-          id: skill.id || `skill_${Math.random().toString(36).substr(2, 9)}`,
-          name: skill.name || skill.title || 'Unnamed Skill',
-          description: skill.description || '',
-          engine: skill.engine || 'generic',
-          estimatedMinutes: skill.estimatedMinutes || skill.estimated_minutes || 5,
-          prerequisites: Array.isArray(skill.prerequisites || skill.pre_reqs) ? (skill.prerequisites || skill.pre_reqs) : [],
-          masteryThreshold: skill.masteryThreshold || skill.mastery_threshold || {
-            minChallenges: 3,
-            minConfidence: 0.8,
-            minSuccessRate: 0.7
-          },
-          challengeTypes: Array.isArray(skill.challengeTypes || skill.challenge_types) 
-            ? (skill.challengeTypes || skill.challenge_types) 
-            : ['multiple_choice'],
-          xpReward: skill.xpReward || skill.xp_reward || 100
-        }))
+        id: skill.id || crypto.randomUUID(),
+        name: skill.name || skill.title || 'Unnamed Skill',
+        description: skill.description || '',
+        engine: skill.engine || 'generic',
+        estimatedMinutes: skill.estimatedMinutes || skill.estimated_minutes || 5,
+        prerequisites: Array.isArray(skill.prerequisites || skill.pre_reqs) ? (skill.prerequisites || skill.pre_reqs) : [],
+        masteryThreshold: skill.masteryThreshold || skill.mastery_threshold || {
+          minChallenges: 3,
+          minConfidence: 0.8,
+          minSuccessRate: 0.7
+        },
+        challengeTypes: Array.isArray(skill.challengeTypes || skill.challenge_types)
+          ? (skill.challengeTypes || skill.challenge_types)
+          : ['multiple_choice'],
+        xpReward: skill.xpReward || skill.xp_reward || 100
+      }))
       : []
   })) : [];
 
   // Ensure miniProjects is an array
   const normalizedMiniProjects = Array.isArray(rawMiniProjects) ? rawMiniProjects.map((project: any) => ({
-    id: project.id || `project_${Math.random().toString(36).substr(2, 9)}`,
+    id: project.id || crypto.randomUUID(),
     name: project.name || project.title || 'Unnamed Project',
     description: project.description || '',
-    unlocksAfter: Array.isArray(project.unlocksAfter || project.unlocks_after) 
-      ? (project.unlocksAfter || project.unlocks_after) 
+    unlocksAfter: Array.isArray(project.unlocksAfter || project.unlocks_after)
+      ? (project.unlocksAfter || project.unlocks_after)
       : [],
     engine: project.engine || 'generic',
     estimatedMinutes: project.estimatedMinutes || project.estimated_minutes || 15,
@@ -56,18 +56,18 @@ export function normalizeSkillGraphData(data: any): {
 
   // Ensure capstoneProject exists
   const normalizedCapstone = rawCapstoneProject ? {
-    id: rawCapstoneProject.id || `capstone_${Math.random().toString(36).substr(2, 9)}`,
+    id: rawCapstoneProject.id || crypto.randomUUID(),
     name: rawCapstoneProject.name || rawCapstoneProject.title || 'Capstone Project',
     description: rawCapstoneProject.description || '',
-    unlocksAfter: Array.isArray(rawCapstoneProject.unlocksAfter || rawCapstoneProject.unlocks_after) 
-      ? (rawCapstoneProject.unlocksAfter || rawCapstoneProject.unlocks_after) 
+    unlocksAfter: Array.isArray(rawCapstoneProject.unlocksAfter || rawCapstoneProject.unlocks_after)
+      ? (rawCapstoneProject.unlocksAfter || rawCapstoneProject.unlocks_after)
       : [],
     engine: rawCapstoneProject.engine || 'generic',
     estimatedMinutes: rawCapstoneProject.estimatedMinutes || rawCapstoneProject.estimated_minutes || 30,
     xpReward: rawCapstoneProject.xpReward || rawCapstoneProject.xp_reward || 500,
     shareTemplate: rawCapstoneProject.shareTemplate || rawCapstoneProject.share_template || ''
   } : {
-    id: `capstone_${Math.random().toString(36).substr(2, 9)}`,
+    id: crypto.randomUUID(),
     name: 'Final Capstone Project',
     description: 'Apply all your skills in this final project.',
     unlocksAfter: [],

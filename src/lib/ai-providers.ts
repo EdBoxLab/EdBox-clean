@@ -1,114 +1,135 @@
 /**
  * AI Provider Management Utility
  * Handles API key rotation for Gemini and Groq with automatic fallback
+ * 
+ * STRATEGY: 
+ * 1. Loop through ALL Groq keys (Priority)
+ * 2. If all Groq keys fail, loop through ALL Gemini keys
+ * 3. Use Voyage AI for all embeddings (Primary)
+ * 4. Continuity handover ensures seamless explanation across key rotations
  */
 
-// ============= API KEYS =============
+import { VoyageAIClient } from 'voyageai';
 
-const GEMINI_API_KEYS = [
-  process.env.GEMINI_API_KEY_1,
-  process.env.GEMINI_API_KEY_2,
-  process.env.GEMINI_API_KEY_3,
-  process.env.GEMINI_API_KEY_4,
-  process.env.GEMINI_API_KEY_5,
-  process.env.GEMINI_API_KEY_6,
-  process.env.GEMINI_API_KEY_7,
-  process.env.GEMINI_API_KEY_8,
-  process.env.GEMINI_API_KEY_9,
-  process.env.GEMINI_API_KEY_10,
-  process.env.GEMINI_API_KEY_11,
-  process.env.GEMINI_API_KEY_12,
-  process.env.GEMINI_API_KEY_13,
-  process.env.GEMINI_API_KEY_14,
-  process.env.GEMINI_API_KEY_15,
-].filter(Boolean) as string[];
+// ============= KEY HELPERS =============
 
-const GROQ_API_KEYS = [
-  process.env.GROQ_API_KEY,
-  process.env.GROQ_API_KEY_2,
-  process.env.GROQ_API_KEY_3,
-  process.env.GROQ_API_KEY_4,
-  process.env.GROQ_API_KEY_5,
-  process.env.GROQ_API_KEY_6,
-  process.env.GROQ_API_KEY_7,
-  process.env.GROQ_API_KEY_8,
-  process.env.GROQ_API_KEY_9,
-  process.env.GROQ_API_KEY_10,
-  process.env.GROQ_API_KEY_11,
-  process.env.GROQ_API_KEY_12,
-  process.env.GROQ_API_KEY_13,
-  process.env.GROQ_API_KEY_14,
-  process.env.GROQ_API_KEY_15,
-  process.env.GROQ_API_KEY_16,
-  process.env.GROQ_API_KEY_17,
-  process.env.GROQ_API_KEY_18,
-  process.env.GROQ_API_KEY_19,
-  process.env.GROQ_API_KEY_20,
-  process.env.GROQ_API_KEY_21,
-  process.env.GROQ_API_KEY_22,
-  process.env.GROQ_API_KEY_23,
-  process.env.GROQ_API_KEY_24,
-  process.env.GROQ_API_KEY_25,
-  process.env.GROQ_API_KEY_26,
-  process.env.GROQ_API_KEY_27,
-  process.env.GROQ_API_KEY_28,
-  process.env.GROQ_API_KEY_29,
-  process.env.GROQ_API_KEY_30,
-  process.env.GROQ_API_KEY_31,
-  process.env.GROQ_API_KEY_32,
-  process.env.GROQ_API_KEY_33,
-  process.env.GROQ_API_KEY_34,
-  process.env.GROQ_API_KEY_35,
-  process.env.GROQ_API_KEY_36,
-  process.env.GROQ_API_KEY_37,
-  process.env.GROQ_API_KEY_38,
-].filter(Boolean) as string[];
+function getGeminiKeys(): string[] {
+  return [
+    process.env.GEMINI_API_KEY_1,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
+    process.env.GEMINI_API_KEY_4,
+    process.env.GEMINI_API_KEY_5,
+    process.env.GEMINI_API_KEY_6,
+    process.env.GEMINI_API_KEY_7,
+    process.env.GEMINI_API_KEY_8,
+    process.env.GEMINI_API_KEY_9,
+    process.env.GEMINI_API_KEY_10,
+    process.env.GEMINI_API_KEY_11,
+    process.env.GEMINI_API_KEY_12,
+    process.env.GEMINI_API_KEY_13,
+    process.env.GEMINI_API_KEY_14,
+    process.env.GEMINI_API_KEY_15,
+  ].filter(Boolean) as string[];
+}
 
-// src/lib/ai-providers.ts
+function getGroqKeys(): string[] {
+  return [
+    process.env.GROQ_API_KEY,
+    process.env.GROQ_API_KEY_2,
+    process.env.GROQ_API_KEY_3,
+    process.env.GROQ_API_KEY_4,
+    process.env.GROQ_API_KEY_5,
+    process.env.GROQ_API_KEY_6,
+    process.env.GROQ_API_KEY_7,
+    process.env.GROQ_API_KEY_8,
+    process.env.GROQ_API_KEY_9,
+    process.env.GROQ_API_KEY_10,
+    process.env.GROQ_API_KEY_11,
+    process.env.GROQ_API_KEY_12,
+    process.env.GROQ_API_KEY_13,
+    process.env.GROQ_API_KEY_14,
+    process.env.GROQ_API_KEY_15,
+    process.env.GROQ_API_KEY_16,
+    process.env.GROQ_API_KEY_17,
+    process.env.GROQ_API_KEY_18,
+    process.env.GROQ_API_KEY_19,
+    process.env.GROQ_API_KEY_20,
+    process.env.GROQ_API_KEY_21,
+    process.env.GROQ_API_KEY_22,
+    process.env.GROQ_API_KEY_23,
+    process.env.GROQ_API_KEY_24,
+    process.env.GROQ_API_KEY_25,
+    process.env.GROQ_API_KEY_26,
+    process.env.GROQ_API_KEY_27,
+    process.env.GROQ_API_KEY_28,
+    process.env.GROQ_API_KEY_29,
+    process.env.GROQ_API_KEY_30,
+    process.env.GROQ_API_KEY_31,
+    process.env.GROQ_API_KEY_32,
+    process.env.GROQ_API_KEY_33,
+    process.env.GROQ_API_KEY_34,
+    process.env.GROQ_API_KEY_35,
+    process.env.GROQ_API_KEY_36,
+    process.env.GROQ_API_KEY_37,
+    process.env.GROQ_API_KEY_38,
+  ].filter(Boolean) as string[];
+}
 
-/**
- * STRATEGY: Round-Robin Key Rotation
- * REASON: Prevents rate-limiting during heavy "Boardroom Level" usage.
- */
-const LLAMA_CLOUD_KEYS = [
-  process.env.LLAMA_CLOUD_KEY_1,
-  process.env.LLAMA_CLOUD_KEY_2,
-  process.env.LLAMA_CLOUD_KEY_3,
-  process.env.LLAMA_CLOUD_KEY_4,
-  process.env.LLAMA_CLOUD_KEY_5,
-].filter(Boolean) as string[];
+function getLlamaCloudKeys(): string[] {
+  return [
+    process.env.LLAMA_CLOUD_KEY_1,
+    process.env.LLAMA_CLOUD_KEY_2,
+    process.env.LLAMA_CLOUD_KEY_3,
+    process.env.LLAMA_CLOUD_KEY_4,
+    process.env.LLAMA_CLOUD_KEY_5,
+  ].filter(Boolean) as string[];
+}
 
-let currentKeyIndex = 0;
-
-export const getLlamaCloudKey = () => {
-  if (LLAMA_CLOUD_KEYS.length === 0) {
-    throw new Error("CRITICAL: No LlamaCloud Keys found in environment variables.");
-  }
-  const key = LLAMA_CLOUD_KEYS[currentKeyIndex];
-  // Rotate to next key for the next request
-  currentKeyIndex = (currentKeyIndex + 1) % LLAMA_CLOUD_KEYS.length;
-  return key;
-};
-// ============= KEY ROTATION =============
+// ============= KEY ROTATION STATE =============
 
 let geminiKeyIndex = 0;
 let groqKeyIndex = 0;
+let llamaKeyIndex = 0;
+
+// Persistent exhausted keys tracking (cleared every hour)
+const exhaustedKeys = new Set<string>();
+setInterval(() => exhaustedKeys.clear(), 3600000);
 
 export function getNextGeminiKey(): string {
-  if (GEMINI_API_KEYS.length === 0) throw new Error('No Gemini API keys configured');
-  const key = GEMINI_API_KEYS[geminiKeyIndex];
-  geminiKeyIndex = (geminiKeyIndex + 1) % GEMINI_API_KEYS.length;
+  const keys = getGeminiKeys().filter(k => !exhaustedKeys.has(k));
+  if (keys.length === 0) {
+    exhaustedKeys.clear(); // Emergency reset if all are exhausted
+    return getGeminiKeys()[0];
+  }
+  const key = keys[geminiKeyIndex % keys.length];
+  geminiKeyIndex = (geminiKeyIndex + 1) % keys.length;
   return key;
 }
 
 export function getNextGroqKey(): string {
-  if (GROQ_API_KEYS.length === 0) throw new Error('No Groq API keys configured');
-  const key = GROQ_API_KEYS[groqKeyIndex];
-  groqKeyIndex = (groqKeyIndex + 1) % GROQ_API_KEYS.length;
+  const keys = getGroqKeys().filter(k => !exhaustedKeys.has(k));
+  if (keys.length === 0) {
+    exhaustedKeys.clear();
+    return getGroqKeys()[0];
+  }
+  const key = keys[groqKeyIndex % keys.length];
+  groqKeyIndex = (groqKeyIndex + 1) % keys.length;
   return key;
 }
 
-// ============= AI GENERATION WITH FALLBACK =============
+export function getLlamaCloudKey(): string {
+  const keys = getLlamaCloudKeys().filter(k => !exhaustedKeys.has(k));
+  if (keys.length === 0) {
+    exhaustedKeys.clear();
+    return getLlamaCloudKeys()[0];
+  }
+  const key = keys[llamaKeyIndex % keys.length];
+  llamaKeyIndex = (llamaKeyIndex + 1) % keys.length;
+  return key;
+}
+
+// ============= INTERFACES =============
 
 export interface GenerateOptions {
   prompt: string;
@@ -120,177 +141,372 @@ export interface GenerateOptions {
     mimeType: string;
     data: string; // base64
   }[];
-  model?: 'versatile' | 'oss';
+  model?: 'versatile' | 'oss' | 'vision';
+  continuationContext?: string; // Used to resume from partial responses
 }
 
 export interface GenerateResult {
   text: string;
-  provider: 'gemini' | 'groq';
+  provider: 'gemini' | 'groq' | 'huggingface' | 'local';
   success: boolean;
 }
 
+// ============= CONTINUITY HELPERS =============
+
 /**
- * Generate embedding for a given text
+ * Creates a continuation prompt for the next AI if the current one fails mid-stream
  */
-export async function embedText(text: string): Promise<number[]> {
-  try {
-    const { GoogleGenAI } = await import("@google/genai");
-    const ai = new GoogleGenAI({ apiKey: getNextGeminiKey() });
-    const model = ai.getGenerativeModel({ model: "embedding-001" });
-    
-    const result = await model.embedContent(text);
-    return result.embedding.values;
-  } catch (error) {
-    console.error('❌ Embedding failed:', error);
-    throw error;
+function createContinuationPrompt(originalPrompt: string, accumulatedText: string): string {
+  if (!accumulatedText) return originalPrompt;
+  
+  // Take the last 500 chars to avoid prompt bloat but give enough context
+  const recentContext = accumulatedText.slice(-500);
+  
+  return `[CONTINUATION REQUEST]
+The previous AI provider was cut off while explaining. 
+What was already said: "...${recentContext}"
+
+TASK: Continue the explanation exactly from where it left off. 
+Do NOT repeat the beginning. Start immediately with the next word or sentence fragment.
+Original Request: ${originalPrompt}`;
+}
+
+// ============= CORE AI METHODS =============
+
+/**
+ * Robust streaming with automatic failover and continuity preservation
+ */
+export async function* streamWithFallback(options: GenerateOptions): AsyncGenerator<string> {
+  const { prompt, systemPrompt, temperature = 0.7, maxTokens = 4000, attachments = [], model = 'oss' } = options;
+  let accumulatedText = '';
+  let currentPrompt = prompt;
+
+  // 1. TRY ALL GROQ KEYS
+  const groqKeys = getGroqKeys();
+  let keyIndex = 0;
+
+  while (keyIndex < groqKeys.length) {
+    const key = groqKeys[keyIndex];
+    if (exhaustedKeys.has(key)) {
+      keyIndex++;
+      continue;
+    }
+
+    try {
+      const Groq = (await import('groq-sdk')).default;
+      const groq = new Groq({ apiKey: key });
+      
+      const groqModel = attachments.length > 0 ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
+      
+      const messages: any[] = [];
+      if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+      
+      // If we have accumulated text, we are resuming
+      if (accumulatedText) {
+        messages.push({ role: 'user', content: createContinuationPrompt(prompt, accumulatedText) });
+      } else {
+        messages.push({ role: 'user', content: prompt });
+      }
+
+      const stream = await groq.chat.completions.create({
+        model: groqModel,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        stream: true,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          accumulatedText += content;
+          yield content;
+        }
+      }
+      
+      // If we finished successfully, return
+      return;
+
+    } catch (error: any) {
+      const isRateLimit = error.status === 429 || error.message?.includes('rate limit');
+      if (isRateLimit) {
+        exhaustedKeys.add(key);
+        console.warn(`⚠️ Groq key ${keyIndex + 1} exhausted mid-stream, rotating...`);
+        keyIndex++;
+        continue;
+      }
+      console.error(`❌ Groq streaming error: ${error.message}`);
+      break; // Try Gemini
+    }
   }
+
+  // 2. FALLBACK TO ALL GEMINI KEYS
+  const geminiKeys = getGeminiKeys();
+  let geminiIndex = 0;
+
+  while (geminiIndex < geminiKeys.length) {
+    const key = geminiKeys[geminiIndex];
+    if (exhaustedKeys.has(key)) {
+      geminiIndex++;
+      continue;
+    }
+
+    try {
+      const { GoogleGenerativeAI } = await import("@google/generative-ai");
+      const genAI = new GoogleGenerativeAI(key);
+      const geminiModel = genAI.getGenerativeModel({ 
+        model: 'gemini-1.5-flash',
+        systemInstruction: systemPrompt 
+      });
+
+      const contents: any[] = [];
+      if (accumulatedText) {
+        contents.push({ role: 'user', parts: [{ text: createContinuationPrompt(prompt, accumulatedText) }] });
+      } else {
+        contents.push({ role: 'user', parts: [{ text: prompt }] });
+      }
+
+      const result = await geminiModel.generateContentStream({ contents, generationConfig: { temperature, maxOutputTokens: maxTokens } });
+      
+      for await (const chunk of result.stream) {
+        const content = chunk.text();
+        if (content) {
+          accumulatedText += content;
+          yield content;
+        }
+      }
+      
+      return;
+
+    } catch (error: any) {
+      const isRateLimit = error.message?.includes('429') || error.message?.includes('quota');
+      if (isRateLimit) {
+        exhaustedKeys.add(key);
+        console.warn(`⚠️ Gemini key ${geminiIndex + 1} exhausted mid-stream, rotating...`);
+        geminiIndex++;
+        continue;
+      }
+      console.error(`❌ Gemini streaming error: ${error.message}`);
+      break;
+    }
+  }
+
+  throw new Error('Streaming failed across all providers and keys.');
 }
 
 /**
- * Clean AI response by removing markdown code blocks and extracting JSON
+ * Generate embedding for a given text with robust fallbacks
+ * VOYAGE AI is the primary provider for high-quality embeddings
+ */
+export async function embedText(text: string): Promise<number[]> {
+  // 1. Try Voyage AI (Primary)
+  const voyageKey = process.env.VOYAGE_API_KEY;
+  if (voyageKey) {
+    try {
+      const client = new VoyageAIClient({ apiKey: voyageKey });
+        const response = await client.embed({
+          input: text,
+          model: 'voyage-3', // High performance, low latency
+          inputType: 'document'
+        });
+        if (response.data?.[0]?.embedding) {
+          return response.data[0].embedding;
+        }
+    } catch (error: any) {
+      console.warn(`⚠️ Voyage AI embedding failed: ${error.message}`);
+    }
+  }
+
+  // 2. Try ALL LlamaCloud Keys (Secondary)
+  const llamaKeys = getLlamaCloudKeys();
+  for (const key of llamaKeys) {
+    if (exhaustedKeys.has(key)) continue;
+    try {
+      const response = await fetch('https://api.llamacloud.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          input: [text],
+          model: 'bge-base-en-v1.5'
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.data?.[0]?.embedding) return data.data[0].embedding;
+      } else if (response.status === 429) {
+        exhaustedKeys.add(key);
+      }
+    } catch (error: any) {
+      console.warn(`⚠️ LlamaCloud key failed: ${error.message}`);
+    }
+  }
+
+  // 3. Try ALL Gemini Keys (Tertiary)
+  const geminiKeys = getGeminiKeys();
+  for (const key of geminiKeys) {
+    if (exhaustedKeys.has(key)) continue;
+    try {
+      const { GoogleGenerativeAI } = await import("@google/generative-ai");
+      const genAI = new GoogleGenerativeAI(key);
+      const model = genAI.getGenerativeModel({ model: "embedding-001" });
+      const result = await model.embedContent(text);
+      if (result.embedding?.values) return result.embedding.values;
+    } catch (error: any) {
+      const isRateLimit = error.message?.includes('429') || error.message?.includes('quota');
+      if (isRateLimit) {
+        exhaustedKeys.add(key);
+        console.warn(`⚠️ Gemini key exhausted, rotating...`);
+        continue;
+      }
+      console.warn(`⚠️ Gemini embedding error: ${error.message}`);
+      break; 
+    }
+  }
+
+  throw new Error('Embedding failed across all keys and providers (Voyage, LlamaCloud, Gemini)');
+}
+
+/**
+ * Clean AI response
  */
 export function cleanJsonResponse(text: string): string {
-  // Remove markdown code blocks if present
   let cleaned = text.trim();
-
-  // Handle cases where the model returns ```json { ... } ``` or similar
   const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   if (jsonMatch && jsonMatch[1]) {
     cleaned = jsonMatch[1].trim();
   } else {
-    // Sometimes it might return just { ... } with some text around it
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
       cleaned = cleaned.substring(firstBrace, lastBrace + 1);
     }
   }
-
   return cleaned;
 }
 
 /**
- * Generate AI content with prioritized Groq (as requested by user)
+ * Generate AI content with prioritized Groq Loop then Gemini Loop
  */
 export async function generateWithFallback(options: GenerateOptions): Promise<GenerateResult> {
-  const { prompt, systemPrompt, schema, temperature = 1.0, maxTokens = 4000, attachments = [], model = 'oss' } = options;
+  const { prompt, systemPrompt, schema, temperature = 0.7, maxTokens = 4000, attachments = [], model = 'oss' } = options;
+  const hasImages = attachments.some(a => a.mimeType.startsWith('image/')) || model === 'vision';
 
-  const hasImages = attachments.some(a => a.mimeType.startsWith('image/'));
-
-  // Determine model: vision for images, versatile for notes, oss for JSON tasks
-  let groqModel = 'openai/gpt-oss-120b';
+  let groqModel = 'llama-3.3-70b-versatile';
   if (hasImages) {
     groqModel = 'llama-3.2-11b-vision-preview';
-  } else if (model === 'versatile') {
-    groqModel = 'llama-3.3-70b-versatile';
+  } else if (model === 'oss') {
+    groqModel = 'llama-3.1-8b-instant';
   }
 
-  // Try Groq FIRST (User preference: "let's not use gemini for now just groq")
-  try {
-    console.log(`🟢 Attempting Groq generation with model: ${groqModel}...`);
-    const Groq = (await import('groq-sdk')).default;
-    const groq = new Groq({ apiKey: getNextGroqKey() });
-
-    const messages: any[] = [];
-
-    if (systemPrompt) {
-      messages.push({
-        role: 'system',
-        content: systemPrompt,
-      });
-    }
-
-    if (hasImages) {
-      const userContent: any[] = [{ type: 'text', text: prompt }];
-      attachments.forEach(attachment => {
-        if (attachment.mimeType.startsWith('image/')) {
-          userContent.push({
-            type: 'image_url',
-            image_url: {
-              url: `data:${attachment.mimeType};base64,${attachment.data}`,
-            },
-          });
-        }
-      });
-      messages.push({ role: 'user', content: userContent });
-    } else {
-      messages.push({ role: 'user', content: prompt });
-    }
-
-    const response = await groq.chat.completions.create({
-      model: groqModel,
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-      response_format: schema ? { type: 'json_object' } : undefined,
-    });
-
-    const text = response.choices[0]?.message?.content || '';
-    console.log('✅ Groq successful. Output sample:', text.substring(0, 100) + '...');
-
-    return {
-      text,
-      provider: 'groq',
-      success: true,
-    };
-  } catch (groqError: any) {
-    console.warn('⚠️ Groq failed:', groqError.message);
-
-    // Fallback to Gemini only as a last resort if Groq fails
+  // 1. TRY ALL GROQ KEYS FIRST
+  const groqKeys = getGroqKeys();
+  for (const key of groqKeys) {
+    if (exhaustedKeys.has(key)) continue;
     try {
-      console.log('🔵 Falling back to Gemini as last resort...');
-      const { GoogleGenAI } = await import("@google/genai");
-      const ai = new GoogleGenAI({ apiKey: getNextGeminiKey() });
+      const Groq = (await import('groq-sdk')).default;
+      const groq = new Groq({ apiKey: key });
 
+      const messages: any[] = [];
+      if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+
+      if (hasImages) {
+        const userContent: any[] = [{ type: 'text', text: prompt }];
+        attachments.forEach(attachment => {
+          if (attachment.mimeType.startsWith('image/')) {
+            userContent.push({
+              type: 'image_url',
+              image_url: { url: `data:${attachment.mimeType};base64,${attachment.data}` },
+            });
+          }
+        });
+        messages.push({ role: 'user', content: userContent });
+      } else {
+        messages.push({ role: 'user', content: prompt });
+      }
+
+      const response = await groq.chat.completions.create({
+        model: groqModel,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        response_format: schema ? { type: 'json_object' } : undefined,
+      });
+
+      return {
+        text: response.choices[0]?.message?.content || '',
+        provider: 'groq',
+        success: true,
+      };
+    } catch (groqError: any) {
+      if (groqError.status === 429 || groqError.message?.includes('rate limit')) {
+        exhaustedKeys.add(key);
+        console.warn(`⚠️ Groq key exhausted, trying next...`);
+        continue;
+      }
+      console.warn(`⚠️ Groq error with key: ${groqError.message}`);
+      break; // Non-rate-limit error, move to Gemini
+    }
+  }
+
+  // 2. FALLBACK TO ALL GEMINI KEYS
+  const geminiKeys = getGeminiKeys();
+  for (const key of geminiKeys) {
+    if (exhaustedKeys.has(key)) continue;
+    try {
+      const { GoogleGenerativeAI } = await import("@google/generative-ai");
+      const genAI = new GoogleGenerativeAI(key);
+      
       const config: any = {
         temperature,
         maxOutputTokens: maxTokens,
       };
 
-      if (systemPrompt) {
-        config.systemInstruction = systemPrompt;
-      }
-
       if (schema) {
         config.responseMimeType = "application/json";
-        config.responseSchema = schema;
       }
 
       const contents: any[] = [{ role: 'user', parts: [{ text: prompt }] }];
-
       if (attachments.length > 0) {
         attachments.forEach(attachment => {
           contents[0].parts.push({
-            inlineData: {
-              mimeType: attachment.mimeType,
-              data: attachment.data,
-            }
+            inlineData: { mimeType: attachment.mimeType, data: attachment.data }
           });
         });
       }
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
-        contents,
-        config,
+      const geminiModel = genAI.getGenerativeModel({ 
+        model: 'gemini-1.5-flash',
+        systemInstruction: systemPrompt 
       });
 
-      console.log('✅ Gemini fallback successful');
+      const result = await geminiModel.generateContent({ contents, generationConfig: config });
+      const response = await result.response;
+
       return {
-        text: response.text,
+        text: response.text(),
         provider: 'gemini',
         success: true,
       };
     } catch (geminiError: any) {
-      console.error('❌ Both Groq and Gemini failed');
-      throw new Error(`AI generation failed: ${geminiError.message}`);
+      const isRateLimit = geminiError.message?.includes('429') || geminiError.message?.includes('quota');
+      if (isRateLimit) {
+        exhaustedKeys.add(key);
+        console.warn(`⚠️ Gemini key exhausted, trying next...`);
+        continue;
+      }
+      console.error(`❌ Gemini error: ${geminiError.message}`);
+      break;
     }
   }
+
+  throw new Error('AI generation failed: All Groq and Gemini keys are exhausted or errored.');
 }
 
-
 /**
- * Retry generation with exponential backoff
+ * Retry generation
  */
 export async function generateWithRetry(
   options: GenerateOptions,
@@ -301,15 +517,8 @@ export async function generateWithRetry(
     try {
       return await generateWithFallback(options);
     } catch (error: any) {
-      const isLastAttempt = attempt === maxRetries - 1;
-
-      if (isLastAttempt) {
-        throw error;
-      }
-
-      // Exponential backoff with jitter
+      if (attempt === maxRetries - 1) throw error;
       const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
-      console.log(`⏳ Retry ${attempt + 1}/${maxRetries} in ${Math.round(delay)}ms`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -317,37 +526,22 @@ export async function generateWithRetry(
 }
 
 /**
- * Extract meaningful context and information from raw text using AI
+ * Unified context extraction
  */
 export async function extractContextFromText(text: string): Promise<string> {
-  if (!text || text.trim().length === 0) return '';
-
-  const systemPrompt = `You are an expert information extractor. Your task is to analyze raw text extracted from a document (PDF, PPTX, etc.) and extract the core context, key concepts, and meaningful information.
-
-Constraints:
-- Focus on the main topic and educational value.
-- Identify the target audience if possible.
-- Extract key terminology and definitions.
-- Summarize the structure of the content.
-- DO NOT just repeat the text; synthesize it into a concise knowledge summary.
-- The summary should be optimized for another AI to use as context for generating educational materials.
-- Max 1000 tokens for the summary.
-
-Return the extraction in a clear, structured format.`;
-
+  if (!text?.trim()) return '';
+  const systemPrompt = `Analyze the raw text and extract core context, key concepts, and structure. Summarize for educational use.`;
+  
   try {
-    console.log('🧠 Extracting context from document text...');
     const result = await generateWithRetry({
-      prompt: `Analyze the following raw text and extract meaningful context:\n\n${text.substring(0, 30000)}`,
+      prompt: `Analyze:\n\n${text.substring(0, 30000)}`,
       systemPrompt,
-      temperature: 0.3, // Lower temperature for more factual extraction
+      temperature: 0.3,
       maxTokens: 1000,
     });
-    console.log('✅ Context extraction complete');
     return result.text;
   } catch (error) {
-    console.error('❌ Failed to extract context from text:', error);
-    // Fallback to a simple truncation if AI extraction fails
+    console.error('❌ Context extraction failed');
     return text.substring(0, 5000);
   }
 }

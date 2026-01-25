@@ -58,6 +58,23 @@ export async function POST(request: NextRequest) {
 
         if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
 
+        // 0. FETCH & MANAGE RETRY COUNT
+        // ---------------------------------------------------------
+        const { data: sessionData } = await persistenceClient
+            .from('interactive_course_sessions')
+            .select('retry_count')
+            .eq('id', sessionId)
+            .single();
+
+        const retryCount = sessionData?.retry_count || 0;
+
+        if (retryCount >= 5) {
+            return new Response(
+                `data: ${JSON.stringify({ type: 'content', content: "I'm temporarily unavailable, so sorry about that." })}\n\n`,
+                { headers: { 'Content-Type': 'text/event-stream' } }
+            );
+        }
+
         // 1. RESOLVE CONTEXT (Knowledge Graph)
         // ---------------------------------------------------------
         // We need to identify exactly which node/concept the user is currently on.
@@ -101,9 +118,21 @@ export async function POST(request: NextRequest) {
             console.warn('Vector retrieval failed (skipping RAG):', e);
         }
 
-        // 3. CHECK MASTERY
+        // 3. CHECK MASTERY (Robustly)
         // ---------------------------------------------------------
-        const mastery = await MasteryTracker.getMastery(user.id, currentNode.id);
+        // Ensure we don't crash if an ID is not a valid UUID
+        const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+        let mastery = null;
+        if (user.id && currentNode.id && isUUID(user.id) && isUUID(currentNode.id)) {
+            try {
+                mastery = await MasteryTracker.getMastery(user.id, currentNode.id);
+            } catch (err) {
+                console.warn(`[GENIE_BRAIN] Mastery check failed for node ${currentNode.id}`, err);
+            }
+        } else {
+            console.warn(`[GENIE_BRAIN] Skipping mastery check. Invalid UUIDs - User: ${user.id}, Node: ${currentNode.id}`);
+        }
 
         // 4. COGNITIVE REASONING (The Decision)
         // ---------------------------------------------------------
@@ -174,29 +203,42 @@ export async function POST(request: NextRequest) {
                                 p_message_type: 'explanation'
                             });
                         } else {
-                            // GENERATE FULL EXPLANATION (grounded in context)
-                            const explanation = await CognitiveReasoning.generatePersonalizedContent(
+                            // GENERATE REAL STREAMING EXPLANATION (Grounded in context with continuity)
+                            const explanationStream = CognitiveReasoning.generatePersonalizedContentStream(
                                 currentNode,
                                 userMessage
                             );
-                            await streamText(explanation, controller, encoder);
+
+                            let fullExplanation = '';
+                            for await (const chunk of explanationStream) {
+                                fullExplanation += chunk;
+                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'content', content: chunk })}\n\n`));
+                            }
 
                             await persistenceClient.rpc('add_conversation_message', {
                                 p_session_id: sessionId,
                                 p_role: 'genie',
-                                p_content: explanation,
+                                p_content: fullExplanation,
                                 p_message_type: 'explanation'
                             });
                         }
                     }
 
-                    // Update Mastery & Goals (Background)
-                    // We interpret the "status" from the decision to update progress
-                    // ... (This logic is simplified for now, as mastery updates usually happen AFTER quiz completion)
+                    // Reset retry count on success
+                    await persistenceClient
+                        .from('interactive_course_sessions')
+                        .update({ retry_count: 0 })
+                        .eq('id', sessionId);
 
                     controller.close();
                 } catch (e) {
                     console.error('Stream Error:', e);
+
+                    // Increment retry count on failure
+                    await persistenceClient.rpc('increment_session_retry', { p_session_id: sessionId });
+
+                    const errorMessage = "I encountered an issue, please retry.";
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'content', content: errorMessage })}\n\n`));
                     controller.close();
                 }
             }

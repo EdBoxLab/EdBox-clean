@@ -1,44 +1,27 @@
-import Groq from "groq-sdk";
-import { GoogleGenAI } from "@google/genai";
-import { keyStates, allKeysConfigured, ApiKeyState } from "../utils/apiKeys";
+import { generateWithRetry, cleanJsonResponse } from "@/lib/ai-providers";
 
 export async function callAI<T>(
   systemPrompt: string,
   userPrompt: string,
   validator: (r: any) => boolean
 ): Promise<T> {
-  if (!allKeysConfigured) throw new Error("No API keys configured");
-
-  const key = keyStates.find(k => k.exhaustedUntil <= Date.now());
-  if (!key) throw new Error("All keys exhausted");
-
-  key.activeRequests++;
-
   try {
-    let result: any;
+    const result = await generateWithRetry({
+      prompt: userPrompt,
+      systemPrompt,
+      schema: true, // Use JSON mode
+      temperature: 0.7,
+    });
 
-    if (key.provider === 'groq') {
-      const groq = new Groq({ apiKey: key.key });
-      const res = await groq.chat.completions.create({
-        model: "openai/gpt-oss-120b",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        response_format: { type: "json_object" }
-      });
+    const parsed = JSON.parse(cleanJsonResponse(result.text));
 
-      result = JSON.parse(res.choices[0].message?.content || "{}");
-    } else {
-      const ai = new GoogleGenAI({ apiKey: key.key });
-      const res = await ai.models.generateContent({ contents: userPrompt });
-      result = JSON.parse(res.text);
+    if (!validator(parsed)) {
+      throw new Error("Invalid AI response format");
     }
 
-    if (!validator(result)) throw new Error("Invalid AI response");
-
-    return result as T;
-  } finally {
-    key.activeRequests--;
+    return parsed as T;
+  } catch (error) {
+    console.error("AI Call Failed:", error);
+    throw error;
   }
 }

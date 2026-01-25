@@ -295,6 +295,22 @@ export default function InteractiveCourseSession({
       return;
     }
 
+    // UUID Validation Helper
+    const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+    // Ensure we only send a valid UUID for currentSkillId
+    let validSkillId = currentSkillId;
+    if (!isUUID(validSkillId)) {
+      console.warn(`[InteractiveSession] Invalid UUID for skillId: "${validSkillId}". Falling back to courseId.`);
+      validSkillId = courseId; // Try falling back to courseId
+
+      // If courseId is also invalid (e.g. legacy slug course), we might have a problem,
+      // but for now, this fixes the "skill slug" issue.
+      if (!isUUID(validSkillId)) {
+        console.warn(`[InteractiveSession] CourseId is also not a UUID: "${validSkillId}". API might reject this.`);
+      }
+    }
+
     const userMessage: ChatMessage = {
       id: 'user-' + Date.now(),
       role: 'learner',
@@ -327,7 +343,7 @@ export default function InteractiveCourseSession({
           userMessage: userMessage.content,
           sessionId: effectiveSessionId,
           courseId,
-          currentSkillId,
+          currentSkillId: validSkillId,
           skillTitle: courseTitle,
           learningStage: stageOverride || learningStage,
           conversationHistory: messages.slice(-5),

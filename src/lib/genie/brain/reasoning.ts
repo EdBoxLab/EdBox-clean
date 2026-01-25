@@ -1,4 +1,4 @@
-import { generateWithRetry, cleanJsonResponse } from '@/lib/ai-providers';
+import { generateWithRetry, cleanJsonResponse, streamWithFallback } from '@/lib/ai-providers';
 import { KnowledgeNode, MasteryRecord } from './types';
 import { VectorBrain } from './vector';
 
@@ -74,17 +74,19 @@ export const CognitiveReasoning = {
   },
 
   /**
-   * Generates a personalized explanation based on vector-retrieved context
+   * Generates a personalized explanation based on vector-retrieved context (streaming)
    */
-  async generatePersonalizedContent(node: KnowledgeNode, query: string) {
+  async *generatePersonalizedContentStream(node: KnowledgeNode, query: string) {
     const relatedContext = await VectorBrain.findRelatedNodes(query);
     const contextText = relatedContext.map(m => m.content).join('\n---\n');
 
-    const result = await generateWithRetry({
+    const stream = streamWithFallback({
       prompt: `Explain the concept "${node.title}" in the context of: ${query}\n\nAdditional Context:\n${contextText}`,
-      systemPrompt: "You are Genie, a helpful and adaptive tutor. Use the provided context to make your explanation more relevant to the user's specific interest or query.",
+      systemPrompt: "You are Genie, a helpful and adaptive tutor. Use the provided context to make your explanation more relevant to the user's specific interest or query. Be concise but thorough.",
     });
 
-    return result.text;
+    for await (const chunk of stream) {
+      yield chunk;
+    }
   }
 };

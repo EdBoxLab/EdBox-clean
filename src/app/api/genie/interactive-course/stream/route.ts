@@ -140,7 +140,8 @@ export async function POST(request: NextRequest) {
             userMessage,
             currentNode,
             mastery,
-            relatedContext
+            relatedContext,
+            conversationHistory || []
         );
 
         console.log('[GENIE_BRAIN] Decision:', decision.action, decision.thought_process);
@@ -159,8 +160,38 @@ export async function POST(request: NextRequest) {
                         p_message_type: 'explanation'
                     });
 
-                    // A. Handle Quiz
-                    if (decision.action === 'quiz' && decision.content.quiz) {
+                    // A. Handle Roadmap
+                    if (decision.action === 'roadmap') {
+                        const { KnowledgeManager } = await import('@/lib/genie/brain/knowledge');
+                        const nodes = await KnowledgeManager.getNodesForCourse(courseId);
+                        
+                        const roadmapData = {
+                            title: skillTitle || "Your Learning Journey",
+                            description: decision.content.text || `Welcome! Here's the roadmap we've designed to help you master ${skillTitle}.`,
+                            items: nodes.map(n => ({
+                                id: n.id,
+                                text: n.title,
+                                description: n.description,
+                                confidence: 0
+                            }))
+                        };
+
+                        const intro = decision.content.text || "Here is your learning roadmap for this course.";
+                        await streamText(intro, controller, encoder);
+
+                        // Send Roadmap Data
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'roadmap', roadmapData })}\n\n`));
+
+                        await persistenceClient.rpc('add_conversation_message', {
+                            p_session_id: sessionId,
+                            p_role: 'genie',
+                            p_content: intro,
+                            p_message_type: 'roadmap',
+                            p_metadata: { roadmapData }
+                        });
+                    }
+                    // B. Handle Quiz
+                    else if (decision.action === 'quiz' && decision.content.quiz) {
                         const intro = decision.content.text || "Let's check your understanding.";
                         await streamText(intro, controller, encoder);
 

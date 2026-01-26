@@ -19,6 +19,8 @@ EdBox is a comprehensive educational platform designed to empower learners with 
 - `src/api`: api routes
 
 ## User Preferences
+- **Persona**: Master Architect. Ruthless efficiency, simple logic, craftsman-like focus. Despise bloat and jargon.
+- **Craftsmanship**: The backend must be as beautiful as the frontend. High UX/UI standards (dopamine-hitting design).
 - No comments unless requested.
 - Use functional components.
 - Use named exports.

@@ -10,7 +10,8 @@ export const CognitiveReasoning = {
       userResponse: string,
       currentNode: KnowledgeNode,
       mastery: MasteryRecord | null,
-      relatedContext: any[]
+      relatedContext: any[],
+      conversationHistory: any[] = []
     ) {
         const systemPrompt = `You are the "Genie Brain", a cognitive reasoning engine for an adaptive tutor. 
         Your goal is to analyze the user's state and determine the single best pedagogical next step.
@@ -21,22 +22,24 @@ export const CognitiveReasoning = {
         - Mastery Score: ${mastery?.mastery_score || 0}/100
         
         Pedagogical Rules:
-        1. JUST STARTED: If Mastery Status is "not_started", always choose "explain". Provide a welcoming intro and a clear foundational explanation.
-        2. STRUGGLING: If Mastery Score < 50, choose "remediate" or "explain" using simpler terms and metaphors.
-        3. COMPETENT: If Mastery Score 50-80, choose "quiz" to verify their mental model.
-        4. MASTERING: If Mastery Score > 80, choose "challenge" to encourage higher-order thinking (application/synthesis).
-        5. USER REQUEST: If the user explicitly asks for a quiz, challenge, or explanation, honor their request regardless of score.
+        1. INITIALIZATION: If this is the very beginning (no history), choose "roadmap" to show the learner what they will cover.
+        2. VAGUE RESPONSES: If the user says something vague or affirmative (e.g., "ok", "yes", "uhm", "go on", "I understand") AFTER you've already explained something, DO NOT repeat the explanation. Instead, move to "quiz" or "challenge" to verify mastery, or "roadmap" to show progress.
+        3. JUST STARTED: If Mastery Status is "not_started" and you haven't explained yet, choose "explain".
+        4. STRUGGLING: If Mastery Score < 50, choose "remediate" or "explain" using simpler terms and metaphors.
+        5. COMPETENT: If Mastery Score 50-80, choose "quiz" to verify their mental model.
+        6. MASTERING: If Mastery Score > 80, choose "challenge" to encourage higher-order thinking (application/synthesis).
+        7. USER REQUEST: If the user explicitly asks for a quiz, challenge, or explanation, honor their request regardless of score.
 
         CRITICAL: 
         - DO NOT return the "Current State" in your response. 
-        - DO NOT return fields like "Mastery Status", "Score", or "Node".
+        - DO NOT repeat yourself. If the history shows you just explained the topic, move to the next action.
         - ONLY return the fields defined in the schema below.
 
         OUTPUT FORMAT:
         You MUST return ONLY a valid JSON object. Do not include markdown blocks, preambles, or extra text.
         The JSON must follow this exact schema:
         {
-          "action": "explain" | "quiz" | "challenge" | "remediate",
+          "action": "explain" | "quiz" | "challenge" | "remediate" | "roadmap",
           "thought_process": "Brief explanation of your pedagogical choice",
           "content": {
             "text": "Introductory or transition text (at least 2 sentences)",
@@ -58,12 +61,12 @@ export const CognitiveReasoning = {
 
 
       const result = await generateWithRetry({
-        prompt: `User Message: "${userResponse}"\nTopic Context: ${currentNode.content.substring(0, 300)}`,
+        prompt: `Conversation History:\n${JSON.stringify(conversationHistory.slice(-5))}\n\nUser Message: "${userResponse}"\nTopic Context: ${currentNode.content.substring(0, 300)}`,
         systemPrompt,
         schema: {
           type: "object",
           properties: {
-            action: { type: "string", enum: ["explain", "quiz", "challenge", "remediate"] },
+            action: { type: "string", enum: ["explain", "quiz", "challenge", "remediate", "roadmap"] },
             thought_process: { type: "string" },
             content: {
               type: "object",

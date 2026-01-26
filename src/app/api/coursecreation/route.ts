@@ -431,7 +431,8 @@ export async function POST(request: NextRequest) {
           uploadedFile.type || '',
           uploadedFile.name || ''
         );
-        extractedContext = await extractContextFromText(rawText);
+        const contextArray = await extractContextFromText(rawText);
+        extractedContext = contextArray.join('\n\n');
         console.log('✅ File context extracted');
       } catch (err) {
         console.error('❌ File processing failed:', err);
@@ -561,16 +562,16 @@ export async function POST(request: NextRequest) {
       },
       {
         skillGraph: {
-            goal: skillGraph.goal,
-            context: skillGraph.context,
-            totalSkills: skillGraph.totalSkills,
-            estimatedHours: skillGraph.estimatedHours,
-            skillPaths: skillGraph.skillPaths,
-            miniProjects: skillGraph.miniProjects,
-            capstone_project: skillGraph.capstone_project,
-            nodes: skillGraph.nodes,
-            edges: skillGraph.edges,
-          },
+          goal: skillGraph.goal,
+          context: skillGraph.context,
+          totalSkills: skillGraph.totalSkills,
+          estimatedHours: skillGraph.estimatedHours,
+          skillPaths: skillGraph.skillPaths,
+          miniProjects: skillGraph.miniProjects,
+          capstone_project: skillGraph.capstone_project,
+          nodes: skillGraph.nodes,
+          edges: skillGraph.edges,
+        },
       }
     );
 

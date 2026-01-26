@@ -4,10 +4,10 @@ import { generateWithRetry, extractContextFromText } from '../lib/ai-providers';
 import { formatAIText } from '../lib/utils/markdown';
 
 const safetySettings = [
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
 ];
 
 export async function askGenie(prompt: string): Promise<string> {
@@ -28,7 +28,7 @@ export async function askGenie(prompt: string): Promise<string> {
 
 
 function buildPrompt(goal: string, audience: string, citationStyle: CitationStyle, sources: Source[]): string {
-    const sourceText = sources.map((src, index) => 
+    const sourceText = sources.map((src, index) =>
         `--- Source ${index + 1} (${src.name}) ---\n${src.content}\n--- End Source ${index + 1} ---`
     ).join('\n\n');
 
@@ -89,19 +89,20 @@ function buildPrompt(goal: string, audience: string, citationStyle: CitationStyl
 }
 
 export async function generateResearchPackage(
-    goal: string, 
-    audience: string, 
-    citationStyle: CitationStyle, 
+    goal: string,
+    audience: string,
+    citationStyle: CitationStyle,
     sources: Source[],
     setStatus: (status: string) => void
 ): Promise<Omit<ResearchPackage, 'id'>> {
-    
+
     setStatus("Extracting key information from sources...");
     const processedSources = await Promise.all(sources.map(async (src) => {
         // Only extract context if it's long (> 3000 chars)
         if (src.content && src.content.length > 3000) {
             console.log(`🧠 Extracting context for source: ${src.name}`);
-            const context = await extractContextFromText(src.content);
+            const contextArray = await extractContextFromText(src.content);
+            const context = contextArray.join('\n\n');
             return { ...src, content: context };
         }
         return src;
@@ -118,7 +119,7 @@ export async function generateResearchPackage(
             temperature: 0.7,
             maxTokens: 8000,
         });
-        
+
         setStatus("Parsing and validating the research package...");
         const cleanJsonText = result.text.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
         const generatedPackage = JSON.parse(cleanJsonText);
@@ -159,11 +160,11 @@ export async function generateResearchPackage(
         }
 
         if (!generatedPackage.audio_dialogue) {
-             generatedPackage.audio_dialogue = { title: "Audio Companion", script: "", audio_base64: null };
+            generatedPackage.audio_dialogue = { title: "Audio Companion", script: "", audio_base64: null };
         }
 
         if (!generatedPackage.image) {
-             generatedPackage.image = { title: "Visual Aid", prompt: "", image_base64: null };
+            generatedPackage.image = { title: "Visual Aid", prompt: "", image_base64: null };
         }
 
         setStatus("Finalizing visual and audio components...");
@@ -177,10 +178,10 @@ export async function generateResearchPackage(
     } catch (error) {
         console.error("Error generating research package:", error);
         if (error instanceof SyntaxError) {
-             console.error("Invalid JSON response from AI:", (error as any).response?.text());
+            console.error("Invalid JSON response from AI:", (error as any).response?.text());
             throw new Error("The AI returned an invalid JSON response. Please try again.");
         }
-         if ((error as any).message?.includes("response was blocked")) {
+        if ((error as any).message?.includes("response was blocked")) {
             throw new Error("The generation request was blocked by the safety filter. This can happen if the source material or the request contains sensitive content. Please review your sources and try again.");
         }
         throw new Error(`An unexpected error occurred during generation: ${(error as any).message}`);

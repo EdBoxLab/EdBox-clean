@@ -10,56 +10,53 @@ type ContentType = 'quizzes' | 'flashcards' | 'mindmaps' | 'notes';
 
 // Updated Templates
 const NOTES_TEMPLATE = `
-Generate a **Strategic Mastery Guide** for this topic.
-Your goal is NOT to summarize. Your goal is to **replace the classroom** for a student who wants a perfect score but has zero time.
+Act as a World-Class Learning Architect. Your goal is to transform this document into a High-Leverage Study Kit (Cheat Sheet) for an extremely busy Executive/Student.
 
-**THE "STRAIGHT A" PROTOCOL:**
-1.  **Density > Volume**: If the source is 10 pages, your output must be 1 page. Cut all fluff.
-2.  **Strategic Formatting**: Use heavy bolding for keywords. Use icons as visual anchors.
-3.  **Tone**: You are not a textbook. You are a high-performance coach. Be direct, tactical, and authoritative.
+**CONSTRAINTS:**
+1.  **Density over Volume**: Strictly maintain a 1:10 page ratio. If the input is 100 pages, the kit must be 10 pages max. Cut all fluff.
+2.  **The 80/20 Principle**: Identify the 20% of concepts that will generate 80% of the exam results or business value.
+3.  **Dopamine Formatting**: Use heavy bolding, Lucide-style icons (markdown emojis), and clean spacing. No walls of text.
+4.  **Mental Models**: Don't just summarize; provide mental models and "Cheat Sheets". Focus on "How can I apply this today?" and "What is the professor most likely to ask?".
+5.  **Active Recall**: End every major section with 3 'High-Stakes Questions' that force the user to think, not just read.
 
 **OUTPUT STRUCTURE (Strict Markdown):**
 
-# [Topic Title]
+# ⚡ [Topic Title]: The High-Leverage Cheat Sheet
 
-## 1. The "Missing Lecture" (Intuition)
-*What professors usually don't say out loud.*
--   **The Core Mental Model**: ONE sentence that explains the entire concept using an analogy.
--   **Why It Matters**: The practical or theoretical stakes.
--   **The "Feynman Block"**: Explain the single most confusing part of this topic as if you were talking to a bright 12-year-old.
+## 🧠 1. The "Missing Lecture" (Core Mental Model)
+*What professors usually don't say out loud. Focus on intuition.*
+-   **The Anchor**: ONE sentence that explains the entire concept using a powerful analogy.
+-   **Practical Application**: How can I apply this today in business/life?
+-   **The "Feynman Block"**: Explain the single most confusing part of this topic simply.
 
-## 2. The Exam Predictor (High-Value Intel)
-*Where the points are hiding.*
--   🛑 **The Trap**: Explicitly identify the most common student mistake. (e.g., "Students often confuse X with Y because...")
--   🎯 **The Guaranteed Question**: Describe the specific type of problem that appears on 90% of exams.
--   🔮 **The Curveball**: A rare but high-point-value edge case.
+## 🎯 2. The 80/20 Exam Predictor (High-Value Intel)
+*Where 80% of the points are hiding.*
+-   🛑 **The Trap**: The most common mistake students/professionals make.
+-   🎯 **The Guaranteed Question**: The specific type of problem that appears on 90% of exams/scenarios.
+-   🔮 **The Curveball**: A rare but high-value edge case to differentiate "A" students.
 
-## 3. The Universal Algorithm (Procedural Mastery)
-*How to solve problems on autopilot.*
-Don't just define concepts. Provide a generic, step-by-step PROTOCOL to solve ANY problem of this type.
--   **Step 1**: Identification (How to know to use this method).
--   **Step 2**: The Setup (Formula/State).
--   **Step 3**: The Execution (Process).
--   **Step 4**: Sanity Check (How to know if your answer is wrong).
+## ⚡ 3. The Universal Algorithm (Procedural Mastery)
+*How to solve/apply this on autopilot.*
+-   **Step 1**: Identification (How to know to use this).
+-   **Step 2**: The Setup (Formula/Mental Framework).
+-   **Step 3**: The Execution (Step-by-step process).
+-   **Step 4**: Sanity Check (How to verify the result).
 
-## 4. Cheat Code Tables (1:10 Density)
-*Pure signal, no noise.*
-Create 2-3 high-density comparison tables.
--   **Rules**: NO sentences inside cells. Keywords only.
--   **Examples**: "Mitosis vs Meiosis", "Market Structure A vs B".
+## 📊 4. Comparison Cheat Sheets (1:10 Density)
+*Pure signal, no noise. High-density tables.*
+-   Create a table comparing critical opposing concepts (e.g., Concept A vs Concept B).
+-   **Rule**: Keywords only. No full sentences in cells.
 
-## 5. High-Stakes Scenarios (Active Recall)
-Three "Scenario-Based" questions. Do not ask "What is X?". Ask:
-"You are a [Role]. [Situation] happens. What is the immediate risk and the correct specific action?"
-1.  [Scenario 1]
-2.  [Scenario 2]
-3.  [Scenario 3]
+## 🚀 5. High-Stakes Active Recall
+*Force thinking, not reading.*
+1. [High-Stakes Scenario Question 1]
+2. [High-Stakes Scenario Question 2]
+3. [High-Stakes Scenario Question 3]
 
 **FORMATTING RULES:**
--   Use emojis as visual anchors (🛑, 🎯, 🔮, ⚡, 🧠).
--   **Bold** every single key term.
--   Use > Blockquotes for "The Anchor" (key takeaways).
--   NO code blocks unless specifically requested for programming.
+- Use emojis (🛑, 🎯, 🔮, ⚡, 🧠, 📊, 🚀) as visual anchors.
+- **Bold** every key term.
+- Use > Blockquotes for "Executive Takeaways".
 `;
 
 const MINDMAP_TEMPLATE = `
@@ -200,8 +197,35 @@ function isProgrammingTopic(prompt: string): boolean {
   return programmingKeywords.some(keyword => lowerPrompt.includes(keyword));
 }
 
+function extractContextForType(type: ContentType, fullPrompt: string): string {
+  // Smart context extraction - only include relevant parts for each type
+  const maxLength = 1500; // characters, not tokens
+
+  if (fullPrompt.length <= maxLength) return fullPrompt;
+
+  // For long prompts, extract key information based on content type
+  switch (type) {
+    case 'quizzes':
+      // Focus on facts, definitions, key concepts
+      return `Key concepts and facts to test: ${fullPrompt.substring(0, maxLength)}...`;
+    case 'flashcards':
+      // Focus on terms and definitions
+      return `Important terms and concepts: ${fullPrompt.substring(0, maxLength)}...`;
+    case 'mindmaps':
+      // Focus on structure and relationships
+      return `Topic structure and relationships: ${fullPrompt.substring(0, maxLength)}...`;
+    case 'notes':
+      // Can use more context for strategic notes
+      return fullPrompt.substring(0, 3000);
+    default:
+      return fullPrompt.substring(0, maxLength);
+  }
+}
+
 function buildPrompt(type: ContentType, prompt: string, isAppend: boolean = false, customInstructions: string = '', itemCount?: number, notesDepth?: string) {
-  const base = `Topic/Content Source: "${prompt}"\n\n`;
+  // Use extracted context instead of full prompt
+  const contextualPrompt = extractContextForType(type, prompt);
+  const base = `Topic/Content Source: "${contextualPrompt}"\n\n`;
   const count = itemCount || (isAppend ? 10 : 15);
 
   switch (type) {
@@ -322,8 +346,18 @@ export async function POST(request: NextRequest) {
     if (fileContent && !kitId) {
       try {
         const extractedText = await processFileContent(fileContent, fileType || '', fileName || '');
-        const contextSummary = await extractContextFromText(extractedText);
-        finalPrompt = `Based on the following extracted document context (${fileName}):\n\n${contextSummary}\n\nUser Context: ${prompt || 'Generate study materials'}\n\nIMPORTANT: Only generate content that is relevant to the provided document context.`;
+        const contextSummaries = await extractContextFromText(extractedText);
+
+        // If it's a small file (one chunk), use traditional logic
+        if (contextSummaries.length === 1) {
+          finalPrompt = `Based on the following extracted document context (${fileName}):\n\n${contextSummaries[0]}\n\nUser Context: ${prompt || 'Generate study materials'}\n\nIMPORTANT: Only generate content that is relevant to the provided document context.`;
+        } else {
+          // Store multiple chunks for parallel processing below
+          (request as any).contextChunks = contextSummaries.map(summary =>
+            `Based on document section (${fileName}):\n\n${summary}\n\nUser Context: ${prompt || 'Generate study materials'}`
+          );
+          finalPrompt = (request as any).contextChunks[0]; // Fallback for basic title use
+        }
       } catch (err) {
         console.error('❌ File processing failed:', err);
       }
@@ -334,51 +368,82 @@ export async function POST(request: NextRequest) {
     const results = await Promise.allSettled(
       typesToGenerate.map(async (type: ContentType) => {
         const isAppend = !!appendType;
+        const chunks = (request as any).contextChunks || [finalPrompt];
 
-        // Parallel batching for Quizzes and Flashcards (batches of 10)
+        // Parallel batching for Quizzes and Flashcards across chunks
         if ((type === 'quizzes' || type === 'flashcards') && itemCount && itemCount > 10) {
           const batchSize = 10;
           const numBatches = Math.ceil(itemCount / batchSize);
           const batchPromises = [];
 
           for (let i = 0; i < numBatches; i++) {
+            // Cycle through chunks to ensure coverage if multiple exist
+            const chunkToUseNum = i % chunks.length;
+            const currentChunk = chunks[chunkToUseNum];
+
             const currentBatchCount = Math.min(batchSize, itemCount - i * batchSize);
             batchPromises.push((async () => {
               const result = await generateWithRetry({
-                prompt: buildPrompt(type, finalPrompt, isAppend, '', currentBatchCount, notesDepth),
+                prompt: buildPrompt(type, currentChunk, isAppend, '', currentBatchCount, notesDepth),
                 systemPrompt: 'Output ONLY valid JSON with no extra text.',
                 temperature: 0.7,
                 maxTokens: 4000,
-                model: 'oss',
+                model: 'llama-3.3-70b-versatile',
               });
               return extractJSON(result.text, type);
             })());
           }
 
           const batchResults = await Promise.all(batchPromises);
-          // Combine all batches into a single array
           const combinedContent = batchResults.flat();
           return { type, content: combinedContent };
         }
 
+        // Parallel processing specifically for NOTES if multi-chunk
+        if (type === 'notes' && chunks.length > 1) {
+          const notePromises = chunks.map(async (chunk: string, i: number) => {
+            const pageInfo = `\n\n**IMPORTANT CONTEXT:** This is Section/Page ${i + 1} of ${chunks.length} of the document. Focus on the content provided for this specific section while maintaining the "World-Class Learning Architect" persona. Ensure this "Cheat Sheet" is self-contained but contributes to the overall kit.`;
+            
+            const result = await generateWithRetry({
+              prompt: buildPrompt(type, chunk, isAppend, customInstructions, itemCount, notesDepth) + pageInfo,
+              systemPrompt: `You are an expert academic note-taker and Learning Architect. Create section ${i + 1} of ${chunks.length} of the study guide.
+              
+              CRITICAL RULES:
+              1. Output ONLY Markdown text
+              2. DO NOT use code blocks unless the topic is specifically about programming
+              3. Start with a header: "## Chapter ${i + 1}: [Strategic Subject Focus]"
+              4. Maintain the "Cheat Sheet" style: Bionic bolding, 80/20 principle, and Active Recall.
+              5. Ensure high density (1:10 ratio).`,
+              temperature: 0.7,
+              maxTokens: 5000,
+              model: 'llama-3.3-70b-versatile',
+            });
+            return cleanMarkdown(result.text);
+          });
+
+          const noteResults = await Promise.all(notePromises);
+          return { type, content: noteResults };
+        }
+
         // Standard generation for other types or single batch
         const result = await generateWithRetry({
-          prompt: buildPrompt(type, finalPrompt, isAppend, type === 'notes' ? customInstructions : '', itemCount, notesDepth),
+          prompt: buildPrompt(type, chunks[0], isAppend, type === 'notes' ? customInstructions : '', itemCount, notesDepth),
           systemPrompt: type === 'notes'
-            ? `You are an expert academic note-taker. Create structured, detailed, and clear study notes in Markdown format.
-
-CRITICAL RULES:
-1. Output ONLY Markdown text - NO JSON
-2. DO NOT use code blocks (backticks) unless the topic is specifically about programming
-3. For math/science topics, write formulas in plain text like "F = m × a" or "x^2 + 2x + 1"
-4. Use prose, tables, lists, and text formatting - NOT code examples
-5. If the topic is NOT programming-related, absolutely NO JavaScript/Python/code of any kind
-
-Start directly with the markdown heading. No preamble.`
+            ? `You are a World-Class Learning Architect. Your goal is to transform documents into High-Leverage Study Kits for extremely busy Executives/Students.
+              
+              CRITICAL RULES:
+              1. Output ONLY Markdown text - NO JSON
+              2. DO NOT use code blocks (backticks) unless the topic is specifically about programming
+              3. For math/science topics, write formulas in plain text like "F = m × a" or "x^2 + 2x + 1"
+              4. Use "Dopamine Formatting": Heavy bolding, emoji icons, and Radix-clean spacing
+              5. Density over Volume: Strictly maintain a 1:10 page ratio. Cut all fluff.
+              6. Identify the 20% of concepts that generate 80% of value.
+              
+              Start directly with the markdown heading. No preamble.`
             : 'Output ONLY valid JSON with no extra text.',
           temperature: 0.7,
           maxTokens: type === 'notes' ? 6000 : 4000,
-          model: type === 'notes' ? 'versatile' : 'oss',
+          model: 'llama-3.3-70b-versatile',
         });
 
         const output = type === 'notes' ? cleanMarkdown(result.text) : extractJSON(result.text, type);

@@ -28,17 +28,17 @@ function extractJSON(text: string, type: ContentType) {
       .replace(/[\x00-\x1F\x7F]/g, '')
       .replace(/\\n/g, ' ')
       .replace(/\r?\n/g, ' ');
-    
+
     const start = cleaned.indexOf('[');
     const end = cleaned.lastIndexOf(']');
-    
+
     if (start === -1 || end === -1) {
       throw new Error('No valid JSON array found');
     }
-    
+
     cleaned = cleaned.substring(start, end + 1);
     cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
-    
+
     let parsed;
     try {
       parsed = JSON.parse(cleaned);
@@ -46,7 +46,7 @@ function extractJSON(text: string, type: ContentType) {
       cleaned = cleaned.replace(/\\(?!"|\\)/g, '\\\\').replace(/[\u0000-\u001F]/g, '');
       parsed = JSON.parse(cleaned);
     }
-    
+
     if (type === 'quizzes' && Array.isArray(parsed)) {
       return parsed.map((q, i) => ({
         question: sanitizeMathText(q.question || `Question ${i + 1}`),
@@ -60,7 +60,7 @@ function extractJSON(text: string, type: ContentType) {
         difficulty: ['Easy', 'Medium', 'Hard'].includes(q.difficulty) ? q.difficulty : 'Medium',
       }));
     }
-    
+
     if (type === 'flashcards' && Array.isArray(parsed)) {
       return parsed.filter(c => c.front && c.back).map(c => ({
         front: sanitizeMathText(c.front),
@@ -68,7 +68,7 @@ function extractJSON(text: string, type: ContentType) {
         hint: sanitizeMathText(c.hint || ''),
       }));
     }
-    
+
     return parsed;
   } catch (error) {
     console.error(`JSON extraction failed for ${type}:`, error);
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     const isPremium = subscription?.plan_id === 'premium' && subscription?.status === 'active';
-    
+
     if (!isPremium && !isAdReward) {
       return NextResponse.json({ error: 'Premium subscription or ad reward required' }, { status: 403 });
     }
@@ -147,69 +147,69 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing data' }, { status: 400 });
     }
 
-      const { data: studyKit } = await supabase
-        .from('study_kit_content')
-        .select('*')
-        .eq('id', studyKitId)
-        .eq('user_id', user.id)
-        .single();
+    const { data: studyKit } = await supabase
+      .from('study_kit_content')
+      .select('*')
+      .eq('id', studyKitId)
+      .eq('user_id', user.id)
+      .single();
 
-      if (!studyKit) {
-        return NextResponse.json({ error: 'Study kit not found' }, { status: 404 });
+    if (!studyKit) {
+      return NextResponse.json({ error: 'Study kit not found' }, { status: 404 });
+    }
+
+    const sourceContext = studyKit.source_content || studyKit.title;
+    const hasFileContext = !!studyKit.source_content;
+
+    let newContent: any;
+
+    if (contentType === 'quizzes' || contentType === 'flashcards') {
+      const existingItems = existingContent?.map((item: any) =>
+        contentType === 'quizzes' ? item.question : item.front
+      ).join('\n- ') || '';
+
+      const template = contentType === 'quizzes' ? MORE_QUIZ_TEMPLATE : MORE_FLASHCARD_TEMPLATE;
+      const contextPrefix = hasFileContext
+        ? `SOURCE MATERIAL (generate content STRICTLY from this):\n${sourceContext}\n\n`
+        : `Topic: ${studyKit.title}\n\n`;
+
+      const basePrompt = `${contextPrefix}Already covered (DO NOT repeat these):\n- ${existingItems}\n\n${template}`;
+
+      const result = await generateWithRetry({
+        prompt: basePrompt,
+        systemPrompt: 'Output ONLY valid JSON with no extra text.',
+        temperature: 0.7,
+        maxTokens: 4000,
+        model: 'llama-3.3-70b-versatile',
+      });
+
+      newContent = extractJSON(result.text, contentType);
+    } else if (contentType === 'notes') {
+      if (!notesSpecification) {
+        return NextResponse.json({ error: 'Notes specification required' }, { status: 400 });
       }
 
-      const sourceContext = studyKit.source_content || studyKit.title;
-      const hasFileContext = !!studyKit.source_content;
+      const contextPrefix = hasFileContext
+        ? `SOURCE MATERIAL (base notes STRICTLY on this):\n${sourceContext}\n\n`
+        : `Topic: ${studyKit.title}\n\n`;
 
-      let newContent: any;
+      const prompt = `${contextPrefix}User's Specific Requirements:\n${notesSpecification}\n\n${CUSTOM_NOTES_TEMPLATE}`;
 
-      if (contentType === 'quizzes' || contentType === 'flashcards') {
-        const existingItems = existingContent?.map((item: any) => 
-          contentType === 'quizzes' ? item.question : item.front
-        ).join('\n- ') || '';
+      const result = await generateWithRetry({
+        prompt,
+        systemPrompt: 'You are an expert study note creator. Output only Markdown formatted notes.',
+        temperature: 0.7,
+        maxTokens: 3000,
+        model: 'llama-3.3-70b-versatile',
+      });
 
-        const template = contentType === 'quizzes' ? MORE_QUIZ_TEMPLATE : MORE_FLASHCARD_TEMPLATE;
-        const contextPrefix = hasFileContext 
-          ? `SOURCE MATERIAL (generate content STRICTLY from this):\n${sourceContext}\n\n`
-          : `Topic: ${studyKit.title}\n\n`;
-
-        const basePrompt = `${contextPrefix}Already covered (DO NOT repeat these):\n- ${existingItems}\n\n${template}`;
-
-        const result = await generateWithRetry({
-          prompt: basePrompt,
-          systemPrompt: 'Output ONLY valid JSON with no extra text.',
-          temperature: 0.7,
-          maxTokens: 4000,
-          model: 'oss',
-        });
-
-        newContent = extractJSON(result.text, contentType);
-      } else if (contentType === 'notes') {
-        if (!notesSpecification) {
-          return NextResponse.json({ error: 'Notes specification required' }, { status: 400 });
-        }
-
-        const contextPrefix = hasFileContext 
-          ? `SOURCE MATERIAL (base notes STRICTLY on this):\n${sourceContext}\n\n`
-          : `Topic: ${studyKit.title}\n\n`;
-
-        const prompt = `${contextPrefix}User's Specific Requirements:\n${notesSpecification}\n\n${CUSTOM_NOTES_TEMPLATE}`;
-
-        const result = await generateWithRetry({
-          prompt,
-          systemPrompt: 'You are an expert study note creator. Output only Markdown formatted notes.',
-          temperature: 0.7,
-          maxTokens: 3000,
-          model: 'versatile',
-        });
-
-        newContent = result.text;
-      } else {
-        return NextResponse.json({ error: 'Invalid content type' }, { status: 400 });
-      }
+      newContent = result.text;
+    } else {
+      return NextResponse.json({ error: 'Invalid content type' }, { status: 400 });
+    }
 
     const updatedGeneratedContent = { ...studyKit.generated_content };
-    
+
     if (contentType === 'notes') {
       const existingNotes = updatedGeneratedContent.notes || '';
       updatedGeneratedContent.notes = existingNotes + '\n\n---\n\n## Custom Notes\n\n' + newContent;
@@ -218,21 +218,21 @@ export async function POST(request: NextRequest) {
       updatedGeneratedContent[contentType] = [...existingArray, ...newContent];
     }
 
-      const { error: updateError } = await supabase
-        .from('study_kit_content')
-        .update({ generated_content: updatedGeneratedContent })
-        .eq('id', studyKitId);
+    const { error: updateError } = await supabase
+      .from('study_kit_content')
+      .update({ generated_content: updatedGeneratedContent })
+      .eq('id', studyKitId);
 
-      if (updateError) {
-        console.error('Database update error:', updateError);
-        return NextResponse.json({ error: 'Failed to save to database' }, { status: 500 });
-      }
+    if (updateError) {
+      console.error('Database update error:', updateError);
+      return NextResponse.json({ error: 'Failed to save to database' }, { status: 500 });
+    }
 
-      return NextResponse.json({ 
-        success: true, 
-        newContent,
-        updatedContent: updatedGeneratedContent[contentType]
-      });
+    return NextResponse.json({
+      success: true,
+      newContent,
+      updatedContent: updatedGeneratedContent[contentType]
+    });
 
   } catch (error: any) {
     console.error('Generate more failed:', error);

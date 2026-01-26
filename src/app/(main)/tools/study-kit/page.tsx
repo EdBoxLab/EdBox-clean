@@ -24,7 +24,9 @@ import {
     Crown,
     Send,
     Copy,
-    Check
+    Check,
+    Clock,
+    Target
 } from 'lucide-react';
 import ShareButton from '@/components/ShareButton';
 import ShareModal, { useShareModal } from '@/components/ShareModal';
@@ -78,6 +80,147 @@ const contentTypes = [
     { id: 'notes', label: 'Notes', icon: FileText, description: 'Structured summary notes' },
     { id: 'mindmaps', label: 'Mind Maps', icon: Map, description: 'Visual concept connections' },
 ];
+
+const GeneratingView = () => {
+    const studyHacks = [
+        { icon: <Brain className="w-5 h-5" />, tip: "The Feynman Technique: Explain a concept to a child to master it." },
+        { icon: <Zap className="w-5 h-5" />, tip: "Spaced Repetition: Reviewing at increasing intervals boosts long-term memory." },
+        { icon: <FileText className="w-5 h-5" />, tip: "Active Recall: Testing yourself is 2x more effective than re-reading." },
+        { icon: <Clock className="w-5 h-5" />, tip: "The Pomodoro Technique: Study for 25 minutes, then take a 5-minute break." },
+        { icon: <Target className="w-5 h-5" />, tip: "Eat the Frog: Start your study session with the hardest topic." },
+        { icon: <Map className="w-5 h-5" />, tip: "Mind Mapping: Visualizing connections improves recall by up to 15%." }
+    ];
+
+    const [hackIndex, setHackIndex] = useState(0);
+    const [statusIndex, setStatusIndex] = useState(0);
+
+    const statusMessages = [
+        "Reading your materials...",
+        "Analyzing key concepts...",
+        "Generating brain-friendly notes...",
+        "Crafting active recall quizzes...",
+        "Building your personalized study kit...",
+        "Optimizing for maximum retention...",
+        "Polishing the final result..."
+    ];
+
+    useEffect(() => {
+        const hackTimer = setInterval(() => {
+            setHackIndex((prev) => (prev + 1) % studyHacks.length);
+        }, 5000);
+
+        const statusTimer = setInterval(() => {
+            setStatusIndex((prev) => (prev + 1) % statusMessages.length);
+        }, 3500);
+
+        return () => {
+            clearInterval(hackTimer);
+            clearInterval(statusTimer);
+        };
+    }, []);
+
+    return (
+        <div className="flex flex-col items-center justify-center min-h-[500px] text-center space-y-10 max-w-2xl mx-auto">
+            {/* Main Loading Visual */}
+            <div className="relative">
+                <motion.div
+                    className="absolute inset-0 bg-indigo-500/20 rounded-full blur-[60px]"
+                    animate={{
+                        scale: [1, 1.2, 1],
+                        opacity: [0.3, 0.6, 0.3]
+                    }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                />
+                <div className="relative z-10 flex flex-col items-center">
+                    <div className="relative w-24 h-24 mb-6">
+                        <Loader2 className="w-full h-full text-indigo-500 animate-spin" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <Sparkles className="w-8 h-8 text-indigo-400 animate-pulse" />
+                        </div>
+                    </div>
+
+                    <AnimatePresence mode="wait">
+                        <motion.h2
+                            key={statusIndex}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400"
+                        >
+                            {statusMessages[statusIndex]}
+                        </motion.h2>
+                    </AnimatePresence>
+                    <p className="text-zinc-500 mt-2 text-sm italic">Sit tight, we're doing the heavy lifting...</p>
+                </div>
+            </div>
+
+            {/* Progress Indicators */}
+            <div className="w-full max-w-md space-y-4">
+                <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+                    <motion.div
+                        className="h-full bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 w-full"
+                        animate={{ x: ["-100%", "100%"] }}
+                        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                    />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    {statusMessages.slice(0, 4).map((_, i) => (
+                        <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900/50 border border-zinc-800/50">
+                            <div className={`w-1.5 h-1.5 rounded-full ${i <= statusIndex ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]' : 'bg-zinc-700'}`}></div>
+                            <span className={`text-[10px] uppercase tracking-wider font-bold ${i <= statusIndex ? 'text-indigo-400' : 'text-zinc-600'}`}>
+                                {i === statusIndex ? 'In Progress' : i < statusIndex ? 'Complete' : 'Pending'}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Study Hack Carousel */}
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="w-full bg-indigo-600/5 border border-indigo-500/10 rounded-3xl p-6 relative overflow-hidden group"
+            >
+                <div className="absolute top-0 right-0 p-3 opacity-20">
+                    <Info className="w-12 h-12 text-indigo-500" />
+                </div>
+
+                <div className="relative z-10 flex flex-col items-center">
+                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Sparkles className="w-3 h-3" /> Pro Study Hack
+                    </span>
+
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={hackIndex}
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            className="flex flex-col items-center gap-4"
+                        >
+                            <div className="p-3 bg-indigo-500/10 rounded-2xl text-indigo-400">
+                                {studyHacks[hackIndex].icon}
+                            </div>
+                            <p className="text-zinc-300 font-medium leading-relaxed max-w-[320px]">
+                                {studyHacks[hackIndex].tip}
+                            </p>
+                        </motion.div>
+                    </AnimatePresence>
+
+                    <div className="flex gap-1.5 mt-6">
+                        {studyHacks.map((_, i) => (
+                            <div
+                                key={i}
+                                className={`h-1 rounded-full transition-all duration-500 ${i === hackIndex ? 'w-6 bg-indigo-500' : 'w-1.5 bg-zinc-800'}`}
+                            />
+                        ))}
+                    </div>
+                </div>
+            </motion.div>
+        </div>
+    );
+};
 
 const FlashcardItem = ({ card }: { card: any }) => {
     const [isFlipped, setIsFlipped] = useState(false);
@@ -168,9 +311,12 @@ function StudyKitContent() {
     const [depthOption, setDepthOption] = useState<'summary' | 'deepdive' | 'coverage' | 'shi'>('coverage');
     const [isConfirmed, setIsConfirmed] = useState(false);
     const [activeChapter, setActiveChapter] = useState(0);
+    const [activeNotePage, setActiveNotePage] = useState(0);
     const [selectedNodeData, setSelectedNodeData] = useState<any>(null);
     const [genieContext, setGenieContext] = useState('');
     const [isGenieOpen, setIsGenieOpen] = useState(false);
+    const [mindmapDragPosition, setMindmapDragPosition] = useState({ x: 0, y: 0 });
+    const windowSize = useWindowSize(); // Move to component level
     // -------------------------
 
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -331,28 +477,16 @@ function StudyKitContent() {
             }));
         }
 
-        // Normalize notes - handle array of objects with heading/content
+        // Normalize notes - keep as array if multiple parts exist
         if (content.notes) {
             const parsed = parseIfString(content.notes);
             console.log('📄 Notes parsed:', parsed);
 
             if (typeof parsed === 'string') {
-                normalized.notes = parsed;
-            } else if (parsed.notes && Array.isArray(parsed.notes)) {
-                // Convert array of note objects to formatted string
-                normalized.notes = parsed.notes.map((note: any) => {
-                    let text = '';
-                    if (note.heading) text += note.heading + '\n\n';
-                    if (Array.isArray(note.content)) {
-                        text += note.content.join('\n');
-                    } else if (typeof note.content === 'string') {
-                        text += note.content;
-                    }
-                    return text;
-                }).join('\n\n---\n\n');
+                normalized.notes = [parsed];
             } else if (Array.isArray(parsed)) {
-                // Handle direct array of note objects
                 normalized.notes = parsed.map((note: any) => {
+                    if (typeof note === 'string') return note;
                     let text = '';
                     if (note.heading) text += note.heading + '\n\n';
                     if (Array.isArray(note.content)) {
@@ -363,13 +497,24 @@ function StudyKitContent() {
                         text += JSON.stringify(note.content, null, 2);
                     }
                     return text;
-                }).join('\n\n---\n\n');
+                });
+            } else if (parsed.notes && Array.isArray(parsed.notes)) {
+                normalized.notes = parsed.notes.map((note: any) => {
+                    let text = '';
+                    if (note.heading) text += note.heading + '\n\n';
+                    if (Array.isArray(note.content)) {
+                        text += note.content.join('\n');
+                    } else if (typeof note.content === 'string') {
+                        text += note.content;
+                    }
+                    return text;
+                });
             } else if (typeof parsed === 'object') {
-                normalized.notes = JSON.stringify(parsed, null, 2);
-                console.warn('⚠️ Notes was an object, converted to JSON string');
+                normalized.notes = [JSON.stringify(parsed, null, 2)];
+                console.warn('⚠️ Notes was an object, converted to single-item array');
             } else {
                 console.error('❌ Unexpected notes format:', parsed);
-                normalized.notes = '';
+                normalized.notes = [''];
             }
         }
 
@@ -1024,28 +1169,7 @@ function StudyKitContent() {
         );
     };
 
-    const renderGenerating = () => (
-        <div className="flex flex-col items-center justify-center min-h-[400px] text-center space-y-6">
-            <div className="relative">
-                <div className="absolute inset-0 bg-indigo-500/20 rounded-full blur-[40px] animate-pulse"></div>
-                <Loader2 className="w-16 h-16 text-indigo-500 animate-spin relative z-10" />
-            </div>
-            <div>
-                <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400 animate-pulse">
-                    Crafting your study materials...
-                </h2>
-                <p className="text-zinc-500 mt-2">This may take a minute depending on the number of tools selected.</p>
-            </div>
-            <div className="grid grid-cols-1 gap-2 w-full max-w-xs">
-                {['Reading materials...', 'Structuring concepts...', 'Polishing results...'].map((txt, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">
-                        <div className="w-2 h-2 rounded-full bg-indigo-500 animate-ping"></div>
-                        <span className="text-xs text-zinc-400">{txt}</span>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
+
 
     return (
         <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-6 md:p-8 relative overflow-hidden">
@@ -1168,7 +1292,7 @@ function StudyKitContent() {
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                 >
-                                    {renderGenerating()}
+                                    <GeneratingView />
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -1597,60 +1721,67 @@ function StudyKitContent() {
 
                                                 <div className="p-6 sm:p-10">
                                                     <article className="prose prose-invert max-w-none 
-                                                        prose-headings:font-extrabold prose-headings:tracking-tight
-                                                        prose-h1:text-3xl sm:prose-h1:text-4xl prose-h1:mb-8 prose-h1:pb-6 prose-h1:border-b-2 prose-h1:border-indigo-500/30 prose-h1:bg-gradient-to-r prose-h1:from-white prose-h1:to-indigo-200 prose-h1:bg-clip-text prose-h1:text-transparent
-                                                        prose-h2:text-2xl prose-h2:mt-12 prose-h2:mb-6 prose-h2:text-indigo-400 prose-h2:flex prose-h2:items-center prose-h2:gap-3 prose-h2:before:content-[''] prose-h2:before:w-1 prose-h2:before:h-6 prose-h2:before:bg-indigo-500 prose-h2:before:rounded-full
-                                                        prose-h3:text-xl prose-h3:text-zinc-100 prose-h3:mt-10 prose-h3:mb-4 prose-h3:font-bold
-                                                        prose-h4:text-lg prose-h4:text-zinc-200 prose-h4:mt-6 prose-h4:mb-3
-                                                        prose-p:text-zinc-300 prose-p:leading-relaxed prose-p:my-4 prose-p:text-base
-                                                        prose-li:text-zinc-300 prose-li:my-2 prose-li:marker:text-indigo-400
-                                                        prose-ul:my-4 prose-ul:space-y-1
-                                                        prose-ol:my-4 prose-ol:space-y-1
-                                                        prose-strong:text-indigo-300 prose-strong:font-bold
-                                                        prose-em:text-purple-300 prose-em:not-italic prose-em:bg-purple-500/10 prose-em:px-1 prose-em:rounded
-                                                        prose-code:text-cyan-300 prose-code:bg-zinc-800/80 prose-code:px-2 prose-code:py-1 prose-code:rounded-md prose-code:text-sm prose-code:before:content-none prose-code:after:content-none prose-code:font-mono
-                                                        prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-800 prose-pre:rounded-xl
-                                                        prose-table:border-collapse prose-table:w-full prose-table:my-8
-                                                        prose-thead:bg-indigo-950/50
-                                                        prose-th:border prose-th:border-zinc-700 prose-th:px-4 prose-th:py-3 prose-th:text-left prose-th:text-indigo-300 prose-th:font-bold prose-th:text-sm prose-th:uppercase prose-th:tracking-wider
-                                                        prose-td:border prose-td:border-zinc-800 prose-td:px-4 prose-td:py-3 prose-td:text-zinc-300
-                                                        prose-tr:even:bg-zinc-900/50
-                                                        prose-blockquote:border-l-4 prose-blockquote:border-indigo-500 prose-blockquote:bg-indigo-950/30 prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:rounded-r-xl prose-blockquote:my-6 prose-blockquote:not-italic prose-blockquote:text-indigo-200
-                                                        prose-hr:border-zinc-800 prose-hr:my-12
-                                                        prose-a:text-indigo-400 prose-a:underline prose-a:underline-offset-2 hover:prose-a:text-indigo-300
-                                                        prose-img:rounded-2xl prose-img:shadow-xl
+                                                        prose-headings:font-black prose-headings:tracking-tight
+                                                        prose-h1:text-4xl sm:prose-h1:text-5xl prose-h1:mb-12 prose-h1:pb-8 prose-h1:border-b-4 prose-h1:border-indigo-500/50 prose-h1:bg-gradient-to-r prose-h1:from-white prose-h1:via-indigo-200 prose-h1:to-purple-200 prose-h1:bg-clip-text prose-h1:text-transparent
+                                                        prose-h2:text-3xl prose-h2:mt-16 prose-h2:mb-8 prose-h2:text-indigo-400 prose-h2:flex prose-h2:items-center prose-h2:gap-4 prose-h2:uppercase prose-h2:tracking-wider
+                                                        prose-h3:text-2xl prose-h3:text-zinc-100 prose-h3:mt-12 prose-h3:mb-6 prose-h3:font-black
+                                                        prose-p:text-zinc-300 prose-p:leading-relaxed prose-p:my-6 prose-p:text-lg
+                                                        prose-li:text-zinc-300 prose-li:my-3 prose-li:marker:text-indigo-400 prose-li:text-lg
+                                                        prose-strong:text-indigo-300 prose-strong:font-black prose-strong:underline prose-strong:underline-offset-4 prose-strong:decoration-indigo-500/30
+                                                        prose-blockquote:border-l-8 prose-blockquote:border-indigo-500 prose-blockquote:bg-indigo-500/5 prose-blockquote:py-8 prose-blockquote:px-10 prose-blockquote:rounded-2xl prose-blockquote:my-10 prose-blockquote:not-italic prose-blockquote:text-indigo-100 prose-blockquote:text-xl prose-blockquote:font-medium
+                                                        prose-hr:border-zinc-800 prose-hr:my-16
+                                                        prose-table:my-12 prose-table:border-spacing-0 prose-table:border-separate
+                                                        prose-th:bg-zinc-900 prose-th:text-indigo-400 prose-th:font-black prose-th:tracking-widest prose-th:py-4
+                                                        prose-td:py-4 prose-td:text-zinc-300
                                                     ">
                                                         <ReactMarkdown
                                                             remarkPlugins={[remarkGfm]}
                                                             components={{
                                                                 h1: ({ children }) => (
-                                                                    <h1 className="relative">
-                                                                        <span className="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full"></span>
+                                                                    <h1 className="relative flex items-center gap-4">
+                                                                        <Zap className="w-10 h-10 text-indigo-400 shrink-0" />
                                                                         {children}
                                                                     </h1>
                                                                 ),
-                                                                h2: ({ children }) => (
-                                                                    <h2 className="group">
-                                                                        <span className="inline-block w-8 h-8 mr-3 bg-indigo-500/20 rounded-lg text-indigo-400 text-center leading-8 text-sm font-mono">§</span>
-                                                                        {children}
-                                                                    </h2>
-                                                                ),
+                                                                h2: ({ children }) => {
+                                                                    // Extract emoji if present to use as icon
+                                                                    const text = String(children);
+                                                                    const emojiMatch = text.match(/^([\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}])/u);
+                                                                    const emoji = emojiMatch ? emojiMatch[0] : null;
+                                                                    const cleanText = emoji ? text.replace(emoji, '').trim() : text;
+
+                                                                    return (
+                                                                        <h2 className="group flex items-center gap-4">
+                                                                            {emoji ? (
+                                                                                <span className="w-12 h-12 flex items-center justify-center bg-zinc-900 border border-zinc-800 rounded-2xl text-2xl group-hover:border-indigo-500 transition-all shadow-xl shadow-indigo-500/10">
+                                                                                    {emoji}
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="w-12 h-12 flex items-center justify-center bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-indigo-400 text-xl font-black group-hover:bg-indigo-500/20 transition-all">§</span>
+                                                                            )}
+                                                                            {cleanText}
+                                                                        </h2>
+                                                                    );
+                                                                },
                                                                 blockquote: ({ children }) => (
-                                                                    <blockquote className="relative">
-                                                                        <div className="absolute -left-2 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-500 via-purple-500 to-pink-500 rounded-full"></div>
-                                                                        <Sparkles className="absolute -left-3 -top-3 w-5 h-5 text-indigo-400" />
-                                                                        {children}
+                                                                    <blockquote className="relative overflow-hidden">
+                                                                        <div className="absolute top-0 right-0 p-4 opacity-10">
+                                                                            <Crown className="w-20 h-20 text-indigo-400" />
+                                                                        </div>
+                                                                        <div className="relative z-10">
+                                                                            {children}
+                                                                        </div>
                                                                     </blockquote>
                                                                 ),
                                                                 ul: ({ children }) => (
-                                                                    <ul className="space-y-2 my-4">
+                                                                    <ul className="space-y-4 my-8">
                                                                         {children}
                                                                     </ul>
                                                                 ),
                                                                 li: ({ children }) => (
-                                                                    <li className="flex items-start gap-3">
-                                                                        <span className="mt-2 w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
-                                                                        <span>{children}</span>
+                                                                    <li className="flex items-start gap-4">
+                                                                        <div className="mt-2.5 w-2.5 h-2.5 rounded-full bg-indigo-500/50 border border-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.5)] shrink-0"></div>
+                                                                        <span className="flex-1">{children}</span>
                                                                     </li>
                                                                 ),
                                                                 table: ({ children }) => (
@@ -1715,15 +1846,68 @@ function StudyKitContent() {
                                                                             {children}
                                                                         </code>
                                                                     );
+
                                                                 }
                                                             }}
                                                         >
                                                             {typeof generatedContent.notes === 'string'
                                                                 ? generatedContent.notes
                                                                 : Array.isArray(generatedContent.notes)
-                                                                    ? generatedContent.notes.join('\n\n')
+                                                                    ? (generatedContent.notes[activeNotePage] || generatedContent.notes[0])
                                                                     : JSON.stringify(generatedContent.notes, null, 2)}
                                                         </ReactMarkdown>
+
+                                                        {/* Note Pagination Controls */}
+                                                        {Array.isArray(generatedContent.notes) && generatedContent.notes.length > 1 && (
+                                                            <div className="mt-12 flex flex-col items-center gap-6 pt-10 border-t border-zinc-800/50">
+                                                                <div className="flex items-center gap-4">
+                                                                    <button
+                                                                        disabled={activeNotePage === 0}
+                                                                        onClick={() => {
+                                                                            setActiveNotePage(prev => Math.max(0, prev - 1));
+                                                                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                                        }}
+                                                                        className="flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-800 rounded-xl font-bold text-sm hover:border-indigo-500 disabled:opacity-30 disabled:hover:border-zinc-800 transition-all"
+                                                                    >
+                                                                        <ArrowLeft className="w-4 h-4" /> Previous Part
+                                                                    </button>
+                                                                    <div className="flex items-center gap-2 px-4 py-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl">
+                                                                        <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Part</span>
+                                                                        <span className="text-lg font-black text-indigo-400">{activeNotePage + 1}</span>
+                                                                        <span className="text-zinc-600">/</span>
+                                                                        <span className="text-sm font-bold text-zinc-500">{generatedContent.notes.length}</span>
+                                                                    </div>
+                                                                    <button
+                                                                        disabled={activeNotePage === generatedContent.notes.length - 1}
+                                                                        onClick={() => {
+                                                                            setActiveNotePage(prev => Math.min(generatedContent.notes.length - 1, prev + 1));
+                                                                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                                        }}
+                                                                        className="flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-800 rounded-xl font-bold text-sm hover:border-indigo-500 disabled:opacity-30 disabled:hover:border-zinc-800 transition-all"
+                                                                    >
+                                                                        Next Part <ArrowLeft className="w-4 h-4 rotate-180" />
+                                                                    </button>
+                                                                </div>
+                                                                <div className="flex flex-wrap justify-center gap-2">
+                                                                    {generatedContent.notes.map((_: any, idx: number) => (
+                                                                        <button
+                                                                            key={idx}
+                                                                            onClick={() => {
+                                                                                setActiveNotePage(idx);
+                                                                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                                            }}
+                                                                            className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm transition-all ${activeNotePage === idx
+                                                                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
+                                                                                : 'bg-zinc-900 text-zinc-500 hover:text-white hover:bg-zinc-800'
+                                                                                }`}
+                                                                        >
+                                                                            {idx + 1}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
                                                     </article>
                                                 </div>
 
@@ -1824,17 +2008,12 @@ function StudyKitContent() {
 
                                                     const centralTopic = data.central || (typeof data.center === 'object' ? data.center.topic : data.center);
                                                     const branches = data.branches || (typeof data.center === 'object' ? data.center.subtopics : []);
-                                                    // eslint-disable-next-line react-hooks/rules-of-hooks
-                                                    const { width } = useWindowSize(); // Use safe window size
-
-                                                    // eslint-disable-next-line react-hooks/rules-of-hooks
-                                                    const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
 
                                                     return (
                                                         <>
                                                             <div className="absolute top-4 right-4 z-50">
                                                                 <button
-                                                                    onClick={() => setDragPosition({ x: 0, y: 0 })}
+                                                                    onClick={() => setMindmapDragPosition({ x: 0, y: 0 })}
                                                                     className="p-2 bg-zinc-800/80 backdrop-blur-md border border-zinc-700 hover:border-indigo-500/50 rounded-full text-zinc-400 hover:text-indigo-400 transition-all shadow-lg hover:shadow-indigo-500/20"
                                                                     title="Reset View"
                                                                 >
@@ -1844,9 +2023,9 @@ function StudyKitContent() {
                                                             <motion.div
                                                                 drag
                                                                 dragConstraints={{ left: -1000, right: 1000, top: -1000, bottom: 1000 }}
-                                                                animate={dragPosition}
+                                                                animate={mindmapDragPosition}
                                                                 onDragEnd={(e, info) => {
-                                                                    setDragPosition({ x: info.point.x, y: info.point.y });
+                                                                    setMindmapDragPosition({ x: info.point.x, y: info.point.y });
                                                                 }}
                                                                 className="relative w-full h-full cursor-grab active:cursor-grabbing flex items-center justify-center p-20"
                                                             >
@@ -1863,7 +2042,7 @@ function StudyKitContent() {
                                                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                                                     {branches.map((branch: any, i: number, arr: any[]) => {
                                                                         const angle = (i / arr.length) * 2 * Math.PI;
-                                                                        const isMobile = width < 768;
+                                                                        const isMobile = windowSize.width < 768;
                                                                         const radius = isMobile ? 220 : 300;
                                                                         const x = Math.cos(angle) * radius;
                                                                         const y = Math.sin(angle) * (radius * 0.7);

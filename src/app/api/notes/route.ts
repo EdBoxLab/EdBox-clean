@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json(notes || []);
+    return NextResponse.json({ notes: notes || [] });
   } catch (error) {
     console.error('Notes GET error:', error);
     return NextResponse.json({ error: 'Failed to fetch notes' }, { status: 500 });
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json(note);
+    return NextResponse.json({ note });
   } catch (error) {
     console.error('Notes POST error:', error);
     return NextResponse.json(

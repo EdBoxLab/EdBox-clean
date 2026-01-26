@@ -141,7 +141,7 @@ export interface GenerateOptions {
     mimeType: string;
     data: string; // base64
   }[];
-  model?: 'versatile' | 'oss' | 'vision';
+  model?: 'versatile' | 'oss' | 'vision' | 'llama-3.3-70b-versatile';
   continuationContext?: string; // Used to resume from partial responses
 }
 
@@ -158,10 +158,10 @@ export interface GenerateResult {
  */
 function createContinuationPrompt(originalPrompt: string, accumulatedText: string): string {
   if (!accumulatedText) return originalPrompt;
-  
+
   // Take the last 500 chars to avoid prompt bloat but give enough context
   const recentContext = accumulatedText.slice(-500);
-  
+
   return `[CONTINUATION REQUEST]
 The previous AI provider was cut off while explaining. 
 What was already said: "...${recentContext}"
@@ -195,12 +195,12 @@ export async function* streamWithFallback(options: GenerateOptions): AsyncGenera
     try {
       const Groq = (await import('groq-sdk')).default;
       const groq = new Groq({ apiKey: key });
-      
+
       const groqModel = attachments.length > 0 ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
-      
+
       const messages: any[] = [];
       if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-      
+
       // If we have accumulated text, we are resuming
       if (accumulatedText) {
         messages.push({ role: 'user', content: createContinuationPrompt(prompt, accumulatedText) });
@@ -223,7 +223,7 @@ export async function* streamWithFallback(options: GenerateOptions): AsyncGenera
           yield content;
         }
       }
-      
+
       // If we finished successfully, return
       return;
 
@@ -254,9 +254,9 @@ export async function* streamWithFallback(options: GenerateOptions): AsyncGenera
     try {
       const { GoogleGenerativeAI } = await import("@google/generative-ai");
       const genAI = new GoogleGenerativeAI(key);
-      const geminiModel = genAI.getGenerativeModel({ 
+      const geminiModel = genAI.getGenerativeModel({
         model: 'gemini-1.5-flash',
-        systemInstruction: systemPrompt 
+        systemInstruction: systemPrompt
       });
 
       const contents: any[] = [];
@@ -267,7 +267,7 @@ export async function* streamWithFallback(options: GenerateOptions): AsyncGenera
       }
 
       const result = await geminiModel.generateContentStream({ contents, generationConfig: { temperature, maxOutputTokens: maxTokens } });
-      
+
       for await (const chunk of result.stream) {
         const content = chunk.text();
         if (content) {
@@ -275,7 +275,7 @@ export async function* streamWithFallback(options: GenerateOptions): AsyncGenera
           yield content;
         }
       }
-      
+
       return;
 
     } catch (error: any) {
@@ -304,14 +304,14 @@ export async function embedText(text: string): Promise<number[]> {
   if (voyageKey) {
     try {
       const client = new VoyageAIClient({ apiKey: voyageKey });
-        const response = await client.embed({
-          input: text,
-          model: 'voyage-3', // High performance, low latency
-          inputType: 'document'
-        });
-        if (response.data?.[0]?.embedding) {
-          return response.data[0].embedding;
-        }
+      const response = await client.embed({
+        input: text,
+        model: 'voyage-3', // High performance, low latency
+        inputType: 'document'
+      });
+      if (response.data?.[0]?.embedding) {
+        return response.data[0].embedding;
+      }
     } catch (error: any) {
       console.warn(`⚠️ Voyage AI embedding failed: ${error.message}`);
     }
@@ -362,7 +362,7 @@ export async function embedText(text: string): Promise<number[]> {
         continue;
       }
       console.warn(`⚠️ Gemini embedding error: ${error.message}`);
-      break; 
+      break;
     }
   }
 
@@ -397,9 +397,8 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
   let groqModel = 'llama-3.3-70b-versatile';
   if (hasImages) {
     groqModel = 'llama-3.2-11b-vision-preview';
-  } else if (model === 'oss') {
-    groqModel = 'llama-3.1-8b-instant';
   }
+  // Always use llama-3.3-70b-versatile for non-image tasks
 
   // 1. TRY ALL GROQ KEYS FIRST
   const groqKeys = getGroqKeys();
@@ -458,7 +457,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
     try {
       const { GoogleGenerativeAI } = await import("@google/generative-ai");
       const genAI = new GoogleGenerativeAI(key);
-      
+
       const config: any = {
         temperature,
         maxOutputTokens: maxTokens,
@@ -477,9 +476,9 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
         });
       }
 
-      const geminiModel = genAI.getGenerativeModel({ 
+      const geminiModel = genAI.getGenerativeModel({
         model: 'gemini-1.5-flash',
-        systemInstruction: systemPrompt 
+        systemInstruction: systemPrompt
       });
 
       const result = await geminiModel.generateContent({ contents, generationConfig: config });
@@ -526,22 +525,56 @@ export async function generateWithRetry(
 }
 
 /**
- * Unified context extraction
+ * Split text into chunks for intelligent processing
  */
-export async function extractContextFromText(text: string): Promise<string> {
-  if (!text?.trim()) return '';
-  const systemPrompt = `Analyze the raw text and extract core context, key concepts, and structure. Summarize for educational use.`;
-  
-  try {
-    const result = await generateWithRetry({
-      prompt: `Analyze:\n\n${text.substring(0, 30000)}`,
-      systemPrompt,
-      temperature: 0.3,
-      maxTokens: 1000,
-    });
-    return result.text;
-  } catch (error) {
-    console.error('❌ Context extraction failed');
-    return text.substring(0, 5000);
+export function chunkText(text: string, chunkSize: number = 20000): string[] {
+  const chunks: string[] = [];
+  let currentPos = 0;
+  while (currentPos < text.length) {
+    chunks.push(text.substring(currentPos, currentPos + chunkSize));
+    currentPos += chunkSize;
   }
+  return chunks;
+}
+
+/**
+ * Unified context extraction with support for multi-chapter chunking
+ */
+export async function extractContextFromText(text: string): Promise<string[]> {
+  if (!text?.trim()) return [''];
+
+  // If text is small (less than ~5 pages), process as a single chunk
+  if (text.length < 15000) {
+    const systemPrompt = `Analyze the raw text and extract core context, key concepts, and structure. Summarize for educational use.`;
+    try {
+      const result = await generateWithRetry({
+        prompt: `Analyze:\n\n${text}`,
+        systemPrompt,
+        temperature: 0.3,
+        maxTokens: 1000,
+      });
+      return [result.text];
+    } catch (error) {
+      return [text.substring(0, 5000)];
+    }
+  }
+
+  // For large text, split into logical chapters/chunks (approx 5-7 pages each)
+  const chunks = chunkText(text, 15000);
+  const contextPromises = chunks.map(async (chunk, i) => {
+    const systemPrompt = `Analyze section ${i + 1} of this document. Extract the major strategic themes, key definitions, and critical concepts for this specific part.`;
+    try {
+      const result = await generateWithRetry({
+        prompt: `Analyze Section ${i + 1}:\n\n${chunk}`,
+        systemPrompt,
+        temperature: 0.3,
+        maxTokens: 800,
+      });
+      return result.text;
+    } catch (error) {
+      return chunk.substring(0, 3000);
+    }
+  });
+
+  return Promise.all(contextPromises);
 }

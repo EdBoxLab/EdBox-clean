@@ -105,6 +105,7 @@ const GeneratingView = () => {
     ];
 
     useEffect(() => {
+        console.log('🎨 GeneratingView mounted - animations should be visible');
         const hackTimer = setInterval(() => {
             setHackIndex((prev) => (prev + 1) % studyHacks.length);
         }, 5000);
@@ -274,6 +275,10 @@ function StudyKitContent() {
     const supabase = createSupabaseBrowserClient();
     const { isOpen, content, openShareModal, closeShareModal } = useShareModal();
 
+    // Call custom hooks first to ensure consistent hook order
+    const windowSize = useWindowSize();
+    const { isPremium } = useSubscription();
+
     const [prompt, setPrompt] = useState('');
     const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -316,11 +321,9 @@ function StudyKitContent() {
     const [genieContext, setGenieContext] = useState('');
     const [isGenieOpen, setIsGenieOpen] = useState(false);
     const [mindmapDragPosition, setMindmapDragPosition] = useState({ x: 0, y: 0 });
-    const windowSize = useWindowSize(); // Move to component level
     // -------------------------
 
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-    const { isPremium } = useSubscription();
 
     const handleAskGenie = (text: string) => {
         setGenieContext(text);

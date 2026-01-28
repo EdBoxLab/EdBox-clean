@@ -109,7 +109,7 @@ export const CognitiveReasoning = {
             }
           }
         },
-        required: ["action", "content"]
+        required: ["action", "content", "evaluation_score"]
       }
     });
 

@@ -4,6 +4,7 @@
 // ============================================
 
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { createServerSupabaseClient } from '@/lib/supabase/admin';
 import {
   InteractiveCourseSession,
   ConversationMessage,
@@ -24,6 +25,22 @@ export class InteractiveCourseSessionManager implements SessionManager {
   private supabase = (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
     ? createSupabaseBrowserClient()
     : null as any;
+  
+  private adminSupabase = null as any;
+
+  constructor(useAdmin = false) {
+    if (useAdmin || typeof window === 'undefined') {
+      try {
+        this.adminSupabase = createServerSupabaseClient();
+      } catch (e) {
+        console.warn('[SessionManager] Failed to create admin client, falling back to browser client');
+      }
+    }
+  }
+
+  private getClient() {
+    return this.adminSupabase || this.supabase;
+  }
 
   /**
    * Create a new interactive course session
@@ -37,7 +54,7 @@ export class InteractiveCourseSessionManager implements SessionManager {
       }
 
       // Create new session using database function
-      const { data, error } = await this.supabase
+      const { data, error } = await this.getClient()
         .rpc('create_or_resume_session', {
           p_user_id: userId,
           p_course_id: courseId
@@ -48,7 +65,7 @@ export class InteractiveCourseSessionManager implements SessionManager {
       }
 
       // Fetch the created session
-      const { data: sessionData, error: fetchError } = await this.supabase
+      const { data: sessionData, error: fetchError } = await this.getClient()
         .from('interactive_course_sessions')
         .select('*')
         .eq('id', data)
@@ -72,7 +89,7 @@ export class InteractiveCourseSessionManager implements SessionManager {
    */
   async resumeSession(userId: string, courseId: string): Promise<InteractiveCourseSession | null> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.getClient()
         .from('interactive_course_sessions')
         .select('*')
         .eq('user_id', userId)
@@ -89,7 +106,7 @@ export class InteractiveCourseSessionManager implements SessionManager {
       }
 
       // Update last interaction timestamp
-      await this.supabase
+      await this.getClient()
         .from('interactive_course_sessions')
         .update({ last_interaction: new Date().toISOString() })
         .eq('id', data.id);
@@ -108,7 +125,7 @@ export class InteractiveCourseSessionManager implements SessionManager {
    */
   async persistSession(session: InteractiveCourseSession): Promise<void> {
     try {
-      const { error } = await this.supabase
+      const { error } = await this.getClient()
         .from('interactive_course_sessions')
         .update({
           current_topic: session.currentTopic,
@@ -135,7 +152,7 @@ export class InteractiveCourseSessionManager implements SessionManager {
    */
   async endSession(sessionId: string): Promise<void> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.getClient()
         .rpc('end_session', { p_session_id: sessionId });
 
       if (error) {
@@ -158,7 +175,7 @@ export class InteractiveCourseSessionManager implements SessionManager {
    */
   async getSessionHistory(sessionId: string, limit: number = 50): Promise<ConversationMessage[]> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.getClient()
         .rpc('get_session_conversation', {
           p_session_id: sessionId,
           p_limit: limit
@@ -188,7 +205,7 @@ export class InteractiveCourseSessionManager implements SessionManager {
     metadata?: Record<string, any>
   ): Promise<string> {
     try {
-      const { data, error } = await this.supabase
+      const { data, error } = await this.getClient()
         .rpc('add_conversation_message', {
           p_session_id: sessionId,
           p_role: role,
@@ -216,7 +233,7 @@ export class InteractiveCourseSessionManager implements SessionManager {
   async getSessionResumeData(sessionId: string): Promise<SessionResumeData> {
     try {
       // Get session data
-      const { data: sessionData, error: sessionError } = await this.supabase
+      const { data: sessionData, error: sessionError } = await this.getClient()
         .from('interactive_course_sessions')
         .select('*')
         .eq('id', sessionId)
@@ -230,7 +247,7 @@ export class InteractiveCourseSessionManager implements SessionManager {
       const recentMessages = await this.getSessionHistory(sessionId, 20);
 
       // Get current learning loop iteration
-      const { data: iterationData } = await this.supabase
+      const { data: iterationData } = await this.getClient()
         .from('learning_loop_iterations')
         .select('*')
         .eq('session_id', sessionId)
@@ -240,7 +257,7 @@ export class InteractiveCourseSessionManager implements SessionManager {
         .single();
 
       // Get pending assessments
-      const { data: assessmentData } = await this.supabase
+      const { data: assessmentData } = await this.getClient()
         .from('understanding_assessments')
         .select('*')
         .eq('session_id', sessionId)

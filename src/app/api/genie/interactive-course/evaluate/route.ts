@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { understandingAssessment } from '@/lib/services/understanding-assessment';
 import { adaptiveResponseSystem } from '@/lib/services/adaptive-response-system';
-import { sessionManager } from '@/lib/services/interactive-course-session-manager';
+import { InteractiveCourseSessionManager } from '@/lib/services/interactive-course-session-manager';
+import { SessionManager } from '@/lib/genie/brain/session';
+
+const sessionManager = new InteractiveCourseSessionManager(true);
 
 export async function POST(request: NextRequest) {
   try {
-    const { sessionId, questionId, answer } = await request.json();
+    const { sessionId, questionId, answer, iterationId } = await request.json();
 
     if (!sessionId || !questionId || !answer) {
       return NextResponse.json(
@@ -74,6 +77,16 @@ export async function POST(request: NextRequest) {
     }
 
     await sessionManager.persistSession(session);
+
+    // Update learning_loop_iterations if iterationId is provided
+    if (iterationId) {
+      try {
+        const masteryAchieved = comprehensionResult.correct;
+        await SessionManager.markEvaluationCompleted(iterationId, masteryAchieved);
+      } catch (iterError) {
+        console.error('Failed to update iteration:', iterError);
+      }
+    }
 
     return NextResponse.json({
       success: true,

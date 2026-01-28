@@ -148,5 +148,23 @@ export const SessionManager = {
 
     if (error) throw error;
     return data;
+  },
+
+  async markEvaluationCompleted(iterationId: string, masteryAchieved: boolean) {
+    const update: any = {
+      evaluation_completed: true,
+      completed_at: new Date().toISOString()
+    };
+    
+    if (masteryAchieved) {
+      update.mastery_achieved = true;
+    }
+
+    const { error } = await supabase
+      .from('learning_loop_iterations')
+      .update(update)
+      .eq('id', iterationId);
+
+    if (error) throw error;
   }
 };

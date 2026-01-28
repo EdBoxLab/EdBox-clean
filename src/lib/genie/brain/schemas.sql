@@ -253,3 +253,40 @@ create table public.user_skill_progress (
 create trigger update_user_skill_progress_updated_at BEFORE
 update on user_skill_progress for EACH row
 execute FUNCTION update_updated_at_column ();
+
+-- Genie Decision Logging Table
+create table public.genie_decision_logs (
+  id uuid not null default gen_random_uuid (),
+  session_id uuid not null,
+  iteration_id uuid null,
+  user_id uuid not null,
+  node_id uuid not null,
+  concept text not null,
+  action text not null,
+  thought_process text null,
+  evaluation_score numeric(5, 2) null default 0,
+  feedback text null,
+  remediation_node_id uuid null,
+  mastery_status text null,
+  mastery_score numeric(5, 2) null default 0,
+  conversation_history_length integer null default 0,
+  context_sources_count integer null default 0,
+  input_message text null,
+  full_decision jsonb null default '{}'::jsonb,
+  created_at timestamp with time zone null default now(),
+  constraint genie_decision_logs_pkey primary key (id),
+  constraint genie_decision_logs_session_id_fkey foreign KEY (session_id) references interactive_course_sessions (id) on delete CASCADE,
+  constraint genie_decision_logs_iteration_id_fkey foreign KEY (iteration_id) references learning_loop_iterations (id) on delete SET NULL,
+  constraint genie_decision_logs_user_id_fkey foreign KEY (user_id) references auth.users (id) on delete CASCADE,
+  constraint genie_decision_logs_node_id_fkey foreign KEY (node_id) references genie_knowledge_nodes (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create index IF not exists idx_decision_logs_session_id on public.genie_decision_logs using btree (session_id) TABLESPACE pg_default;
+
+create index IF not exists idx_decision_logs_user_id on public.genie_decision_logs using btree (user_id) TABLESPACE pg_default;
+
+create index IF not exists idx_decision_logs_node_id on public.genie_decision_logs using btree (node_id) TABLESPACE pg_default;
+
+create index IF not exists idx_decision_logs_action on public.genie_decision_logs using btree (action) TABLESPACE pg_default;
+
+create index IF not exists idx_decision_logs_created_at on public.genie_decision_logs using btree (created_at desc) TABLESPACE pg_default;

@@ -6,6 +6,7 @@ import { skillProgressionIntegration } from '@/lib/services/skill-progression-in
 import { CognitiveReasoning } from '@/lib/genie/brain/reasoning';
 import { VectorBrain } from '@/lib/genie/brain/vector';
 import { MasteryTracker } from '@/lib/genie/brain/mastery';
+import { DecisionLogger, GenieDecision } from '@/lib/genie/brain/decision-logger';
 import { KnowledgeNode, MasteryRecord } from '@/lib/genie/brain/types';
 
 // ============================================
@@ -91,6 +92,65 @@ export async function POST(request: NextRequest) {
             updated_at: new Date().toISOString()
         };
 
+        // Try to fetch real node content from genie_knowledge_nodes first
+        let resolvedNodeId: string | null = null;
+        if (currentSkillId) {
+            const { data: nodeData } = await persistenceClient
+                .from('genie_knowledge_nodes')
+                .select('*')
+                .eq('id', currentSkillId)
+                .single();
+            
+            if (nodeData) {
+                resolvedNodeId = nodeData.id;
+                currentNode = {
+                    id: nodeData.id,
+                    course_id: nodeData.course_id,
+                    title: nodeData.title,
+                    description: nodeData.description || '',
+                    content: nodeData.content || nodeData.title,
+                    level: nodeData.level || 1,
+                    order_index: nodeData.order_index || 0,
+                    prerequisite_ids: nodeData.prerequisite_ids || [],
+                    created_at: nodeData.created_at,
+                    updated_at: nodeData.updated_at
+                };
+            }
+        }
+
+        // If no node found yet, try to find by course_id (first node for that course)
+        if (!resolvedNodeId) {
+            const { data: nodeByCourse } = await persistenceClient
+                .from('genie_knowledge_nodes')
+                .select('*')
+                .eq('course_id', courseId)
+                .order('order_index', { ascending: true })
+                .limit(1)
+                .single();
+            
+            if (nodeByCourse) {
+                resolvedNodeId = nodeByCourse.id;
+                currentNode = {
+                    id: nodeByCourse.id,
+                    course_id: nodeByCourse.course_id,
+                    title: nodeByCourse.title,
+                    description: nodeByCourse.description || '',
+                    content: nodeByCourse.content || nodeByCourse.title,
+                    level: nodeByCourse.level || 1,
+                    order_index: nodeByCourse.order_index || 0,
+                    prerequisite_ids: nodeByCourse.prerequisite_ids || [],
+                    created_at: nodeByCourse.created_at,
+                    updated_at: nodeByCourse.updated_at
+                };
+            }
+        }
+
+        // Fallback: use currentSkillId if it's a valid UUID, even if not in knowledge_nodes
+        // The MasteryTracker will handle non-existent nodes gracefully
+        if (!resolvedNodeId && currentSkillId) {
+            resolvedNodeId = currentSkillId;
+        }
+
         // Try to fetch real node content from the graph or new knowledge table
         const { data: graphData } = await persistenceClient
             .from('skill_graphs')
@@ -126,14 +186,15 @@ export async function POST(request: NextRequest) {
         const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
         let mastery = null;
-        if (user.id && currentNode.id && isUUID(user.id) && isUUID(currentNode.id)) {
+        const nodeIdForMastery = resolvedNodeId || currentNode.id;
+        if (user.id && nodeIdForMastery && isUUID(user.id) && isUUID(nodeIdForMastery)) {
             try {
-                mastery = await MasteryTracker.getMastery(user.id, currentNode.id);
+                mastery = await MasteryTracker.getMastery(user.id, nodeIdForMastery);
             } catch (err) {
-                console.warn(`[GENIE_BRAIN] Mastery check failed for node ${currentNode.id}`, err);
+                console.warn(`[GENIE_BRAIN] Mastery check failed for node ${nodeIdForMastery}`, err);
             }
         } else {
-            console.warn(`[GENIE_BRAIN] Skipping mastery check. Invalid UUIDs - User: ${user.id}, Node: ${currentNode.id}`);
+            console.warn(`[GENIE_BRAIN] Skipping mastery check. Invalid UUIDs - User: ${user.id}, Node: ${nodeIdForMastery}`);
         }
 
         // 4. COGNITIVE REASONING (The Decision)
@@ -146,21 +207,76 @@ export async function POST(request: NextRequest) {
             conversationHistory || []
         );
 
-        console.log('[GENIE_BRAIN] Decision:', decision.action, decision.thought_process);
+        // Log the decision for analytics and debugging
+        let decisionLog: GenieDecision = {
+            session_id: sessionId,
+            user_id: user.id,
+            node_id: nodeIdForMastery || currentNode.id,
+            concept: currentNode.title,
+            action: decision.action,
+            thought_process: decision.thought_process || '',
+            evaluation_score: decision.evaluation_score || 0,
+            feedback: decision.feedback || '',
+            remediation_node_id: decision.remediation_node_id,
+            mastery_status: mastery?.status || 'not_started',
+            mastery_score: mastery?.mastery_score || 0,
+            conversation_history_length: (conversationHistory || []).length,
+            context_sources_count: relatedContext.length,
+            input_message: userMessage,
+            full_decision: decision as Record<string, any>
+        };
+        
+        // Log asynchronously (don't block the response)
+        const logId = await DecisionLogger.logDecision(decisionLog);
+        decisionLog.id = logId || undefined;
 
-        // 5. STREAM RESPONSE
+        // 5. UPDATE MASTERY & TRANSITIONS (Persistence)
+        // ---------------------------------------------------------
+        let masteryAchieved = false;
+        if (user.id && nodeIdForMastery) {
+            const masteryResult = await MasteryTracker.updateMastery(user.id, nodeIdForMastery, decision.evaluation_score);
+            masteryAchieved = decision.evaluation_score >= 80;
+        }
+
+        let nextNodeId = currentNode.id;
+        if (decision.action === 'advance') {
+            const eligibleNodes = await MasteryTracker.getEligibleNodes(user.id, courseId);
+            if (eligibleNodes.length > 0) {
+                nextNodeId = eligibleNodes[0];
+            }
+        } else if (decision.action === 'remediate' && decision.remediation_node_id) {
+            nextNodeId = decision.remediation_node_id;
+        }
+
+        // 6. STREAM RESPONSE
         // ---------------------------------------------------------
         const encoder = new TextEncoder();
         const stream = new ReadableStream({
             async start(controller) {
                 try {
-                    // Log user message into the current session context if needed
-                    // (The brain uses conversationHistory, but we can log for persistence)
+                    // Update current node in session if changed
                     const { SessionManager } = await import('@/lib/genie/brain/session');
+                    if (nextNodeId !== currentNode.id) {
+                        await SessionManager.updateCurrentNode(sessionId, nextNodeId);
+                        // Notify frontend about node transition via metadata
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'node_transition', nodeId: nextNodeId })}\n\n`));
+                    }
 
-                    // Create/Get an iteration for this interaction if it's a new concept
-                    // For simplicity, we'll use the retry_count or a timestamp-based iteration
+                    // Create/Get an iteration for this interaction
                     const iteration = await SessionManager.startIteration(sessionId, 1, currentNode.title);
+
+                    // Update decision log with iteration ID
+                    if (decisionLog.id) {
+                        await persistenceClient
+                            .from('genie_decision_logs')
+                            .update({ iteration_id: iteration.id })
+                            .eq('id', decisionLog.id);
+                    }
+
+                    // Mark evaluation as completed if there's an evaluation score
+                    if (decision.evaluation_score !== undefined && decision.evaluation_score !== null) {
+                      await SessionManager.markEvaluationCompleted(iteration.id, masteryAchieved);
+                    }
 
                     // A. Handle Roadmap
                     if (decision.action === 'roadmap') {
@@ -189,7 +305,7 @@ export async function POST(request: NextRequest) {
                     // B. Handle Quiz
                     else if (decision.action === 'quiz') {
                         let intro = decision.content.text || "Let's check your understanding.";
-                        
+
                         // If AI leaked question into intro, truncate intro
                         if (decision.content.quiz?.question && intro.includes(decision.content.quiz.question)) {
                             intro = "Let's see how much you've learned so far:";

@@ -19,8 +19,39 @@ export const MasteryTracker = {
     return data;
   },
 
-  async updateMastery(userId: string, nodeId: string, score: number) {
+  async updateMastery(userId: string, nodeId: string, score: number): Promise<boolean> {
     const status = score >= 80 ? 'mastered' : score > 0 ? 'in_progress' : 'not_started';
+    const masteryAchieved = score >= 80;
+
+    // Verify node exists in genie_knowledge_nodes, create if missing
+    const { data: nodeExists } = await supabase
+      .from('genie_knowledge_nodes')
+      .select('id')
+      .eq('id', nodeId)
+      .single();
+
+    if (!nodeExists) {
+      console.warn(`[MasteryTracker] Node ${nodeId} not found, creating it...`);
+      const { data: newNode, error: insertError } = await supabase
+        .from('genie_knowledge_nodes')
+        .insert({
+          id: nodeId,
+          course_id: 'interactive-course',
+          title: `Node ${nodeId.slice(0, 8)}`,
+          description: 'Auto-generated node from interactive course',
+          content: 'Auto-generated node content',
+          level: 1,
+          order_index: 0
+        })
+        .select()
+        .single();
+      
+      if (insertError) {
+        console.error(`[MasteryTracker] Failed to create node ${nodeId}:`, insertError);
+        return false;
+      }
+      console.log(`[MasteryTracker] Created node ${nodeId} successfully`);
+    }
 
     // Update main mastery table with atomic-like increment behavior if possible
     // Since we don't have an RPC here, we use a single upsert but we still need the previous count for manual increment
@@ -66,6 +97,8 @@ export const MasteryTracker = {
           last_updated: new Date().toISOString()
         }, { onConflict: 'user_id,topic,concept' });
     }
+
+    return masteryAchieved;
   },
 
   async getEligibleNodes(userId: string, courseId: string): Promise<string[]> {

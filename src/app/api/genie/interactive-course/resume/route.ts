@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sessionManager } from '@/lib/services/interactive-course-session-manager';
+import { InteractiveCourseSessionManager } from '@/lib/services/interactive-course-session-manager';
+
+const sessionManager = new InteractiveCourseSessionManager(true);
 
 export async function POST(request: NextRequest) {
   try {

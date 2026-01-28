@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateWithRetry, cleanJsonResponse } from '@/lib/ai-providers';
-import { sessionManager } from '@/lib/services/interactive-course-session-manager';
+import { InteractiveCourseSessionManager } from '@/lib/services/interactive-course-session-manager';
 import { createServerSupabaseClient } from '@/lib/supabase/admin';
+import { SessionManager } from '@/lib/genie/brain/session';
+
+const sessionManager = new InteractiveCourseSessionManager(true);
 
 export async function POST(request: NextRequest) {
     const supabase = createServerSupabaseClient();
     try {
-        const { challenge, answer, sessionId, imageUrl } = await request.json();
+        const { challenge, answer, sessionId, imageUrl, iterationId } = await request.json();
 
         if (!challenge || (!answer && !imageUrl)) {
             return NextResponse.json(
@@ -129,6 +132,16 @@ Format: Return ONLY the JSON object. DO NOT include any explanatory text or mark
                 }
             } catch (persistError) {
                 console.error('Failed to persist challenge progress:', persistError);
+            }
+        }
+
+        // Update learning_loop_iterations if iterationId is provided
+        if (iterationId) {
+            try {
+                const masteryAchieved = evaluation.passed && evaluation.score >= 0.8;
+                await SessionManager.markEvaluationCompleted(iterationId, masteryAchieved);
+            } catch (iterError) {
+                console.error('Failed to update iteration:', iterError);
             }
         }
 

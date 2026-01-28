@@ -24,8 +24,8 @@ export async function POST(request: NextRequest) {
 
     // 1. Get Session state
     const { data: sessionData, error: sessionError } = await supabase
-      .from('genie_sessions')
-      .select('*, genie_knowledge_nodes(*)')
+      .from('interactive_course_sessions')
+      .select('*')
       .eq('id', sessionId)
       .single();
 
@@ -33,7 +33,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    const currentNode = sessionData.genie_knowledge_nodes;
+    // Fetch the current node details
+    const { data: currentNode, error: nodeError } = await supabase
+      .from('genie_knowledge_nodes')
+      .select('*')
+      .eq('id', sessionData.current_topic)
+      .single();
+
+    if (nodeError || !currentNode) {
+      return NextResponse.json({ error: 'Current node not found' }, { status: 404 });
+    }
     
     // 2. Get User Mastery for current node
     const mastery = await MasteryTracker.getMastery(userId, currentNode.id);
@@ -63,13 +72,13 @@ export async function POST(request: NextRequest) {
 
     // 7. Handle Transitions
     let nextNodeId = currentNode.id;
-    if (reasoning.next_action === 'advance') {
+    if (reasoning.action === 'advance') {
       const eligibleNodes = await MasteryTracker.getEligibleNodes(userId, sessionData.course_id);
       if (eligibleNodes.length > 0) {
         nextNodeId = eligibleNodes[0];
         await SessionManager.updateCurrentNode(sessionId, nextNodeId);
       }
-    } else if (reasoning.next_action === 'remediate' && reasoning.remediation_node_id) {
+    } else if (reasoning.action === 'remediate' && reasoning.remediation_node_id) {
       nextNodeId = reasoning.remediation_node_id;
       await SessionManager.updateCurrentNode(sessionId, nextNodeId);
     }
@@ -77,7 +86,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       response: reasoning.feedback,
-      next_action: reasoning.next_action,
+      next_action: reasoning.action,
       evaluation: reasoning.evaluation_score,
       suggested_explanation: reasoning.suggested_explanation,
       current_node_id: nextNodeId

@@ -85,8 +85,10 @@ export async function POST(request: NextRequest) {
             description: 'Current Topic',
             content: skillTitle || 'this topic', // Fallback if no content found
             level: 1,
-            prerequisites: [],
-            created_at: new Date().toISOString()
+            order_index: 0,
+            prerequisite_ids: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
         };
 
         // Try to fetch real node content from the graph or new knowledge table
@@ -152,13 +154,13 @@ export async function POST(request: NextRequest) {
         const stream = new ReadableStream({
             async start(controller) {
                 try {
-                    // Log user message
-                    await persistenceClient.rpc('add_conversation_message', {
-                        p_session_id: sessionId,
-                        p_role: 'learner',
-                        p_content: userMessage,
-                        p_message_type: 'explanation'
-                    });
+                    // Log user message into the current session context if needed
+                    // (The brain uses conversationHistory, but we can log for persistence)
+                    const { SessionManager } = await import('@/lib/genie/brain/session');
+                    
+                    // Create/Get an iteration for this interaction if it's a new concept
+                    // For simplicity, we'll use the retry_count or a timestamp-based iteration
+                    const iteration = await SessionManager.startIteration(sessionId, 1, currentNode.title);
 
                     // A. Handle Roadmap
                     if (decision.action === 'roadmap') {
@@ -181,14 +183,8 @@ export async function POST(request: NextRequest) {
 
                         // Send Roadmap Data
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'roadmap', roadmapData })}\n\n`));
-
-                        await persistenceClient.rpc('add_conversation_message', {
-                            p_session_id: sessionId,
-                            p_role: 'genie',
-                            p_content: intro,
-                            p_message_type: 'roadmap',
-                            p_metadata: { roadmapData }
-                        });
+                        
+                        await SessionManager.completeIterationStep(iteration.id, 'explanation');
                     }
                     // B. Handle Quiz
                     else if (decision.action === 'quiz' && decision.content.quiz) {
@@ -198,13 +194,16 @@ export async function POST(request: NextRequest) {
                         // Send Quiz Data
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'quiz', quizData: decision.content.quiz })}\n\n`));
 
-                        await persistenceClient.rpc('add_conversation_message', {
-                            p_session_id: sessionId,
-                            p_role: 'genie',
-                            p_content: decision.content.quiz.question,
-                            p_message_type: 'assessment',
-                            p_metadata: { quizData: decision.content.quiz }
+                        // Log to understanding_assessments
+                        await SessionManager.logAssessment({
+                            session_id: sessionId,
+                            concept: currentNode.title,
+                            question_type: 'multiple_choice',
+                            question_data: decision.content.quiz,
+                            created_at: new Date().toISOString()
                         });
+                        
+                        await SessionManager.completeIterationStep(iteration.id, 'assessment');
                     }
                     // B. Handle Challenge
                     else if (decision.action === 'challenge' && decision.content.challenge) {
@@ -213,28 +212,17 @@ export async function POST(request: NextRequest) {
 
                         // Send Challenge Data
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData: decision.content.challenge })}\n\n`));
-
-                        await persistenceClient.rpc('add_conversation_message', {
-                            p_session_id: sessionId,
-                            p_role: 'genie',
-                            p_content: decision.content.challenge.description,
-                            p_message_type: 'challenge',
-                            p_metadata: { challengeData: decision.content.challenge }
-                        });
+                        
+                        await SessionManager.completeIterationStep(iteration.id, 'challenge');
                     }
                     // C. Handle Explanation / Remediation / Advance
                     else {
                         // If it's a simple transition text from reasoning
                         if (decision.content.text && decision.content.text.length > 50) {
                             await streamText(decision.content.text, controller, encoder);
-                            await persistenceClient.rpc('add_conversation_message', {
-                                p_session_id: sessionId,
-                                p_role: 'genie',
-                                p_content: decision.content.text,
-                                p_message_type: 'explanation'
-                            });
+                            await SessionManager.completeIterationStep(iteration.id, 'explanation');
                         } else {
-                            // GENERATE REAL STREAMING EXPLANATION (Grounded in context with continuity)
+                            // GENERATE REAL STREAMING EXPLANATION
                             const explanationStream = CognitiveReasoning.generatePersonalizedContentStream(
                                 currentNode,
                                 userMessage
@@ -246,36 +234,25 @@ export async function POST(request: NextRequest) {
                                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'content', content: chunk })}\n\n`));
                             }
 
-                            if (!fullExplanation.trim()) {
-                                // Increment retry count on generation failure
-                                await persistenceClient.rpc('increment_session_retry', { p_session_id: sessionId });
-                                
-                                const fallback = "I encountered an issue, please retry.";
-                                await streamText(fallback, controller, encoder);
-                                fullExplanation = fallback;
-                            } else {
-                                // Success - reset retry count
+                            if (fullExplanation.trim()) {
                                 await persistenceClient
                                     .from('interactive_course_sessions')
                                     .update({ retry_count: 0 })
                                     .eq('id', sessionId);
+                                
+                                await SessionManager.completeIterationStep(iteration.id, 'explanation');
                             }
-
-                            await persistenceClient.rpc('add_conversation_message', {
-                                p_session_id: sessionId,
-                                p_role: 'genie',
-                                p_content: fullExplanation,
-                                p_message_type: 'explanation'
-                            });
                         }
                     }
 
                     controller.close();
                 } catch (e) {
+
                     console.error('Stream Error:', e);
 
                     // Increment retry count on failure
-                    await persistenceClient.rpc('increment_session_retry', { p_session_id: sessionId });
+                    const { SessionManager } = await import('@/lib/genie/brain/session');
+                    await SessionManager.incrementSessionRetry(sessionId);
 
                     const errorMessage = "I encountered an issue, please retry.";
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'content', content: errorMessage })}\n\n`));

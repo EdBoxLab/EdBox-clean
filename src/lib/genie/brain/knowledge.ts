@@ -73,6 +73,18 @@ export const KnowledgeManager = {
 
     if (error) throw error;
 
+    // Save the entire skill graph structure
+    await supabase
+      .from('skill_graphs')
+      .insert({
+        user_id: (await supabase.auth.getUser()).data.user?.id || '00000000-0000-0000-0000-000000000000', // Default if no user
+        goal: `Course: ${courseId}`,
+        nodes: savedNodes,
+        edges: [], // Could be populated if relationships are defined
+        total_skills: savedNodes.length,
+        context: { courseId, timeLimit }
+      });
+
     // Resolve prerequisite IDs
     for (const node of savedNodes) {
       nodesMap.set(node.title, node.id);

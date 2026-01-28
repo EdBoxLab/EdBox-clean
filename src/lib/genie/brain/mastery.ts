@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { MasteryRecord } from './types';
+import { MasteryRecord, UserCompetency, UserSkillProgress, LearnerState } from './types';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,6 +22,19 @@ export const MasteryTracker = {
   async updateMastery(userId: string, nodeId: string, score: number) {
     const status = score >= 80 ? 'mastered' : score > 0 ? 'in_progress' : 'not_started';
 
+    // Update main mastery table with atomic-like increment behavior if possible
+    // Since we don't have an RPC here, we use a single upsert but we still need the previous count for manual increment
+    // unless we use a raw SQL query or RPC. For now, let's at least optimize the flow.
+    
+    const { data: currentMastery } = await supabase
+      .from('genie_user_mastery')
+      .select('attempts_count')
+      .eq('user_id', userId)
+      .eq('node_id', nodeId)
+      .single();
+
+    const newAttempts = (currentMastery?.attempts_count || 0) + 1;
+
     const { error } = await supabase
       .from('genie_user_mastery')
       .upsert({
@@ -29,40 +42,112 @@ export const MasteryTracker = {
         node_id: nodeId,
         mastery_score: score,
         status: status,
+        attempts_count: newAttempts,
         last_attempt_at: new Date().toISOString(),
       }, { onConflict: 'user_id,node_id' });
 
     if (error) throw error;
 
-    // Increment attempts count
-    await supabase.rpc('increment_mastery_attempts', { p_user_id: userId, p_node_id: nodeId });
-  },
-
-  async getNextNode(userId: string, courseId: string, currentNodeId: string): Promise<string | null> {
-    // 1. Get all nodes for the course ordered by index
-    const { data: nodes, error } = await supabase
+    // Sync to user_competency for broader tracking
+    const { data: node } = await supabase
       .from('genie_knowledge_nodes')
-      .select('id, order_index, level')
-      .eq('course_id', courseId)
-      .order('order_index', { ascending: true });
+      .select('title, course_id')
+      .eq('id', nodeId)
+      .single();
 
-    if (error || !nodes) return null;
-
-    // 2. Find current node index
-    const currentIndex = nodes.findIndex((n: any) => n.id === currentNodeId);
-    if (currentIndex === -1) return nodes[0]?.id || null; // Fallback to start
-
-    // 3. Find next node
-    // We simply take the next one in the linear sequence
-    const nextNode = nodes[currentIndex + 1];
-    if (!nextNode) return null; // Course completed
-
-    return nextNode.id;
+    if (node) {
+      await supabase
+        .from('user_competency')
+        .upsert({
+          user_id: userId,
+          topic: node.course_id,
+          concept: node.title,
+          confidence: score / 100,
+          last_updated: new Date().toISOString()
+        }, { onConflict: 'user_id,topic,concept' });
+    }
   },
 
   async getEligibleNodes(userId: string, courseId: string): Promise<string[]> {
-    // Placeholder for non-linear graph logic (graph traversal)
-    // For now, relies on getNextNode for linear
-    return [];
+    // Optimization: Fetch only necessary data and use a single query for mastery if possible
+    // For now, let's keep the logic but make it cleaner.
+    const { data: nodes } = await supabase
+      .from('genie_knowledge_nodes')
+      .select('id, prerequisite_ids')
+      .eq('course_id', courseId)
+      .order('order_index', { ascending: true });
+
+    if (!nodes || nodes.length === 0) return [];
+
+    const { data: mastery } = await supabase
+      .from('genie_user_mastery')
+      .select('node_id')
+      .eq('user_id', userId)
+      .eq('status', 'mastered');
+
+    const masteredIds = new Set(mastery?.map(m => m.node_id) || []);
+
+    return nodes
+      .filter(node => {
+        if (masteredIds.has(node.id)) return false;
+        const prerequisites = node.prerequisite_ids || [];
+        if (prerequisites.length === 0) return true;
+        return (prerequisites as string[]).every((id: string) => masteredIds.has(id));
+      })
+      .map(node => node.id);
+  },
+
+  async updateSkillProgress(userId: string, skillId: string, success: boolean, xp: number = 10) {
+    const { data: currentProgress } = await supabase
+      .from('user_skill_progress')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('skill_id', skillId)
+      .single();
+
+    const totalAttempts = (currentProgress?.total_attempts || 0) + 1;
+    const challengesCompleted = (currentProgress?.challenges_completed || 0) + (success ? 1 : 0);
+    
+    // Fix: Prevent NaN if totalAttempts is 0 (though it shouldn't be here)
+    const successRate = totalAttempts > 0 ? challengesCompleted / totalAttempts : 0;
+    
+    const challengesRequired = currentProgress?.challenges_required || 3;
+    const masteryAchieved = challengesCompleted >= challengesRequired && successRate >= 0.7;
+
+    await supabase
+      .from('user_skill_progress')
+      .upsert({
+        user_id: userId,
+        skill_id: skillId,
+        challenges_completed: challengesCompleted,
+        total_attempts: totalAttempts,
+        success_rate: successRate,
+        mastery_achieved: masteryAchieved,
+        xp_earned: (currentProgress?.xp_earned || 0) + (success ? xp : 2),
+        last_attempt: new Date().toISOString()
+      }, { onConflict: 'user_id,skill_id' });
+
+    // Update learner state (global XP/level)
+    if (success) {
+      const { data: state } = await supabase
+        .from('learner_states')
+        .select('total_xp, level')
+        .eq('user_id', userId)
+        .single();
+
+      if (state) {
+        const newXp = state.total_xp + xp;
+        const newLevel = Math.floor(Math.sqrt(newXp / 100)) + 1;
+        
+        await supabase
+          .from('learner_states')
+          .update({ 
+            total_xp: newXp, 
+            level: newLevel,
+            last_active: new Date().toISOString()
+          })
+          .eq('user_id', userId);
+      }
+    }
   }
 };

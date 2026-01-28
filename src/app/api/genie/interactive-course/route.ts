@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     );
 
     // 5. Update Mastery based on evaluation
-    await MasteryTracker.updateMastery(userId, currentNode.id, reasoning.evaluation_score);
+    await MasteryTracker.updateMastery(userId, currentNode.id, reasoning.evaluation_score, sessionData.course_id, currentNode.title);
 
     // 6. Log interaction
     await SessionManager.logResponse(

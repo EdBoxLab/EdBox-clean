@@ -234,7 +234,13 @@ export async function POST(request: NextRequest) {
         // ---------------------------------------------------------
         let masteryAchieved = false;
         if (user.id && nodeIdForMastery) {
-            const masteryResult = await MasteryTracker.updateMastery(user.id, nodeIdForMastery, decision.evaluation_score);
+            const masteryResult = await MasteryTracker.updateMastery(
+                user.id, 
+                nodeIdForMastery, 
+                decision.evaluation_score,
+                courseId,
+                currentNode.title
+            );
             masteryAchieved = decision.evaluation_score >= 80;
         }
 

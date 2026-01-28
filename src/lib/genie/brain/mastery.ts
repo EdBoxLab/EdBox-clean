@@ -19,11 +19,17 @@ export const MasteryTracker = {
     return data;
   },
 
-  async updateMastery(userId: string, nodeId: string, score: number): Promise<boolean> {
+  async updateMastery(
+    userId: string,
+    nodeId: string,
+    score: number,
+    courseId?: string,
+    skillTitle?: string
+  ): Promise<boolean> {
     const status = score >= 80 ? 'mastered' : score > 0 ? 'in_progress' : 'not_started';
     const masteryAchieved = score >= 80;
 
-    // Verify node exists in genie_knowledge_nodes, create if missing
+    // Verify node exists in genie_knowledge_nodes, create if missing with proper course context
     const { data: nodeExists } = await supabase
       .from('genie_knowledge_nodes')
       .select('id')
@@ -32,16 +38,28 @@ export const MasteryTracker = {
 
     if (!nodeExists) {
       console.warn(`[MasteryTracker] Node ${nodeId} not found, creating it...`);
+      
+      // Get the next order_index for this course
+      const { data: lastNode } = await supabase
+        .from('genie_knowledge_nodes')
+        .select('order_index')
+        .eq('course_id', courseId || 'interactive-course')
+        .order('order_index', { ascending: false })
+        .limit(1)
+        .single();
+      
+      const nextOrderIndex = (lastNode?.order_index || 0) + 1;
+      
       const { data: newNode, error: insertError } = await supabase
         .from('genie_knowledge_nodes')
         .insert({
           id: nodeId,
-          course_id: 'interactive-course',
-          title: `Node ${nodeId.slice(0, 8)}`,
-          description: 'Auto-generated node from interactive course',
-          content: 'Auto-generated node content',
+          course_id: courseId || 'interactive-course',
+          title: skillTitle || `Node ${nodeId.slice(0, 8)}`,
+          description: `Learning node for ${skillTitle || 'interactive course'}`,
+          content: `Auto-generated content for ${skillTitle || 'interactive course'}`,
           level: 1,
-          order_index: 0
+          order_index: nextOrderIndex
         })
         .select()
         .single();
@@ -50,7 +68,7 @@ export const MasteryTracker = {
         console.error(`[MasteryTracker] Failed to create node ${nodeId}:`, insertError);
         return false;
       }
-      console.log(`[MasteryTracker] Created node ${nodeId} successfully`);
+      console.log(`[MasteryTracker] Created node ${nodeId} for course ${courseId || 'interactive-course'}`);
     }
 
     // Update main mastery table with atomic-like increment behavior if possible

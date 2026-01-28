@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { SessionManager } from '@/lib/genie/brain/session';
-import { LearningOrchestrator } from '@/lib/genie/brain/reasoning';
+import { CognitiveReasoning } from '@/lib/genie/brain/reasoning';
 import { MasteryTracker } from '@/lib/genie/brain/mastery';
 import { VectorBrain } from '@/lib/genie/brain/vector';
 
@@ -50,47 +50,46 @@ export async function POST(request: NextRequest) {
     // 3. Find related context via Vector Search
     const relatedContext = await VectorBrain.findRelatedNodes(userMessage, 3);
 
-    // 4. Determine Next Action using Learning Orchestrator
-    const orchestrator = new LearningOrchestrator();
-    const decision = await orchestrator.processUserMessage(
+    // 4. Determine Next Action using Cognitive Reasoning
+    const reasoning = await CognitiveReasoning.determineNextAction(
       userMessage,
       currentNode,
       mastery,
-      [] // conversationHistory - could be fetched from session if needed
+      relatedContext
     );
 
     // 5. Update Mastery based on evaluation
-    await MasteryTracker.updateMastery(userId, currentNode.id, decision.evaluation_score);
+    await MasteryTracker.updateMastery(userId, currentNode.id, reasoning.evaluation_score);
 
     // 6. Log interaction
     await SessionManager.logResponse(
       sessionId,
       currentNode.id,
       userMessage,
-      decision,
-      decision.feedback
+      reasoning,
+      reasoning.feedback
     );
 
     // 7. Handle Transitions
     let nextNodeId = currentNode.id;
-    if (decision.action === 'advance') {
+    if (reasoning.action === 'advance') {
       const eligibleNodes = await MasteryTracker.getEligibleNodes(userId, sessionData.course_id);
       if (eligibleNodes.length > 0) {
         nextNodeId = eligibleNodes[0];
         await SessionManager.updateCurrentNode(sessionId, nextNodeId);
       }
-    } else if (decision.action === 'remediate') {
-      // Remediation logic - could navigate to prerequisite nodes if needed
-      // For now, stay on current node
+    } else if (reasoning.action === 'remediate' && reasoning.remediation_node_id) {
+      nextNodeId = reasoning.remediation_node_id;
+      await SessionManager.updateCurrentNode(sessionId, nextNodeId);
     }
 
     return NextResponse.json({
       success: true,
-      response: decision.feedback,
-      next_action: decision.action,
-      evaluation: decision.evaluation_score,
-      current_node_id: nextNodeId,
-      iteration: decision.iteration
+      response: reasoning.feedback,
+      next_action: reasoning.action,
+      evaluation: reasoning.evaluation_score,
+      suggested_explanation: reasoning.suggested_explanation,
+      current_node_id: nextNodeId
     });
 
   } catch (error: any) {

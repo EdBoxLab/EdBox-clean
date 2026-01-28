@@ -89,7 +89,8 @@ export async function POST(request: NextRequest) {
       next_action: reasoning.action,
       evaluation: reasoning.evaluation_score,
       suggested_explanation: reasoning.suggested_explanation,
-      current_node_id: nextNodeId
+      current_node_id: nextNodeId,
+      content: reasoning.content // Include full content object for quizzes/challenges
     });
 
   } catch (error: any) {

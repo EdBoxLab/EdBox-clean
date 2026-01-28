@@ -187,31 +187,51 @@ export async function POST(request: NextRequest) {
                         await SessionManager.completeIterationStep(iteration.id, 'explanation');
                     }
                     // B. Handle Quiz
-                    else if (decision.action === 'quiz' && decision.content.quiz) {
-                        const intro = decision.content.text || "Let's check your understanding.";
+                    else if (decision.action === 'quiz') {
+                        let intro = decision.content.text || "Let's check your understanding.";
+                        
+                        // If AI leaked question into intro, truncate intro
+                        if (decision.content.quiz?.question && intro.includes(decision.content.quiz.question)) {
+                            intro = "Let's see how much you've learned so far:";
+                        } else if (intro.length > 100) {
+                            intro = "Here is a quick check to verify your understanding:";
+                        }
+
                         await streamText(intro, controller, encoder);
 
-                        // Send Quiz Data
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'quiz', quizData: decision.content.quiz })}\n\n`));
+                        if (decision.content.quiz) {
+                            // Send Quiz Data
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'quiz', quizData: decision.content.quiz })}\n\n`));
 
-                        // Log to understanding_assessments
-                        await SessionManager.logAssessment({
-                            session_id: sessionId,
-                            concept: currentNode.title,
-                            question_type: 'multiple_choice',
-                            question_data: decision.content.quiz,
-                            created_at: new Date().toISOString()
-                        });
+                            // Log to understanding_assessments
+                            await SessionManager.logAssessment({
+                                session_id: sessionId,
+                                concept: currentNode.title,
+                                question_type: 'multiple_choice',
+                                question_data: decision.content.quiz,
+                                created_at: new Date().toISOString()
+                            });
+                        }
 
                         await SessionManager.completeIterationStep(iteration.id, 'assessment');
                     }
-                    // B. Handle Challenge
-                    else if (decision.action === 'challenge' && decision.content.challenge) {
-                        const intro = decision.content.text || "Time to apply what you've learned!";
+                    // C. Handle Challenge
+                    else if (decision.action === 'challenge') {
+                        let intro = decision.content.text || "Time to apply what you've learned!";
+
+                        // If AI leaked description into intro, truncate intro
+                        if (decision.content.challenge?.description && intro.includes(decision.content.challenge.description)) {
+                            intro = "Time for a practical challenge!";
+                        } else if (intro.length > 100) {
+                            intro = "Let's apply your knowledge with a real-world task:";
+                        }
+
                         await streamText(intro, controller, encoder);
 
-                        // Send Challenge Data
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData: decision.content.challenge })}\n\n`));
+                        if (decision.content.challenge) {
+                            // Send Challenge Data
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData: decision.content.challenge })}\n\n`));
+                        }
 
                         await SessionManager.completeIterationStep(iteration.id, 'challenge');
                     }

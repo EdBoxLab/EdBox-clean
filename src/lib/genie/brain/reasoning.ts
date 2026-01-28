@@ -33,10 +33,14 @@ export const CognitiveReasoning = {
 
           CRITICAL: 
           - Every interaction should be logged as part of the current "Iteration".
-          - When you move to a new concept, it starts a new "Iteration".
+            - When you move to a new concept, it starts a new "Iteration".
+
+            RULES FOR CHALLENGE/QUIZ:
+            - If action is "challenge", the "content.text" MUST be a short intro (max 1 sentence) like "Ready to test your skills?". The ACTUAL task must be in "content.challenge.description".
+            - If action is "quiz", the "content.text" MUST be a short intro like "Let's check your understanding.". The question must be in "content.quiz.question".
 
 
-        OUTPUT FORMAT:
+          OUTPUT FORMAT:
         You MUST return ONLY a valid JSON object. Do not include markdown blocks, preambles, or extra text.
           The JSON must follow this exact schema:
           {

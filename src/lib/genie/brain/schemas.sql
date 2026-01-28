@@ -78,6 +78,10 @@ execute FUNCTION update_updated_at_column ();
 create trigger update_interactive_course_sessions_updated_at BEFORE
 update on interactive_course_sessions for EACH row
 execute FUNCTION update_updated_at_column ();
+create index IF not exists idx_certificates_user_id on public.certificates using btree (user_id) TABLESPACE pg_default;
+
+create index IF not exists idx_certificates_skill_graph_id on public.certificates using btree (skill_graph_id) TABLESPACE pg_default;
+
 create table public.learner_states (
   id text not null,
   user_id uuid null,
@@ -226,6 +230,51 @@ create table public.user_competency (
 ) TABLESPACE pg_default;
 
 create index IF not exists user_competency_user_id_topic_idx on public.user_competency using btree (user_id, topic) TABLESPACE pg_default;
+create table public.skill_progress (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  user_id uuid not null,
+  skill_graph_id text not null,
+  skill_id text not null,
+  status text null default 'available'::text,
+  mastery_score numeric(5, 2) null default 0,
+  quiz_scores numeric(5, 2)[] null default array[]::numeric[],
+  challenge_results jsonb null default '[]'::jsonb,
+  time_spent_minutes integer null default 0,
+  attempts_count integer null default 0,
+  started_at timestamp with time zone null,
+  mastered_at timestamp with time zone null,
+  current_milestone text null default 'foundation'::text,
+  last_activity_at timestamp with time zone null,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  constraint skill_progress_pkey primary key (id),
+  constraint skill_progress_user_id_skill_graph_id_skill_id_key unique (user_id, skill_graph_id, skill_id),
+  constraint skill_progress_user_id_fkey foreign KEY (user_id) references auth.users (id) on delete CASCADE,
+  constraint skill_progress_status_check check (
+    (
+      status = any (
+        array[
+          'available'::text,
+          'in_progress'::text,
+          'mastered'::text
+        ]
+      )
+    )
+  )
+) TABLESPACE pg_default;
+
+create index IF not exists idx_skill_progress_user_id on public.skill_progress using btree (user_id) TABLESPACE pg_default;
+
+create index IF not exists idx_skill_progress_skill_graph_id on public.skill_progress using btree (skill_graph_id) TABLESPACE pg_default;
+
+create index IF not exists idx_skill_progress_skill_id on public.skill_progress using btree (skill_id) TABLESPACE pg_default;
+
+create index IF not exists idx_skill_progress_status on public.skill_progress using btree (status) TABLESPACE pg_default;
+
+create trigger update_skill_progress_updated_at BEFORE
+update on skill_progress for EACH row
+execute FUNCTION update_updated_at_column ();
+
 create table public.user_skill_progress (
   id uuid not null default extensions.uuid_generate_v4 (),
   user_id uuid not null,

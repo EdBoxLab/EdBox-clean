@@ -1,59 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, BookOpen, Brain, Trophy, MessageCircle, Menu, X, Loader, Check, AlertCircle, Map } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Send, BookOpen, Brain, Trophy, MessageCircle, Menu, X, Loader, AlertCircle } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import posthog from 'posthog-js';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-
-const StepProgress = ({ goals }: { goals: any[] }) => {
-  if (!goals || goals.length === 0) return null;
-
-  return (
-    <div className="flex items-center gap-3 p-4 bg-gray-950/80 backdrop-blur-xl border-b border-gray-800 sticky top-0 z-30 overflow-x-auto no-scrollbar shadow-2xl">
-      <div className="flex-shrink-0 mr-2">
-        <div className="p-2 bg-purple-500/10 rounded-lg border border-purple-500/20">
-          <Map className="w-4 h-4 text-purple-400" />
-        </div>
-      </div>
-      <div className="flex items-center gap-4 min-w-max pr-6">
-        {goals.map((goal, idx) => (
-          <React.Fragment key={goal.id}>
-            <div className="flex items-center gap-2">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black transition-all duration-500 ${goal.status === 'mastered' ? 'bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.4)]' :
-                goal.status === 'in_progress' ? 'bg-purple-600 text-white animate-pulse shadow-[0_0_15px_rgba(147,51,234,0.4)]' :
-                  'bg-gray-800 text-gray-500 border border-gray-700'
-                }`}>
-                {goal.status === 'mastered' ? <Check className="w-4 h-4" strokeWidth={3} /> : idx + 1}
-              </div>
-              <div className="flex flex-col">
-                <span className={`text-[9px] font-black uppercase tracking-wider truncate max-w-[80px] ${goal.status === 'mastered' ? 'text-green-400' :
-                  goal.status === 'in_progress' ? 'text-purple-400' :
-                    'text-gray-500'
-                  }`}>
-                  {goal.text}
-                </span>
-                <div className="h-0.5 w-full bg-gray-800 rounded-full mt-0.5 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${goal.confidence || 0}%` }}
-                    className={`h-full ${goal.status === 'mastered' ? 'bg-green-500' : 'bg-purple-500'}`}
-                  />
-                </div>
-              </div>
-            </div>
-            {idx < goals.length - 1 && (
-              <div className={`h-[1px] w-6 flex-shrink-0 ${goals[idx + 1].status !== 'pending' ? 'bg-purple-500/50' : 'bg-gray-800'
-                }`} />
-            )}
-          </React.Fragment>
-        ))}
-      </div>
-    </div>
-  );
-}; import {
+import { ProgressBar, StepProgress, ProgressBarHandle } from './InteractiveCourseProgress';
+import {
   InteractiveCourseSession as SessionType,
   QuickCheckQuestion
 } from '@/types/interactive-course';
@@ -86,24 +41,24 @@ function RoadmapWelcome({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-4xl mx-auto bg-gray-900 border border-gray-800 rounded-3xl overflow-hidden shadow-2xl my-4"
+      className="w-full max-w-4xl mx-auto bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-xl my-4"
     >
-      <div className="p-8 bg-gradient-to-br from-purple-900/40 to-indigo-900/40 border-b border-gray-800">
+      <div className="p-8 bg-gradient-to-br from-blue-950/40 to-purple-950/40 border-b border-gray-800">
         <div className="flex items-center gap-4 mb-4">
-          <div className="p-3 bg-purple-500/20 rounded-2xl border border-purple-500/30">
-            <BookOpen className="w-8 h-8 text-purple-400" />
+          <div className="p-3 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl border border-blue-500/30">
+            <BookOpen className="w-8 h-8 text-blue-400" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-white tracking-tight">{title}</h2>
+            <h2 className="text-2xl font-bold text-white tracking-tight">{title}</h2>
           </div>
         </div>
-        <p className="text-gray-300 leading-relaxed text-sm lg:text-base font-medium">
+        <p className="text-gray-300 leading-relaxed text-sm lg:text-base">
           {description}
         </p>
       </div>
 
       <div className="p-6 space-y-4">
-        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-2">Core Learning Objectives</h3>
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-2">What You'll Learn</h3>
         <div className="grid gap-3">
           {items.map((item, idx) => (
             <motion.div
@@ -111,18 +66,18 @@ function RoadmapWelcome({
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 * idx }}
-              className="flex items-center gap-4 p-4 bg-gray-800/40 rounded-2xl border border-gray-700/50 hover:border-purple-500/30 transition-all group"
+              className="flex items-center gap-4 p-4 bg-gray-800/40 rounded-xl border border-gray-700/50 hover:border-blue-500/30 transition-all group"
             >
-              <div className="flex-shrink-0 w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center border border-gray-700 font-bold text-purple-400 text-sm group-hover:border-purple-500/50 transition-colors">
+              <div className="flex-shrink-0 w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center border border-gray-700 font-semibold text-blue-400 text-sm group-hover:border-blue-500/50 transition-colors">
                 {idx + 1}
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-bold text-white group-hover:text-purple-300 transition-colors">{item.text}</h4>
+                <h4 className="text-sm font-semibold text-white group-hover:text-blue-300 transition-colors">{item.text}</h4>
                 <p className="text-xs text-gray-500 line-clamp-1">{item.description}</p>
               </div>
               <div className="text-right">
-                <div className="text-[10px] font-bold text-gray-500 uppercase mb-1">Confidence</div>
-                <div className="text-sm font-black text-white">{item.confidence}%</div>
+                <div className="text-[10px] font-medium text-gray-500 uppercase mb-1">Progress</div>
+                <div className="text-sm font-semibold text-white">{item.confidence}%</div>
               </div>
             </motion.div>
           ))}
@@ -133,10 +88,10 @@ function RoadmapWelcome({
         <button
           type="button"
           onClick={onStart}
-          className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-2xl font-black text-lg shadow-xl shadow-purple-500/20 transition-all active:scale-95 flex items-center justify-center gap-3"
+          className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl font-semibold text-lg shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3"
         >
-          <Trophy className="w-6 h-6" />
-          Start Learning Journey
+          <BookOpen className="w-5 h-5" />
+          Start Learning
         </button>
       </div>
     </motion.div>
@@ -177,6 +132,7 @@ export default function InteractiveCourseSession({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const initializingRef = useRef(false);
+  const progressBarRef = useRef<ProgressBarHandle>(null);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -226,6 +182,9 @@ export default function InteractiveCourseSession({
 
       if (existingSessionData) {
         setSession(existingSessionData);
+        if (progressBarRef.current && existingSessionData.progressState?.overallCourseProgress !== undefined) {
+          progressBarRef.current.setProgress(existingSessionData.progressState.overallCourseProgress);
+        }
         const history = await sessionManager.getSessionHistory(existingSessionData.id);
         if (history && history.length > 0) {
           const mappedMessages: ChatMessage[] = history.map(m => {
@@ -423,6 +382,10 @@ export default function InteractiveCourseSession({
                     }
                   };
                 });
+              } else if (data.type === 'progress_updated') {
+                if (progressBarRef.current && typeof data.progress === 'number') {
+                  progressBarRef.current.setProgress(data.progress);
+                }
               }
             } catch (e) { }
           }
@@ -520,12 +483,12 @@ export default function InteractiveCourseSession({
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-purple-600/20 rounded-xl border border-purple-500/20">
-                    <Brain className="w-5 h-5 text-purple-400" />
+                  <div className="p-2.5 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl border border-blue-500/30">
+                    <Brain className="w-5 h-5 text-blue-400" />
                   </div>
                   <div>
-                    <h2 className="font-bold text-sm tracking-tight">Quest Log</h2>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest">Cognitive Ascent</p>
+                    <h2 className="font-semibold text-sm tracking-tight">{courseTitle}</h2>
+                    <p className="text-[10px] text-gray-500">Learning Path</p>
                   </div>
                 </div>
                 <button
@@ -540,39 +503,35 @@ export default function InteractiveCourseSession({
               <div className="flex-1 overflow-y-auto">
                 {session?.learningContext?.goals && (
                   <div className="space-y-4">
-                    <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest">Growth Pulse</h3>
+                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Learning Goals</h3>
                     <GoalTracker goals={session.learningContext.goals || []} />
                   </div>
                 )}
               </div>
 
-              <div className="pt-6 border-t border-gray-800">
-              </div>
+
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Sidebar with Sticky Goal Tracker (Desktop) */}
+      {/* Sidebar with Goal Tracker (Desktop) */}
       <aside className="hidden lg:flex w-[320px] bg-gray-900 border-r border-gray-800 flex-col p-6 gap-6 overflow-y-auto shrink-0">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-purple-600/20 rounded-xl border border-purple-500/20">
-            <Brain className="w-5 h-5 text-purple-400" />
+          <div className="p-3 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl border border-blue-500/30">
+            <Brain className="w-5 h-5 text-blue-400" />
           </div>
           <div>
-            <h2 className="text-lg font-bold">{courseTitle}</h2>
+            <h2 className="text-lg font-semibold tracking-tight">{courseTitle}</h2>
+            <p className="text-xs text-gray-500">Learning Path</p>
           </div>
         </div>
 
-        {/* Real-Time Goal Tracker */}
         {session?.learningContext?.goals && session.learningContext.goals.length > 0 && (
-          <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+          <div className="bg-gray-800/40 rounded-xl p-4 border border-gray-700/50">
             <GoalTracker goals={session.learningContext.goals || []} />
           </div>
         )}
-
-        <div className="mt-auto pt-6 border-t border-gray-800">
-        </div>
       </aside>
 
       {/* Main Chat Area */}
@@ -580,38 +539,18 @@ export default function InteractiveCourseSession({
         {/* Mobile Sidebar Toggle & Header */}
         <header className="h-16 flex items-center justify-between px-6 border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl sticky top-0 z-20">
           <div className="flex items-center gap-3">
-            <div className="lg:hidden p-2 text-gray-400" onClick={() => setIsSidebarOpen(true)}><Menu /></div>
-            <h1 className="font-bold text-sm tracking-tight">GENIE <span className="text-purple-500">SESSION</span></h1>
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="lg:hidden p-2 text-gray-400 hover:text-white transition-colors"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <h1 className="font-semibold text-sm tracking-tight">
+              <span className="text-white">EdBox</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 ml-2">Learning</span>
+            </h1>
           </div>
-          <div className="flex items-center gap-3">
-            {(() => {
-              const progress = session?.progressState?.overallCourseProgress || 0;
-              return (
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${progress <= 30 ? 'bg-red-500/10 border-red-500/30 text-red-400' :
-                  progress <= 69 ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
-                    'bg-green-500/10 border-green-500/30 text-green-400'
-                  }`}>
-                  <div className="flex flex-col items-end">
-                    <span className="text-[8px] font-black uppercase tracking-tighter leading-none opacity-60">Mastery</span>
-                    <span className="text-xs font-black leading-none">{Math.round(progress)}%</span>
-                  </div>
-                  <div className="w-1.5 h-6 bg-gray-800 rounded-full overflow-hidden flex flex-col justify-end">
-                    <motion.div
-                      initial={{ height: 0 }}
-                      animate={{ height: `${progress}%` }}
-                      className={`w-full rounded-full ${progress <= 30 ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' :
-                        progress <= 69 ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]' :
-                          'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'
-                        }`}
-                    />
-                  </div>
-                  {progress >= 70 && (
-                    <Trophy className="w-3.5 h-3.5 text-green-400 animate-bounce" />
-                  )}
-                </div>
-              );
-            })()}
-          </div>
+          <ProgressBar ref={progressBarRef} initialProgress={session?.progressState?.overallCourseProgress || 0} />
         </header>
 
         <StepProgress goals={session?.learningContext?.goals || []} />
@@ -628,7 +567,7 @@ export default function InteractiveCourseSession({
                   className={`flex ${message.role === 'learner' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`max-w-[95%] lg:max-w-[90%] ${message.role === 'learner'
-                    ? 'bg-purple-600 text-white px-5 py-3.5 rounded-2xl rounded-tr-sm shadow-lg shadow-purple-500/10'
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white px-5 py-3.5 rounded-2xl rounded-tr-sm shadow-lg'
                     : message.type === 'roadmap' || message.type === 'quiz' || message.type === 'challenge_trigger'
                       ? 'w-full'
                       : 'bg-gray-800/80 border border-gray-700/50 px-5 py-3.5 rounded-2xl rounded-tl-sm backdrop-blur-sm'
@@ -670,33 +609,32 @@ export default function InteractiveCourseSession({
                       />
                     ) : message.type === 'challenge_trigger' && message.challengeData ? (
 
-                      <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-6 rounded-2xl shadow-xl border border-white/10">
-                        <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
-                          <Trophy className="w-5 h-5 text-yellow-300" />
+                      <div className="bg-gradient-to-br from-blue-600 to-purple-600 p-6 rounded-2xl shadow-xl border border-white/10">
+                        <h3 className="text-xl font-semibold mb-2 flex items-center gap-2">
+                          <Trophy className="w-5 h-5 text-white" />
                           {message.challengeData.title}
                         </h3>
-                        <p className="text-white/80 mb-4 text-sm leading-relaxed">{message.challengeData.description}</p>
+                        <p className="text-white/90 mb-4 text-sm leading-relaxed">{message.challengeData.description}</p>
                         <button
                           type="button"
                           onClick={() => handleChallengeTrigger(message.id, message.challengeData)}
-                          className="w-full py-3 bg-white text-purple-700 font-bold rounded-xl hover:bg-gray-100 transition-all active:scale-95"
+                          className="w-full py-3 bg-white text-blue-700 font-semibold rounded-xl hover:bg-gray-100 transition-all active:scale-95 shadow-lg"
                         >
-                          Accept Challenge
+                          Start Challenge
                         </button>
                       </div>
                     ) : message.type === 'error' ? (
                       <div className="flex flex-col items-center gap-4 p-6 bg-red-500/10 border border-red-500/20 rounded-2xl">
                         <div className="p-3 bg-red-500/20 rounded-full">
-                          <AlertCircle className="w-6 h-6 text-red-500" />
+                          <AlertCircle className="w-6 h-6 text-red-400" />
                         </div>
                         <div className="text-center">
-                          <p className="text-sm font-medium text-red-200 mb-1">I encountered a little hiccup!</p>
-                          <p className="text-xs text-red-400/60">Don't worry, just tap below to get back on track.</p>
+                          <p className="text-sm font-medium text-red-200 mb-1">Something went wrong</p>
+                          <p className="text-xs text-red-400/70">Let's try that again</p>
                         </div>
                         <button
                           type="button"
                           onClick={() => {
-                            // Remove the error message and its preceding user message, then retry
                             setMessages(prev => {
                               const newMessages = [...prev];
                               const errorIdx = newMessages.findIndex(m => m.id === message.id);
@@ -708,9 +646,9 @@ export default function InteractiveCourseSession({
                               return newMessages;
                             });
                           }}
-                          className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-black rounded-xl transition-all active:scale-95 shadow-lg shadow-red-900/20"
+                          className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-xl transition-all active:scale-95 shadow-lg"
                         >
-                          Let's Start!
+                          Try Again
                         </button>
                       </div>
                     ) : (
@@ -744,7 +682,7 @@ export default function InteractiveCourseSession({
                     setLearningStage('QUIZ');
                     handleSendMessage("Quiz me on what we've learned!", true, 'QUIZ');
                   }}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 text-blue-300 rounded-xl text-sm font-semibold whitespace-nowrap transition-all active:scale-95"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-300 rounded-xl text-sm font-medium whitespace-nowrap transition-all active:scale-95"
                 >
                   <Brain className="w-4 h-4" />
                   Quiz Me
@@ -755,7 +693,7 @@ export default function InteractiveCourseSession({
                     setLearningStage('CHALLENGE');
                     handleSendMessage("I'm ready for a challenge!", true, 'CHALLENGE');
                   }}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-amber-600/20 hover:bg-amber-600/40 border border-amber-500/30 text-amber-300 rounded-xl text-sm font-semibold whitespace-nowrap transition-all active:scale-95"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 rounded-xl text-sm font-medium whitespace-nowrap transition-all active:scale-95"
                 >
                   <Trophy className="w-4 h-4" />
                   Challenge Me
@@ -765,7 +703,7 @@ export default function InteractiveCourseSession({
                   onClick={() => {
                     handleSendMessage("Tell me more about this topic", true);
                   }}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-gray-700/50 hover:bg-gray-700 border border-gray-600/30 text-gray-300 rounded-xl text-sm font-semibold whitespace-nowrap transition-all active:scale-95"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gray-800/50 hover:bg-gray-700/50 border border-gray-600/30 text-gray-300 rounded-xl text-sm font-medium whitespace-nowrap transition-all active:scale-95"
                 >
                   <MessageCircle className="w-4 h-4" />
                   Explain More
@@ -810,7 +748,7 @@ export default function InteractiveCourseSession({
               type="button"
               onClick={() => handleSendMessage(inputMessage)}
               disabled={isLoading}
-              className="p-3 bg-purple-600 rounded-xl hover:bg-purple-500 transition-colors disabled:opacity-50 h-[48px] shrink-0"
+              className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-xl transition-all disabled:opacity-50 h-[48px] shrink-0 shadow-lg"
             >
               <Send className="w-5 h-5" />
             </button>

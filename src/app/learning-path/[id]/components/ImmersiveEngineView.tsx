@@ -4,12 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { SkillNode, Challenge } from '@/lib/courseCreation/types';
-import UnifiedLearningShell from './UnifiedLearningShell';
 import InteractiveCourseSession from '@/components/InteractiveCourseSession';
-import { Trophy } from 'lucide-react';
+import { X, Trophy } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
-// Dynamic imports for engines
 const CodeStudio = dynamic(() => import('@/lib/courseCreation/engines/codestudio/App'), { ssr: false });
 const WriteLab = dynamic(() => import('@/lib/courseCreation/engines/writingstudio/App'), { ssr: false });
 const MathLab = dynamic(() => import('@/lib/courseCreation/engines/mathlab/App'), { ssr: false });
@@ -37,14 +35,11 @@ export default function ImmersiveEngineView({
     onChallengeComplete
 }: ImmersiveEngineViewProps) {
     const [viewState, setViewState] = useState<'interactive' | 'engine' | 'success'>('interactive');
-    const [showGenie, setShowGenie] = useState(false);
     const [user, setUser] = useState<any>(null);
 
-    // ✅ FIX: Use ref to track if user has been fetched
     const userFetchedRef = useRef(false);
     const supabase = createSupabaseBrowserClient();
 
-    // ✅ FIX: Only fetch user ONCE on mount
     useEffect(() => {
         if (userFetchedRef.current) return;
 
@@ -54,14 +49,10 @@ export default function ImmersiveEngineView({
             userFetchedRef.current = true;
         };
         getUser();
-    }, []); // ✅ Empty deps - only run once
+    }, []);
 
-    // Switch to engine after interactive learning
     const handleInteractiveComplete = () => {
-        console.log('Skipping to challenges...', { activeChallengeIndex, sessionChallenges: sessionChallenges.length });
-
         setViewState('engine');
-        setShowGenie(true);
 
         if (activeChallengeIndex === -1 && sessionChallenges.length > 0) {
             setTimeout(() => {
@@ -70,7 +61,6 @@ export default function ImmersiveEngineView({
         }
     };
 
-    // Handle completion with radical UX feedback
     const handleChallengeComplete = async (success: boolean) => {
         if (success) {
             setViewState('success');
@@ -80,7 +70,6 @@ export default function ImmersiveEngineView({
         }
     };
 
-    // Reset view state when challenge changes
     useEffect(() => {
         if (activeChallengeIndex === -1) {
             setViewState('interactive');
@@ -92,9 +81,6 @@ export default function ImmersiveEngineView({
     if (!selectedSkill) return null;
 
     const skillTitle = selectedSkill.title || (selectedSkill as any).name || 'this skill';
-    const totalSteps = sessionChallenges.length + 1;
-    const currentStep = activeChallengeIndex + 1;
-    const progressPercent = Math.max(0, Math.min(100, (currentStep / totalSteps) * 100));
 
     const renderEngine = () => {
         if (!currentChallenge) return null;
@@ -115,46 +101,45 @@ export default function ImmersiveEngineView({
     };
 
     return (
-        <UnifiedLearningShell
-            title={selectedSkill.title}
-            progress={progressPercent}
-            onClose={onClose}
-            lives={5}
-            xp={selectedSkill.xpReward || 0}
-            showGenie={showGenie}
-        >
+        <div className="fixed inset-0 bg-gray-950 text-white z-50 flex flex-col overflow-hidden">
             <AnimatePresence mode="wait">
                 {viewState === 'interactive' && (
                     <motion.div
                         key="interactive"
-                        initial={{ opacity: 0, scale: 0.95 }}
+                        initial={{ opacity: 0, scale: 0.98 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 1.05 }}
-                        className="flex-1 h-full"
+                        exit={{ opacity: 0, scale: 1.02 }}
+                        transition={{ duration: 0.3 }}
+                        className="absolute inset-0"
                     >
-                        <div className="relative h-full">
-                            {user ? (
-                                <InteractiveCourseSession
-                                    courseId={selectedSkill.id}
-                                    userId={user.id}
-                                    courseTitle={skillTitle}
-                                    courseCreator="AI Learning Assistant"
-                                    onStartChallenge={handleInteractiveComplete}
-                                />
-                            ) : (
-                                <div className="flex items-center justify-center h-full">
-                                    <div className="text-center">
-                                        <p className="text-gray-400 mb-4">Please log in to start your interactive learning session</p>
-                                        <button
-                                            onClick={handleInteractiveComplete}
-                                            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded transition-colors"
-                                        >
-                                            Continue to Challenges
-                                        </button>
-                                    </div>
+                        <button
+                            onClick={onClose}
+                            className="absolute top-4 right-4 z-50 p-2 bg-gray-900/80 hover:bg-gray-800 backdrop-blur-md border border-gray-700 rounded-xl transition-all shadow-xl"
+                            aria-label="Close"
+                        >
+                            <X className="w-5 h-5 text-gray-300" />
+                        </button>
+                        {user ? (
+                            <InteractiveCourseSession
+                                courseId={selectedSkill.id}
+                                userId={user.id}
+                                courseTitle={skillTitle}
+                                courseCreator="EdBox AI"
+                                onStartChallenge={handleInteractiveComplete}
+                            />
+                        ) : (
+                            <div className="flex items-center justify-center h-full">
+                                <div className="text-center">
+                                    <p className="text-gray-400 mb-4">Please log in to start your learning session</p>
+                                    <button
+                                        onClick={handleInteractiveComplete}
+                                        className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl font-semibold transition-all"
+                                    >
+                                        Continue to Practice
+                                    </button>
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </motion.div>
                 )}
 
@@ -164,67 +149,72 @@ export default function ImmersiveEngineView({
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
-                        className="flex-1 min-h-0"
+                        className="flex-1 flex flex-col"
                     >
-                        {renderEngine()}
+                        <header className="px-6 py-4 border-b border-gray-800 bg-gray-900/50 backdrop-blur-md flex items-center justify-between">
+                            <h1 className="text-lg font-semibold text-white">{skillTitle}</h1>
+                            <button
+                                onClick={onClose}
+                                className="p-2 hover:bg-gray-800 rounded-xl transition-colors"
+                                aria-label="Close"
+                            >
+                                <X className="w-5 h-5 text-gray-400" />
+                            </button>
+                        </header>
+                        <div className="flex-1 min-h-0">
+                            {renderEngine()}
+                        </div>
                     </motion.div>
                 )}
 
                 {viewState === 'success' && (
                     <motion.div
                         key="success"
-                        initial={{ opacity: 0, scale: 0.5 }}
+                        initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0 }}
-                        className="flex-1 flex flex-col items-center justify-center text-center"
+                        className="flex-1 flex flex-col items-center justify-center text-center bg-gradient-to-br from-gray-950 to-gray-900"
                     >
                         <div className="relative">
                             <motion.div
                                 animate={{ rotate: 360 }}
                                 transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                                className="absolute inset-0 bg-yellow-400/20 blur-3xl rounded-full"
+                                className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 blur-3xl rounded-full"
                             />
-                            <div className="relative w-32 h-32 bg-yellow-500 rounded-full flex items-center justify-center shadow-2xl shadow-yellow-500/50">
-                                <Trophy className="w-16 h-16 text-white" />
+                            <div className="relative w-28 h-28 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center shadow-2xl">
+                                <Trophy className="w-14 h-14 text-white" />
                             </div>
                         </div>
 
                         <motion.h2
                             initial={{ y: 20, opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.3 }}
-                            className="mt-8 text-4xl font-black text-white"
+                            transition={{ delay: 0.2 }}
+                            className="mt-8 text-3xl font-bold text-white"
                         >
-                            EXCELLENT!
+                            Well Done!
                         </motion.h2>
                         <motion.p
                             initial={{ y: 20, opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.4 }}
-                            className="mt-2 text-xl text-yellow-500 font-bold"
+                            transition={{ delay: 0.3 }}
+                            className="mt-3 text-lg text-gray-300 max-w-md"
                         >
-                            Mastery achieved in this step
+                            You've successfully completed this challenge
                         </motion.p>
 
-                        <motion.div
+                        <motion.button
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
-                            transition={{ delay: 0.6, type: 'spring' }}
-                            className="mt-8 px-6 py-3 bg-gray-900 border border-gray-800 rounded-2xl flex items-center gap-4"
+                            transition={{ delay: 0.5, type: 'spring' }}
+                            onClick={onClose}
+                            className="mt-8 px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl font-semibold transition-all shadow-xl"
                         >
-                            <div className="flex flex-col items-center">
-                                <span className="text-xs text-gray-400 uppercase font-bold tracking-widest">XP Gained</span>
-                                <span className="text-2xl font-black text-white">+{currentChallenge?.xpReward || 50}</span>
-                            </div>
-                            <div className="w-px h-10 bg-gray-800" />
-                            <div className="flex flex-col items-center">
-                                <span className="text-xs text-gray-400 uppercase font-bold tracking-widest">New Goal</span>
-                                <span className="text-sm font-black text-indigo-400">NEXT CHALLENGE</span>
-                            </div>
-                        </motion.div>
+                            Continue Learning
+                        </motion.button>
                     </motion.div>
                 )}
             </AnimatePresence>
-        </UnifiedLearningShell>
+        </div>
     );
 }

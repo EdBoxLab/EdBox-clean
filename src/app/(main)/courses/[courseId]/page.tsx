@@ -151,25 +151,13 @@ export default function CoursePlayerPage() {
     // Use interactive mode by default
     if (useInteractiveMode) {
         return (
-            <div className="relative bg-slate-900 min-h-screen">
-                {/* Mode Toggle */}
-                <div className="absolute top-4 right-4 z-20">
-                    <button
-                        onClick={() => setUseInteractiveMode(false)}
-                        className="bg-slate-900/50 hover:bg-slate-800/50 border border-white/10 backdrop-blur-md text-white px-4 py-2 rounded-xl text-sm font-medium transition-all shadow-xl"
-                    >
-                        Switch to Classic View
-                    </button>
-                </div>
-
-                <InteractiveCourseSession
-                    courseId={courseId}
-                    userId={user.id}
-                    courseTitle={course.title}
-                    courseCreator={course.creator}
-                    skillGraph={course.rawGraph}
-                />
-            </div>
+            <InteractiveCourseSession
+                courseId={courseId}
+                userId={user.id}
+                courseTitle={course.title}
+                courseCreator={course.creator}
+                skillGraph={course.rawGraph}
+            />
         );
     }
 

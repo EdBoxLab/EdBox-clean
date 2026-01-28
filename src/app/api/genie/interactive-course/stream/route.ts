@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 import { createSupabaseServerClient, createServerSupabaseClient } from '@/lib/supabase/server';
 import { generateWithRetry } from '@/lib/ai-providers';
 import { skillProgressionIntegration } from '@/lib/services/skill-progression-integration';
-import { CognitiveReasoning } from '@/lib/genie/brain/reasoning';
+import { LearningOrchestrator, ContentGenerator } from '@/lib/genie/brain/reasoning';
 import { VectorBrain } from '@/lib/genie/brain/vector';
 import { MasteryTracker } from '@/lib/genie/brain/mastery';
 import { KnowledgeNode, MasteryRecord } from '@/lib/genie/brain/types';
@@ -138,15 +138,18 @@ export async function POST(request: NextRequest) {
 
         // 4. COGNITIVE REASONING (The Decision)
         // ---------------------------------------------------------
-        const decision = await CognitiveReasoning.determineNextAction(
+        const orchestrator = new LearningOrchestrator();
+        const decision = await orchestrator.processUserMessage(
             userMessage,
             currentNode,
             mastery,
-            relatedContext,
             conversationHistory || []
         );
 
         console.log('[GENIE_BRAIN] Decision:', decision.action, decision.thought_process);
+
+        // Generate content based on decision
+        const content = await orchestrator.generateContent(decision, currentNode);
 
         // 5. STREAM RESPONSE
         // ---------------------------------------------------------
@@ -157,19 +160,19 @@ export async function POST(request: NextRequest) {
                     // Log user message into the current session context if needed
                     // (The brain uses conversationHistory, but we can log for persistence)
                     const { SessionManager } = await import('@/lib/genie/brain/session');
-                    
+
                     // Create/Get an iteration for this interaction if it's a new concept
                     // For simplicity, we'll use the retry_count or a timestamp-based iteration
                     const iteration = await SessionManager.startIteration(sessionId, 1, currentNode.title);
 
                     // A. Handle Roadmap
-                    if (decision.action === 'roadmap') {
+                    if (content.type === 'roadmap') {
                         const { KnowledgeManager } = await import('@/lib/genie/brain/knowledge');
                         const nodes = await KnowledgeManager.getNodesForCourse(courseId);
-                        
+
                         const roadmapData = {
                             title: skillTitle || "Your Learning Journey",
-                            description: decision.content.text || `Welcome! Here's the roadmap we've designed to help you master ${skillTitle}.`,
+                            description: content.data.message || `Welcome! Here's the roadmap we've designed to help you master ${skillTitle}.`,
                             items: nodes.map(n => ({
                                 id: n.id,
                                 text: n.title,
@@ -178,71 +181,65 @@ export async function POST(request: NextRequest) {
                             }))
                         };
 
-                        const intro = decision.content.text || "Here is your learning roadmap for this course.";
+                        const intro = content.data.message || "Here is your learning roadmap for this course.";
                         await streamText(intro, controller, encoder);
 
                         // Send Roadmap Data
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'roadmap', roadmapData })}\n\n`));
-                        
+
                         await SessionManager.completeIterationStep(iteration.id, 'explanation');
                     }
                     // B. Handle Quiz
-                    else if (decision.action === 'quiz' && decision.content.quiz) {
-                        const intro = decision.content.text || "Let's check your understanding.";
+                    else if (content.type === 'quiz') {
+                        const intro = "Let's check your understanding.";
                         await streamText(intro, controller, encoder);
 
                         // Send Quiz Data
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'quiz', quizData: decision.content.quiz })}\n\n`));
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'quiz', quizData: content.data })}\n\n`));
 
                         // Log to understanding_assessments
                         await SessionManager.logAssessment({
                             session_id: sessionId,
                             concept: currentNode.title,
                             question_type: 'multiple_choice',
-                            question_data: decision.content.quiz,
+                            question_data: content.data,
                             created_at: new Date().toISOString()
                         });
-                        
+
                         await SessionManager.completeIterationStep(iteration.id, 'assessment');
                     }
-                    // B. Handle Challenge
-                    else if (decision.action === 'challenge' && decision.content.challenge) {
-                        const intro = decision.content.text || "Time to apply what you've learned!";
+                    // C. Handle Challenge
+                    else if (content.type === 'challenge') {
+                        const intro = "Time to apply what you've learned!";
                         await streamText(intro, controller, encoder);
 
                         // Send Challenge Data
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData: decision.content.challenge })}\n\n`));
-                        
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData: content.data })}\n\n`));
+
                         await SessionManager.completeIterationStep(iteration.id, 'challenge');
                     }
-                    // C. Handle Explanation / Remediation / Advance
-                    else {
-                        // If it's a simple transition text from reasoning
-                        if (decision.content.text && decision.content.text.length > 50) {
-                            await streamText(decision.content.text, controller, encoder);
-                            await SessionManager.completeIterationStep(iteration.id, 'explanation');
-                        } else {
-                            // GENERATE REAL STREAMING EXPLANATION
-                            const explanationStream = CognitiveReasoning.generatePersonalizedContentStream(
-                                currentNode,
-                                userMessage
-                            );
-
-                            let fullExplanation = '';
-                            for await (const chunk of explanationStream) {
-                                fullExplanation += chunk;
-                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'content', content: chunk })}\n\n`));
-                            }
-
-                            if (fullExplanation.trim()) {
-                                await persistenceClient
-                                    .from('interactive_course_sessions')
-                                    .update({ retry_count: 0 })
-                                    .eq('id', sessionId);
-                                
-                                await SessionManager.completeIterationStep(iteration.id, 'explanation');
-                            }
+                    // D. Handle Explanation / Remediation
+                    else if (content.type === 'explanation' && content.stream) {
+                        // STREAM EXPLANATION
+                        let fullExplanation = '';
+                        for await (const chunk of content.stream) {
+                            fullExplanation += chunk;
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'content', content: chunk })}\n\n`));
                         }
+
+                        if (fullExplanation.trim()) {
+                            await persistenceClient
+                                .from('interactive_course_sessions')
+                                .update({ retry_count: 0 })
+                                .eq('id', sessionId);
+
+                            await SessionManager.completeIterationStep(iteration.id, 'explanation');
+                        }
+                    }
+                    // E. Handle generic messages
+                    else if (content.type === 'message' && content.data.text) {
+                        await streamText(content.data.text, controller, encoder);
+                        await SessionManager.completeIterationStep(iteration.id, 'explanation');
                     }
 
                     controller.close();

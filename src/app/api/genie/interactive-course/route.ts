@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { SessionManager } from '@/lib/genie/brain/session';
-import { CognitiveReasoning } from '@/lib/genie/brain/reasoning';
+import { LearningOrchestrator } from '@/lib/genie/brain/reasoning';
 import { MasteryTracker } from '@/lib/genie/brain/mastery';
 import { VectorBrain } from '@/lib/genie/brain/vector';
 
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createSupabaseServerClient();
     const { data: { session: authSession } } = await supabase.auth.getSession();
-    
+
     if (!authSession) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -43,53 +43,54 @@ export async function POST(request: NextRequest) {
     if (nodeError || !currentNode) {
       return NextResponse.json({ error: 'Current node not found' }, { status: 404 });
     }
-    
+
     // 2. Get User Mastery for current node
     const mastery = await MasteryTracker.getMastery(userId, currentNode.id);
 
     // 3. Find related context via Vector Search
     const relatedContext = await VectorBrain.findRelatedNodes(userMessage, 3);
 
-    // 4. Determine Next Action using Cognitive Reasoning
-    const reasoning = await CognitiveReasoning.determineNextAction(
+    // 4. Determine Next Action using Learning Orchestrator
+    const orchestrator = new LearningOrchestrator();
+    const decision = await orchestrator.processUserMessage(
       userMessage,
       currentNode,
       mastery,
-      relatedContext
+      [] // conversationHistory - could be fetched from session if needed
     );
 
     // 5. Update Mastery based on evaluation
-    await MasteryTracker.updateMastery(userId, currentNode.id, reasoning.evaluation_score);
+    await MasteryTracker.updateMastery(userId, currentNode.id, decision.evaluation_score);
 
     // 6. Log interaction
     await SessionManager.logResponse(
       sessionId,
       currentNode.id,
       userMessage,
-      reasoning,
-      reasoning.feedback
+      decision,
+      decision.feedback
     );
 
     // 7. Handle Transitions
     let nextNodeId = currentNode.id;
-    if (reasoning.action === 'advance') {
+    if (decision.action === 'advance') {
       const eligibleNodes = await MasteryTracker.getEligibleNodes(userId, sessionData.course_id);
       if (eligibleNodes.length > 0) {
         nextNodeId = eligibleNodes[0];
         await SessionManager.updateCurrentNode(sessionId, nextNodeId);
       }
-    } else if (reasoning.action === 'remediate' && reasoning.remediation_node_id) {
-      nextNodeId = reasoning.remediation_node_id;
-      await SessionManager.updateCurrentNode(sessionId, nextNodeId);
+    } else if (decision.action === 'remediate') {
+      // Remediation logic - could navigate to prerequisite nodes if needed
+      // For now, stay on current node
     }
 
     return NextResponse.json({
       success: true,
-      response: reasoning.feedback,
-      next_action: reasoning.action,
-      evaluation: reasoning.evaluation_score,
-      suggested_explanation: reasoning.suggested_explanation,
-      current_node_id: nextNodeId
+      response: decision.feedback,
+      next_action: decision.action,
+      evaluation: decision.evaluation_score,
+      current_node_id: nextNodeId,
+      iteration: decision.iteration
     });
 
   } catch (error: any) {

@@ -4,6 +4,7 @@ import { Clock, Trophy, CheckCircle, Target, Lock, AlertCircle } from 'lucide-re
 import { SkillNode } from '@/lib/courseCreation/types';
 import type { SkillState } from '@/types/skill-progression';
 import { RadialProgress } from '@/components/ui/RadialProgress';
+import SkillProgressBar from './SkillProgressBar';
 
 interface SkillProgress {
   challengesCompleted: number;
@@ -138,42 +139,41 @@ export default function SkillCard({
 
         {/* Progress Bar */}
         <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl overflow-hidden bg-gray-700">
-          <motion.div
-            className={`h-full ${skillState === 'mastered' ? 'bg-green-500' : skillState === 'unlocked' ? 'bg-indigo-500' : 'bg-gray-600'}`}
-            initial={{ width: '0%' }}
-            animate={{
-              width: skillState === 'mastered' ? '100%' :
-                progress ? `${progress.progressPercentage}%` : '0%'
-            }}
-            transition={{ duration: 1, delay: 0.6 + index * 0.1 }}
+          <SkillProgressBar
+            progress={skillState === 'mastered' ? 100 : progress ? progress.progressPercentage : 0}
+            height="h-1"
+            trackColorClass="bg-transparent"
+            colorClass={skillState === 'mastered' ? 'bg-green-500' : skillState === 'unlocked' ? 'bg-indigo-500' : 'bg-gray-600'}
+            delay={0.6 + index * 0.1}
+            roundedClass="rounded-none"
           />
         </div>
 
-          {/* State Icon / Radial Progress */}
-          <div className="absolute top-3 right-3">
-            {progress && skillState !== 'locked' ? (
-              <RadialProgress 
-                value={progress.progressPercentage / 100} 
-                size={40} 
-                strokeWidth={4}
-                color={skillState === 'mastered' ? 'stroke-green-500' : 'stroke-indigo-500'}
-              />
-            ) : (
-              <motion.div
-                animate={skillState === 'mastered' ? {
-                  scale: [1, 1.1, 1],
-                  rotate: [0, 5, -5, 0]
-                } : {}}
-                transition={{
-                  duration: 2,
-                  repeat: skillState === 'mastered' ? Infinity : 0,
-                  repeatDelay: 3
-                }}
-              >
-                <StateIcon className={`w-5 h-5 ${styles.iconColor}`} />
-              </motion.div>
-            )}
-          </div>
+        {/* State Icon / Radial Progress */}
+        <div className="absolute top-3 right-3">
+          {progress && skillState !== 'locked' ? (
+            <RadialProgress
+              value={progress.progressPercentage / 100}
+              size={40}
+              strokeWidth={4}
+              color={skillState === 'mastered' ? 'stroke-green-500' : 'stroke-indigo-500'}
+            />
+          ) : (
+            <motion.div
+              animate={skillState === 'mastered' ? {
+                scale: [1, 1.1, 1],
+                rotate: [0, 5, -5, 0]
+              } : {}}
+              transition={{
+                duration: 2,
+                repeat: skillState === 'mastered' ? Infinity : 0,
+                repeatDelay: 3
+              }}
+            >
+              <StateIcon className={`w-5 h-5 ${styles.iconColor}`} />
+            </motion.div>
+          )}
+        </div>
 
 
         {/* Content */}
@@ -205,12 +205,13 @@ export default function SkillCard({
               </div>
 
               {/* Mini progress bar */}
-              <div className="w-full bg-gray-600 rounded-full h-1.5 mb-2">
-                <motion.div
-                  className={`h-1.5 rounded-full ${skillState === 'mastered' ? 'bg-green-500' : 'bg-indigo-500'}`}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress.progressPercentage}%` }}
-                  transition={{ duration: 1, delay: 0.5 }}
+              <div className="mb-2">
+                <SkillProgressBar
+                  progress={progress.progressPercentage}
+                  height="h-1.5"
+                  colorClass={skillState === 'mastered' ? 'bg-green-500' : 'bg-indigo-500'}
+                  trackColorClass="bg-gray-600"
+                  delay={0.5}
                 />
               </div>
 

@@ -4,6 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, Target, Zap, Trophy, Clock } from 'lucide-react';
 import { SkillGraph } from '@/lib/courseCreation/types';
+import SkillProgressBar from './SkillProgressBar';
 
 interface HeroSectionProps {
   graph: SkillGraph;
@@ -125,14 +126,14 @@ export default function HeroSection({
                 <span>Overall Progress</span>
                 <span>{Math.round((masteredSkills / (graph?.nodes?.length || 1)) * 100)}% Complete</span>
               </div>
-              <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden">
-                <motion.div
-                  className="h-2 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${(masteredSkills / (graph?.nodes?.length || 1)) * 100}%` }}
-                  transition={{ duration: 2, delay: 1, ease: "easeOut" }}
-                />
-              </div>
+              <SkillProgressBar
+                progress={(masteredSkills / (graph?.nodes?.length || 1)) * 100}
+                height="h-2"
+                trackColorClass="bg-white/20"
+                colorClass="bg-gradient-to-r from-green-400 to-emerald-500"
+                delay={1}
+                duration={2}
+              />
               <div className="flex justify-between text-xs text-white/70 mt-1">
                 <span>{masteredSkills} mastered</span>
                 <span>{(graph?.nodes?.length || 0) - masteredSkills} remaining</span>

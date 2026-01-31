@@ -59,6 +59,10 @@ export async function POST(request: NextRequest) {
 
         if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
 
+        // Save User Message
+        const { SessionManager } = await import('@/lib/genie/brain/session');
+        await SessionManager.saveMessage(sessionId, 'learner', userMessage, 'question');
+
         // 0. FETCH & MANAGE RETRY COUNT
         // ---------------------------------------------------------
         const { data: sessionData } = await persistenceClient
@@ -100,7 +104,7 @@ export async function POST(request: NextRequest) {
                 .select('*')
                 .eq('id', currentSkillId)
                 .single();
-            
+
             if (nodeData) {
                 resolvedNodeId = nodeData.id;
                 currentNode = {
@@ -127,7 +131,7 @@ export async function POST(request: NextRequest) {
                 .order('order_index', { ascending: true })
                 .limit(1)
                 .single();
-            
+
             if (nodeByCourse) {
                 resolvedNodeId = nodeByCourse.id;
                 currentNode = {
@@ -225,7 +229,7 @@ export async function POST(request: NextRequest) {
             input_message: userMessage,
             full_decision: decision as Record<string, any>
         };
-        
+
         // Log asynchronously (don't block the response)
         const logId = await DecisionLogger.logDecision(decisionLog);
         decisionLog.id = logId || undefined;
@@ -235,8 +239,8 @@ export async function POST(request: NextRequest) {
         let masteryAchieved = false;
         if (user.id && nodeIdForMastery) {
             const masteryResult = await MasteryTracker.updateMastery(
-                user.id, 
-                nodeIdForMastery, 
+                user.id,
+                nodeIdForMastery,
                 decision.evaluation_score,
                 courseId,
                 currentNode.title
@@ -281,7 +285,7 @@ export async function POST(request: NextRequest) {
 
                     // Mark evaluation as completed if there's an evaluation score
                     if (decision.evaluation_score !== undefined && decision.evaluation_score !== null) {
-                      await SessionManager.markEvaluationCompleted(iteration.id, masteryAchieved);
+                        await SessionManager.markEvaluationCompleted(iteration.id, masteryAchieved);
                     }
 
                     // A. Handle Roadmap
@@ -305,6 +309,9 @@ export async function POST(request: NextRequest) {
 
                         // Send Roadmap Data
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'roadmap', roadmapData })}\n\n`));
+
+                        // Save Genie Intro Message
+                        await SessionManager.saveMessage(sessionId, 'genie', intro, 'summary', { roadmap: roadmapData }); // Type 'summary' fits roadmap well
 
                         await SessionManager.completeIterationStep(iteration.id, 'explanation');
                     }
@@ -335,6 +342,9 @@ export async function POST(request: NextRequest) {
                             });
                         }
 
+                        // Save Genie Intro Message
+                        await SessionManager.saveMessage(sessionId, 'genie', intro, 'assessment');
+
                         await SessionManager.completeIterationStep(iteration.id, 'assessment');
                     }
                     // C. Handle Challenge
@@ -355,6 +365,9 @@ export async function POST(request: NextRequest) {
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'challenge_trigger', challengeData: decision.content.challenge })}\n\n`));
                         }
 
+                        // Save Genie Intro Message
+                        await SessionManager.saveMessage(sessionId, 'genie', intro, 'challenge');
+
                         await SessionManager.completeIterationStep(iteration.id, 'challenge');
                     }
                     // C. Handle Explanation / Remediation / Advance
@@ -363,6 +376,8 @@ export async function POST(request: NextRequest) {
                         if (decision.content.text && decision.content.text.length > 50) {
                             await streamText(decision.content.text, controller, encoder);
                             await SessionManager.completeIterationStep(iteration.id, 'explanation');
+                            // Save Genie Message
+                            await SessionManager.saveMessage(sessionId, 'genie', decision.content.text, 'explanation');
                         } else {
                             // GENERATE REAL STREAMING EXPLANATION
                             const explanationStream = CognitiveReasoning.generatePersonalizedContentStream(
@@ -383,6 +398,9 @@ export async function POST(request: NextRequest) {
                                     .eq('id', sessionId);
 
                                 await SessionManager.completeIterationStep(iteration.id, 'explanation');
+
+                                // Save Genie Message (Full Explanation)
+                                await SessionManager.saveMessage(sessionId, 'genie', fullExplanation, 'explanation');
                             }
                         }
                     }

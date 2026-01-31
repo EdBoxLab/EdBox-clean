@@ -61,7 +61,11 @@ export async function POST(request: NextRequest) {
     // 5. Update Mastery based on evaluation
     await MasteryTracker.updateMastery(userId, currentNode.id, reasoning.evaluation_score, sessionData.course_id, currentNode.title);
 
-    // 6. Log interaction
+    // 6. Log interaction (Persist Chat)
+    await SessionManager.saveMessage(sessionId, 'learner', userMessage, 'question');
+    await SessionManager.saveMessage(sessionId, 'genie', reasoning.feedback, 'explanation');
+
+    // Also log to progress state (legacy, can keep for now or remove if unused)
     await SessionManager.logResponse(
       sessionId,
       currentNode.id,

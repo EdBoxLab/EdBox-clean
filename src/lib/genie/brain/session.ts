@@ -38,7 +38,7 @@ export const SessionManager = {
   async updateCurrentTopic(sessionId: string, topic: string) {
     const { error } = await supabase
       .from('interactive_course_sessions')
-      .update({ 
+      .update({
         current_topic: topic,
         last_interaction: new Date().toISOString()
       })
@@ -95,7 +95,7 @@ export const SessionManager = {
   async updateCurrentNode(sessionId: string, nodeId: string) {
     const { error } = await supabase
       .from('interactive_course_sessions')
-      .update({ 
+      .update({
         current_topic: nodeId,
         last_interaction: new Date().toISOString()
       })
@@ -112,7 +112,7 @@ export const SessionManager = {
       .single();
 
     const history = session?.progress_state?.history || [];
-    
+
     // Optimization: Cap history length to prevent document size bloat (Musk-tier efficiency)
     const updatedHistory = [
       ...history.slice(-19), // Keep last 19 entries
@@ -127,7 +127,7 @@ export const SessionManager = {
 
     const { error } = await supabase
       .from('interactive_course_sessions')
-      .update({ 
+      .update({
         progress_state: { ...session?.progress_state, history: updatedHistory },
         last_interaction: new Date().toISOString()
       })
@@ -155,7 +155,7 @@ export const SessionManager = {
       evaluation_completed: true,
       completed_at: new Date().toISOString()
     };
-    
+
     if (masteryAchieved) {
       update.mastery_achieved = true;
     }
@@ -166,5 +166,42 @@ export const SessionManager = {
       .eq('id', iterationId);
 
     if (error) throw error;
+  },
+
+  async saveMessage(
+    sessionId: string,
+    role: 'genie' | 'learner',
+    content: string,
+    type: 'explanation' | 'question' | 'assessment' | 'challenge' | 'feedback' | 'encouragement' | 'summary' = 'explanation',
+    metadata: any = {}
+  ) {
+    const { error } = await supabase
+      .from('conversation_messages')
+      .insert({
+        session_id: sessionId,
+        role: role,
+        content: content,
+        message_type: type,
+        metadata: metadata
+      });
+
+    if (error) {
+      console.error('Failed to save message:', error);
+      // Don't throw, just log to allow flow to continue
+    }
+  },
+
+  async getMessages(sessionId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('conversation_messages')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('timestamp', { ascending: true });
+
+    if (error) {
+      console.error('Failed to fetch messages:', error);
+      return [];
+    }
+    return data;
   }
 };

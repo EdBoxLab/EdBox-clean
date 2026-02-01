@@ -24,7 +24,7 @@ import { Crown, Sparkles as SparklesIcon } from 'lucide-react';
 const NAV_ITEMS = [
   { label: 'Home', icon: Home, href: '/dashboard' },
   { label: 'Courses', icon: BookOpen, href: '/courses' },
-  { label: 'Feed', icon: Sparkles, href: '/feed' },
+  // { label: 'Feed', icon: Sparkles, href: '/feed' },
   { label: 'Tools', icon: Wrench, href: '/tools' },
   // { label: 'Socials', icon: Users, href: '/socials' },
 ];

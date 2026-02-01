@@ -70,7 +70,7 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
             {/* Stunning Background Effects */}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(168,85,247,0.15),transparent_80%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(236,72,153,0.1),transparent_70%)]" />
-            
+
             <Confetti isFiring={isCorrect === true} />
 
             {/* Premium Header */}
@@ -122,8 +122,8 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                 </h2>
             </motion.div>
 
-            {/* Options */}
-            <div className="w-full max-w-sm space-y-3.5 z-10">
+            {/* Options - Moved up with margin-bottom */}
+            <div className="w-full max-w-sm space-y-3.5 z-10 mb-24">
                 {item.options?.map((option, index) => {
                     const isSelected = selected === option;
                     const isCorrectOption = option === item.answer || item.options[item.correctIndex] === option;
@@ -136,15 +136,14 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                             transition={{ delay: 0.3 + index * 0.1 }}
                             onClick={() => handleAnswer(option)}
                             disabled={answered}
-                            className={`group relative w-full p-4.5 rounded-2xl border transition-all duration-500 overflow-hidden ${
-                                answered
-                                    ? isCorrectOption
-                                        ? 'border-green-500/50 bg-green-500/10 shadow-[0_0_20px_rgba(34,197,94,0.15)]'
-                                        : isSelected
-                                            ? 'border-red-500/50 bg-red-500/10 shadow-[0_0_20px_rgba(239,68,68,0.15)]'
-                                            : 'border-white/5 bg-white/5 opacity-40'
-                                    : 'border-white/10 bg-white/5 hover:border-purple-500/30 hover:bg-white/10 active:scale-[0.98]'
-                            }`}
+                            className={`group relative w-full p-4.5 rounded-2xl border transition-all duration-500 overflow-hidden ${answered
+                                ? isCorrectOption
+                                    ? 'border-green-500/50 bg-green-500/10 shadow-[0_0_20px_rgba(34,197,94,0.15)]'
+                                    : isSelected
+                                        ? 'border-red-500/50 bg-red-500/10 shadow-[0_0_20px_rgba(239,68,68,0.15)]'
+                                        : 'border-white/5 bg-white/5 opacity-40'
+                                : 'border-white/10 bg-white/5 hover:border-purple-500/30 hover:bg-white/10 active:scale-[0.98]'
+                                }`}
                         >
                             {/* Sliding Progress Bar */}
                             <AnimatePresence mode="wait">
@@ -153,23 +152,21 @@ export const QuizCard: React.FC<QuizCardProps> = ({ item, isActive, onCorrect, o
                                         initial={{ width: 0 }}
                                         animate={{ width: "100%" }}
                                         transition={{ duration: 1, ease: [0.32, 0.72, 0, 1] }}
-                                        className={`absolute inset-0 h-full ${
-                                            isCorrectOption ? 'bg-green-500/20' : 'bg-red-500/20'
-                                        }`}
+                                        className={`absolute inset-0 h-full ${isCorrectOption ? 'bg-green-500/20' : 'bg-red-500/20'
+                                            }`}
                                     />
                                 )}
                             </AnimatePresence>
 
                             <div className="relative flex items-center justify-between z-20">
-                                <span className={`font-semibold text-base transition-colors duration-300 ${
-                                    answered
-                                        ? isCorrectOption 
-                                            ? 'text-green-300' 
-                                            : isSelected 
-                                                ? 'text-red-300' 
-                                                : 'text-white/40'
-                                        : 'text-white/90'
-                                }`}>
+                                <span className={`font-semibold text-base transition-colors duration-300 ${answered
+                                    ? isCorrectOption
+                                        ? 'text-green-300'
+                                        : isSelected
+                                            ? 'text-red-300'
+                                            : 'text-white/40'
+                                    : 'text-white/90'
+                                    }`}>
                                     {option}
                                 </span>
 

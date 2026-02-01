@@ -202,16 +202,16 @@ export function StreakCard() {
   const today = new Date().getDay();
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 sm:p-4 shadow-sm w-full box-border overflow-hidden">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm sm:text-base font-semibold text-white">Your Progress</h3>
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 shadow-sm w-full box-border overflow-hidden">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-semibold text-white">Your Progress</h3>
         <div className="flex items-center gap-1 text-orange-500">
-          <Flame className="w-4 h-4 sm:w-5 sm:h-5" />
-          <span className="font-bold text-sm sm:text-base">{streak.current}</span>
+          <Flame className="w-4 h-4" />
+          <span className="font-bold text-sm">{streak.current}</span>
         </div>
       </div>
 
-      <div className="flex justify-between mb-3">
+      <div className="flex justify-between mb-2">
         {weekDays.map((day, index) => {
           const isToday = index === today;
           const isPast = index < today;
@@ -220,20 +220,20 @@ export function StreakCard() {
 
           return (
             <div key={index} className="flex flex-col items-center gap-0.5 flex-1 min-w-0">
-              <span className="text-[9px] sm:text-[10px] text-gray-400">{day}</span>
+              <span className="text-[9px] text-gray-400">{day}</span>
               <div
-                className={`w-5 h-5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-all ${isCheckedIn
-                    ? 'bg-orange-500 text-white'
-                    : isPast || isToday // Missed day (checked but no history = missed)
-                      ? 'bg-zinc-800 text-gray-600'
-                      : 'bg-zinc-800/50 text-gray-700' // Future
+                className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${isCheckedIn
+                  ? 'bg-orange-500 text-white'
+                  : isPast || isToday // Missed day (checked but no history = missed)
+                    ? 'bg-zinc-800 text-gray-600'
+                    : 'bg-zinc-800/50 text-gray-700' // Future
                   } ${isToday ? 'ring-2 ring-indigo-500/50 ring-offset-1 ring-offset-zinc-900' : ''}`}
               >
                 {isCheckedIn ? (
-                  <Flame className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" />
+                  <Flame className="w-2.5 h-2.5" />
                 ) : (isPast || isToday) ? (
                   /* Smoke/Cloud icon for missed/unmarked days */
-                  <CloudFog className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 opacity-60" />
+                  <CloudFog className="w-2.5 h-2.5 opacity-60" />
                 ) : null}
               </div>
             </div>
@@ -241,40 +241,25 @@ export function StreakCard() {
         })}
       </div>
 
-      <div className="bg-zinc-800/50 rounded-lg p-2 sm:p-3">
-        <div className="flex items-center justify-between mb-1.5">
+      <div className="bg-zinc-800/50 rounded-lg p-2">
+        <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1.5">
-            <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />
-            <span className="text-[10px] sm:text-xs font-medium text-gray-300">
+            <Star className="w-3.5 h-3.5 text-purple-500" />
+            <span className="text-[10px] font-medium text-gray-300">
               Level {xp.level}
             </span>
           </div>
-          <span className="text-[9px] sm:text-[10px] text-gray-500">
+          <span className="text-[9px] text-gray-500">
             {xp.total} / {xp.xpForNextLevel} XP
           </span>
         </div>
-        <div className="w-full h-1.5 sm:h-2 bg-zinc-700 rounded-full overflow-hidden">
+        <div className="w-full h-1.5 bg-zinc-700 rounded-full overflow-hidden">
           <motion.div
             className="h-full bg-gradient-to-r from-purple-500 to-indigo-500"
             initial={{ width: 0 }}
             animate={{ width: `${progressPercentage}%` }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
           />
-        </div>
-      </div>
-
-      <div className="mt-2 sm:mt-3 flex justify-between text-[10px] sm:text-xs">
-        <div className="text-center flex-1 min-w-0">
-          <div className="font-semibold text-white">{streak.longest}</div>
-          <div className="text-[9px] sm:text-[10px] text-gray-500">Best Streak</div>
-        </div>
-        <div className="text-center flex-1 min-w-0">
-          <div className="font-semibold text-white">{xp.total}</div>
-          <div className="text-[9px] sm:text-[10px] text-gray-500">Total XP</div>
-        </div>
-        <div className="text-center flex-1 min-w-0">
-          <div className="font-semibold text-white">{xp.level}</div>
-          <div className="text-[9px] sm:text-[10px] text-gray-500">Level</div>
         </div>
       </div>
     </div>

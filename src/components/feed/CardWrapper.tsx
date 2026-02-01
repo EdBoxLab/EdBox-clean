@@ -87,106 +87,103 @@ export const CardWrapper: React.FC<CardWrapperProps> = ({
                 <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black z-10" />
             </div>
 
-            {/* Main Content - Padded aggressively on mobile (pb-48) to clear metadata bar */}
-            {/* Increased Z-INDEX to z-30 to ensure it's above the metadata bar (z-10) */}
-            <div className={`relative flex-1 flex items-center justify-center z-30 px-4 sm:px-6 ${isMediaType ? '' : 'pb-48 sm:pb-32'}`}>
+            {/* Main Content - Padded to avoid overlap with right sidebar and bottom text */}
+            <div className={`relative flex-1 flex items-center justify-center z-30 pl-4 pr-16 pb-40 ${isMediaType ? '' : ''}`}>
                 {children}
             </div>
 
-            {/* Bottom Metadata Bar - Higher z-index for clickable buttons */}
-            <div className="absolute bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-black via-black/95 to-transparent backdrop-blur-sm">
-                <div className="px-4 sm:px-6 pb-6 pt-10">
-                    {/* Course Reference Tag (if exists) */}
-                    {item.courseReference && (
-                        <div className="flex items-center gap-2 px-2.5 py-1 bg-purple-500/20 border border-purple-500/30 rounded-full w-fit mb-2">
-                            <ArrowRight className="w-3 h-3 text-purple-400" />
-                            <span className="text-[10px] font-semibold text-purple-300 uppercase tracking-wider">
+            {/* Right Sidebar - Vertical Actions - High Z-Index & Pointer Events */}
+            <div className="absolute right-2 bottom-20 z-50 flex flex-col items-center gap-6 pointer-events-auto">
+                {/* Like */}
+                <div className="flex flex-col items-center gap-1">
+                    <button
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onFeedback(item.id, 'like');
+                        }}
+                        className={`p-3 rounded-full transition-all duration-300 ${isLiked
+                            ? 'bg-purple-500/20 text-purple-400'
+                            : 'bg-black/40 text-white hover:bg-black/60'
+                            } backdrop-blur-md border border-white/10 active:scale-95 touch-manipulation`}
+                    >
+                        <ThumbsUp className={`w-6 h-6 ${isLiked ? 'fill-current' : ''}`} />
+                    </button>
+                    <span className="text-xs font-medium text-white shadow-black drop-shadow-md">
+                        {item.likes > 0 ? item.likes : 'Like'}
+                    </span>
+                </div>
+
+                {/* Save */}
+                <div className="flex flex-col items-center gap-1">
+                    <button
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleSave();
+                        }}
+                        className={`p-3 rounded-full transition-all duration-300 ${isSaved
+                            ? 'bg-blue-500/20 text-blue-400'
+                            : 'bg-black/40 text-white hover:bg-black/60'
+                            } backdrop-blur-md border border-white/10 active:scale-95 touch-manipulation`}
+                    >
+                        <Bookmark className={`w-6 h-6 ${isSaved ? 'fill-current' : ''}`} />
+                    </button>
+                    <span className="text-xs font-medium text-white shadow-black drop-shadow-md">
+                        Save
+                    </span>
+                </div>
+
+                {/* Share */}
+                <div className="flex flex-col items-center gap-1">
+                    <button
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleShare();
+                        }}
+                        className="p-3 rounded-full bg-black/40 text-white hover:bg-black/60 transition-all duration-300 backdrop-blur-md border border-white/10 active:scale-95 touch-manipulation"
+                    >
+                        <Share2 className="w-6 h-6" />
+                    </button>
+                    <span className="text-xs font-medium text-white shadow-black drop-shadow-md">
+                        Share
+                    </span>
+                </div>
+
+                {/* More Options */}
+                <button className="p-3 rounded-full bg-black/40 text-white/70 hover:bg-black/60 transition-all duration-300 backdrop-blur-md border border-white/10 active:scale-95 touch-manipulation">
+                    <MoreHorizontal className="w-6 h-6" />
+                </button>
+            </div>
+
+            {/* Bottom Left - Title & Context Overlay - Reduced vertical footprint & softened gradient - Pointer Events None to pass clicks */}
+            <div className="absolute bottom-0 left-0 right-16 z-40 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-12 pointer-events-none">
+                {item.courseReference && (
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="flex items-center gap-1 px-2 py-1 bg-white/10 backdrop-blur-md rounded-md border border-white/10">
+                            <ArrowRight className="w-3 h-3 text-white/70" />
+                            <span className="text-[10px] font-bold text-white/90 uppercase tracking-wider">
                                 {item.courseReference}
                             </span>
                         </div>
-                    )}
-
-                    {/* Topic + Title - Compact */}
-                    <div className="mb-3">
-                        <p className="text-xs font-semibold text-purple-400 mb-1">
-                            @{item.topic.toLowerCase().replace(/\s+/g, '')}
-                        </p>
-                        <p className="text-sm font-medium text-white/90 line-clamp-1">
-                            {item.title}
-                        </p>
                     </div>
+                )}
 
-                {/* Action Buttons Row - Horizontal, Small */}
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                {/* Like */}
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onFeedback(item.id, 'like'); }}
-                                    className="flex items-center gap-1.5 group"
-                            >
-                                <div className={`p-2 rounded-full transition-colors ${isLiked
-                                    ? 'bg-purple-500/20 border border-purple-500/40'
-                                    : 'bg-white/5 border border-white/10 hover:bg-white/10'
-                                    }`}>
-                                    <ThumbsUp
-                                        className={`w-4 h-4 transition-all ${isLiked
-                                            ? 'text-purple-400 fill-purple-400'
-                                            : 'text-white/70 group-hover:text-white'
-                                            }`}
-                                    />
-                                </div>
-                                {item.likes > 0 && (
-                                    <span className="text-xs text-white/50 font-medium">
-                                        {item.likes}
-                                    </span>
-                                )}
-                            </button>
-
-                            {/* Save */}
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); handleSave(); }}
-                                    className="group"
-                            >
-                                <div className={`p-2 rounded-full transition-colors ${isSaved
-                                    ? 'bg-blue-500/20 border border-blue-500/40'
-                                    : 'bg-white/5 border border-white/10 hover:bg-white/10'
-                                    }`}>
-                                    <Bookmark
-                                        className={`w-4 h-4 transition-all ${isSaved
-                                            ? 'text-blue-400 fill-blue-400'
-                                            : 'text-white/70 group-hover:text-white'
-                                            }`}
-                                    />
-                                </div>
-                            </button>
-
-                            {/* Share */}
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); handleShare(); }}
-                                    className="group"
-                            >
-                                <div className="p-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                                    <Share2 className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" />
-                                </div>
-                            </button>
-                        </div>
-
-                        {/* XP Badge + More Options */}
-                            <div className="flex items-center gap-2">
-                            {item.xp_reward > 0 && (
-                                <div className="px-2.5 py-1 bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 rounded-full">
-                                    <span className="text-xs font-bold text-purple-300">
-                                        +{item.xp_reward} XP
-                                    </span>
-                                </div>
-                            )}
-
-                            <button className="p-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                                <MoreHorizontal className="w-4 h-4 text-white/50" />
-                            </button>
-                        </div>
-                    </div>
+                <div className="mb-1">
+                    <span className="text-sm font-bold text-purple-400 block mb-1">
+                        @{item.topic.toLowerCase().replace(/\s+/g, '')}
+                    </span>
+                    <h3 className="text-lg font-bold text-white leading-tight line-clamp-2 drop-shadow-md">
+                        {item.title}
+                    </h3>
                 </div>
+
+                {item.xp_reward > 0 && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/20 border border-purple-500/30">
+                        <span className="text-xs font-bold text-purple-300">+{item.xp_reward} XP</span>
+                    </div>
+                )}
             </div>
         </div>
     );

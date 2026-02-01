@@ -7,6 +7,7 @@ import OnboardingForm from '@/components/OnboardingForm';
 import { motion, Variants } from 'framer-motion';
 import { ArrowRight, Book, FileText, Zap, PlayCircle, Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { StreakCard } from '@/components/StreakXP';
+import { DiscoverFeed } from '@/components/feed/DiscoverFeed';
 
 const Dashboard: React.FC = () => {
   const supabase = createSupabaseBrowserClient();
@@ -18,7 +19,7 @@ const Dashboard: React.FC = () => {
   const [notes, setNotes] = useState<any[]>([]);
   const [studyKits, setStudyKits] = useState<any[]>([]);
   const [recentCourse, setRecentCourse] = useState<any>(null);
-  
+
   const [coursesLoading, setCoursesLoading] = useState(true);
   const [notesLoading, setNotesLoading] = useState(true);
   const [kitsLoading, setKitsLoading] = useState(true);
@@ -61,7 +62,7 @@ const Dashboard: React.FC = () => {
           try {
             const coursesRes = await fetch('/api/skill-graph/list');
             const coursesJson = await coursesRes.json();
-            
+
             if (coursesJson.success && coursesJson.courses) {
               const mappedCourses = coursesJson.courses.map((c: any) => ({
                 id: c.id,
@@ -180,7 +181,7 @@ const Dashboard: React.FC = () => {
       </div>
     );
   }
-  
+
   if (!profile || !profile.onboarding_completed) {
     return <OnboardingForm onComplete={(newProfile) => setProfile(newProfile)} />;
   }
@@ -207,16 +208,16 @@ const Dashboard: React.FC = () => {
     </div>
   );
 
-  const ExploreRow = ({ 
-    title, 
-    items, 
-    emptyMessage, 
+  const ExploreRow = ({
+    title,
+    items,
+    emptyMessage,
     showProgress = false,
     createLink,
     createText,
     isLoading = false,
     onDelete
-  }: { 
+  }: {
     title: string;
     items: any[];
     emptyMessage?: string;
@@ -297,25 +298,23 @@ const Dashboard: React.FC = () => {
           <h2 className="text-2xl font-bold text-white">{title}</h2>
           {items.length > 3 && (
             <div className="flex gap-2">
-              <button 
-                onClick={() => scroll('left')} 
-                className={`p-1.5 border rounded-md transition ${
-                  showLeftArrow 
-                    ? 'border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-zinc-200' 
-                    : 'border-zinc-800 text-zinc-700 cursor-not-allowed'
-                }`}
+              <button
+                onClick={() => scroll('left')}
+                className={`p-1.5 border rounded-md transition ${showLeftArrow
+                  ? 'border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-zinc-200'
+                  : 'border-zinc-800 text-zinc-700 cursor-not-allowed'
+                  }`}
                 disabled={!showLeftArrow}
                 aria-label="Scroll left"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button 
-                onClick={() => scroll('right')} 
-                className={`p-1.5 border rounded-md transition ${
-                  showRightArrow 
-                    ? 'border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-zinc-200' 
-                    : 'border-zinc-800 text-zinc-700 cursor-not-allowed'
-                }`}
+              <button
+                onClick={() => scroll('right')}
+                className={`p-1.5 border rounded-md transition ${showRightArrow
+                  ? 'border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-zinc-200'
+                  : 'border-zinc-800 text-zinc-700 cursor-not-allowed'
+                  }`}
                 disabled={!showRightArrow}
                 aria-label="Scroll right"
               >
@@ -324,8 +323,8 @@ const Dashboard: React.FC = () => {
             </div>
           )}
         </div>
-        <div 
-          ref={scrollRef} 
+        <div
+          ref={scrollRef}
           className="flex gap-4 overflow-x-auto pb-4 scroll-smooth"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
@@ -349,40 +348,40 @@ const Dashboard: React.FC = () => {
                     </div>
                     {item.icon && <div className="flex-shrink-0 ml-2">{item.icon}</div>}
                   </div>
-                  
+
                   {showProgress && typeof item.progress === 'number' && (
                     <div className="mt-3">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs text-gray-400">{item.progress}% complete</span>
                       </div>
                       <div className="w-full bg-zinc-800 rounded-full h-2">
-                        <div 
-                          className="bg-indigo-500 h-2 rounded-full transition-all duration-300" 
+                        <div
+                          className="bg-indigo-500 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${item.progress}%` }}
                         />
                       </div>
                     </div>
                   )}
-                  
+
                   <div className="flex items-center gap-2 text-indigo-400 group-hover:text-indigo-300 text-sm mt-3 transition-colors">
                     Open <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </motion.div>
               </Link>
-              
-                {onDelete && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onDelete(item.id, item.type);
-                    }}
-                      className="absolute bottom-2 right-2 p-2.5 bg-zinc-900/90 hover:bg-red-500 text-zinc-400 hover:text-white rounded-full border border-zinc-800 hover:border-red-500 transition-all z-20 shadow-xl"
-                    title={`Delete ${item.type}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+
+              {onDelete && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onDelete(item.id, item.type);
+                  }}
+                  className="absolute bottom-2 right-2 p-2.5 bg-zinc-900/90 hover:bg-red-500 text-zinc-400 hover:text-white rounded-full border border-zinc-800 hover:border-red-500 transition-all z-20 shadow-xl"
+                  title={`Delete ${item.type}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -390,28 +389,32 @@ const Dashboard: React.FC = () => {
     );
   };
 
-    return (
-      <div className="min-h-screen bg-zinc-950 overflow-x-hidden">
-        <div className="max-w-7xl mx-auto px-3 py-4 sm:p-6 md:p-8">
-          <div className="flex flex-col gap-4 sm:gap-6 mb-8 sm:mb-12">
-            <div className="min-w-0">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mb-1 sm:mb-2 break-words">
-                Welcome, {profile?.username || user?.email?.split('@')[0]}!
-              </h1>
-              <p className="text-sm sm:text-base md:text-lg text-gray-400">Let's continue your learning journey.</p>
-            </div>
-            <div className="w-full max-w-full lg:max-w-sm">
-              <StreakCard />
-            </div>
+  return (
+    <div className="min-h-screen bg-zinc-950 overflow-x-hidden">
+      <div className="max-w-7xl mx-auto px-3 py-4 sm:p-6 md:p-8">
+        <div className="flex flex-col gap-4 sm:gap-6 mb-8 sm:mb-12">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mb-1 sm:mb-2 break-words">
+              Welcome, {profile?.username || user?.email?.split('@')[0]}!
+            </h1>
+            <p className="text-sm sm:text-base md:text-lg text-gray-400">Let's continue your learning journey.</p>
           </div>
+          <div className="w-full max-w-full lg:max-w-sm">
+            <StreakCard />
+          </div>
+        </div>
+
+        <div className="mb-12">
+          <DiscoverFeed />
+        </div>
 
         {recentCourse && (
           <div className="mb-12">
             <h2 className="text-2xl font-bold text-white mb-4">Continue Learning</h2>
             <Link href={recentCourse.href}>
-              <motion.div 
-                className="bg-gradient-to-r from-indigo-900/80 to-purple-900/80 border border-indigo-500/30 rounded-xl p-6 sm:p-8 flex justify-between items-center group hover:border-indigo-500/50 transition-all cursor-pointer" 
-                whileHover={{ scale: 1.01 }} 
+              <motion.div
+                className="bg-gradient-to-r from-indigo-900/80 to-purple-900/80 border border-indigo-500/30 rounded-xl p-6 sm:p-8 flex justify-between items-center group hover:border-indigo-500/50 transition-all cursor-pointer"
+                whileHover={{ scale: 1.01 }}
                 transition={{ duration: 0.2 }}
               >
                 <div className="flex-grow">
@@ -426,8 +429,8 @@ const Dashboard: React.FC = () => {
                       {recentCourse.progress}% Complete
                     </span>
                     <div className="w-24 sm:w-32 bg-indigo-950 rounded-full h-2">
-                      <div 
-                        className="bg-indigo-400 h-2 rounded-full transition-all duration-300" 
+                      <div
+                        className="bg-indigo-400 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${recentCourse.progress}%` }}
                       />
                     </div>
@@ -441,9 +444,9 @@ const Dashboard: React.FC = () => {
 
         <div>
           <h2 className="text-3xl font-bold text-white mb-6">Explore</h2>
-          <ExploreRow 
-            title="Your Courses" 
-            items={courses} 
+          <ExploreRow
+            title="Your Courses"
+            items={courses}
             emptyMessage="You haven't enrolled in any courses yet."
             showProgress={true}
             createLink="/creator"
@@ -451,16 +454,16 @@ const Dashboard: React.FC = () => {
             isLoading={coursesLoading}
             onDelete={handleDelete}
           />
-          <ExploreRow 
-            title="Your Notes" 
-            items={notes} 
+          <ExploreRow
+            title="Your Notes"
+            items={notes}
             emptyMessage="No notes created yet. Use the Note Taker to get started!"
             isLoading={notesLoading}
             onDelete={handleDelete}
           />
-          <ExploreRow 
-            title="Your Study Kits" 
-            items={studyKits} 
+          <ExploreRow
+            title="Your Study Kits"
+            items={studyKits}
             emptyMessage="No study kits generated yet. Use Study Kit to create one!"
             isLoading={kitsLoading}
             onDelete={handleDelete}

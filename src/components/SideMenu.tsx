@@ -26,7 +26,7 @@ const NAV_ITEMS = [
   { label: 'Courses', icon: BookOpen, href: '/courses' },
   { label: 'Feed', icon: Sparkles, href: '/feed' },
   { label: 'Tools', icon: Wrench, href: '/tools' },
-  { label: 'Socials', icon: Users, href: '/socials' },
+  // { label: 'Socials', icon: Users, href: '/socials' },
 ];
 
 const SideMenu = () => {

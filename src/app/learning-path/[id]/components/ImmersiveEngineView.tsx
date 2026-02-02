@@ -15,6 +15,7 @@ const LinguaLab = dynamic(() => import('@/lib/courseCreation/engines/lingualab/A
 
 interface ImmersiveEngineViewProps {
     selectedSkill: SkillNode | null;
+    parentGraph?: any;
     sessionChallenges: Challenge[];
     activeChallengeIndex: number;
     currentChallenge: Challenge | null;
@@ -26,6 +27,7 @@ interface ImmersiveEngineViewProps {
 
 export default function ImmersiveEngineView({
     selectedSkill,
+    parentGraph,
     sessionChallenges,
     activeChallengeIndex,
     currentChallenge,
@@ -121,10 +123,12 @@ export default function ImmersiveEngineView({
                         </button>
                         {user ? (
                             <InteractiveCourseSession
-                                courseId={selectedSkill.id}
+                                courseId={parentGraph?.id || selectedSkill.id}
                                 userId={user.id}
                                 courseTitle={skillTitle}
                                 courseCreator="EdBox AI"
+                                skillGraph={parentGraph}
+                                initialNodeId={selectedSkill.id}
                                 onStartChallenge={handleInteractiveComplete}
                             />
                         ) : (

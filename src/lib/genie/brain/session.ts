@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { LearningSession, LearningLoopIteration, UnderstandingAssessment } from './types';
+import { LearningSession, LearningLoopIteration, UnderstandingAssessment, NodeStateMetadata } from './types';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,13 +26,73 @@ export const SessionManager = {
         course_id: courseId,
         is_active: true,
         learning_context: {},
-        progress_state: {}
+        progress_state: { node_metadata: {} }
       })
       .select()
       .single();
 
     if (createError) throw createError;
     return newSession;
+  },
+
+  async getNodeMetadata(sessionId: string, nodeId: string): Promise<NodeStateMetadata> {
+    const { data: session } = await supabase
+      .from('interactive_course_sessions')
+      .select('progress_state')
+      .eq('id', sessionId)
+      .single();
+
+    const metadata = session?.progress_state?.node_metadata?.[nodeId];
+    
+    if (metadata) return metadata;
+
+    // Default metadata for a new node
+    return {
+      sub_state: 'DISCOVERY',
+      explanation_count: 0,
+      interaction_count: 0,
+      quizzes_completed: 0,
+      challenges_completed: 0,
+      mastery_velocity: 0,
+      remediation_flag: false,
+      objectives_covered: []
+    };
+  },
+
+  async updateNodeMetadata(sessionId: string, nodeId: string, updates: Partial<NodeStateMetadata>) {
+    const { data: session } = await supabase
+      .from('interactive_course_sessions')
+      .select('progress_state')
+      .eq('id', sessionId)
+      .single();
+
+    const currentMetadata = session?.progress_state?.node_metadata?.[nodeId] || {
+      sub_state: 'DISCOVERY',
+      explanation_count: 0,
+      interaction_count: 0,
+      quizzes_completed: 0,
+      challenges_completed: 0,
+      mastery_velocity: 0,
+      remediation_flag: false,
+      objectives_covered: []
+    };
+
+    const newMetadata = { ...currentMetadata, ...updates };
+
+    const { error } = await supabase
+      .from('interactive_course_sessions')
+      .update({
+        progress_state: {
+          ...session?.progress_state,
+          node_metadata: {
+            ...(session?.progress_state?.node_metadata || {}),
+            [nodeId]: newMetadata
+          }
+        }
+      })
+      .eq('id', sessionId);
+
+    if (error) throw error;
   },
 
   async updateCurrentTopic(sessionId: string, topic: string) {
@@ -113,9 +173,8 @@ export const SessionManager = {
 
     const history = session?.progress_state?.history || [];
 
-    // Optimization: Cap history length to prevent document size bloat (Musk-tier efficiency)
     const updatedHistory = [
-      ...history.slice(-19), // Keep last 19 entries
+      ...history.slice(-19), 
       {
         timestamp: new Date().toISOString(),
         nodeId,
@@ -187,7 +246,6 @@ export const SessionManager = {
 
     if (error) {
       console.error('Failed to save message:', error);
-      // Don't throw, just log to allow flow to continue
     }
   },
 

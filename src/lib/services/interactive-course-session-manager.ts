@@ -195,6 +195,80 @@ export class InteractiveCourseSessionManager implements SessionManager {
   }
 
   /**
+   * Sync goals for a session based on the course's atomic nodes
+   */
+  async syncGoals(sessionId: string, courseId: string, userId: string): Promise<any[]> {
+    try {
+      // First try to fetch from the new atomic nodes table
+      const { data: nodes, error: nodeError } = await this.getClient()
+        .from('genie_atomic_nodes')
+        .select('*')
+        .eq('skill_id', courseId)
+        .order('order_index', { ascending: true });
+
+      // Fallback to legacy knowledge nodes if none found in atomic
+      let finalNodes = nodes;
+      if (!nodes || nodes.length === 0) {
+        const { data: legacyNodes } = await this.getClient()
+          .from('genie_knowledge_nodes')
+          .select('*')
+          .eq('course_id', courseId)
+          .order('order_index', { ascending: true });
+        finalNodes = legacyNodes;
+      }
+
+      const { data: masteries } = await this.getClient()
+        .from('genie_user_mastery')
+        .select('*')
+        .eq('user_id', userId);
+
+      const { data: session } = await this.getClient()
+        .from('interactive_course_sessions')
+        .select('progress_state')
+        .eq('id', sessionId)
+        .single();
+
+      const nodeMetadataMap = session?.progress_state?.node_metadata || {};
+
+      const goals = (finalNodes || []).map(node => {
+        const mastery = (masteries || []).find(m => m.node_id === node.id);
+        const meta = nodeMetadataMap[node.id] || {};
+        return {
+          id: node.id,
+          text: node.title,
+          status: mastery?.status || 'not_started',
+          confidence: mastery?.mastery_score || 0,
+          quizzes_completed: meta.quizzes_completed || 0,
+          challenges_completed: meta.challenges_completed || 0,
+          timestamp: new Date().toISOString()
+        };
+      });
+
+      // Update session with these goals
+      const { data: currentSession } = await this.getClient()
+        .from('interactive_course_sessions')
+        .select('learning_context')
+        .eq('id', sessionId)
+        .single();
+
+      await this.getClient()
+        .from('interactive_course_sessions')
+        .update({
+          learning_context: {
+            ...(currentSession?.learning_context || {}),
+            goals
+          }
+        })
+        .eq('id', sessionId);
+
+      return goals;
+    } catch (e) {
+      console.error('Failed to sync goals:', e);
+      return [];
+    }
+  }
+
+  /**
    * Add a message to the conversation
    */
   async addMessage(

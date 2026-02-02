@@ -46,19 +46,10 @@ export interface LearningGoal {
   id: string;
   text: string;
   status: 'pending' | 'in_progress' | 'mastered';
-  confidence: number; // 0-100 scale
-  evidence?: string; // e.g., "Passed Quiz 1 with 100%"
-  timestamp: string;
-}
-
-/**
- * Specific learning goal for mastery tracking
- */
-export interface LearningGoal {
-  id: string;
-  text: string;
-  status: 'pending' | 'in_progress' | 'mastered';
-  evidence?: string; // e.g., "Passed Quiz 1 with 100%"
+  confidence: number;
+  quizzes_completed?: number;
+  challenges_completed?: number;
+  evidence?: string;
   timestamp: string;
 }
 

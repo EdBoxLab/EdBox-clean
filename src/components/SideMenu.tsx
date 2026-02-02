@@ -155,18 +155,18 @@ const SideMenu = () => {
                       </span>
                     </div>
                   </div>
-                  {!isPremium && (
-                    <button
-                      onClick={() => {
-                        router.push('/pricing');
-                        setSidebarOpen(false);
-                      }}
-                      className="w-full mt-2 py-1.5 px-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-[11px] font-bold rounded-lg transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
-                    >
-                      <Crown size={12} />
-                      UPGRADE TO PRO
-                    </button>
-                  )}
+                    {!isPremium && (
+                      <button
+                        onClick={() => {
+                          router.push('/pricing');
+                          setSidebarOpen(false);
+                        }}
+                        className="w-full mt-2 py-2 px-3 bg-zinc-100 hover:bg-white text-zinc-950 text-[11px] font-bold rounded-lg transition-all shadow-xl shadow-white/5 flex items-center justify-center gap-2"
+                      >
+                        <Crown size={12} />
+                        UPGRADE TO PRO
+                      </button>
+                    )}
                 </div>
               </div>
 

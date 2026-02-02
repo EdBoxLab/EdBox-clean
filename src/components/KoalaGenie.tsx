@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, Send, X, Sparkles, User, Bot, Plus, MessageSquare, Loader2, Trash2, Edit2, Check, Paperclip, File, Image as ImageIcon, FileText, ChevronRight, History } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
+import { GenieIcon } from './GenieIcon';
 
 interface Message {
   id: string;
@@ -335,7 +336,15 @@ export default function KoalaGenie() {
             className="fixed bottom-20 right-4 lg:bottom-8 lg:right-8 z-50 flex items-center justify-center w-14 h-14 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl hover:bg-zinc-800 transition-colors group"
           >
             <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
-            <Sparkles className="w-6 h-6 text-white group-hover:text-indigo-400 transition-colors" />
+
+            {/* Creative Orbit Ring */}
+            <motion.div
+              className="absolute inset-0 border border-indigo-500/30 rounded-2xl"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+            />
+
+            <GenieIcon className="w-8 h-8 text-white group-hover:text-indigo-400 transition-colors" />
             <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-zinc-950 shadow-lg shadow-indigo-500/20" />
           </motion.button>
         )}
@@ -357,14 +366,14 @@ export default function KoalaGenie() {
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 20, opacity: 0, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[440px] sm:h-[700px] z-50 bg-zinc-950/95 backdrop-blur-2xl border-0 sm:border sm:border-zinc-800 shadow-[0_24px_100px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden sm:rounded-[32px]"
+            className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[440px] sm:h-[700px] max-h-[90vh] z-50 bg-zinc-950/98 backdrop-blur-2xl border-0 sm:border sm:border-zinc-800 shadow-[0_24px_100px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden sm:rounded-[32px]"
           >
             {/* Minimalist Header */}
             <div className="px-6 py-5 flex items-center justify-between border-b border-zinc-900 bg-zinc-950/50 backdrop-blur-md">
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <div className="w-10 h-10 rounded-xl bg-zinc-900 flex items-center justify-center border border-zinc-800">
-                    <Sparkles className="w-5 h-5 text-indigo-400" />
+                    <GenieIcon className="w-6 h-6" />
                   </div>
                   <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-zinc-950" />
                 </div>
@@ -412,7 +421,7 @@ export default function KoalaGenie() {
                   >
                     {message.role === 'assistant' && (
                       <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center border border-zinc-800 shrink-0 mt-0.5">
-                        <Sparkles className="w-4 h-4 text-indigo-400" />
+                        <GenieIcon className="w-5 h-5" />
                       </div>
                     )}
 
@@ -455,7 +464,7 @@ export default function KoalaGenie() {
                 {isSending && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-4">
                     <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center border border-zinc-800 shrink-0">
-                      <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse" />
+                      <GenieIcon className="w-5 h-5 animate-pulse" />
                     </div>
                     <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl px-5 py-3 flex items-center gap-3">
                       <div className="flex gap-1.5">

@@ -56,7 +56,7 @@ export default function QuizBubble({
                 </h3>
 
                 <div className="space-y-2">
-                    {options.map((option) => {
+                    {options?.map((option) => {
                         const isSelected = selected === option;
                         // Robust check for correct option visual state
                         const optionLetter = option.split(')')[0].trim();

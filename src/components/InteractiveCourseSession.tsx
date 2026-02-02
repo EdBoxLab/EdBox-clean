@@ -104,6 +104,7 @@ interface InteractiveCourseSessionProps {
   courseTitle?: string;
   courseCreator?: string;
   skillGraph?: any;
+  initialNodeId?: string;
   onStartChallenge?: () => void;
 }
 
@@ -113,6 +114,7 @@ export default function InteractiveCourseSession({
   courseTitle = 'Interactive Course',
   courseCreator = 'AI Tutor',
   skillGraph,
+  initialNodeId,
   onStartChallenge
 }: InteractiveCourseSessionProps) {
   const safeSkillGraph = skillGraph || { id: courseId, goal: courseTitle, nodes: [], edges: [] };
@@ -246,7 +248,7 @@ export default function InteractiveCourseSession({
   const handleSendMessage = async (text: string, isAuto = false, stageOverride?: 'EXPLAIN' | 'QUIZ' | 'CHALLENGE', sessionIdOverride?: string) => {
     if (!text.trim() || isLoading) return;
 
-    const currentSkillId = safeSkillGraph?.nodes?.[0]?.id || courseId;
+    const currentSkillId = initialNodeId || safeSkillGraph?.nodes?.[0]?.id || courseId;
     const effectiveSessionId = sessionIdOverride || session?.id;
 
     if (!effectiveSessionId && !isInitializing) {

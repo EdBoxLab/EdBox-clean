@@ -528,6 +528,16 @@ User Profile:
     // 🔥 ENHANCED: Build context-aware system prompt with asterisk prevention
     let systemPrompt;
     
+    const BREVITY_GUIDELINE = `
+TOKEN OPTIMIZATION & BREVITY:
+- Analyze user query complexity:
+  - Simple greeting/question: max 15-20 words.
+  - Concept explanation: max 50-70 words using direct language.
+  - Complex multi-part query: max 150 words using concise bullet points.
+- Avoid flowery language, repetitive affirmations ("That's a great question!"), or unnecessary preambles.
+- Get straight to the point.
+- Efficiency is priority.`;
+
     if (isInteractiveCourse && skillTitle) {
       systemPrompt = `You are Genie, an enthusiastic AI learning companion guiding users through an interactive course on "${skillTitle}".
 ${userProfileContext}${studySetsContext}${notesContext}${studyKitContext}
@@ -547,6 +557,7 @@ INTERACTIVE COURSE GUIDELINES:
 - NEVER use asterisks (*) for emphasis, actions, or formatting
 - Use natural language for emphasis: "really important" instead of "*important*"
 - If showing actions or emotions, describe them naturally without asterisks
+${BREVITY_GUIDELINE}
 
 🎯 YOUR CAPABILITIES:
 - ✅ View and analyze images (screenshots, diagrams, charts, handwritten notes)
@@ -567,6 +578,8 @@ Respond as their learning companion:`;
 ${userProfileContext}${studySetsContext}${notesContext}${studyKitContext}
 
 ${context ? `Context: ${context}` : ''}
+
+${BREVITY_GUIDELINE}
 
 🎯 YOUR CAPABILITIES:
 - ✅ Read and analyze text files (code, documents, data)
@@ -662,13 +675,13 @@ FORMATTING RULES:
 
       console.log(`🤖 Using model: ${model} (${hasImages ? 'with vision' : 'text only'})`);
 
-      const completion = await groq.chat.completions.create({
-        messages,
-        model,
-        temperature: 0.7,
-        max_tokens: isInteractiveCourse ? 800 : 3000,
-        top_p: 1,
-      });
+        const completion = await groq.chat.completions.create({
+          messages,
+          model,
+          temperature: 0.7,
+          max_tokens: isInteractiveCourse ? 800 : 500,
+          top_p: 1,
+        });
 
       aiResponse = completion.choices?.[0]?.message?.content || "I couldn't generate a response. Please try again.";
       

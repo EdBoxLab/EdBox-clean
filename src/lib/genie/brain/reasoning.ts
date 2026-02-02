@@ -1,86 +1,70 @@
 import { generateWithRetry, cleanJsonResponse, streamWithFallback } from '@/lib/ai-providers';
-import { KnowledgeNode, MasteryRecord } from './types';
+import { KnowledgeNode, MasteryRecord, NodeStateMetadata } from './types';
 import { VectorBrain } from './vector';
+import { Strategist } from './strategist';
 
 export const CognitiveReasoning = {
   /**
-   * Decides the next action for the learner based on their current state and performance
+   * Orchestrates the V3 pedagogical loop: Strategist Decides -> AI Generates Content
    */
-  async determineNextAction(
-    userResponse: string,
-    currentNode: KnowledgeNode,
-    mastery: MasteryRecord | null,
-    relatedContext: any[],
-    conversationHistory: any[] = []
-  ) {
-    const systemPrompt = `You are the "Genie Brain", a cognitive reasoning engine for an adaptive tutor. 
-        Your goal is to analyze the user's state and determine the single best pedagogical next step.
+    async determineNextAction(
+      userResponse: string,
+      currentNode: KnowledgeNode,
+      mastery: MasteryRecord | null,
+      metadata: NodeStateMetadata,
+      conversationHistory: any[] = [],
+      forcedDecision?: any
+    ) {
+      // 1. The Decision (Stateless pure logic)
+      const decision = forcedDecision || Strategist.decide(userResponse, currentNode, mastery, metadata, conversationHistory);
+  
+    // 2. The Content Generation (Thin AI layer)
+    const systemPrompt = `You are "Genie", an adaptive cognitive tutor. 
+    You have been given a strategic decision by the Brain. Your job is to generate the HIGH-QUALITY content for this decision.
 
-        Current State:
-        - Topic: "${currentNode.title}"
-        - Mastery Status: ${mastery?.status || 'not_started'}
-        - Mastery Score: ${mastery?.mastery_score || 0}/100
-        
-          Pedagogical Rules:
-          1. INITIALIZATION: If this is the very beginning (no history), choose "roadmap" to show the learner what they will cover.
-          2. VAGUE RESPONSES: If the user says something vague or affirmative (e.g., "ok", "yes", "uhm", "go on", "I understand") AFTER you've already explained something, DO NOT repeat the explanation. Instead, move to "quiz" or "challenge" to verify mastery, or "roadmap" to show progress.
-          3. JUST STARTED: If Mastery Status is "not_started" and you haven't explained yet, choose "explain".
-          4. STRUGGLING: If Mastery Score < 50, choose "remediate" or "explain" using simpler terms and metaphors.
-          5. COMPETENT: If Mastery Score 50-80, choose "quiz" to verify their mental model.
-          6. MASTERING: If Mastery Score > 80, choose "challenge" to encourage higher-order thinking (application/synthesis).
-          7. USER REQUEST: If the user explicitly asks for a quiz, challenge, or explanation, honor their request regardless of score.
-          8. LOOP ITERATIONS: You are part of a "Learning Loop". Each loop should ideally consist of Explanation -> Assessment (Quiz) -> Challenge -> Evaluation. 
+    STRATEGIC DECISION:
+    - Action: ${decision.action}
+    - Sub-State: ${decision.sub_state}
+    - Reason: ${decision.reason}
+    - Intensity: ${decision.intensity || 'Normal'}
+    - Remediation Flag: ${decision.remediation_flag || 'None'}
 
-          CRITICAL: 
-          - Every interaction should be logged as part of the current "Iteration".
-            - When you move to a new concept, it starts a new "Iteration".
+    TOPIC CONTEXT:
+    - Title: "${currentNode.title}"
+    - Content: "${currentNode.content.substring(0, 500)}"
+    - Learning Objectives: ${currentNode.learning_objectives?.join(', ') || 'None provided'}
 
-            RULES FOR CHALLENGE/QUIZ:
-            - If action is "challenge", the "content.text" MUST be a short intro (max 1 sentence) like "Ready to test your skills?". The ACTUAL task must be in "content.challenge.description".
-            - If action is "quiz", the "content.text" MUST be a short intro like "Let's check your understanding.". The question must be in "content.quiz.question".
+      PEDAGOGICAL RULES:
+        1. EXPLAIN: DO NOT be brief. If Sub-State is "DISCOVERY", you are in a "Deep Dive" phase. You MUST provide an extreme in-depth breakdown (minimum 3 paragraphs), use at least 2 distinct analogies, and provide multiple concrete examples. Each "Deep Dive" interaction (up to 10) should peel back a new layer of the concept.
+        2. READY_TO_PROGRESS: If Sub-State is "READY_TO_PROGRESS", your "content.text" must congratulate the user on completing the 10-5-3 mastery cycle and explicitly ask if they are ready to move on to the next node in the roadmap.
+        3. CHALLENGE: If action is "challenge", use the intensity to scale difficulty. The "content.text" must be a one-sentence hook. The actual task goes in "content.challenge.description".
+        4. QUIZ: Focus on a specific objective the user hasn't proven yet.
+        5. REVISE: If remediation is active, change your teaching style (e.g., if you used a definition before, use a story now). Provide even more scaffolding and examples. Use Intensity to determine how much help to provide.
 
-
-          OUTPUT FORMAT:
-        You MUST return ONLY a valid JSON object. Do not include markdown blocks, preambles, or extra text.
-          The JSON must follow this exact schema:
-          {
-            "action": "explain" | "quiz" | "challenge" | "remediate" | "roadmap" | "advance",
-            "thought_process": "Brief explanation of your pedagogical choice",
-            "evaluation_score": number (0-100, estimate of user's current mastery of this concept based on the response),
-            "feedback": "Personalized feedback for the user (at least 2 sentences)",
-            "remediation_node_id": "UUID of a prerequisite node if user is struggling (optional)",
-            "suggested_explanation": "A specific angle or metaphor to use for the next explanation (optional)",
-            "content": {
-              "text": "Introductory or transition text (at least 2 sentences)",
-            "quiz": {
-              "question": "The question string",
-              "options": ["Option A", "Option B", "Option C", "Option D"],
-              "correctAnswer": "The exact string of the correct option",
-              "explanation": "Why this is correct"
-            },
-            "challenge": {
-              "title": "Challenge Name",
-              "description": "The task to perform",
-              "hint": "A helpful nudge",
-              "difficulty": "Easy" | "Medium" | "Hard",
-              "expectedOutcome": "What the solution looks like"
-            }
-          }
-        }`;
-
+    OUTPUT FORMAT:
+    Return ONLY a valid JSON object.
+    {
+      "action": "${decision.action}",
+      "thought_process": "${decision.reason}",
+      "evaluation_score": number (0-100, analyze user's message),
+      "feedback": "Personalized feedback (min 2 sentences)",
+      "content": {
+        "text": "Intro/Transition text",
+        "quiz": { ... },
+        "challenge": { ... }
+      }
+    }`;
 
     const result = await generateWithRetry({
-      prompt: `Conversation History:\n${JSON.stringify(conversationHistory.slice(-5))}\n\nUser Message: "${userResponse}"\nTopic Context: ${currentNode.content.substring(0, 300)}`,
+      prompt: `User Response: "${userResponse}"\nHistory: ${JSON.stringify(conversationHistory.slice(-3))}`,
       systemPrompt,
       schema: {
         type: "object",
         properties: {
-          action: { type: "string", enum: ["explain", "quiz", "challenge", "remediate", "roadmap", "advance"] },
+          action: { type: "string" },
           thought_process: { type: "string" },
           evaluation_score: { type: "number" },
           feedback: { type: "string" },
-          remediation_node_id: { type: "string" },
-          suggested_explanation: { type: "string" },
           content: {
             type: "object",
             properties: {
@@ -92,8 +76,7 @@ export const CognitiveReasoning = {
                   options: { type: "array", items: { type: "string" } },
                   correctAnswer: { type: "string" },
                   explanation: { type: "string" }
-                },
-                required: ["question", "options", "correctAnswer"]
+                }
               },
               challenge: {
                 type: "object",
@@ -103,8 +86,7 @@ export const CognitiveReasoning = {
                   hint: { type: "string" },
                   difficulty: { type: "string", enum: ["Easy", "Medium", "Hard"] },
                   expectedOutcome: { type: "string" }
-                },
-                required: ["title", "description", "difficulty"]
+                }
               }
             }
           }
@@ -115,46 +97,28 @@ export const CognitiveReasoning = {
 
     try {
       const parsed = JSON.parse(cleanJsonResponse(result.text));
-
-      // Fallback if missing action/content
-      if (!parsed.action || !parsed.content) {
-        console.warn('[GENIE_BRAIN] AI returned incomplete decision, defaulting to Explain.', parsed);
-        return {
-          action: 'explain',
-          thought_process: 'Fallback due to malformed AI response',
-          evaluation_score: 0,
-          feedback: "Let's keep going.",
-          content: { text: "Let's dive into this topic." }
-        };
-      }
       return {
         ...parsed,
-        evaluation_score: parsed.evaluation_score || 0,
-        feedback: parsed.feedback || parsed.content?.text || "Let's continue."
+        sub_state: decision.sub_state, // Pass the strategist's state through
+        remediation_flag: decision.remediation_flag
       };
-
     } catch (e) {
-      console.warn('[GENIE_BRAIN] Failed to parse decision JSON, defaulting to Explain.', e);
       return {
-        action: 'explain',
-        thought_process: 'Fallback due to JSON parse error',
-        evaluation_score: 0,
-        feedback: "Let's try again.",
-        content: { text: "Let's iterate on this concept." }
+        action: decision.action,
+        sub_state: decision.sub_state,
+        content: { text: "Let's keep moving forward with this concept." },
+        evaluation_score: 0
       };
     }
   },
 
   /**
-   * Generates a personalized explanation based on vector-retrieved context (streaming)
+   * Personalized stream for explanations
    */
   async *generatePersonalizedContentStream(node: KnowledgeNode, query: string) {
-    const relatedContext = await VectorBrain.findRelatedNodes(query);
-    const contextText = relatedContext.map(m => m.content).join('\n---\n');
-
     const stream = streamWithFallback({
-      prompt: `Explain the concept "${node.title}" in the context of: ${query}\n\nAdditional Context:\n${contextText}`,
-      systemPrompt: "You are Genie, a helpful and adaptive tutor. Use the provided context to make your explanation more relevant to the user's specific interest or query. Be concise but thorough.",
+      prompt: `Explain "${node.title}" based on this specific interest: ${query}`,
+      systemPrompt: "You are Genie. Be concise and high-impact. Use the node context to teach.",
     });
 
     for await (const chunk of stream) {

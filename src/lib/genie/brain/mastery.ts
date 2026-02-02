@@ -29,12 +29,20 @@ export const MasteryTracker = {
     const status = score >= 80 ? 'mastered' : score > 0 ? 'in_progress' : 'not_started';
     const masteryAchieved = score >= 80;
 
-    // Verify node exists in genie_knowledge_nodes, create if missing with proper course context
-    const { data: nodeExists } = await supabase
-      .from('genie_knowledge_nodes')
+    // Verify node exists in either genie_atomic_nodes or genie_knowledge_nodes
+    const { data: atomicExists } = await supabase
+      .from('genie_atomic_nodes')
       .select('id')
       .eq('id', nodeId)
       .single();
+
+    const { data: legacyExists } = !atomicExists ? await supabase
+      .from('genie_knowledge_nodes')
+      .select('id')
+      .eq('id', nodeId)
+      .single() : { data: null };
+
+    const nodeExists = !!(atomicExists || legacyExists);
 
     if (!nodeExists) {
       console.warn(`[MasteryTracker] Node ${nodeId} not found, creating it...`);

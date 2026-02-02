@@ -336,7 +336,9 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
         onClose={() => setShowPrerequisites(null)} onSkillClick={handleSkillClick}
       />
       <EngineModal
-        selectedSkill={selectedSkill} sessionChallenges={sessionChallenges}
+        selectedSkill={selectedSkill} 
+        parentGraph={graph}
+        sessionChallenges={sessionChallenges}
         activeChallengeIndex={activeChallengeIndex} currentChallenge={currentChallenge}
         isGenerating={isGenerating} onClose={handleCloseEngine}
         onChallengeSelect={handleChallengeSelect} onChallengeComplete={handleChallengeComplete}

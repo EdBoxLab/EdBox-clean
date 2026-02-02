@@ -3,7 +3,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SkillGraph, SkillNode } from '@/lib/courseCreation/types';
-import { Lock, CheckCircle2, Sparkles, Trophy, Clock } from 'lucide-react';
+import { Lock, CheckCircle2, Trophy, Clock } from 'lucide-react';
+import { GenieIcon } from './GenieIcon';
 
 interface SkillGraphViewProps {
     graph: SkillGraph;
@@ -230,7 +231,7 @@ export const SkillGraphView: React.FC<SkillGraphViewProps> = ({
                                         ) : status === 'locked' ? (
                                             <Lock className={`${isMobile ? 'w-5 h-5' : 'w-8 h-8'} text-zinc-500`} />
                                         ) : (
-                                            <Sparkles className={`${isMobile ? 'w-5 h-5' : 'w-8 h-8'} text-indigo-400`} />
+                                            <GenieIcon className={`${isMobile ? 'w-5 h-5' : 'w-8 h-8'}`} />
                                         )}
                                     </div>
 

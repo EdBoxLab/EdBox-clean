@@ -9,6 +9,12 @@ export interface KnowledgeNode {
   level: number;
   order_index: number;
   prerequisite_ids: string[];
+  learning_objectives: string[];
+  passing_criteria: {
+    type: 'challenge' | 'quiz' | 'hybrid';
+    requirement: string;
+    threshold: number;
+  };
   created_at: string;
   updated_at: string;
 }
@@ -23,13 +29,28 @@ export interface MasteryRecord {
   last_attempt_at: string;
 }
 
+export interface NodeStateMetadata {
+  sub_state: 'DISCOVERY' | 'APPLICATION' | 'VALIDATION' | 'READY_TO_PROGRESS';
+  explanation_count: number;
+  interaction_count: number;
+  quizzes_completed: number;
+  challenges_completed: number;
+  mastery_velocity: number;
+  remediation_flag: boolean;
+  objectives_covered: string[];
+}
+
 export interface LearningSession {
   id: string;
   course_id: string;
   user_id: string;
   current_topic: string | null;
   learning_context: Record<string, any>;
-  progress_state: Record<string, any>;
+  progress_state: {
+    history?: any[];
+    node_metadata?: Record<string, NodeStateMetadata>;
+    current_velocity?: number;
+  };
   session_start_time: string;
   last_interaction: string;
   is_active: boolean;

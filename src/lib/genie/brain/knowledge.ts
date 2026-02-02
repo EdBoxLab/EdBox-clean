@@ -64,11 +64,11 @@ export const KnowledgeManager = {
       order_index: idx
     }));
 
-    // Insert into legacy table
-    const { data: savedNodes, error } = await supabase
-      .from('genie_knowledge_nodes')
-      .insert(nodesToInsert.map(({ skill_id, ...rest }) => rest))
-      .select();
+      // Insert into legacy table
+      const { data: savedNodes, error } = await supabase
+        .from('genie_knowledge_nodes')
+        .insert(nodesToInsert.map(({ skill_id, ...rest }: any) => rest))
+        .select();
 
     if (error) throw error;
 

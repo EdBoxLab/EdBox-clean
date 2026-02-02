@@ -230,8 +230,8 @@ export class InteractiveCourseSessionManager implements SessionManager {
 
       const nodeMetadataMap = session?.progress_state?.node_metadata || {};
 
-      const goals = (finalNodes || []).map(node => {
-        const mastery = (masteries || []).find(m => m.node_id === node.id);
+      const goals = (finalNodes || []).map((node: any) => {
+        const mastery = (masteries || []).find((m: any) => m.node_id === node.id);
         const meta = nodeMetadataMap[node.id] || {};
         return {
           id: node.id,

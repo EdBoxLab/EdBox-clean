@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, Volume2, VolumeX, Loader2, Sparkles, MessageCircle, Paperclip, X, FileText, Image as ImageIcon } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, Loader2, MessageCircle, Paperclip, X, FileText, Image as ImageIcon } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
+import { GenieIcon } from './GenieIcon';
 
 interface GenieAssistantProps {
     skillTitle: string;
@@ -151,9 +152,9 @@ export const GenieAssistant: React.FC<GenieAssistantProps> = ({
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 onClick={() => setIsMinimized(false)}
-                className="fixed bottom-6 right-6 z-50 w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-transform"
+                className="fixed bottom-6 right-6 z-50 w-16 h-16 bg-zinc-900 border border-zinc-800 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-transform"
             >
-                <Sparkles className="w-8 h-8 text-white" />
+                <GenieIcon className="w-8 h-8" />
             </motion.button>
         );
     }
@@ -164,24 +165,19 @@ export const GenieAssistant: React.FC<GenieAssistantProps> = ({
             animate={{ opacity: 1, y: 0 }}
             className="fixed bottom-6 right-6 z-50 w-80 md:w-96"
         >
-            <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-4 flex items-center justify-between">
+                <div className="bg-zinc-900 p-4 flex items-center justify-between border-b border-zinc-800">
                     <div className="flex items-center gap-2">
-                        <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                        >
-                            <Sparkles className="w-5 h-5 text-white" />
-                        </motion.div>
+                        <GenieIcon className="w-5 h-5" />
                         <div>
                             <h3 className="font-bold text-white">Genie AI</h3>
-                            <p className="text-xs text-white/80">Your learning companion</p>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Neural Engine</p>
                         </div>
                     </div>
                     <button
                         onClick={() => setIsMinimized(true)}
-                        className="text-white/80 hover:text-white"
+                        className="text-zinc-500 hover:text-white"
                     >
                         ×
                     </button>

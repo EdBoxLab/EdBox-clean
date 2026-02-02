@@ -3,7 +3,7 @@ import React from 'react';
 import SideMenu from '../../components/SideMenu';
 import { Header } from '../../components/Header';
 import Footer from '../../components/Footer';
-import KoalaGenie from '../../components/KoalaGenie';
+import GenieChat from '../../components/GenieChat';
 import { Toaster } from '../../components/ui/toaster';
 import { AppTour } from '../../components/AppTour';
 
@@ -19,9 +19,7 @@ export default function MainAppLayout({
       <main className="lg:pl-64 min-h-screen overflow-x-hidden overflow-y-auto bg-background pb-20 lg:pb-0">
         {children}
       </main>
-      <div className="fixed bottom-4 right-4 z-50">
-        <KoalaGenie />
-      </div>
+      <GenieChat />
       <Toaster />
     </div>
   );

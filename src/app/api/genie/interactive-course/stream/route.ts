@@ -250,6 +250,8 @@ export async function POST(request: NextRequest) {
                         mastery_status: masteryAchieved ? 'mastered' : 'in_progress',
                         mastery_score: decision.evaluation_score,
                         input_message: userMessage,
+                        conversation_history_length: (conversationHistory || []).length,
+                        context_sources_count: 1, // Current knowledge node
                         full_decision: decision
                     });
 

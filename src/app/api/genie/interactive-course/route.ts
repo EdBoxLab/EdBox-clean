@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { SessionManager } from '@/lib/genie/brain/session';
 import { CognitiveReasoning } from '@/lib/genie/brain/reasoning';
 import { MasteryTracker } from '@/lib/genie/brain/mastery';
-import { VectorBrain } from '@/lib/genie/brain/vector';
+import { KnowledgeNode, NodeStateMetadata } from '@/lib/genie/brain/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,47 +34,57 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch the current node details
-    const { data: currentNode, error: nodeError } = await supabase
+    const { data: nodeData, error: nodeError } = await supabase
       .from('genie_knowledge_nodes')
       .select('*')
       .eq('id', sessionData.current_topic)
       .single();
 
-    if (nodeError || !currentNode) {
+    if (nodeError || !nodeData) {
       return NextResponse.json({ error: 'Current node not found' }, { status: 404 });
     }
 
-    // 2. Get User Mastery for current node
+    const currentNode: KnowledgeNode = {
+      ...nodeData,
+      learning_objectives: nodeData.learning_objectives || [],
+      passing_criteria: nodeData.passing_criteria || { type: 'challenge', requirement: 'Master the concept', threshold: 80 }
+    };
+
+    // 2. Fetch V3 Metadata
+    const metadata = await SessionManager.getNodeMetadata(sessionId, currentNode.id);
+
+    // 3. Get User Mastery
     const mastery = await MasteryTracker.getMastery(userId, currentNode.id);
 
-    // 3. Find related context via Vector Search
-    const relatedContext = await VectorBrain.findRelatedNodes(userMessage, 3);
-
-    // 4. Determine Next Action using Cognitive Reasoning
+    // 4. Determine Next Action using Cognitive Reasoning (V3)
     const reasoning = await CognitiveReasoning.determineNextAction(
       userMessage,
       currentNode,
       mastery,
-      relatedContext
+      metadata
     );
 
-    // 5. Update Mastery based on evaluation
+    // 5. Update Metadata & Persistence
+    const updates: Partial<NodeStateMetadata> = {
+      sub_state: reasoning.sub_state,
+      remediation_flag: reasoning.remediation_flag
+    };
+
+    if (reasoning.action === 'explain') updates.explanation_count = (metadata.explanation_count || 0) + 1;
+    if (reasoning.action === 'challenge') updates.interaction_count = (metadata.interaction_count || 0) + 1;
+    
+    updates.mastery_velocity = (reasoning.evaluation_score - (mastery?.mastery_score || 0));
+
+    await SessionManager.updateNodeMetadata(sessionId, currentNode.id, updates);
+
+    // 6. Update Mastery based on evaluation
     await MasteryTracker.updateMastery(userId, currentNode.id, reasoning.evaluation_score, sessionData.course_id, currentNode.title);
 
-    // 6. Log interaction (Persist Chat)
+    // 7. Log interaction
     await SessionManager.saveMessage(sessionId, 'learner', userMessage, 'question');
     await SessionManager.saveMessage(sessionId, 'genie', reasoning.feedback, 'explanation');
 
-    // Also log to progress state (legacy, can keep for now or remove if unused)
-    await SessionManager.logResponse(
-      sessionId,
-      currentNode.id,
-      userMessage,
-      reasoning,
-      reasoning.feedback
-    );
-
-    // 7. Handle Transitions
+    // 8. Handle Transitions
     let nextNodeId = currentNode.id;
     if (reasoning.action === 'advance') {
       const eligibleNodes = await MasteryTracker.getEligibleNodes(userId, sessionData.course_id);
@@ -92,9 +102,9 @@ export async function POST(request: NextRequest) {
       response: reasoning.feedback,
       next_action: reasoning.action,
       evaluation: reasoning.evaluation_score,
-      suggested_explanation: reasoning.suggested_explanation,
       current_node_id: nextNodeId,
-      content: reasoning.content // Include full content object for quizzes/challenges
+      content: reasoning.content,
+      sub_state: reasoning.sub_state
     });
 
   } catch (error: any) {

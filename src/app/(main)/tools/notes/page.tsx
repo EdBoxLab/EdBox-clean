@@ -1,16 +1,16 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-    Save, 
-    Download, 
-    Plus, 
-    Trash2, 
-    FileText, 
-    Loader2, 
-    Clock, 
-    Search, 
-    ChevronLeft, 
+import {
+    Save,
+    Download,
+    Plus,
+    Trash2,
+    FileText,
+    Loader2,
+    Clock,
+    Search,
+    ChevronLeft,
     MoreVertical,
     Share2,
     Calendar,
@@ -36,7 +36,7 @@ export default function NotesPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
     const [isMobile, setIsMobile] = useState(false);
-    
+
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Check for mobile screen
@@ -57,10 +57,10 @@ export default function NotesPage() {
         try {
             const response = await fetch('/api/notes');
             const data = await response.json();
-            if (data.notes) {
-                setNotes(data.notes);
-                if (data.notes.length > 0 && !currentNoteId && window.innerWidth >= 768) {
-                    loadNote(data.notes[0]);
+            if (Array.isArray(data)) {
+                setNotes(data);
+                if (data.length > 0 && !currentNoteId && window.innerWidth >= 768) {
+                    loadNote(data[0]);
                 }
             }
         } catch (error) {
@@ -90,26 +90,27 @@ export default function NotesPage() {
         if (manual) setIsSaving(true);
         try {
             const method = currentNoteId ? 'PUT' : 'POST';
-            const body: any = { 
-                title: title || 'Untitled Note', 
-                content: content || '' 
+            const body: any = {
+                title: title || 'Untitled Note',
+                content: content || ''
             };
             if (currentNoteId) body.id = currentNoteId;
 
-            const response = await fetch('/api/notes', {
+            const url = currentNoteId ? `/api/notes/${currentNoteId}` : '/api/notes';
+            const response = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
             });
 
-            const data = await response.json();
+            const note = await response.json();
 
-            if (data.note) {
+            if (note && note.id) {
                 if (currentNoteId) {
-                    setNotes(prev => prev.map(n => n.id === currentNoteId ? data.note : n));
+                    setNotes(prev => prev.map(n => n.id === currentNoteId ? note : n));
                 } else {
-                    setNotes(prev => [data.note, ...prev]);
-                    setCurrentNoteId(data.note.id);
+                    setNotes(prev => [note, ...prev]);
+                    setCurrentNoteId(note.id);
                 }
             }
         } catch (error) {
@@ -123,9 +124,9 @@ export default function NotesPage() {
     // Auto-save logic
     useEffect(() => {
         if (!currentNoteId && !title && !content) return;
-        
+
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        
+
         saveTimeoutRef.current = setTimeout(() => {
             handleSave(false);
         }, 2000);
@@ -140,7 +141,7 @@ export default function NotesPage() {
         if (!confirm('Are you sure you want to delete this note?')) return;
 
         try {
-            await fetch(`/api/notes?id=${id}`, { method: 'DELETE' });
+            await fetch(`/api/notes/${id}`, { method: 'DELETE' });
             setNotes(prev => prev.filter(n => n.id !== id));
             if (currentNoteId === id) {
                 setCurrentNoteId(null);
@@ -153,7 +154,7 @@ export default function NotesPage() {
         }
     };
 
-    const filteredNotes = notes.filter(note => 
+    const filteredNotes = notes.filter(note =>
         note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         note.content.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -165,10 +166,10 @@ export default function NotesPage() {
 
     return (
         <div className="h-[calc(100vh-64px)] lg:h-screen overflow-hidden bg-background text-zinc-100 flex relative">
-            
+
             <AnimatePresence mode="wait">
                 {(!isMobile || mobileView === 'list') && (
-                    <motion.div 
+                    <motion.div
                         initial={isMobile ? { x: -300, opacity: 0 } : false}
                         animate={{ x: 0, opacity: 1 }}
                         exit={{ x: -300, opacity: 0 }}
@@ -195,7 +196,7 @@ export default function NotesPage() {
 
                             <div className="relative group">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-green-400 transition-colors" />
-                                <input 
+                                <input
                                     type="text"
                                     placeholder="Search notes..."
                                     value={searchQuery}
@@ -228,16 +229,14 @@ export default function NotesPage() {
                                         layout
                                         key={note.id}
                                         onClick={() => loadNote(note)}
-                                        className={`p-4 rounded-2xl cursor-pointer group transition-all duration-300 relative overflow-hidden ${
-                                            currentNoteId === note.id
+                                        className={`p-4 rounded-2xl cursor-pointer group transition-all duration-300 relative overflow-hidden ${currentNoteId === note.id
                                                 ? 'bg-green-500/10 border border-green-500/20 shadow-lg shadow-green-500/5'
                                                 : 'bg-zinc-800/30 border border-zinc-800/50 hover:bg-zinc-800/60 hover:border-zinc-700'
-                                        }`}
+                                            }`}
                                     >
                                         <div className="flex justify-between items-start mb-1.5">
-                                            <h3 className={`font-semibold text-[15px] truncate pr-4 ${
-                                                currentNoteId === note.id ? 'text-green-400' : 'text-zinc-200'
-                                            }`}>
+                                            <h3 className={`font-semibold text-[15px] truncate pr-4 ${currentNoteId === note.id ? 'text-green-400' : 'text-zinc-200'
+                                                }`}>
                                                 {note.title || 'Untitled'}
                                             </h3>
                                             {!isMobile && (
@@ -258,10 +257,10 @@ export default function NotesPage() {
                                                 {formatDate(note.updated_at)}
                                             </div>
                                             {currentNoteId === note.id && (
-                                                <motion.div 
+                                                <motion.div
                                                     initial={{ scale: 0 }}
                                                     animate={{ scale: 1 }}
-                                                    className="w-1.5 h-1.5 rounded-full bg-green-500" 
+                                                    className="w-1.5 h-1.5 rounded-full bg-green-500"
                                                 />
                                             )}
                                         </div>
@@ -288,7 +287,7 @@ export default function NotesPage() {
             {/* Main Editor */}
             <AnimatePresence mode="wait">
                 {(!isMobile || mobileView === 'editor') && (
-                    <motion.div 
+                    <motion.div
                         initial={isMobile ? { x: 300, opacity: 0 } : false}
                         animate={{ x: 0, opacity: 1 }}
                         exit={{ x: 300, opacity: 0 }}
@@ -321,12 +320,12 @@ export default function NotesPage() {
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div className="flex items-center gap-2 md:gap-4 ml-4">
                                 <button className="p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-zinc-100 transition-colors hidden md:flex">
                                     <Share2 className="w-4 h-4" />
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => handleSave(true)}
                                     disabled={isSaving}
                                     className="h-10 md:h-11 px-4 md:px-6 bg-green-500 hover:bg-green-400 text-black font-bold rounded-xl transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
@@ -335,7 +334,7 @@ export default function NotesPage() {
                                     <span className="hidden md:inline">Save</span>
                                 </button>
                                 {isMobile && (
-                                    <button 
+                                    <button
                                         onClick={() => handleDelete(currentNoteId!, undefined)}
                                         className="p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-red-500 active:scale-95"
                                     >

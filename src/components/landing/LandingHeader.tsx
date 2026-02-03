@@ -13,7 +13,7 @@ export const LandingHeader = () => {
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
             className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-5 bg-[#0A0A0A]/40 backdrop-blur-2xl border-b border-white/[0.03]"
         >
-            <div className="flex items-center gap-14">
+            <div className="flex items-center gap-8">
                 <Link href="/" className="flex items-center gap-3 group relative">
                     {/* Living Logo Glow */}
                     <motion.div
@@ -36,7 +36,7 @@ export const LandingHeader = () => {
                     <span className="font-black text-xl tracking-tight text-white group-hover:text-[#8B5CF6] transition-colors">EdBox</span>
                 </Link>
 
-                <nav className="hidden lg:flex items-center gap-10">
+                <nav className="hidden lg:flex items-center gap-8">
                     {[
                         { name: 'Why EdBox?', href: '#how-it-works' },
                         { name: 'Features', href: '#features' },
@@ -53,7 +53,7 @@ export const LandingHeader = () => {
                 </nav>
             </div>
 
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
                 <Link
                     href="/login"
                     className="text-xs font-black uppercase tracking-widest text-[#9CA3AF] hover:text-white transition-colors"

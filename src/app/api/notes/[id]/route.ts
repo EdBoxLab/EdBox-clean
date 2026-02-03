@@ -4,23 +4,31 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 // GET a single note by ID
 export async function GET(
   req: NextRequest,
-  context: { params: Promise<{ id: string }> } // ✅ Note: params is now a Promise
+  context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params; // ✅ Await the params
-  const supabase = await createSupabaseServerClient();
-
   try {
+    const { id } = await context.params;
+    const supabase = await createSupabaseServerClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { data: note, error } = await supabase
       .from('notes')
       .select('*')
       .eq('id', id)
+      .eq('user_id', user.id)
       .single();
 
-    if (error || !note) throw error;
+    if (error || !note) {
+      return NextResponse.json({ message: 'Note not found' }, { status: 404 });
+    }
 
     return NextResponse.json(note);
   } catch (error: any) {
-    console.error(error);
+    console.error('Note GET error:', error);
     return NextResponse.json({ message: 'Error fetching note' }, { status: 500 });
   }
 }
@@ -30,22 +38,29 @@ export async function PUT(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params;
-  const supabase = await createSupabaseServerClient();
-
   try {
+    const { id } = await context.params;
+    const supabase = await createSupabaseServerClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { title, content } = await req.json();
-    const { data, error } = await supabase
+    const { data: note, error } = await supabase
       .from('notes')
       .update({ title, content })
       .eq('id', id)
-      .select();
+      .eq('user_id', user.id)
+      .select()
+      .single();
 
     if (error) throw error;
 
-    return NextResponse.json(data);
+    return NextResponse.json(note);
   } catch (error: any) {
-    console.error(error);
+    console.error('Note PUT error:', error);
     return NextResponse.json({ message: 'Error updating note' }, { status: 500 });
   }
 }
@@ -55,15 +70,25 @@ export async function DELETE(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params;
-  const supabase = await createSupabaseServerClient();
-
   try {
-    const { error } = await supabase.from('notes').delete().eq('id', id);
+    const { id } = await context.params;
+    const supabase = await createSupabaseServerClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { error } = await supabase
+      .from('notes')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
     if (error) throw error;
     return new Response(null, { status: 204 });
   } catch (error: any) {
-    console.error(error);
+    console.error('Note DELETE error:', error);
     return NextResponse.json({ message: 'Error deleting note' }, { status: 500 });
   }
 }

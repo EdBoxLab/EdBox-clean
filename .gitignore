@@ -295,3 +295,4 @@ vite.config.ts.timestamp-*
 .vite/
 .vercel
 .orchids/orchids.json
+next-env.d.ts

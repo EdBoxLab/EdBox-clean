@@ -1,7 +1,6 @@
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { HeroSection } from '@/components/landing/HeroSection';
 import { ProductShowcase } from '@/components/landing/ProductShowcase';
-import { StorySection } from '@/components/landing/StorySection';
 import { SocialProof } from '@/components/landing/SocialProof';
 import { LandingFooter } from '@/components/landing/LandingFooter';
 
@@ -11,7 +10,6 @@ export default function LandingPage() {
             <LandingHeader />
             <HeroSection />
             <ProductShowcase />
-            <StorySection />
             <SocialProof />
             <LandingFooter />
         </main>

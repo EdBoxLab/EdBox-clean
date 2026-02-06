@@ -561,7 +561,7 @@ FORMATTING RULES:
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.0-flash-exp:free',
+            model: 'allenai/molmo-2-8b:free',
             messages,
             temperature: 0.7,
             max_tokens: isInteractiveCourse ? 800 : 500,

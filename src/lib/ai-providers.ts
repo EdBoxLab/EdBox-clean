@@ -232,7 +232,7 @@ export async function* streamWithFallback(options: GenerateOptions): AsyncGenera
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.0-flash-exp:free',
+            model: 'allenai/molmo-2-8b:free',
             messages,
             temperature,
             max_tokens: maxTokens,

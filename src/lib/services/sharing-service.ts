@@ -32,14 +32,15 @@ export function generateShareUrl(content: ShareableContent, options?: ShareOptio
     baseUrl = baseUrl.slice(0, -1);
   }
 
-  // Build the content URL
+  // Build the content URL - using actual routes
   let contentUrl = '';
   switch (content.type) {
     case 'course':
       contentUrl = `${baseUrl}/courses/${content.id}`;
       break;
     case 'studylist':
-      contentUrl = `${baseUrl}/studylist/${content.id}`;
+      // Use the actual route that works: /tools/study-kit?id=...
+      contentUrl = `${baseUrl}/tools/study-kit?id=${content.id}`;
       break;
     case 'learning-path':
       contentUrl = `${baseUrl}/learning-path/${content.id}`;
@@ -51,13 +52,16 @@ export function generateShareUrl(content: ShareableContent, options?: ShareOptio
   if (options?.utmSource) params.append('utm_source', options.utmSource);
   if (options?.utmMedium) params.append('utm_medium', options.utmMedium);
   if (options?.utmCampaign) params.append('utm_campaign', options.utmCampaign);
-
-  // Add platform-specific tracking
-  if (options?.platform) {
-    params.append('shared_via', options.platform);
-  }
+  if (options?.platform) params.append('shared_via', options.platform);
 
   const queryString = params.toString();
+  
+  // For studylist, URL already has ?id=..., so append with &
+  // For others, use ?
+  if (content.type === 'studylist' && queryString) {
+    return `${contentUrl}&${queryString}`;
+  }
+  
   return queryString ? `${contentUrl}?${queryString}` : contentUrl;
 }
 
@@ -211,11 +215,12 @@ export async function copyShareLink(content: ShareableContent): Promise<boolean>
       textArea.value = url;
       textArea.style.position = 'fixed';
       textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
       document.body.appendChild(textArea);
       textArea.select();
-      document.execCommand('copy');
+      const successful = document.execCommand('copy');
       document.body.removeChild(textArea);
-      return true;
+      return successful;
     } catch (fallbackError) {
       console.error('Fallback copy failed:', fallbackError);
       return false;
@@ -226,7 +231,11 @@ export async function copyShareLink(content: ShareableContent): Promise<boolean>
 /**
  * Share to Study Circle
  */
-export async function shareToStudyCircle(content: ShareableContent, circleId: string, message?: string): Promise<boolean> {
+export async function shareToStudyCircle(
+  content: ShareableContent,
+  circleId: string,
+  message?: string
+): Promise<boolean> {
   const url = generateShareUrl(content, {
     platform: 'study_circle',
     utmSource: 'study_circle',
@@ -253,7 +262,13 @@ export async function shareToStudyCircle(content: ShareableContent, circleId: st
       }),
     });
 
-    return response.ok;
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      console.error('Failed to share to study circle:', error);
+      return false;
+    }
+
+    return true;
   } catch (error) {
     console.error('Failed to share to study circle:', error);
     return false;
@@ -263,7 +278,11 @@ export async function shareToStudyCircle(content: ShareableContent, circleId: st
 /**
  * Share via Direct Message
  */
-export async function shareViaDirectMessage(content: ShareableContent, recipientId: string, message?: string): Promise<boolean> {
+export async function shareViaDirectMessage(
+  content: ShareableContent,
+  recipientId: string,
+  message?: string
+): Promise<boolean> {
   const url = generateShareUrl(content, {
     platform: 'direct_message',
     utmSource: 'direct_message',
@@ -291,7 +310,13 @@ export async function shareViaDirectMessage(content: ShareableContent, recipient
       }),
     });
 
-    return response.ok;
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      console.error('Failed to share via direct message:', error);
+      return false;
+    }
+
+    return true;
   } catch (error) {
     console.error('Failed to share via direct message:', error);
     return false;
@@ -322,7 +347,9 @@ export async function shareNative(content: ShareableContent): Promise<boolean> {
     return true;
   } catch (error) {
     // User cancelled or share failed
-    console.log('Native share cancelled or failed:', error);
+    if ((error as Error).name !== 'AbortError') {
+      console.error('Native share failed:', error);
+    }
     return false;
   }
 }
@@ -330,10 +357,13 @@ export async function shareNative(content: ShareableContent): Promise<boolean> {
 /**
  * Get user's study circles for sharing
  */
-export async function getUserStudyCircles(): Promise<Array<{ id: string, name: string, member_count: number }>> {
+export async function getUserStudyCircles(): Promise<Array<{ id: string; name: string; member_count: number }>> {
   try {
     const response = await fetch('/api/study-circles');
-    if (!response.ok) return [];
+    if (!response.ok) {
+      console.error('Failed to fetch study circles:', response.status);
+      return [];
+    }
     const data = await response.json();
     return Array.isArray(data) ? data.filter((circle: any) => circle.is_member) : [];
   } catch (error) {
@@ -345,10 +375,13 @@ export async function getUserStudyCircles(): Promise<Array<{ id: string, name: s
 /**
  * Get user's friends/contacts for direct messaging
  */
-export async function getUserContacts(): Promise<Array<{ id: string, name: string, avatar?: string }>> {
+export async function getUserContacts(): Promise<Array<{ id: string; name: string; avatar?: string }>> {
   try {
     const response = await fetch('/api/messages/contacts');
-    if (!response.ok) return [];
+    if (!response.ok) {
+      console.error('Failed to fetch contacts:', response.status);
+      return [];
+    }
     const data = await response.json();
     return Array.isArray(data.contacts) ? data.contacts : [];
   } catch (error) {
@@ -366,7 +399,7 @@ export async function trackShare(
   userId?: string
 ): Promise<void> {
   try {
-    await fetch('/api/analytics/share', {
+    const response = await fetch('/api/analytics/share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -377,6 +410,10 @@ export async function trackShare(
         timestamp: new Date().toISOString()
       })
     });
+
+    if (!response.ok) {
+      console.error('Failed to track share:', response.status);
+    }
   } catch (error) {
     console.error('Failed to track share:', error);
     // Don't throw - tracking failure shouldn't break sharing
@@ -388,10 +425,13 @@ export async function trackShare(
  */
 export async function getShareCount(contentType: string, contentId: string): Promise<number> {
   try {
-    const response = await fetch(`/api/analytics/share-count?type=${contentType}&id=${contentId}`);
-    if (!response.ok) return 0;
+    const response = await fetch(`/api/analytics/share-count?type=${encodeURIComponent(contentType)}&id=${encodeURIComponent(contentId)}`);
+    if (!response.ok) {
+      console.error('Failed to get share count:', response.status);
+      return 0;
+    }
     const data = await response.json();
-    return data.count || 0;
+    return typeof data.count === 'number' ? data.count : 0;
   } catch (error) {
     console.error('Failed to get share count:', error);
     return 0;

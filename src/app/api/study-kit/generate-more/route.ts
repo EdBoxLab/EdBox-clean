@@ -211,8 +211,14 @@ export async function POST(request: NextRequest) {
     const updatedGeneratedContent = { ...studyKit.generated_content };
 
     if (contentType === 'notes') {
-      const existingNotes = updatedGeneratedContent.notes || '';
-      updatedGeneratedContent.notes = existingNotes + '\n\n---\n\n## Custom Notes\n\n' + newContent;
+      const existingNotes = updatedGeneratedContent.notes || {};
+      if (typeof existingNotes === 'object' && !Array.isArray(existingNotes) && existingNotes.deepExplanation !== undefined) {
+        existingNotes.deepExplanation = (existingNotes.deepExplanation || '') + '\n\n---\n\n## Custom Notes\n\n' + newContent;
+        updatedGeneratedContent.notes = existingNotes;
+      } else {
+        const oldNotes = typeof existingNotes === 'string' ? existingNotes : '';
+        updatedGeneratedContent.notes = oldNotes + '\n\n---\n\n## Custom Notes\n\n' + newContent;
+      }
     } else if (Array.isArray(newContent)) {
       const existingArray = updatedGeneratedContent[contentType] || [];
       updatedGeneratedContent[contentType] = [...existingArray, ...newContent];

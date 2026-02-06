@@ -86,11 +86,20 @@ function getLlamaCloudKeys(): string[] {
   ].filter(Boolean) as string[];
 }
 
+function getOpenRouterKeys(): string[] {
+  return [
+    process.env.OPEN_ROUTER_KEY_1,
+    process.env.OPEN_ROUTER_KEY_2,
+    process.env.OPEN_ROUTER_KEY_3,
+  ].filter(Boolean) as string[];
+}
+
 // ============= KEY ROTATION STATE =============
 
 let geminiKeyIndex = 0;
 let groqKeyIndex = 0;
 let llamaKeyIndex = 0;
+let openRouterKeyIndex = 0;
 
 // Persistent exhausted keys tracking (cleared every hour)
 const exhaustedKeys = new Set<string>();
@@ -129,6 +138,17 @@ export function getLlamaCloudKey(): string {
   return key;
 }
 
+export function getNextOpenRouterKey(): string {
+  const keys = getOpenRouterKeys().filter(k => !exhaustedKeys.has(k));
+  if (keys.length === 0) {
+    exhaustedKeys.clear();
+    return getOpenRouterKeys()[0];
+  }
+  const key = keys[openRouterKeyIndex % keys.length];
+  openRouterKeyIndex = (openRouterKeyIndex + 1) % keys.length;
+  return key;
+}
+
 // ============= INTERFACES =============
 
 export interface GenerateOptions {
@@ -147,7 +167,7 @@ export interface GenerateOptions {
 
 export interface GenerateResult {
   text: string;
-  provider: 'gemini' | 'groq' | 'huggingface' | 'local';
+  provider: 'gemini' | 'groq' | 'huggingface' | 'local' | 'openrouter';
   success: boolean;
 }
 
@@ -177,9 +197,95 @@ Original Request: ${originalPrompt}`;
  * Robust streaming with automatic failover and continuity preservation
  */
 export async function* streamWithFallback(options: GenerateOptions): AsyncGenerator<string> {
-  const { prompt, systemPrompt, temperature = 0.7, maxTokens = 4000, attachments = [], model = 'oss' } = options;
+  const { prompt, systemPrompt, temperature = 0.7, maxTokens = 4000, attachments = [] }: GenerateOptions = options;
+  const model = options.model || 'oss';
+  const hasImages = attachments.some(a => a.mimeType.startsWith('image/')) || model === 'vision';
   let accumulatedText = '';
-  let currentPrompt = prompt;
+
+  // 0. TRY OPENROUTER FOR VISION REQUESTS
+  if (hasImages || (model as any) === 'vision') {
+    const openRouterKeys = getOpenRouterKeys();
+    for (const key of openRouterKeys) {
+      if (exhaustedKeys.has(key)) continue;
+
+      try {
+        const messages: any[] = [];
+        if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+
+        const userContent: any[] = [{ type: 'text', text: prompt }];
+        attachments.forEach(attachment => {
+          if (attachment.mimeType.startsWith('image/')) {
+            userContent.push({
+              type: 'image_url',
+              image_url: { url: `data:${attachment.mimeType};base64,${attachment.data}` },
+            });
+          }
+        });
+        messages.push({ role: 'user', content: userContent });
+
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${key}`,
+            'HTTP-Referer': 'https://edbox.app',
+            'X-Title': 'EdBox',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'allenai/molmo-2-8b:free',
+            messages,
+            temperature,
+            max_tokens: maxTokens,
+            stream: true,
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || 'OpenRouter API error');
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') break;
+                try {
+                  const parsed = JSON.parse(data);
+                  const content = parsed.choices[0]?.delta?.content || '';
+                  if (content) {
+                    accumulatedText += content;
+                    yield content;
+                  }
+                } catch (e) {
+                  // Skip invalid JSON
+                }
+              }
+            }
+          }
+          return; // Success
+        }
+      } catch (orError: any) {
+        if (orError.status === 429 || orError.message?.includes('rate limit')) {
+          exhaustedKeys.add(key);
+          console.warn(`⚠️ OpenRouter key exhausted mid-stream, rotating...`);
+          continue;
+        }
+        console.error(`❌ OpenRouter streaming error: ${orError.message}`);
+        break; // Try Groq/Gemini
+      }
+    }
+  }
 
   // 1. TRY ALL GROQ KEYS
   const groqKeys = getGroqKeys();
@@ -196,7 +302,8 @@ export async function* streamWithFallback(options: GenerateOptions): AsyncGenera
       const Groq = (await import('groq-sdk')).default;
       const groq = new Groq({ apiKey: key });
 
-      const groqModel = attachments.length > 0 ? 'llama-3.2-11b-vision-preview' : 'llama-3.3-70b-versatile';
+      // Groq vision is decommissioned, only use for text
+      const groqModel = 'llama-3.3-70b-versatile';
 
       const messages: any[] = [];
       if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
@@ -391,14 +498,68 @@ export function cleanJsonResponse(text: string): string {
  * Generate AI content with prioritized Groq Loop then Gemini Loop
  */
 export async function generateWithFallback(options: GenerateOptions): Promise<GenerateResult> {
-  const { prompt, systemPrompt, schema, temperature = 0.7, maxTokens = 4000, attachments = [], model = 'oss' } = options;
+  const { prompt, systemPrompt, schema, temperature = 0.7, maxTokens = 4000, attachments = [] }: GenerateOptions = options;
+  const model = options.model || 'oss';
   const hasImages = attachments.some(a => a.mimeType.startsWith('image/')) || model === 'vision';
 
-  let groqModel = 'llama-3.3-70b-versatile';
-  if (hasImages) {
-    groqModel = 'llama-3.2-11b-vision-preview';
+  // 0. TRY OPENROUTER FOR VISION REQUESTS OR IF EXPLICITLY REQUESTED
+  if (hasImages || (model as any) === 'vision') {
+    const openRouterKeys = getOpenRouterKeys();
+    for (const key of openRouterKeys) {
+      if (exhaustedKeys.has(key)) continue;
+      try {
+        const messages: any[] = [];
+        if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+
+        const userContent: any[] = [{ type: 'text', text: prompt }];
+        attachments.forEach(attachment => {
+          if (attachment.mimeType.startsWith('image/')) {
+            userContent.push({
+              type: 'image_url',
+              image_url: { url: `data:${attachment.mimeType};base64,${attachment.data}` },
+            });
+          }
+        });
+        messages.push({ role: 'user', content: userContent });
+
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${key}`,
+            'HTTP-Referer': 'https://edbox.app',
+            'X-Title': 'EdBox',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.0-flash-exp:free',
+            messages,
+            temperature,
+            max_tokens: maxTokens,
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error?.message || 'OpenRouter API error');
+        }
+
+        const data = await response.json();
+        return {
+          text: data.choices[0]?.message?.content || '',
+          provider: 'openrouter',
+          success: true,
+        };
+      } catch (orError: any) {
+        if (orError.status === 429 || orError.message?.includes('rate limit')) {
+          exhaustedKeys.add(key);
+          console.warn(`⚠️ OpenRouter key exhausted, trying next...`);
+          continue;
+        }
+        console.warn(`⚠️ OpenRouter error: ${orError.message}`);
+        break; // Try fallbacks
+      }
+    }
   }
-  // Always use llama-3.3-70b-versatile for non-image tasks
 
   // 1. TRY ALL GROQ KEYS FIRST
   const groqKeys = getGroqKeys();
@@ -411,23 +572,12 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
       const messages: any[] = [];
       if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
 
-      if (hasImages) {
-        const userContent: any[] = [{ type: 'text', text: prompt }];
-        attachments.forEach(attachment => {
-          if (attachment.mimeType.startsWith('image/')) {
-            userContent.push({
-              type: 'image_url',
-              image_url: { url: `data:${attachment.mimeType};base64,${attachment.data}` },
-            });
-          }
-        });
-        messages.push({ role: 'user', content: userContent });
-      } else {
-        messages.push({ role: 'user', content: prompt });
-      }
+      // Groq vision model is decommissioned, so we've handled vision above.
+      // If images somehow reach here, we'll strip them to avoid errors.
+      messages.push({ role: 'user', content: prompt });
 
       const response = await groq.chat.completions.create({
-        model: groqModel,
+        model: 'llama-3.3-70b-versatile',
         messages,
         temperature,
         max_tokens: maxTokens,

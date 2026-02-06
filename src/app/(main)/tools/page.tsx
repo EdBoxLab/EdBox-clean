@@ -13,7 +13,7 @@ import { Zap } from 'lucide-react';
 const tools = [
   {
     id: 'notes',
-    href: '/notes',
+    href: '/tools/notes',
     title: 'Notes',
     description: 'Create notes from PDFs, images, or prompts. Take notes with your voice or by writing.',
     icon: PencilSquareIcon,

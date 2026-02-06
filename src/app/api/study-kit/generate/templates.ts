@@ -45,57 +45,9 @@ Format as a JSON array:
 ]
 `;
 
-export const NOTES_TEMPLATE = `
-Generate comprehensive, professionally structured study notes that are DETAILED and HIGHLY USEFUL for students.
-
-CRITICAL: These notes must be SUBSTANTIAL and THOROUGH - at least 2500 words minimum. Do NOT generate basic, surface-level summaries.
-
-Use Markdown formatting. Structure as follows:
-
-# [Topic Title]
-
-## Overview
-Provide a comprehensive introduction (3-4 paragraphs) explaining what this topic is, why it matters, and how it connects to broader concepts. Include real-world relevance and historical context if applicable.
-
-## Core Concepts
-For EACH major concept:
-### [Concept Name]
-- **Definition**: Clear, precise explanation.
-- **Detailed Breakdown**: Use multiple bullet points to explain nuances.
-- **How It Works**: Step-by-step explanation of processes or mechanisms.
-- **Formulas/Notation**: Use clear text or LaTeX-style formatting for mathematical expressions.
-- **Example**: Concrete illustration. ONLY include code snippets (use \`\`\`language) if the topic is specifically about programming, software development, or if a simulation is highly relevant.
-
-## Examples & Use Cases
-Provide 4-6 detailed, practical examples that show the concept in action. Include:
-- Real-world scenarios.
-- Detailed walkthroughs of how to solve related problems.
-- Visual descriptions or diagrams represented in text.
-
-## Deep Dive
-Advanced details including:
-- Edge cases and exceptions.
-- Performance considerations (if technical) or advanced theoretical implications.
-- Best practices and expert-level insights.
-- Related advanced concepts and future trends.
-
-## Common Pitfalls / Misconceptions
-List at least 7-10 common mistakes with a detailed table:
-| Pitfall | Why It Happens | How to Avoid / Correct Understanding |
-|---------|----------------|-------------------------------------|
-
-## Key Takeaways
-- Comprehensive bulleted summary (10-15 key points).
-- Each takeaway should be actionable, specific, and memorable.
-
-## Quick Reference & Cheat Sheet
-Provide a summary of the most important formulas, terms, or syntax in an easy-to-scan format.
-
-IMPORTANT RULES:
-- **NO BOGUS CODE**: Do NOT include Python/Java/etc. code for non-programming topics (like Kepler's Law, History, etc.) unless explicitly useful for a simulation.
-- **THOROUGHNESS**: Expand on every point. Be the ultimate resource for this topic.
-- **FORMATTING**: Use headers, bold text, lists, and tables effectively.
-`;
+// NOTE: NOTES_TEMPLATE has been replaced by the 4 specialized note templates
+// (deepExplanation, cheatsheet, application, tables) in route.ts
+// This export is kept for backward compatibility but is no longer used by the generation route.
 
 export const MINDMAP_TEMPLATE = `
 Generate a structured, hierarchical mind map of the topic.

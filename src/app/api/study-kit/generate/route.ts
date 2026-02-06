@@ -8,56 +8,205 @@ import { processFileContent } from '@/lib/utils/fileProcessing';
 
 type ContentType = 'quizzes' | 'flashcards' | 'mindmaps' | 'notes';
 
-// Updated Templates
-const NOTES_TEMPLATE = `
-Act as a World-Class Learning Architect. Your goal is to transform this document into a High-Leverage Study Kit (Cheat Sheet) for an extremely busy Executive/Student.
+type NoteType = 'deepExplanation' | 'cheatsheet' | 'application' | 'tables';
+
+const NOTE_TEMPLATES: Record<NoteType, string> = {
+  deepExplanation: `
+Act as a World-Class Learning Architect. Create a **Deep Explanation Note** that is so thorough the student never needs to touch the source material again.
 
 **CONSTRAINTS:**
-1.  **Density over Volume**: Strictly maintain a 1:10 page ratio. If the input is 100 pages, the kit must be 10 pages max. Cut all fluff.
-2.  **The 80/20 Principle**: Identify the 20% of concepts that will generate 80% of the exam results or business value.
-3.  **Dopamine Formatting**: Use heavy bolding, Lucide-style icons (markdown emojis), and clean spacing. No walls of text.
-4.  **Mental Models**: Don't just summarize; provide mental models and "Cheat Sheets". Focus on "How can I apply this today?" and "What is the professor most likely to ask?".
-5.  **Active Recall**: End every major section with 3 'High-Stakes Questions' that force the user to think, not just read.
+1. **Completeness**: Cover every concept, definition, and relationship. Leave no gaps.
+2. **Feynman-Style Clarity**: Explain complex ideas so simply a 12-year-old could understand.
+3. **Analogies & Mental Models**: For every abstract concept, provide a concrete real-world analogy.
+4. **Prerequisites Built In**: If a concept requires prior knowledge, briefly explain that too.
+5. **Dopamine Formatting**: Heavy bolding, emojis as visual anchors, clean spacing.
 
 **OUTPUT STRUCTURE (Strict Markdown):**
 
-# ⚡ [Topic Title]: The High-Leverage Cheat Sheet
+# 📖 [Topic Title]: The Complete Breakdown
 
-## 🧠 1. The "Missing Lecture" (Core Mental Model)
-*What professors usually don't say out loud. Focus on intuition.*
--   **The Anchor**: ONE sentence that explains the entire concept using a powerful analogy.
--   **Practical Application**: How can I apply this today in business/life?
--   **The "Feynman Block"**: Explain the single most confusing part of this topic simply.
+## 🧠 The Big Picture
+*A 3-4 paragraph overview explaining what this topic IS, why it matters, and how it fits into the bigger picture. Use an analogy to ground it.*
 
-## 🎯 2. The 80/20 Exam Predictor (High-Value Intel)
-*Where 80% of the points are hiding.*
--   🛑 **The Trap**: The most common mistake students/professionals make.
--   🎯 **The Guaranteed Question**: The specific type of problem that appears on 90% of exams/scenarios.
--   🔮 **The Curveball**: A rare but high-value edge case to differentiate "A" students.
+## 🔑 Core Concepts Explained
+*For EACH major concept:*
+### [Concept Name]
+- **What it is (Simple)**: One-sentence Feynman explanation.
+- **What it is (Precise)**: The formal/textbook definition.
+- **The Analogy**: A real-world comparison that makes it click.
+- **How it works**: Step-by-step breakdown of the mechanism/process.
+- **Why it matters**: The "so what?" — why should you care?
+- **Common Confusion**: What people usually get wrong about this.
 
-## ⚡ 3. The Universal Algorithm (Procedural Mastery)
-*How to solve/apply this on autopilot.*
--   **Step 1**: Identification (How to know to use this).
--   **Step 2**: The Setup (Formula/Mental Framework).
--   **Step 3**: The Execution (Step-by-step process).
--   **Step 4**: Sanity Check (How to verify the result).
+## 🔗 How Everything Connects
+*Explain the relationships between the core concepts. How does Concept A lead to Concept B? What depends on what?*
 
-## 📊 4. Comparison Cheat Sheets (1:10 Density)
-*Pure signal, no noise. High-density tables.*
--   Create a table comparing critical opposing concepts (e.g., Concept A vs Concept B).
--   **Rule**: Keywords only. No full sentences in cells.
+## 💡 The "Aha!" Moments
+*3-5 insights that transform surface-level understanding into deep comprehension.*
 
-## 🚀 5. High-Stakes Active Recall
-*Force thinking, not reading.*
-1. [High-Stakes Scenario Question 1]
-2. [High-Stakes Scenario Question 2]
-3. [High-Stakes Scenario Question 3]
+## 🧪 Thought Experiments
+*2-3 scenarios that test whether the reader truly understands (not memorized) the material.*
 
 **FORMATTING RULES:**
-- Use emojis (🛑, 🎯, 🔮, ⚡, 🧠, 📊, 🚀) as visual anchors.
+- Use emojis (📖, 🧠, 🔑, 🔗, 💡, 🧪) as visual anchors.
+- **Bold** every key term on first use.
+- Use > Blockquotes for critical insights.
+`,
+
+  cheatsheet: `
+Act as a World-Class Exam Coach. Create a **Plain-Language Cheatsheet** focused on what actually appears on tests and exams.
+
+**CONSTRAINTS:**
+1. **No Jargon**: Write in plain, understandable terms. If you use a technical term, immediately explain it.
+2. **Exam-Focused**: Every line should answer "Will this be on the test?"
+3. **The 80/20 Principle**: The 20% of material that covers 80% of exam questions.
+4. **Memorization Aids**: Mnemonics, shortcuts, patterns.
+5. **Density over Volume**: 1:10 page ratio. Pure signal.
+
+**OUTPUT STRUCTURE (Strict Markdown):**
+
+# 🎯 [Topic Title]: Exam Cheatsheet
+
+## 🛑 The #1 Trap (Most Common Mistake)
+*The specific error that loses students the most points. Explain what it is and how to avoid it.*
+
+## 📋 Must-Know Definitions
+*Every definition a professor could ask. Format:*
+- **[Term]**: [Plain-language definition] → *"In other words..."*
+
+## ⚡ Formulas & Key Relationships
+*Every formula/rule you need. For each:*
+- The formula itself
+- What each variable means (in plain words)
+- When to use it (the trigger/signal)
+
+## 🎯 The "Guaranteed" Question Types
+*The 3-5 question patterns that appear on almost every exam. For each:*
+1. **What it looks like**: How to recognize this question type
+2. **The approach**: Step-by-step how to solve it
+3. **The shortcut**: Any time-saving tricks
+
+## 🧠 Memory Hacks
+*Mnemonics, acronyms, rhymes, or visual tricks to remember key facts.*
+
+## 🔮 The Curveball
+*1-2 rare but high-value edge cases that separate A students from B students.*
+
+## ✅ Last-Minute Checklist
+*10-15 bullet points to review 5 minutes before the exam.*
+
+**FORMATTING RULES:**
+- Use emojis (🛑, 📋, ⚡, 🎯, 🧠, 🔮, ✅) as visual anchors.
 - **Bold** every key term.
-- Use > Blockquotes for "Executive Takeaways".
-`;
+- Keep it scannable — a student should find any fact in under 5 seconds.
+`,
+
+  application: `
+Act as a Senior Industry Practitioner and Professor. Create an **Application Note** focused on real-world usage and worked examples.
+
+**CONSTRAINTS:**
+1. **Practical Focus**: Every section must answer "How is this used in real life?"
+2. **Fully Worked Examples**: Show complete problem-solving, step by step.
+3. **Decision Trees**: Help students know WHEN to apply WHICH concept.
+4. **Industry Relevance**: Connect academic concepts to career applications.
+5. **Dopamine Formatting**: Heavy bolding, emojis, clean spacing.
+
+**OUTPUT STRUCTURE (Strict Markdown):**
+
+# 🔧 [Topic Title]: Real-World Applications
+
+## 🌍 Where This Shows Up in the Real World
+*3-5 concrete examples of industries, jobs, or situations where this knowledge is used daily.*
+
+## 🛠️ Worked Examples
+*For EACH major concept, provide a fully worked problem:*
+### Example: [Scenario Name]
+- **The Situation**: Describe a realistic scenario
+- **What We Know**: List the given information
+- **Step-by-Step Solution**: Walk through every step with explanations
+- **The Answer**: Clear final result
+- **Why This Matters**: What this example teaches us
+
+## 🗺️ The Decision Tree
+*"When should I use what?" — A clear guide:*
+- **If you see [signal]** → Use [concept/formula/approach]
+- **If you see [different signal]** → Use [different approach]
+
+## 💼 Career Connections
+*How this topic applies in specific careers (engineering, business, research, etc.)*
+
+## 🏋️ Practice Scenarios
+*3-5 problems for the student to try on their own, with varying difficulty. Include hints.*
+
+**FORMATTING RULES:**
+- Use emojis (🔧, 🌍, 🛠️, 🗺️, 💼, 🏋️) as visual anchors.
+- **Bold** key terms and important numbers in examples.
+- Use > Blockquotes for "Pro Tips" from industry experience.
+`,
+
+  tables: `
+Act as a Data Architect and Reference Designer. Create a **Tables Reference Note** — pure high-density comparison data and reference tables.
+
+**CONSTRAINTS:**
+1. **Tables Only (Mostly)**: This note is primarily structured data in table format.
+2. **Comparison-First**: Compare and contrast related concepts side-by-side.
+3. **Keywords Only in Cells**: No full sentences inside table cells.
+4. **Complete Coverage**: Every important comparison, formula, or term should be in a table.
+5. **Scannable**: A student should find any fact in under 3 seconds.
+
+**OUTPUT STRUCTURE (Strict Markdown):**
+
+# 📊 [Topic Title]: Quick Reference Tables
+
+## ⚔️ Concept Comparisons
+*Create comparison tables for every pair/group of related concepts:*
+
+| Feature | Concept A | Concept B | Concept C |
+|---------|-----------|-----------|-----------|
+| Definition | ... | ... | ... |
+| Key Property | ... | ... | ... |
+| When to Use | ... | ... | ... |
+| Pros | ... | ... | ... |
+| Cons | ... | ... | ... |
+
+## 📐 Formula Sheet
+*Every formula/equation in a clean reference table:*
+
+| Name | Formula | Variables | Use When |
+|------|---------|-----------|----------|
+| ... | ... | ... | ... |
+
+## 📖 Glossary
+*All key terms in alphabetical order:*
+
+| Term | Definition | Related To |
+|------|-----------|------------|
+| ... | ... | ... |
+
+## 🔢 Key Facts & Figures
+*Important numbers, dates, constants, or thresholds:*
+
+| Fact | Value | Context |
+|------|-------|---------|
+| ... | ... | ... |
+
+## 🗂️ Classification / Taxonomy
+*If applicable, organize concepts into categories:*
+
+| Category | Members | Key Characteristic |
+|----------|---------|-------------------|
+| ... | ... | ... |
+
+## ⚡ Quick-Lookup Cheat Table
+*The single most useful reference table — the one you'd print on a single page:*
+
+**FORMATTING RULES:**
+- Prioritize tables over prose.
+- Use emojis (📊, ⚔️, 📐, 📖, 🔢, 🗂️, ⚡) as section markers.
+- **Bold** column headers and key terms.
+- Keep cell content to 1-5 words max.
+`
+};
 
 const MINDMAP_TEMPLATE = `
 Generate a structured, hierarchical mind map of the topic.
@@ -276,41 +425,48 @@ Format as a JSON array:
       return base + MINDMAP_TEMPLATE + '\nOutput ONLY JSON object.';
 
     case 'notes':
-      const isCodeRelated = isProgrammingTopic(prompt);
-      let depthInstructions = '';
+      return buildNotePrompt(prompt, notesDepth, customInstructions);
+  }
+}
 
-      switch (notesDepth) {
-        case 'summary':
-          depthInstructions = 'Focus: High-level overview. Provide a concise but comprehensive summary of the key points.';
-          break;
-        case 'deepdive':
-          depthInstructions = 'Focus: Deep Dive. Provide detailed explanations, intricate nuances, and in-depth analysis of every aspect.';
-          break;
-        case 'coverage':
-          depthInstructions = 'Focus: Balanced mix of breadth and depth. Ensure all major topics are covered with sufficient detail.';
-          break;
-        case 'shi':
-          depthInstructions = 'Focus: SHI Mode (Experimental). Provide a creative, unconventional, and highly engaging perspective. Use analogies, storytelling, and unique insights while maintaining academic accuracy.';
-          break;
-        default:
-          depthInstructions = 'Focus: Comprehensive coverage.';
-      }
+function buildNotePrompt(prompt: string, notesDepth?: string, customInstructions?: string, noteType?: NoteType): string {
+  const contextualPrompt = extractContextForType('notes', prompt);
+  const base = `Topic/Content Source: "${contextualPrompt}"\n\n`;
+  const isCodeRelated = isProgrammingTopic(prompt);
+  let depthInstructions = '';
 
-      let notesPrompt = base + depthInstructions + '\n\n' + NOTES_TEMPLATE;
+  switch (notesDepth) {
+    case 'summary':
+      depthInstructions = 'Focus: High-level overview. Provide a concise but comprehensive summary of the key points.';
+      break;
+    case 'deepdive':
+      depthInstructions = 'Focus: Deep Dive. Provide detailed explanations, intricate nuances, and in-depth analysis of every aspect.';
+      break;
+    case 'coverage':
+      depthInstructions = 'Focus: Balanced mix of breadth and depth. Ensure all major topics are covered with sufficient detail.';
+      break;
+    case 'shi':
+      depthInstructions = 'Focus: SHI Mode (Experimental). Provide a creative, unconventional, and highly engaging perspective. Use analogies, storytelling, and unique insights while maintaining academic accuracy.';
+      break;
+    default:
+      depthInstructions = 'Focus: Comprehensive coverage.';
+  }
 
-      if (!isCodeRelated) {
-        notesPrompt += `\n\n**EXTRA CRITICAL REMINDER FOR THIS TOPIC:**
+  const template = noteType ? NOTE_TEMPLATES[noteType] : NOTE_TEMPLATES.deepExplanation;
+  let notesPrompt = base + depthInstructions + '\n\n' + template;
+
+  if (!isCodeRelated) {
+    notesPrompt += `\n\n**EXTRA CRITICAL REMINDER FOR THIS TOPIC:**
 This topic ("${prompt}") is NOT about programming or software development.
 Therefore, you MUST NOT include ANY code examples, function definitions, or programming syntax.
 Use plain text explanations, mathematical notation, and prose examples only.
 Any code-like syntax will be considered an error.`;
-      }
-
-      if (customInstructions) {
-        notesPrompt += `\n\nCUSTOM INSTRUCTIONS FOR THESE NOTES: ${customInstructions}\nIMPORTANT: Please follow these details strictly.`;
-      }
-      return notesPrompt;
   }
+
+  if (customInstructions) {
+    notesPrompt += `\n\nCUSTOM INSTRUCTIONS FOR THESE NOTES: ${customInstructions}\nIMPORTANT: Please follow these details strictly.`;
+  }
+  return notesPrompt;
 }
 
 export async function POST(request: NextRequest) {
@@ -399,54 +555,50 @@ export async function POST(request: NextRequest) {
           return { type, content: combinedContent };
         }
 
-        // Parallel processing specifically for NOTES if multi-chunk
-        if (type === 'notes' && chunks.length > 1) {
-          const notePromises = chunks.map(async (chunk: string, i: number) => {
-            const pageInfo = `\n\n**IMPORTANT CONTEXT:** This is Section/Page ${i + 1} of ${chunks.length} of the document. Focus on the content provided for this specific section while maintaining the "World-Class Learning Architect" persona. Ensure this "Cheat Sheet" is self-contained but contributes to the overall kit.`;
-            
+        // Generate 4 parallel note types when 'notes' is selected
+        if (type === 'notes') {
+          const noteTypes: NoteType[] = ['deepExplanation', 'cheatsheet', 'application', 'tables'];
+          const chunk = chunks[0];
+
+          const notePromises = noteTypes.map(async (noteType) => {
+            const notePrompt = buildNotePrompt(chunk, notesDepth, customInstructions, noteType);
+            const systemPromptMap: Record<NoteType, string> = {
+              deepExplanation: `You are a World-Class Learning Architect creating a Deep Explanation Note. Output ONLY Markdown text — NO JSON. Start directly with the markdown heading. No preamble.`,
+              cheatsheet: `You are a World-Class Exam Coach creating a Plain-Language Cheatsheet. Output ONLY Markdown text — NO JSON. Start directly with the markdown heading. No preamble.`,
+              application: `You are a Senior Industry Practitioner creating an Application Note with worked examples. Output ONLY Markdown text — NO JSON. Start directly with the markdown heading. No preamble.`,
+              tables: `You are a Reference Designer creating a Tables Reference Note. Output ONLY Markdown text — NO JSON. Prioritize tables. Start directly with the markdown heading. No preamble.`,
+            };
+
             const result = await generateWithRetry({
-              prompt: buildPrompt(type, chunk, isAppend, customInstructions, itemCount, notesDepth) + pageInfo,
-              systemPrompt: `You are an expert academic note-taker and Learning Architect. Create section ${i + 1} of ${chunks.length} of the study guide.
-              
-              CRITICAL RULES:
-              1. Output ONLY Markdown text
-              2. DO NOT use code blocks unless the topic is specifically about programming
-              3. Start with a header: "## Chapter ${i + 1}: [Strategic Subject Focus]"
-              4. Maintain the "Cheat Sheet" style: Bionic bolding, 80/20 principle, and Active Recall.
-              5. Ensure high density (1:10 ratio).`,
+              prompt: notePrompt,
+              systemPrompt: systemPromptMap[noteType],
               temperature: 0.7,
               maxTokens: 5000,
               model: 'llama-3.3-70b-versatile',
             });
-            return cleanMarkdown(result.text);
+            return { noteType, text: cleanMarkdown(result.text) };
           });
 
-          const noteResults = await Promise.all(notePromises);
-          return { type, content: noteResults };
+          const noteResults = await Promise.allSettled(notePromises);
+          const notesObj: Record<string, string> = {};
+          noteResults.forEach(r => {
+            if (r.status === 'fulfilled') {
+              notesObj[r.value.noteType] = r.value.text;
+            }
+          });
+          return { type, content: notesObj };
         }
 
-        // Standard generation for other types or single batch
+        // Standard generation for non-notes types
         const result = await generateWithRetry({
-          prompt: buildPrompt(type, chunks[0], isAppend, type === 'notes' ? customInstructions : '', itemCount, notesDepth),
-          systemPrompt: type === 'notes'
-            ? `You are a World-Class Learning Architect. Your goal is to transform documents into High-Leverage Study Kits for extremely busy Executives/Students.
-              
-              CRITICAL RULES:
-              1. Output ONLY Markdown text - NO JSON
-              2. DO NOT use code blocks (backticks) unless the topic is specifically about programming
-              3. For math/science topics, write formulas in plain text like "F = m × a" or "x^2 + 2x + 1"
-              4. Use "Dopamine Formatting": Heavy bolding, emoji icons, and Radix-clean spacing
-              5. Density over Volume: Strictly maintain a 1:10 page ratio. Cut all fluff.
-              6. Identify the 20% of concepts that generate 80% of value.
-              
-              Start directly with the markdown heading. No preamble.`
-            : 'Output ONLY valid JSON with no extra text.',
+          prompt: buildPrompt(type, chunks[0], isAppend, '', itemCount, notesDepth),
+          systemPrompt: 'Output ONLY valid JSON with no extra text.',
           temperature: 0.7,
-          maxTokens: type === 'notes' ? 6000 : 4000,
+          maxTokens: 4000,
           model: 'llama-3.3-70b-versatile',
         });
 
-        const output = type === 'notes' ? cleanMarkdown(result.text) : extractJSON(result.text, type);
+        const output = extractJSON(result.text, type);
         return { type, content: output };
       })
     );

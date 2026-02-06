@@ -274,7 +274,7 @@ export default function KoalaGenie() {
         body: JSON.stringify({
           conversationId: currentChatId,
           message: userMsgContent,
-          files: processedFiles
+          attachments: processedFiles
         })
       });
 

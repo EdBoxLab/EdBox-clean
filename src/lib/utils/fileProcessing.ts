@@ -14,6 +14,42 @@ import { Document } from "llamaindex";
 import { getLlamaCloudKey } from "@/lib/ai-providers";
 import pdf from "pdf-parse";
 import { getTextExtractor } from "office-text-extractor";
+import { createWorker } from "tesseract.js";
+
+// ---------------------------------------------------------------------------
+// OCR EXTRACTION
+// ---------------------------------------------------------------------------
+
+async function extractTextFromImage(buffer: Buffer, fileName: string): Promise<string> {
+  FORCE_LOG('INFO', `Starting OCR extraction for ${fileName}...`);
+  const startTime = Date.now();
+
+  try {
+    // Configure Tesseract for Node.js environment
+    const worker = await createWorker('eng', 1, {
+      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
+      langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+      corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js',
+    });
+
+    FORCE_LOG('DEBUG', 'Tesseract worker initialized');
+
+    const { data: { text } } = await worker.recognize(buffer);
+
+    await worker.terminate();
+
+    const processingTime = Date.now() - startTime;
+    const extractedLength = text?.trim().length || 0;
+
+    FORCE_LOG('INFO', `OCR completed in ${processingTime}ms, extracted ${extractedLength} characters`);
+
+    return text?.trim() || '';
+  } catch (error) {
+    const processingTime = Date.now() - startTime;
+    FORCE_LOG('WARN', `OCR failed after ${processingTime}ms:`, error);
+    return ''; // Return empty string on failure, don't block image processing
+  }
+}
 
 // ---------------------------------------------------------------------------
 // EMERGENCY LOGGING - VISIBLE IN ALL PLATFORMS
@@ -448,16 +484,24 @@ export async function processFileContent(
 
     // STEP 3: Process Images
     if (mimeType.startsWith('image/')) {
-      FORCE_LOG('INFO', '[STEP 3/4] Processing as IMAGE');
+      FORCE_LOG('INFO', '[STEP 3/4] Processing as IMAGE with OCR');
+
+      // Extract text from image using OCR
+      const extractedText = await extractTextFromImage(buffer, fileName);
+
       const result = JSON.stringify({
         type: 'image',
         base64: buffer.toString('base64'),
         mimeType,
         fileName,
+        extractedText: extractedText || undefined, // Only include if text was found
       });
 
       const processingTime = Date.now() - startTime;
       FORCE_LOG('INFO', `✓ Image processed in ${processingTime}ms`);
+      if (extractedText) {
+        FORCE_LOG('INFO', `✓ OCR extracted ${extractedText.length} characters`);
+      }
       FORCE_LOG('INFO', '╚═══════════════════════════════════════════════════╝');
       return result;
     }

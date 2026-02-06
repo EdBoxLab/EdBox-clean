@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import Groq from 'groq-sdk';
 import pdf from 'pdf-parse';
-import { extractTextFromPPTX } from '@/lib/utils/fileProcessing';
+import { processFileContent as processFileUtility } from '@/lib/utils/fileProcessing';
 
 type ChatRole = 'system' | 'user' | 'assistant';
 
@@ -14,7 +14,7 @@ interface FileAttachment {
 }
 
 interface ProcessedFile {
-  type: 'text' | 'image' | 'pdf' | 'pptx' | 'unsupported';
+  type: 'text' | 'image' | 'processed';
   content: string;
   metadata: {
     name: string;
@@ -43,174 +43,6 @@ interface Conversation {
   user_id: string;
   title: string;
   created_at: string;
-}
-
-// 🔥 ENHANCED: File processing with Vision + PPTX support
-async function processFileContent(file: FileAttachment): Promise<ProcessedFile> {
-  try {
-    const buffer = Buffer.from(file.content, 'base64');
-
-    // ===== IMAGE FILES (USE VISION API) =====
-    if (file.type.startsWith('image/')) {
-      return {
-        type: 'image',
-        content: `[Image: ${file.name}]`,
-        metadata: {
-          name: file.name,
-          size: file.size,
-          mimeType: file.type,
-        },
-        imageData: {
-          base64: file.content,
-          mimeType: file.type,
-        },
-      };
-    }
-
-    // ===== PPTX FILES (EXTRACT TEXT) =====
-    if (file.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' 
-        || file.name.endsWith('.pptx')) {
-      try {
-        const text = await extractTextFromPPTX(buffer);
-        const maxLength = 15000;
-        const truncatedText = text.length > maxLength
-          ? text.substring(0, maxLength) + '\n\n[... Content truncated ...]'
-          : text;
-
-        return {
-          type: 'pptx',
-          content: `📊 PPTX: ${file.name}\n${'═'.repeat(60)}\n${truncatedText}\n${'═'.repeat(60)}`,
-          metadata: {
-            name: file.name,
-            size: file.size,
-            mimeType: file.type,
-          },
-        };
-      } catch (pptxError) {
-        console.error('PPTX parsing error:', pptxError);
-        return {
-          type: 'pptx',
-          content: `📊 PPTX: ${file.name} - Could not extract text. Please describe what you need help with.`,
-          metadata: {
-            name: file.name,
-            size: file.size,
-            mimeType: file.type,
-          },
-        };
-      }
-    }
-
-    // ===== PDF FILES (EXTRACT TEXT) =====
-    if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-      try {
-        const pdfData = await pdf(buffer);
-        const text = pdfData.text.trim();
-
-        if (text && text.length > 50) {
-          const maxLength = 15000;
-          const truncatedText = text.length > maxLength
-            ? text.substring(0, maxLength) + '\n\n[... Content truncated ...]'
-            : text;
-
-          return {
-            type: 'pdf',
-            content: `📕 PDF: ${file.name}\n${'═'.repeat(60)}\n${truncatedText}\n${'═'.repeat(60)}`,
-            metadata: {
-              name: file.name,
-              size: file.size,
-              mimeType: file.type,
-            },
-          };
-        } else {
-          return {
-            type: 'pdf',
-            content: `📕 PDF: ${file.name} (${(file.size / 1024).toFixed(2)} KB)\n\nThis PDF appears to be image-based or has minimal text. If you need help, please describe its contents.`,
-            metadata: {
-              name: file.name,
-              size: file.size,
-              mimeType: file.type,
-            },
-          };
-        }
-      } catch (pdfError) {
-        console.error('PDF parsing error:', pdfError);
-        return {
-          type: 'pdf',
-          content: `📕 PDF: ${file.name} - Could not extract text. The file may be password-protected or corrupted.`,
-          metadata: {
-            name: file.name,
-            size: file.size,
-            mimeType: file.type,
-          },
-        };
-      }
-    }
-
-    // ===== TEXT FILES =====
-    const isTextFile =
-      file.type.startsWith('text/') ||
-      file.type.includes('json') ||
-      file.type.includes('javascript') ||
-      file.type.includes('typescript') ||
-      file.type.includes('xml') ||
-      file.type.includes('html') ||
-      ['.txt', '.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.c',
-        '.h', '.cs', '.php', '.rb', '.go', '.rs', '.swift', '.kt', '.md',
-        '.json', '.xml', '.yaml', '.yml', '.csv', '.sql', '.sh', '.bat']
-        .some(ext => file.name.toLowerCase().endsWith(ext));
-
-    if (isTextFile) {
-      let content = buffer.toString('utf-8');
-
-      const replacementChars = (content.match(/�/g) || []).length;
-      if (replacementChars > content.length * 0.05) {
-        content = buffer.toString('latin1');
-      }
-
-      content = content
-        .replace(/\0/g, '')
-        .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '')
-        .trim();
-
-      const maxLength = 12000;
-      const truncatedContent = content.length > maxLength
-        ? content.substring(0, maxLength) + '\n\n[... Content truncated ...]'
-        : content;
-
-      return {
-        type: 'text',
-        content: `📄 FILE: ${file.name}\n${'─'.repeat(60)}\n${truncatedContent}\n${'─'.repeat(60)}`,
-        metadata: {
-          name: file.name,
-          size: file.size,
-          mimeType: file.type,
-        },
-      };
-    }
-
-    // ===== UNSUPPORTED FILES =====
-    return {
-      type: 'unsupported',
-      content: `📎 FILE: ${file.name} (${file.type}, ${(file.size / 1024).toFixed(2)} KB)\nThis file type is not supported for content analysis.`,
-      metadata: {
-        name: file.name,
-        size: file.size,
-        mimeType: file.type,
-      },
-    };
-
-  } catch (err) {
-    console.error('Error processing file:', file.name, err);
-    return {
-      type: 'unsupported',
-      content: `❌ ERROR: Unable to process file "${file.name}"`,
-      metadata: {
-        name: file.name,
-        size: file.size,
-        mimeType: file.type,
-      },
-    };
-  }
 }
 
 // GET endpoint for fetching conversations and messages
@@ -441,7 +273,7 @@ User Profile:
       studyKitContext = `\n\nUser's Study Materials:\n${studyKits.map(kit => {
         const contentTypes = Array.isArray(kit.content_types) ? kit.content_types.join(', ') : 'various';
         const generatedContent = kit.generated_content as any;
-        
+
         // Extract relevant content details
         let contentSummary = '';
         if (generatedContent) {
@@ -455,27 +287,66 @@ User Profile:
             contentSummary += contentSummary ? `, ${generatedContent.practice_problems.length} practice problems` : `${generatedContent.practice_problems.length} practice problems`;
           }
         }
-        
+
         return `- "${kit.title}" (${contentTypes})${contentSummary ? `: ${contentSummary}` : ''}`;
       }).join('\n')}`;
     }
 
     // 🔥 Process attachments with enhanced system
-    const processedFiles = await Promise.all(
-      attachments.map(file => processFileContent(file))
+    const processedFiles: ProcessedFile[] = await Promise.all(
+      attachments.map(async (file) => {
+        const result = await processFileUtility(file.content, file.type, file.name);
+
+        // Check if it's an image JSON (utility returns JSON string for images)
+        if (typeof result === 'string' && result.startsWith('{"type":"image"')) {
+          try {
+            const parsed = JSON.parse(result);
+            return {
+              type: 'image',
+              content: parsed.extractedText
+                ? `[Image: ${file.name}]\n\n📝 Extracted Text (OCR):\n${parsed.extractedText}`
+                : `[Image: ${file.name}]`,
+              metadata: {
+                name: file.name,
+                size: file.size,
+                mimeType: file.type,
+              },
+              imageData: {
+                base64: parsed.base64,
+                mimeType: parsed.mimeType,
+              },
+            } as ProcessedFile;
+          } catch (e) {
+            console.error('Failed to parse image result:', e);
+          }
+        }
+
+        // Return as processed text/document content
+        return {
+          type: 'processed',
+          content: result,
+          metadata: {
+            name: file.name,
+            size: file.size,
+            mimeType: file.type,
+          },
+        } as ProcessedFile;
+      })
     );
 
     // Separate images from text content
-    const imageFiles = processedFiles.filter(f => f.type === 'image' && f.imageData);
+    const imageFiles = processedFiles.filter((f: ProcessedFile) => f.type === 'image' && !!f.imageData);
+
+    // Include all processed content (including OCR from images) in the text block
     const textContent = processedFiles
-      .filter(f => f.type !== 'image')
-      .map(f => f.content)
+      .map((f: ProcessedFile) => f.content)
       .join('\n\n');
 
     // Build enhanced message
     let enhancedMessage = message;
     if (textContent) {
-      enhancedMessage += `\n\n${'═'.repeat(70)}\n📎 ATTACHED FILES\n${'═'.repeat(70)}\n\n${textContent}\n\n${'═'.repeat(70)}`;
+      // Note: The utility already wraps content in headers, but we add a master section
+      enhancedMessage += `\n\n${'═'.repeat(70)}\n📎 ATTACHED MATERIALS\n${'═'.repeat(70)}\n\n${textContent}\n\n${'═'.repeat(70)}`;
     }
 
     // Save user message
@@ -520,14 +391,14 @@ User Profile:
 
     // 🔥 ENHANCED: Detect interactive course mode
     const isInteractiveCourse = context && (
-      context.includes('Currently learning:') || 
+      context.includes('Currently learning:') ||
       context.includes('comprehension level') ||
       context.includes('mastered:')
     );
 
     // 🔥 ENHANCED: Build context-aware system prompt with asterisk prevention
     let systemPrompt;
-    
+
     const BREVITY_GUIDELINE = `
 TOKEN OPTIMIZATION & BREVITY:
 - Analyze user query complexity:
@@ -635,17 +506,18 @@ FORMATTING RULES:
     try {
       // 🔥 Choose model based on content type
       const hasImages = imageFiles.length > 0;
-      const model = hasImages
-        ? 'llama-3.2-90b-vision-preview'
-        : (process.env.GROQ_MODEL || 'llama-3.1-8b-instant');
 
-      // 🔥 Build messages array with vision support
+      // 🔥 Integration: Select model and provider
+      // Groq vision models are decommissioned. Use OpenRouter for vision.
+      const useOpenRouter = hasImages;
+
+      // 🔥 Build messages array
       const messages: any[] = [
         { role: 'system', content: systemPrompt },
         ...conversationHistory,
       ];
 
-      // Add user message with images if present
+      // Add user message content
       if (hasImages) {
         const userContent: any[] = [
           { type: 'text', text: enhancedMessage }
@@ -673,7 +545,41 @@ FORMATTING RULES:
         });
       }
 
-      console.log(`🤖 Using model: ${model} (${hasImages ? 'with vision' : 'text only'})`);
+      if (useOpenRouter) {
+        console.log(`🤖 Using OpenRouter for ${imageFiles.length} images...`);
+
+        // Import OpenRouter helper
+        const { getNextOpenRouterKey } = await import('@/lib/ai-providers');
+        const openRouterKey = getNextOpenRouterKey();
+
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openRouterKey}`,
+            'HTTP-Referer': 'https://edbox.app',
+            'X-Title': 'EdBox',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'allenai/molmo-2-8b:free',
+            messages,
+            temperature: 0.7,
+            max_tokens: isInteractiveCourse ? 800 : 500,
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('OpenRouter error details:', errorData);
+          throw new Error(`OpenRouter API error: ${errorData.error?.message || response.statusText}`);
+        }
+
+        const data = await response.json();
+        aiResponse = data.choices?.[0]?.message?.content || "I couldn't analyze the images. Please try again.";
+      } else {
+        // Use Groq for text-only
+        const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+        console.log(`🤖 Using Groq model: ${model}`);
 
         const completion = await groq.chat.completions.create({
           messages,
@@ -683,22 +589,26 @@ FORMATTING RULES:
           top_p: 1,
         });
 
-      aiResponse = completion.choices?.[0]?.message?.content || "I couldn't generate a response. Please try again.";
-      
+        aiResponse = completion.choices?.[0]?.message?.content || "I couldn't generate a response. Please try again.";
+      }
+
       // 🔥 POST-PROCESSING: Remove any asterisks that might have slipped through
       aiResponse = aiResponse.replace(/\*/g, '');
-      
-    } catch (groqError: any) {
-      console.error('Groq error:', groqError);
 
-      if (groqError.status === 429) {
+    } catch (apiError: any) {
+      console.error('AI Processing Error:', apiError);
+
+      if (apiError.status === 429 || apiError.message?.includes('429')) {
         return NextResponse.json(
           { error: 'Rate limit exceeded. Please wait a moment.' },
           { status: 429 }
         );
       }
 
-      throw new Error('problem with AI service error');
+      return NextResponse.json(
+        { error: `Genie is currently overloaded: ${apiError.message || 'Service unreachable'}` },
+        { status: 500 }
+      );
     }
 
     // Save AI response

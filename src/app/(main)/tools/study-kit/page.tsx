@@ -21,12 +21,15 @@ import {
     Info,
     Plus,
     Sparkles,
-    Crown,
     Send,
     Copy,
     Check,
     Clock,
-    Target
+    Target,
+    BookOpen,
+    Briefcase,
+    Table2,
+    Crown
 } from 'lucide-react';
 import ShareButton from '@/components/ShareButton';
 import ShareModal, { useShareModal } from '@/components/ShareModal';
@@ -42,6 +45,9 @@ import {
     CustomEdBoxTd
 } from '@/components/ui/CustomEdBoxTable';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { RotateCcw } from 'lucide-react';
 import { NoteNavigation } from '@/components/NoteNavigation';
 import { TextSelectionTooltip } from '@/components/TextSelectionTooltip';
@@ -80,6 +86,15 @@ const contentTypes = [
     { id: 'notes', label: 'Notes', icon: FileText, description: 'Structured summary notes' },
     { id: 'mindmaps', label: 'Mind Maps', icon: Map, description: 'Visual concept connections' },
 ];
+
+const noteSubTabs = [
+    { id: 'deepExplanation', label: 'Deep Explanation', icon: BookOpen, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500', tag: 'Master the Material' },
+    { id: 'cheatsheet', label: 'Cheatsheet', icon: Target, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500', tag: 'Exam Ready' },
+    { id: 'application', label: 'Application', icon: Briefcase, color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500', tag: 'Real World' },
+    { id: 'tables', label: 'Tables', icon: Table2, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500', tag: 'Quick Reference' },
+] as const;
+
+type NoteSubTab = typeof noteSubTabs[number]['id'];
 
 const GeneratingView = () => {
     const studyHacks = [
@@ -308,15 +323,14 @@ function StudyKitContent() {
     const [isWatchingAd, setIsWatchingAd] = useState(false);
     const [notesAdRewarded, setNotesAdRewarded] = useState(false);
     // --- NEW UPGRADE STATE ---
-    const [kitMode, setKitMode] = useState<'single' | 'multi' | null>(null);
     const [multiSelectedTypes, setMultiSelectedTypes] = useState<string[]>([]);
-    const [currentStep, setCurrentStep] = useState<'mode_selection' | 'menu' | 'multi_menu' | 'options' | 'confirm' | 'generating' | 'result'>('mode_selection');
-    const [selectedStepType, setSelectedStepType] = useState<string | null>(null);
+    const [currentStep, setCurrentStep] = useState<'menu' | 'options' | 'confirm' | 'generating' | 'result'>('menu');
     const [countOption, setCountOption] = useState<number>(10);
     const [depthOption, setDepthOption] = useState<'summary' | 'deepdive' | 'coverage' | 'shi'>('coverage');
     const [isConfirmed, setIsConfirmed] = useState(false);
     const [activeChapter, setActiveChapter] = useState(0);
     const [activeNotePage, setActiveNotePage] = useState(0);
+    const [activeNoteType, setActiveNoteType] = useState<NoteSubTab>('deepExplanation');
     const [selectedNodeData, setSelectedNodeData] = useState<any>(null);
     const [genieContext, setGenieContext] = useState('');
     const [isGenieOpen, setIsGenieOpen] = useState(false);
@@ -437,7 +451,7 @@ function StudyKitContent() {
         // Initialize all requested types with default values to prevent validation failures
         requestedTypes.forEach(typeId => {
             if (typeId === 'quizzes' || typeId === 'flashcards') normalized[typeId] = [];
-            else if (typeId === 'notes') normalized[typeId] = '';
+            else if (typeId === 'notes') normalized[typeId] = { deepExplanation: '', cheatsheet: '', application: '', tables: '' };
             else if (typeId === 'mindmaps') normalized[typeId] = { central: 'Topic', branches: [] };
         });
 
@@ -480,46 +494,51 @@ function StudyKitContent() {
             }));
         }
 
-        // Normalize notes - keep as array if multiple parts exist
-        if (content.notes) {
-            const parsed = parseIfString(content.notes);
-            console.log('📄 Notes parsed:', parsed);
+    // Normalize notes - handle multi-note object format and legacy formats
+    if (content.notes) {
+        const parsed = parseIfString(content.notes);
+        console.log('📄 Notes parsed:', parsed);
 
-            if (typeof parsed === 'string') {
-                normalized.notes = [parsed];
-            } else if (Array.isArray(parsed)) {
-                normalized.notes = parsed.map((note: any) => {
-                    if (typeof note === 'string') return note;
-                    let text = '';
-                    if (note.heading) text += note.heading + '\n\n';
-                    if (Array.isArray(note.content)) {
-                        text += note.content.join('\n');
-                    } else if (typeof note.content === 'string') {
-                        text += note.content;
-                    } else if (typeof note.content === 'object') {
-                        text += JSON.stringify(note.content, null, 2);
-                    }
-                    return text;
-                });
-            } else if (parsed.notes && Array.isArray(parsed.notes)) {
-                normalized.notes = parsed.notes.map((note: any) => {
-                    let text = '';
-                    if (note.heading) text += note.heading + '\n\n';
-                    if (Array.isArray(note.content)) {
-                        text += note.content.join('\n');
-                    } else if (typeof note.content === 'string') {
-                        text += note.content;
-                    }
-                    return text;
-                });
-            } else if (typeof parsed === 'object') {
-                normalized.notes = [JSON.stringify(parsed, null, 2)];
-                console.warn('⚠️ Notes was an object, converted to single-item array');
+        if (typeof parsed === 'object' && !Array.isArray(parsed) && (parsed.deepExplanation || parsed.cheatsheet || parsed.application || parsed.tables)) {
+            normalized.notes = parsed;
+        } else if (typeof parsed === 'string') {
+            normalized.notes = { deepExplanation: parsed, cheatsheet: '', application: '', tables: '' };
+        } else if (Array.isArray(parsed)) {
+            const joined = parsed.map((note: any) => {
+                if (typeof note === 'string') return note;
+                let text = '';
+                if (note.heading) text += note.heading + '\n\n';
+                if (Array.isArray(note.content)) {
+                    text += note.content.join('\n');
+                } else if (typeof note.content === 'string') {
+                    text += note.content;
+                } else if (typeof note.content === 'object') {
+                    const entries = Object.entries(note.content)
+                        .filter(([_, v]) => typeof v === 'string')
+                        .map(([k, v]) => `**${k}**: ${v}`)
+                        .join('\n\n');
+                    text += entries || JSON.stringify(note.content, null, 2);
+                }
+                return text;
+            }).join('\n\n---\n\n');
+            normalized.notes = { deepExplanation: joined, cheatsheet: '', application: '', tables: '' };
+        } else if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+            // Object without expected keys — extract string values as markdown
+            const stringValues = Object.entries(parsed)
+                .filter(([_, v]) => typeof v === 'string' && v.length > 0)
+                .map(([key, value]) => `## ${key.charAt(0).toUpperCase() + key.slice(1)}\n\n${value}`)
+                .join('\n\n---\n\n');
+
+            if (stringValues) {
+                normalized.notes = { deepExplanation: stringValues, cheatsheet: '', application: '', tables: '' };
             } else {
-                console.error('❌ Unexpected notes format:', parsed);
-                normalized.notes = [''];
+                // Truly unrecognizable — wrap in code block so it at least renders cleanly
+                normalized.notes = { deepExplanation: '```json\n' + JSON.stringify(parsed, null, 2) + '\n```', cheatsheet: '', application: '', tables: '' };
             }
+        } else {
+            normalized.notes = { deepExplanation: '', cheatsheet: '', application: '', tables: '' };
         }
+    }
 
         // Normalize mindmaps - handle title/children or title/nodes structure
         if (content.mindmaps) {
@@ -589,12 +608,6 @@ function StudyKitContent() {
     };
 
     const toggleContentType = (id: string) => {
-        // Multi-select is now replaced by single select in the new flow
-        setSelectedStepType(id);
-        setCurrentStep('options');
-    };
-
-    const toggleMultiType = (id: string) => {
         setMultiSelectedTypes(prev =>
             prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
         );
@@ -636,7 +649,7 @@ function StudyKitContent() {
     };
 
     const handleGenerate = async () => {
-        const types = kitMode === 'multi' ? multiSelectedTypes : (selectedStepType ? [selectedStepType] : []);
+        const types = multiSelectedTypes;
         if ((!prompt.trim() && !uploadedFile) || types.length === 0 || isGenerating) return;
 
         setIsGenerating(true);
@@ -689,8 +702,7 @@ function StudyKitContent() {
                     content_types: types,
                     item_count: countOption,
                     notes_depth: depthOption,
-                    has_file: !!uploadedFile,
-                    kit_mode: kitMode
+                    has_file: !!uploadedFile
                 });
 
                 // Use setTimeout to ensure state update happens after current render cycle
@@ -822,56 +834,11 @@ function StudyKitContent() {
         setAdContentType(null);
     };
 
-    const renderModeSelection = () => (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <motion.button
-                whileHover={{ y: -5, scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                    setKitMode('single');
-                    setCurrentStep('menu');
-                }}
-                className="bg-zinc-900/50 border-2 border-zinc-800 hover:border-indigo-500 p-8 rounded-3xl text-left group transition-all"
-            >
-                <div className="w-16 h-16 bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-indigo-500/20 transition-all">
-                    <Sparkles className="w-8 h-8 text-indigo-400" />
-                </div>
-                <h3 className="text-2xl font-bold mb-2">Option 1: Guided Study</h3>
-                <p className="text-zinc-500">Pick one tool and follow a guided flow to generate specific content.</p>
-                <div className="mt-6 flex items-center gap-2 text-indigo-400 font-bold text-sm">
-                    Get Started <ArrowLeft className="w-4 h-4 rotate-180" />
-                </div>
-            </motion.button>
-
-            <motion.button
-                whileHover={{ y: -5, scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                    setKitMode('multi');
-                    setCurrentStep('multi_menu');
-                }}
-                className="bg-zinc-900/50 border-2 border-zinc-800 hover:border-indigo-500 p-8 rounded-3xl text-left group transition-all"
-            >
-                <div className="w-16 h-16 bg-purple-500/10 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-purple-500/20 transition-all">
-                    <Crown className="w-8 h-8 text-purple-400" />
-                </div>
-                <h3 className="text-2xl font-bold mb-2">Option 2: Multi-Kit</h3>
-                <p className="text-zinc-500">Select multiple tools at once to build a comprehensive study suite.</p>
-                <div className="mt-6 flex items-center gap-2 text-purple-400 font-bold text-sm">
-                    Build Everything <ArrowLeft className="w-4 h-4 rotate-180" />
-                </div>
-            </motion.button>
-        </div>
-    );
-
-    const renderMultiMenu = () => (
+    const renderMenu = () => (
         <div className="max-w-4xl mx-auto space-y-8">
             <div className="text-center space-y-4">
-                <button onClick={() => setCurrentStep('mode_selection')} className="text-zinc-500 hover:text-white flex items-center gap-2 mx-auto mb-4">
-                    <ArrowLeft className="w-4 h-4" /> Back to Mode Selection
-                </button>
-                <h2 className="text-3xl font-bold">Select Your Tools</h2>
-                <p className="text-zinc-400">Choose all the tools you want in your multi-kit</p>
+                <h2 className="text-3xl font-bold">What would you like to create?</h2>
+                <p className="text-zinc-400">Select one or more tools for your study kit</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -881,7 +848,7 @@ function StudyKitContent() {
                     return (
                         <button
                             key={type.id}
-                            onClick={() => toggleMultiType(type.id)}
+                            onClick={() => toggleContentType(type.id)}
                             className={`group p-6 rounded-2xl border-2 transition-all text-left ${isSelected
                                 ? 'border-indigo-500 bg-indigo-500/5'
                                 : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700'
@@ -907,49 +874,14 @@ function StudyKitContent() {
                 })}
             </div>
 
-            <div className="flex justify-center pt-8">
+            <div className="flex justify-center pt-4">
                 <button
                     onClick={() => setCurrentStep('options')}
                     disabled={multiSelectedTypes.length === 0}
-                    className="px-12 py-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 rounded-xl font-bold transition-all shadow-xl shadow-indigo-950/50"
+                    className="px-12 py-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-xl font-bold transition-all shadow-xl shadow-indigo-950/50"
                 >
                     Continue to Setup
                 </button>
-            </div>
-        </div>
-    );
-
-    const renderMenu = () => (
-        <div className="max-w-4xl mx-auto space-y-8">
-            <div className="text-center space-y-4">
-                <button onClick={() => setCurrentStep('mode_selection')} className="text-zinc-500 hover:text-white flex items-center gap-2 mx-auto mb-4">
-                    <ArrowLeft className="w-4 h-4" /> Back to Mode Selection
-                </button>
-                <h2 className="text-3xl font-bold">What would you like to create?</h2>
-                <p className="text-zinc-400">Select a study tool to get started</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {contentTypes.map((type) => {
-                    const Icon = type.icon;
-                    return (
-                        <button
-                            key={type.id}
-                            onClick={() => toggleContentType(type.id)}
-                            className="group p-6 rounded-2xl border-2 border-zinc-800 bg-zinc-900/50 hover:border-indigo-500 hover:bg-indigo-500/5 transition-all text-left"
-                        >
-                            <div className="flex items-start gap-4">
-                                <div className="p-3 rounded-xl bg-zinc-800 group-hover:bg-indigo-500/20 transition-colors">
-                                    <Icon className="w-6 h-6 text-zinc-400 group-hover:text-indigo-400" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-xl mb-1 group-hover:text-white">{type.label}</h3>
-                                    <p className="text-zinc-400 text-sm">{type.description}</p>
-                                </div>
-                            </div>
-                        </button>
-                    );
-                })}
             </div>
 
             {/* My Study Kits List (Secondary) */}
@@ -995,7 +927,7 @@ function StudyKitContent() {
     );
 
     const renderOptions = () => {
-        const types = kitMode === 'multi' ? multiSelectedTypes : (selectedStepType ? [selectedStepType] : []);
+        const types = multiSelectedTypes;
         const hasQuizzes = types.includes('quizzes');
         const hasFlashcards = types.includes('flashcards');
         const hasNotes = types.includes('notes');
@@ -1004,7 +936,7 @@ function StudyKitContent() {
         return (
             <div className="max-w-2xl mx-auto space-y-8">
                 <div className="text-center mb-8">
-                    <button onClick={() => setCurrentStep(kitMode === 'multi' ? 'multi_menu' : 'menu')} className="text-zinc-500 hover:text-white flex items-center gap-2 mx-auto mb-4">
+                    <button onClick={() => setCurrentStep('menu')} className="text-zinc-500 hover:text-white flex items-center gap-2 mx-auto mb-4">
                         <ArrowLeft className="w-4 h-4" /> Back to Selection
                     </button>
                     <h2 className="text-3xl font-bold">Configure Your Kit</h2>
@@ -1016,7 +948,7 @@ function StudyKitContent() {
                     {(hasQuizzes || hasFlashcards) && (
                         <div>
                             <label className="block text-sm font-medium text-zinc-400 mb-4 text-center uppercase tracking-widest">
-                                {kitMode === 'multi' ? 'Item Count (for Quizzes & Flashcards)' : 'How many items?'}
+                                Item Count (for Quizzes & Flashcards)
                             </label>
                             <div className="grid grid-cols-5 gap-3">
                                 {[10, 20, 30, 40, 50].map((num) => (
@@ -1085,7 +1017,7 @@ function StudyKitContent() {
     };
 
     const renderConfirm = () => {
-        const types = kitMode === 'multi' ? multiSelectedTypes : (selectedStepType ? [selectedStepType] : []);
+        const types = multiSelectedTypes;
         return (
             <div className="max-w-xl mx-auto space-y-8">
                 <div className="text-center mb-8">
@@ -1234,17 +1166,6 @@ function StudyKitContent() {
                 {!generatedContent && !id ? (
                     <div className="max-w-4xl mx-auto">
                         <AnimatePresence mode="wait">
-                            {currentStep === 'mode_selection' && (
-                                <motion.div
-                                    key="mode_selection"
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -20 }}
-                                >
-                                    {renderModeSelection()}
-                                </motion.div>
-                            )}
-
                             {currentStep === 'menu' && (
                                 <motion.div
                                     key="menu"
@@ -1253,17 +1174,6 @@ function StudyKitContent() {
                                     exit={{ opacity: 0, y: -20 }}
                                 >
                                     {renderMenu()}
-                                </motion.div>
-                            )}
-
-                            {currentStep === 'multi_menu' && (
-                                <motion.div
-                                    key="multi_menu"
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -20 }}
-                                >
-                                    {renderMultiMenu()}
                                 </motion.div>
                             )}
 
@@ -1344,7 +1254,11 @@ function StudyKitContent() {
                             })}
                             {!id && (
                                 <button
-                                    onClick={() => setGeneratedContent(null)}
+                                    onClick={() => {
+                                        setGeneratedContent(null);
+                                        setMultiSelectedTypes([]);
+                                        setCurrentStep('menu');
+                                    }}
                                     className="ml-auto px-4 py-2 text-zinc-500 hover:text-white transition flex items-center gap-2"
                                 >
                                     <X className="w-4 h-4" /> Create New
@@ -1680,7 +1594,7 @@ function StudyKitContent() {
                                     {activeTab === 'notes' && generatedContent.notes && (
                                         <div className="space-y-6 relative">
                                             {/* Note Navigation HUD */}
-                                            <NoteNavigation content={typeof generatedContent.notes === 'string' ? generatedContent.notes : ''} />
+                                            <NoteNavigation content={generatedContent.notes?.[activeNoteType] || ''} />
 
                                             {/* Genie Interaction */}
                                             <TextSelectionTooltip onAskGenie={handleAskGenie} />
@@ -1694,27 +1608,60 @@ function StudyKitContent() {
                                             <div className="bg-gradient-to-br from-indigo-950/80 via-zinc-900 to-purple-950/50 border border-indigo-500/20 rounded-3xl p-6 sm:p-8">
                                                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                                     <div className="flex items-center gap-4">
-                                                        <div className="w-12 h-12 bg-indigo-500/20 rounded-2xl flex items-center justify-center">
-                                                            <FileText className="w-6 h-6 text-indigo-400" />
-                                                        </div>
+                                                        {(() => {
+                                                            const activeSubTab = noteSubTabs.find(t => t.id === activeNoteType);
+                                                            const Icon = activeSubTab?.icon || FileText;
+                                                            return (
+                                                                <div className={`w-12 h-12 ${activeSubTab?.bg || 'bg-indigo-500/20'} rounded-2xl flex items-center justify-center`}>
+                                                                    <Icon className={`w-6 h-6 ${activeSubTab?.color || 'text-indigo-400'}`} />
+                                                                </div>
+                                                            );
+                                                        })()}
                                                         <div>
                                                             <h3 className="text-xl font-bold text-white">Study Notes</h3>
-                                                            <p className="text-sm text-zinc-400">AI-generated comprehensive notes</p>
+                                                            <p className="text-sm text-zinc-400">
+                                                                {noteSubTabs.find(t => t.id === activeNoteType)?.tag || 'AI-generated comprehensive notes'}
+                                                            </p>
                                                         </div>
                                                     </div>
                                                     <button
                                                         onClick={() => {
-                                                            const notesText = typeof generatedContent.notes === 'string'
-                                                                ? generatedContent.notes
-                                                                : JSON.stringify(generatedContent.notes, null, 2);
-                                                            navigator.clipboard.writeText(notesText);
+                                                            const notes = generatedContent.notes;
+                                                            const currentNote = notes?.[activeNoteType] || '';
+                                                            navigator.clipboard.writeText(currentNote);
                                                         }}
                                                         className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-sm font-bold transition-all"
                                                     >
                                                         <Copy className="w-4 h-4" />
-                                                        Copy All
+                                                        Copy
                                                     </button>
                                                 </div>
+                                            </div>
+
+                                            {/* Note Sub-Tabs */}
+                                            <div className="flex overflow-x-auto gap-2 pb-1">
+                                                {noteSubTabs.map(tab => {
+                                                    const Icon = tab.icon;
+                                                    const isActive = activeNoteType === tab.id;
+                                                    const hasContent = !!(generatedContent.notes?.[tab.id]);
+                                                    return (
+                                                        <button
+                                                            key={tab.id}
+                                                            onClick={() => setActiveNoteType(tab.id)}
+                                                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap border ${isActive
+                                                                ? `${tab.bg} ${tab.border} ${tab.color}`
+                                                                : hasContent
+                                                                    ? 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:border-zinc-700'
+                                                                    : 'border-zinc-800/50 bg-zinc-900/30 text-zinc-600 cursor-default'
+                                                                }`}
+                                                            disabled={!hasContent}
+                                                        >
+                                                            <Icon className="w-4 h-4" />
+                                                            <span className="hidden sm:inline">{tab.label}</span>
+                                                            <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
 
                                             {/* Notes Content */}
@@ -1738,7 +1685,8 @@ function StudyKitContent() {
                                                         prose-td:py-4 prose-td:text-zinc-300
                                                     ">
                                                         <ReactMarkdown
-                                                            remarkPlugins={[remarkGfm]}
+                                                            remarkPlugins={[remarkGfm, remarkMath]}
+                                                            rehypePlugins={[rehypeKatex]}
                                                             components={{
                                                                 h1: ({ children }) => (
                                                                     <h1 className="relative flex items-center gap-4">
@@ -1853,63 +1801,8 @@ function StudyKitContent() {
                                                                 }
                                                             }}
                                                         >
-                                                            {typeof generatedContent.notes === 'string'
-                                                                ? generatedContent.notes
-                                                                : Array.isArray(generatedContent.notes)
-                                                                    ? (generatedContent.notes[activeNotePage] || generatedContent.notes[0])
-                                                                    : JSON.stringify(generatedContent.notes, null, 2)}
+                                                            {generatedContent.notes?.[activeNoteType] || 'No content available for this note type.'}
                                                         </ReactMarkdown>
-
-                                                        {/* Note Pagination Controls */}
-                                                        {Array.isArray(generatedContent.notes) && generatedContent.notes.length > 1 && (
-                                                            <div className="mt-12 flex flex-col items-center gap-6 pt-10 border-t border-zinc-800/50">
-                                                                <div className="flex items-center gap-4">
-                                                                    <button
-                                                                        disabled={activeNotePage === 0}
-                                                                        onClick={() => {
-                                                                            setActiveNotePage(prev => Math.max(0, prev - 1));
-                                                                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                                                                        }}
-                                                                        className="flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-800 rounded-xl font-bold text-sm hover:border-indigo-500 disabled:opacity-30 disabled:hover:border-zinc-800 transition-all"
-                                                                    >
-                                                                        <ArrowLeft className="w-4 h-4" /> Previous Part
-                                                                    </button>
-                                                                    <div className="flex items-center gap-2 px-4 py-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl">
-                                                                        <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Part</span>
-                                                                        <span className="text-lg font-black text-indigo-400">{activeNotePage + 1}</span>
-                                                                        <span className="text-zinc-600">/</span>
-                                                                        <span className="text-sm font-bold text-zinc-500">{generatedContent.notes.length}</span>
-                                                                    </div>
-                                                                    <button
-                                                                        disabled={activeNotePage === generatedContent.notes.length - 1}
-                                                                        onClick={() => {
-                                                                            setActiveNotePage(prev => Math.min(generatedContent.notes.length - 1, prev + 1));
-                                                                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                                                                        }}
-                                                                        className="flex items-center gap-2 px-6 py-3 bg-zinc-900 border border-zinc-800 rounded-xl font-bold text-sm hover:border-indigo-500 disabled:opacity-30 disabled:hover:border-zinc-800 transition-all"
-                                                                    >
-                                                                        Next Part <ArrowLeft className="w-4 h-4 rotate-180" />
-                                                                    </button>
-                                                                </div>
-                                                                <div className="flex flex-wrap justify-center gap-2">
-                                                                    {generatedContent.notes.map((_: any, idx: number) => (
-                                                                        <button
-                                                                            key={idx}
-                                                                            onClick={() => {
-                                                                                setActiveNotePage(idx);
-                                                                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                                                                            }}
-                                                                            className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm transition-all ${activeNotePage === idx
-                                                                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
-                                                                                : 'bg-zinc-900 text-zinc-500 hover:text-white hover:bg-zinc-800'
-                                                                                }`}
-                                                                        >
-                                                                            {idx + 1}
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        )}
 
                                                     </article>
                                                 </div>

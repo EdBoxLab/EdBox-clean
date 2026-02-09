@@ -1,8 +1,16 @@
+require('dotenv').config({ path: '.env.local' });
 const { Client } = require('pg');
+
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.error('ERROR: Missing DATABASE_URL in .env.local');
+  process.exit(1);
+}
 
 async function testConnection() {
   const client = new Client({
-    connectionString: "postgresql://postgres:%40EdBox01101@db.fiviygonxineoynebhxy.supabase.co:5432/postgres",
+    connectionString: connectionString,
     ssl: { rejectUnauthorized: false }
   });
 

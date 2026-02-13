@@ -5,10 +5,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { generateWithRetry, extractContextFromText } from '@/lib/ai-providers';
 import { processFileContent } from '@/lib/utils/fileProcessing';
+import { detectChapters, detectChaptersFromLargeFile } from '@/lib/chapter-detection';
+import type { DetectedChapter, ChapterContent } from '@/types/chapters';
 
 type ContentType = 'quizzes' | 'flashcards' | 'mindmaps' | 'notes';
 
 type NoteType = 'deepExplanation' | 'cheatsheet' | 'application' | 'tables';
+
+const LARGE_FILE_THRESHOLD = 100000;
 
 const NOTE_TEMPLATES: Record<NoteType, string> = {
   deepExplanation: `
@@ -469,6 +473,163 @@ Any code-like syntax will be considered an error.`;
   return notesPrompt;
 }
 
+async function generateChapterContent(
+  chapter: DetectedChapter,
+  contentTypes: string[],
+  customInstructions?: string,
+  itemCount?: number,
+  notesDepth?: string
+): Promise<ChapterContent> {
+  const chapterContext = chapter.sourceContext || '';
+  const chapterPrompt = `Chapter: ${chapter.title}\n\nSummary: ${chapter.summary}\n\nKey Topics: ${chapter.keyTopics.join(', ')}\n\nLearning Objectives: ${chapter.learningObjectives.join(', ')}\n\nContent:\n${chapterContext}`;
+
+  const result: ChapterContent = {
+    id: chapter.id,
+    title: chapter.title,
+    summary: chapter.summary
+  };
+
+  const warnings: string[] = [];
+
+  // Helper: generate a single content type with logging
+  async function generateSingleType(typeLabel: string, fn: () => Promise<any>): Promise<{ success: boolean; error?: string }> {
+    const startTime = Date.now();
+    try {
+      await fn();
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`  ✅ [${chapter.title}] ${typeLabel} generated in ${elapsed}s`);
+      return { success: true };
+    } catch (error: any) {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.error(`  ❌ [${chapter.title}] ${typeLabel} FAILED after ${elapsed}s:`, error.message || error);
+      return { success: false, error: error.message || String(error) };
+    }
+  }
+
+  // --- Phase 1: Fire all content types in parallel ---
+  console.log(`\n📖 Generating content for chapter: "${chapter.title}" (${contentTypes.join(', ')})`);
+  const phase1Start = Date.now();
+
+  const phase1Tasks: { label: string; run: () => Promise<any> }[] = [];
+
+  if (contentTypes.includes('quizzes')) {
+    phase1Tasks.push({
+      label: 'quizzes',
+      run: async () => {
+        const quizResult = await generateWithRetry({
+          prompt: buildPrompt('quizzes', chapterPrompt, false, '', itemCount || 5, notesDepth),
+          systemPrompt: 'Output ONLY valid JSON with no extra text.',
+          temperature: 0.7,
+          maxTokens: 4000,
+          model: 'llama-3.3-70b-versatile'
+        });
+        result.quizzes = extractJSON(quizResult.text, 'quizzes');
+      }
+    });
+  }
+
+  if (contentTypes.includes('flashcards')) {
+    phase1Tasks.push({
+      label: 'flashcards',
+      run: async () => {
+        const flashcardResult = await generateWithRetry({
+          prompt: buildPrompt('flashcards', chapterPrompt, false, '', itemCount || 10, notesDepth),
+          systemPrompt: 'Output ONLY valid JSON with no extra text.',
+          temperature: 0.7,
+          maxTokens: 4000,
+          model: 'llama-3.3-70b-versatile'
+        });
+        result.flashcards = extractJSON(flashcardResult.text, 'flashcards');
+      }
+    });
+  }
+
+  if (contentTypes.includes('mindmaps')) {
+    phase1Tasks.push({
+      label: 'mindmaps',
+      run: async () => {
+        const mindmapResult = await generateWithRetry({
+          prompt: buildPrompt('mindmaps', chapterPrompt, false, '', itemCount, notesDepth),
+          systemPrompt: 'Output ONLY valid JSON with no extra text.',
+          temperature: 0.7,
+          maxTokens: 4000,
+          model: 'llama-3.3-70b-versatile'
+        });
+        result.mindmaps = extractJSON(mindmapResult.text, 'mindmaps');
+      }
+    });
+  }
+
+  if (contentTypes.includes('notes')) {
+    const noteTypes: NoteType[] = ['deepExplanation', 'cheatsheet', 'application', 'tables'];
+    const systemPromptMap: Record<NoteType, string> = {
+      deepExplanation: `You are a World-Class Learning Architect creating a Deep Explanation Note. Output ONLY Markdown text — NO JSON. Start directly with the markdown heading. No preamble.`,
+      cheatsheet: `You are a World-Class Exam Coach creating a Plain-Language Cheatsheet. Output ONLY Markdown text — NO JSON. Start directly with the markdown heading. No preamble.`,
+      application: `You are a Senior Industry Practitioner creating an Application Note with worked examples. Output ONLY Markdown text — NO JSON. Start directly with the markdown heading. No preamble.`,
+      tables: `You are a Reference Designer creating a Tables Reference Note. Output ONLY Markdown text — NO JSON. Prioritize tables. Start directly with the markdown heading. No preamble.`
+    };
+
+    if (!result.notes) result.notes = { deepExplanation: '', cheatsheet: '', application: '', tables: '' };
+
+    for (const noteType of noteTypes) {
+      phase1Tasks.push({
+        label: `notes/${noteType}`,
+        run: async () => {
+          const notePrompt = buildNotePrompt(chapterPrompt, notesDepth, customInstructions, noteType);
+          const noteResult = await generateWithRetry({
+            prompt: notePrompt,
+            systemPrompt: systemPromptMap[noteType],
+            temperature: 0.7,
+            maxTokens: 5000,
+            model: 'llama-3.3-70b-versatile'
+          });
+          result.notes![noteType] = cleanMarkdown(noteResult.text);
+        }
+      });
+    }
+  }
+
+  // Run all tasks in parallel
+  const phase1Results = await Promise.allSettled(
+    phase1Tasks.map(task => generateSingleType(task.label, task.run))
+  );
+
+  // Collect failures for retry
+  const failedTasks: typeof phase1Tasks = [];
+  phase1Results.forEach((settledResult, i) => {
+    const taskResult = settledResult.status === 'fulfilled' ? settledResult.value : { success: false, error: 'Promise rejected' };
+    if (!taskResult.success) {
+      failedTasks.push(phase1Tasks[i]);
+    }
+  });
+
+  const phase1Elapsed = ((Date.now() - phase1Start) / 1000).toFixed(1);
+  console.log(`  📊 [${chapter.title}] Phase 1 complete in ${phase1Elapsed}s — ${phase1Tasks.length - failedTasks.length}/${phase1Tasks.length} succeeded`);
+
+  // --- Phase 2: Retry failed types sequentially (avoids rate limit stacking) ---
+  if (failedTasks.length > 0) {
+    console.log(`  🔄 [${chapter.title}] Retrying ${failedTasks.length} failed type(s) sequentially...`);
+
+    for (const task of failedTasks) {
+      const retryResult = await generateSingleType(`${task.label} (retry)`, task.run);
+      if (!retryResult.success) {
+        warnings.push(`${task.label} could not be generated for "${chapter.title}": ${retryResult.error}`);
+      }
+    }
+  }
+
+  // Attach warnings to result
+  (result as any).warnings = warnings;
+  if (warnings.length > 0) {
+    console.warn(`  ⚠️ [${chapter.title}] Completed with ${warnings.length} warning(s):`);
+    warnings.forEach(w => console.warn(`     - ${w}`));
+  } else {
+    console.log(`  ✨ [${chapter.title}] All content generated successfully!`);
+  }
+
+  return result;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient();
@@ -477,10 +638,11 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { prompt, contentTypes, fileName, fileContent, fileType, kitId, appendType, customInstructions, itemCount, notesDepth } = body;
+    const { prompt, contentTypes, fileName, fileContent, fileType, kitId, appendType, customInstructions, itemCount, notesDepth, useChapters, chapters: confirmedChapters } = body;
 
     let finalPrompt = prompt || '';
     let existingKit = null;
+    let extractedText = '';
 
     if (kitId) {
       const { data } = await supabase
@@ -495,28 +657,98 @@ export async function POST(request: NextRequest) {
       finalPrompt = data.source_content || prompt || '';
     }
 
-    if ((!finalPrompt && !fileContent) && !kitId) {
+    if ((!finalPrompt && !fileContent) && !kitId && !confirmedChapters) {
       return NextResponse.json({ error: 'Missing data' }, { status: 400 });
     }
 
     if (fileContent && !kitId) {
       try {
-        const extractedText = await processFileContent(fileContent, fileType || '', fileName || '');
+        extractedText = await processFileContent(fileContent, fileType || '', fileName || '');
         const contextSummaries = await extractContextFromText(extractedText);
 
-        // If it's a small file (one chunk), use traditional logic
         if (contextSummaries.length === 1) {
           finalPrompt = `Based on the following extracted document context (${fileName}):\n\n${contextSummaries[0]}\n\nUser Context: ${prompt || 'Generate study materials'}\n\nIMPORTANT: Only generate content that is relevant to the provided document context.`;
         } else {
-          // Store multiple chunks for parallel processing below
           (request as any).contextChunks = contextSummaries.map(summary =>
             `Based on document section (${fileName}):\n\n${summary}\n\nUser Context: ${prompt || 'Generate study materials'}`
           );
-          finalPrompt = (request as any).contextChunks[0]; // Fallback for basic title use
+          finalPrompt = (request as any).contextChunks[0];
         }
       } catch (err) {
         console.error('❌ File processing failed:', err);
       }
+    }
+
+    if (useChapters && !confirmedChapters && extractedText) {
+      const textSize = extractedText.length;
+      let chapterResult;
+
+      if (textSize > LARGE_FILE_THRESHOLD) {
+        chapterResult = await detectChaptersFromLargeFile(extractedText, {
+          maxChapters: 12,
+          minChapterLength: 2000
+        });
+      } else {
+        chapterResult = await detectChapters(extractedText);
+      }
+
+      return NextResponse.json({
+        needsChapterReview: true,
+        chapters: chapterResult.chapters,
+        documentAnalysis: chapterResult.documentAnalysis,
+        recommendations: chapterResult.recommendations,
+        fileName,
+        textSize
+      });
+    }
+
+    if (useChapters && confirmedChapters && confirmedChapters.length > 0) {
+      const chapterContents: ChapterContent[] = [];
+      const typesToGenerate = contentTypes || ['quizzes', 'flashcards', 'mindmaps', 'notes'];
+      const totalStart = Date.now();
+      const allWarnings: string[] = [];
+
+      console.log(`\n🚀 Starting chapter-based generation: ${confirmedChapters.length} chapter(s), types: [${typesToGenerate.join(', ')}]`);
+
+      for (let i = 0; i < (confirmedChapters as DetectedChapter[]).length; i++) {
+        const chapter = (confirmedChapters as DetectedChapter[])[i];
+        console.log(`\n━━━ Chapter ${i + 1}/${confirmedChapters.length}: "${chapter.title}" ━━━`);
+        const chapterContent = await generateChapterContent(chapter, typesToGenerate, customInstructions, itemCount, notesDepth);
+        chapterContents.push(chapterContent);
+        if ((chapterContent as any).warnings?.length > 0) {
+          allWarnings.push(...(chapterContent as any).warnings);
+        }
+      }
+
+      const totalElapsed = ((Date.now() - totalStart) / 1000).toFixed(1);
+      console.log(`\n🏁 All chapters complete in ${totalElapsed}s — ${allWarnings.length} total warning(s)`);
+      if (allWarnings.length > 0) {
+        allWarnings.forEach(w => console.warn(`  ⚠️ ${w}`));
+      }
+
+      let title = prompt?.slice(0, 100) || fileName?.split('.')[0] || 'Study Kit';
+      if (title.length < 3) title = 'My Study Kit';
+
+      const { data: studyKit } = await supabase
+        .from('study_kit_content')
+        .insert({
+          user_id: user.id,
+          title: title,
+          source_type: fileName ? 'file' : 'text',
+          source_content: finalPrompt.substring(0, 5000),
+          file_name: fileName,
+          content_types: typesToGenerate,
+          generated_content: { chapters: chapterContents },
+        })
+        .select()
+        .single();
+
+      return NextResponse.json({
+        success: true,
+        id: studyKit?.id,
+        content: { chapters: chapterContents },
+        hasChapters: true
+      });
     }
 
     const typesToGenerate = appendType ? [appendType] : contentTypes;

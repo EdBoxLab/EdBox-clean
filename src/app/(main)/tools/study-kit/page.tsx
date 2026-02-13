@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -95,6 +96,87 @@ const noteSubTabs = [
 ] as const;
 
 type NoteSubTab = typeof noteSubTabs[number]['id'];
+
+// Preprocesses markdown text that may be on a single line (e.g. from PDF extraction).
+// Inserts newlines so that remark-gfm can parse tables, headings, and horizontal rules.
+function preprocessMarkdown(text: string): string {
+    if (!text) return '';
+    let result = text;
+
+    // 1. Add newlines before markdown headings (##, #, etc.)
+    result = result.replace(/\s+(#{1,6}\s)/g, '\n\n$1');
+
+    // 2. Add newlines around standalone --- (horizontal rules, not table separators inside |---|
+    result = result.replace(/\s+---\s+/g, '\n\n---\n\n');
+
+    // 3. Split table rows: when a row ends with | and the next starts with |,
+    //    the boundary looks like "| |" (pipe, whitespace-only, pipe).
+    result = result.replace(/\|\s+\|/g, '|\n|');
+
+    return result;
+}
+
+// Flattens chapter-based content { chapters: [...] } into the standard
+// { quizzes: [...], flashcards: [...], notes: {...}, mindmaps: {...} } shape
+// that the existing tab rendering expects.
+function flattenChapterContent(content: any): any {
+    if (!content?.chapters || !Array.isArray(content.chapters)) return content;
+
+    const flat: any = {};
+    const chapters = content.chapters;
+
+    // Quizzes: merge all chapter quizzes into a single array
+    const allQuizzes = chapters.flatMap((ch: any) => ch.quizzes || []);
+    if (allQuizzes.length > 0) flat.quizzes = allQuizzes;
+
+    // Flashcards: merge all chapter flashcards into a single array
+    const allFlashcards = chapters.flatMap((ch: any) => ch.flashcards || []);
+    if (allFlashcards.length > 0) flat.flashcards = allFlashcards;
+
+    // Notes: concatenate each note type from all chapters, separated by chapter headings
+    const noteTypes = ['deepExplanation', 'cheatsheet', 'application', 'tables'];
+    const mergedNotes: any = {};
+    let hasAnyNote = false;
+    for (const nt of noteTypes) {
+        const parts: string[] = [];
+        for (const ch of chapters) {
+            if (ch.notes?.[nt]) {
+                if (chapters.length > 1) {
+                    parts.push(`\n\n---\n\n## 📖 ${ch.title}\n\n${ch.notes[nt]}`);
+                } else {
+                    parts.push(ch.notes[nt]);
+                }
+            }
+        }
+        if (parts.length > 0) {
+            mergedNotes[nt] = parts.join('');
+            hasAnyNote = true;
+        } else {
+            mergedNotes[nt] = '';
+        }
+    }
+    if (hasAnyNote) flat.notes = mergedNotes;
+
+    // Mindmaps: merge branches from all chapters into one mindmap
+    const allBranches: any[] = [];
+    for (const ch of chapters) {
+        if (ch.mindmaps) {
+            if (ch.mindmaps.branches) {
+                allBranches.push(...ch.mindmaps.branches);
+            }
+        }
+    }
+    if (allBranches.length > 0) {
+        flat.mindmaps = {
+            central: chapters.length > 1
+                ? chapters.map((ch: any) => ch.title).join(' & ')
+                : chapters[0]?.title || 'Study Kit',
+            branches: allBranches
+        };
+    }
+
+    return flat;
+}
 
 const GeneratingView = () => {
     const studyHacks = [
@@ -284,6 +366,12 @@ const FlashcardItem = ({ card }: { card: any }) => {
 };
 
 function StudyKitContent() {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const searchParams = useSearchParams();
     const router = useRouter();
     const id = searchParams.get('id');
@@ -336,6 +424,11 @@ function StudyKitContent() {
     const [isGenieOpen, setIsGenieOpen] = useState(false);
     const [mindmapDragPosition, setMindmapDragPosition] = useState({ x: 0, y: 0 });
     // -------------------------
+
+    // Chapter detection state
+    const [detectedChapters, setDetectedChapters] = useState<any[]>([]);
+    const [showChapterReview, setShowChapterReview] = useState(false);
+    const [chapterDetectionMeta, setChapterDetectionMeta] = useState<any>(null);
 
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -411,6 +504,12 @@ function StudyKitContent() {
 
     const normalizeContent = (content: any, requestedTypes: string[] = []) => {
         console.log('🔍 Starting normalization with:', JSON.stringify(content, null, 2));
+
+        // If content has chapters, flatten into standard shape first
+        if (content?.chapters && Array.isArray(content.chapters)) {
+            console.log('📖 Detected chapter-based content — flattening...');
+            content = flattenChapterContent(content);
+        }
 
         const parseIfString = (data: any) => {
             if (typeof data !== 'string') return data;
@@ -494,51 +593,51 @@ function StudyKitContent() {
             }));
         }
 
-    // Normalize notes - handle multi-note object format and legacy formats
-    if (content.notes) {
-        const parsed = parseIfString(content.notes);
-        console.log('📄 Notes parsed:', parsed);
+        // Normalize notes - handle multi-note object format and legacy formats
+        if (content.notes) {
+            const parsed = parseIfString(content.notes);
+            console.log('📄 Notes parsed:', parsed);
 
-        if (typeof parsed === 'object' && !Array.isArray(parsed) && (parsed.deepExplanation || parsed.cheatsheet || parsed.application || parsed.tables)) {
-            normalized.notes = parsed;
-        } else if (typeof parsed === 'string') {
-            normalized.notes = { deepExplanation: parsed, cheatsheet: '', application: '', tables: '' };
-        } else if (Array.isArray(parsed)) {
-            const joined = parsed.map((note: any) => {
-                if (typeof note === 'string') return note;
-                let text = '';
-                if (note.heading) text += note.heading + '\n\n';
-                if (Array.isArray(note.content)) {
-                    text += note.content.join('\n');
-                } else if (typeof note.content === 'string') {
-                    text += note.content;
-                } else if (typeof note.content === 'object') {
-                    const entries = Object.entries(note.content)
-                        .filter(([_, v]) => typeof v === 'string')
-                        .map(([k, v]) => `**${k}**: ${v}`)
-                        .join('\n\n');
-                    text += entries || JSON.stringify(note.content, null, 2);
+            if (typeof parsed === 'object' && !Array.isArray(parsed) && (parsed.deepExplanation || parsed.cheatsheet || parsed.application || parsed.tables)) {
+                normalized.notes = parsed;
+            } else if (typeof parsed === 'string') {
+                normalized.notes = { deepExplanation: parsed, cheatsheet: '', application: '', tables: '' };
+            } else if (Array.isArray(parsed)) {
+                const joined = parsed.map((note: any) => {
+                    if (typeof note === 'string') return note;
+                    let text = '';
+                    if (note.heading) text += note.heading + '\n\n';
+                    if (Array.isArray(note.content)) {
+                        text += note.content.join('\n');
+                    } else if (typeof note.content === 'string') {
+                        text += note.content;
+                    } else if (typeof note.content === 'object') {
+                        const entries = Object.entries(note.content)
+                            .filter(([_, v]) => typeof v === 'string')
+                            .map(([k, v]) => `**${k}**: ${v}`)
+                            .join('\n\n');
+                        text += entries || JSON.stringify(note.content, null, 2);
+                    }
+                    return text;
+                }).join('\n\n---\n\n');
+                normalized.notes = { deepExplanation: joined, cheatsheet: '', application: '', tables: '' };
+            } else if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                // Object without expected keys — extract string values as markdown
+                const stringValues = Object.entries(parsed)
+                    .filter(([_, v]) => typeof v === 'string' && v.length > 0)
+                    .map(([key, value]) => `## ${key.charAt(0).toUpperCase() + key.slice(1)}\n\n${value}`)
+                    .join('\n\n---\n\n');
+
+                if (stringValues) {
+                    normalized.notes = { deepExplanation: stringValues, cheatsheet: '', application: '', tables: '' };
+                } else {
+                    // Truly unrecognizable — wrap in code block so it at least renders cleanly
+                    normalized.notes = { deepExplanation: '```json\n' + JSON.stringify(parsed, null, 2) + '\n```', cheatsheet: '', application: '', tables: '' };
                 }
-                return text;
-            }).join('\n\n---\n\n');
-            normalized.notes = { deepExplanation: joined, cheatsheet: '', application: '', tables: '' };
-        } else if (typeof parsed === 'object' && !Array.isArray(parsed)) {
-            // Object without expected keys — extract string values as markdown
-            const stringValues = Object.entries(parsed)
-                .filter(([_, v]) => typeof v === 'string' && v.length > 0)
-                .map(([key, value]) => `## ${key.charAt(0).toUpperCase() + key.slice(1)}\n\n${value}`)
-                .join('\n\n---\n\n');
-
-            if (stringValues) {
-                normalized.notes = { deepExplanation: stringValues, cheatsheet: '', application: '', tables: '' };
             } else {
-                // Truly unrecognizable — wrap in code block so it at least renders cleanly
-                normalized.notes = { deepExplanation: '```json\n' + JSON.stringify(parsed, null, 2) + '\n```', cheatsheet: '', application: '', tables: '' };
+                normalized.notes = { deepExplanation: '', cheatsheet: '', application: '', tables: '' };
             }
-        } else {
-            normalized.notes = { deepExplanation: '', cheatsheet: '', application: '', tables: '' };
         }
-    }
 
         // Normalize mindmaps - handle title/children or title/nodes structure
         if (content.mindmaps) {
@@ -685,11 +784,27 @@ function StudyKitContent() {
                     notesDepth: depthOption,
                     fileName: uploadedFile?.name,
                     fileContent: fileData?.content,
-                    fileType: fileData?.type
+                    fileType: fileData?.type,
+                    useChapters: !!uploadedFile
                 }),
             });
 
             const data = await response.json();
+
+            // Handle chapter detection flow
+            if (data.needsChapterReview) {
+                setDetectedChapters(data.chapters);
+                setChapterDetectionMeta({
+                    documentAnalysis: data.documentAnalysis,
+                    recommendations: data.recommendations,
+                    fileName: data.fileName,
+                    textSize: data.textSize
+                });
+                setShowChapterReview(true);
+                setCurrentStep('confirm');
+                setIsGenerating(false);
+                return;
+            }
 
             if (data.success) {
                 console.log('Raw API response:', data.content);
@@ -732,6 +847,66 @@ function StudyKitContent() {
         } finally {
             setIsGenerating(false);
         }
+    };
+
+    const handleConfirmChapters = async (confirmedChapters: any[]) => {
+        setShowChapterReview(false);
+        setIsGenerating(true);
+        setCurrentStep('generating');
+
+        try {
+            const types = multiSelectedTypes;
+            const response = await fetch('/api/study-kit/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: prompt,
+                    contentTypes: types,
+                    itemCount: countOption,
+                    notesDepth: depthOption,
+                    fileName: chapterDetectionMeta?.fileName,
+                    useChapters: true,
+                    chapters: confirmedChapters
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                posthog.capture('study_kit_generated_with_chapters', {
+                    prompt: prompt,
+                    content_types: types,
+                    chapter_count: confirmedChapters.length,
+                    has_file: true
+                });
+
+                setTimeout(() => {
+                    setSelectedTypes(types);
+                    const flatContent = flattenChapterContent(data.content);
+                    setGeneratedContent(flatContent);
+                    setActiveTab(types[0] || null);
+                    setCurrentStep('result');
+                    setDetectedChapters([]);
+                    setChapterDetectionMeta(null);
+                }, 0);
+            } else {
+                alert('Generation failed: ' + data.error);
+                setCurrentStep('confirm');
+            }
+        } catch (error) {
+            console.error('Chapter generation error:', error);
+            alert('Failed to generate chapter content. Please try again.');
+            setCurrentStep('confirm');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleCancelChapterReview = () => {
+        setShowChapterReview(false);
+        setDetectedChapters([]);
+        setChapterDetectionMeta(null);
+        setCurrentStep('confirm');
     };
 
     const handleBackToCreate = () => {
@@ -1165,6 +1340,83 @@ function StudyKitContent() {
                 {/* Generation Interface */}
                 {!generatedContent && !id ? (
                     <div className="max-w-4xl mx-auto">
+                        {/* Chapter Review Modal */}
+                        {showChapterReview && detectedChapters.length > 0 && mounted && createPortal(
+                            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto" style={{ position: 'fixed', inset: 0, zIndex: 9999 }}>
+                                <div className="bg-zinc-900 rounded-2xl w-full max-w-4xl my-8 border border-zinc-700 shadow-2xl relative z-[10000]">
+                                    <div className="p-4 sm:p-6 border-b border-zinc-700">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                            <div>
+                                                <h2 className="text-xl sm:text-2xl font-bold text-white">Review Detected Chapters</h2>
+                                                <p className="text-zinc-400 text-sm mt-1">
+                                                    We found {detectedChapters.length} chapters in your document. Review and adjust before generating.
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={handleCancelChapterReview}
+                                                className="p-2 hover:bg-zinc-800 rounded-lg transition self-end sm:self-auto"
+                                            >
+                                                <X className="w-5 h-5 text-zinc-400" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="p-4 sm:p-6 overflow-y-auto max-h-[50vh] sm:max-h-[60vh]">
+                                        <div className="space-y-3 sm:space-y-4">
+                                            {detectedChapters.map((chapter, index) => (
+                                                <div key={chapter.id} className="bg-zinc-800/50 rounded-xl p-3 sm:p-4 border border-zinc-700">
+                                                    <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
+                                                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-sm sm:text-base shrink-0">
+                                                            {index + 1}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-zinc-300 text-xs sm:text-sm prose prose-invert prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-h1:text-base prose-h1:font-bold prose-h2:text-sm prose-h2:font-semibold prose-h3:text-sm">
+                                                                <ReactMarkdown
+                                                                    remarkPlugins={[remarkGfm]}
+                                                                    components={{
+                                                                        table: ({ node, ...props }) => <div className="overflow-x-auto my-3 border border-zinc-700 rounded-lg"><table className="w-full text-left border-collapse min-w-full" {...props} /></div>,
+                                                                        th: ({ node, ...props }) => <th className="border-b border-zinc-700 px-3 py-2 bg-zinc-800/50 font-bold text-zinc-300 whitespace-nowrap text-xs" {...props} />,
+                                                                        td: ({ node, ...props }) => <td className="border-b border-zinc-700/50 px-3 py-2 text-zinc-400 text-xs" {...props} />,
+                                                                        hr: () => <hr className="border-zinc-700 my-3" />,
+                                                                        p: ({ node, ...props }) => <p className="my-1 text-zinc-300" {...props} />
+                                                                    }}
+                                                                >
+                                                                    {preprocessMarkdown((chapter.title || '') + '\n\n' + (chapter.summary || ''))}
+                                                                </ReactMarkdown>
+                                                            </div>
+                                                            {chapter.keyTopics && chapter.keyTopics.length > 0 && (
+                                                                <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-3">
+                                                                    {chapter.keyTopics.slice(0, 5).map((topic: string, i: number) => (
+                                                                        <span key={i} className="px-2 py-0.5 sm:py-1 bg-zinc-700 rounded text-xs text-zinc-300">
+                                                                            {topic}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="p-4 sm:p-6 border-t border-zinc-700 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0">
+                                        <button
+                                            onClick={handleCancelChapterReview}
+                                            className="px-4 py-2 text-zinc-400 hover:text-white transition order-2 sm:order-1"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={() => handleConfirmChapters(detectedChapters)}
+                                            className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl font-semibold hover:opacity-90 transition order-1 sm:order-2 text-center"
+                                        >
+                                            Generate Study Kit with {detectedChapters.length} Chapters
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>,
+                            document.body
+                        )}
+
                         <AnimatePresence mode="wait">
                             {currentStep === 'menu' && (
                                 <motion.div
@@ -2039,11 +2291,12 @@ function StudyKitContent() {
                             </AnimatePresence>
                         </div>
                     </div>
-                ) : null}
-            </div>
+                ) : null
+                }
+            </div >
 
             {/* Share Modal */}
-            <ShareModal
+            < ShareModal
                 isOpen={isOpen}
                 onClose={closeShareModal}
                 content={content || {
@@ -2057,70 +2310,72 @@ function StudyKitContent() {
 
             {/* Ad Modal for Free Users */}
             <AnimatePresence>
-                {showAdModal && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                        onClick={() => !isWatchingAd && setShowAdModal(false)}
-                    >
+                {
+                    showAdModal && (
                         <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="bg-zinc-900 border border-zinc-700 rounded-3xl p-8 max-w-md w-full text-center"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                            onClick={() => !isWatchingAd && setShowAdModal(false)}
                         >
-                            <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                                <Sparkles className="w-8 h-8 text-amber-400" />
-                            </div>
-                            <h3 className="text-2xl font-bold mb-2">Unlock More Content</h3>
-                            <p className="text-zinc-400 mb-6">
-                                Watch a short ad to generate more {adContentType === 'notes' ? 'custom notes' : adContentType}
-                            </p>
-
-                            {/* AdSense Script for Verification */}
-                            <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7134321558578802"
-                                crossOrigin="anonymous"></script>
-
-                            {/* Simulated Ad Placeholder */}
-                            <div className="bg-gradient-to-br from-indigo-900/50 to-purple-900/50 border border-indigo-500/30 rounded-2xl p-6 mb-6">
-                                <div className="text-xs uppercase tracking-widest text-indigo-400 mb-3">Sponsored</div>
-                                <div className="bg-zinc-800/50 rounded-xl p-4 mb-4">
-                                    <Crown className="w-10 h-10 text-amber-400 mx-auto mb-2" />
-                                    <p className="text-sm font-bold text-white">Upgrade to Premium</p>
-                                    <p className="text-xs text-zinc-400 mt-1">Remove ads & get unlimited generations</p>
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.9, opacity: 0 }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="bg-zinc-900 border border-zinc-700 rounded-3xl p-8 max-w-md w-full text-center"
+                            >
+                                <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <Sparkles className="w-8 h-8 text-amber-400" />
                                 </div>
-                                <button
-                                    onClick={() => router.push('/pricing')}
-                                    className="text-xs text-indigo-400 hover:text-indigo-300 transition"
-                                >
-                                    Learn More →
-                                </button>
-                            </div>
+                                <h3 className="text-2xl font-bold mb-2">Unlock More Content</h3>
+                                <p className="text-zinc-400 mb-6">
+                                    Watch a short ad to generate more {adContentType === 'notes' ? 'custom notes' : adContentType}
+                                </p>
 
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setShowAdModal(false)}
-                                    disabled={isWatchingAd}
-                                    className="flex-1 py-3 border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600 rounded-xl transition disabled:opacity-50"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleAdComplete}
-                                    disabled={isWatchingAd}
-                                    className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-xl font-bold transition disabled:opacity-50"
-                                >
-                                    {isWatchingAd ? `Wait ${adCountdown}s...` : 'Continue'}
-                                </button>
-                            </div>
+                                {/* AdSense Script for Verification */}
+                                <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7134321558578802"
+                                    crossOrigin="anonymous"></script>
+
+                                {/* Simulated Ad Placeholder */}
+                                <div className="bg-gradient-to-br from-indigo-900/50 to-purple-900/50 border border-indigo-500/30 rounded-2xl p-6 mb-6">
+                                    <div className="text-xs uppercase tracking-widest text-indigo-400 mb-3">Sponsored</div>
+                                    <div className="bg-zinc-800/50 rounded-xl p-4 mb-4">
+                                        <Crown className="w-10 h-10 text-amber-400 mx-auto mb-2" />
+                                        <p className="text-sm font-bold text-white">Upgrade to Premium</p>
+                                        <p className="text-xs text-zinc-400 mt-1">Remove ads & get unlimited generations</p>
+                                    </div>
+                                    <button
+                                        onClick={() => router.push('/pricing')}
+                                        className="text-xs text-indigo-400 hover:text-indigo-300 transition"
+                                    >
+                                        Learn More →
+                                    </button>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setShowAdModal(false)}
+                                        disabled={isWatchingAd}
+                                        className="flex-1 py-3 border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600 rounded-xl transition disabled:opacity-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleAdComplete}
+                                        disabled={isWatchingAd}
+                                        className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-xl font-bold transition disabled:opacity-50"
+                                    >
+                                        {isWatchingAd ? `Wait ${adCountdown}s...` : 'Continue'}
+                                    </button>
+                                </div>
+                            </motion.div>
                         </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
+                    )
+                }
+            </AnimatePresence >
+        </div >
     );
 }
 

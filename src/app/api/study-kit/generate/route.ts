@@ -7,6 +7,7 @@ import { generateWithRetry, extractContextFromText } from '@/lib/ai-providers';
 import { processFileContent } from '@/lib/utils/fileProcessing';
 import { detectChapters, detectChaptersFromLargeFile } from '@/lib/chapter-detection';
 import type { DetectedChapter, ChapterContent } from '@/types/chapters';
+import { getRateLimiter } from '@/lib/rate-limit';
 
 type ContentType = 'quizzes' | 'flashcards' | 'mindmaps' | 'notes';
 
@@ -636,6 +637,41 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const ratelimit = getRateLimiter();
+    if (ratelimit) {
+      const identifier = user.id;
+      const { success, limit, reset, remaining } = await ratelimit.limit(identifier);
+
+      if (!success) {
+        const resetDate = new Date(reset);
+        const retryAfter = Math.ceil((reset - Date.now()) / 1000);
+        
+        console.warn(`⚠️ Rate limit exceeded for user ${user.id}. Remaining: ${remaining}/${limit}. Reset: ${resetDate.toISOString()}`);
+        
+        return NextResponse.json(
+          {
+            error: 'Rate limit exceeded',
+            message: 'You have exceeded the maximum number of study kit generation requests. Please try again later.',
+            retryAfter,
+            resetAt: resetDate.toISOString(),
+            limit,
+            remaining: 0
+          },
+          {
+            status: 429,
+            headers: {
+              'X-RateLimit-Limit': limit.toString(),
+              'X-RateLimit-Remaining': remaining.toString(),
+              'X-RateLimit-Reset': reset.toString(),
+              'Retry-After': retryAfter.toString()
+            }
+          }
+        );
+      }
+
+      console.log(`✅ Rate limit check passed for user ${user.id}. Remaining: ${remaining}/${limit}`);
+    }
 
     const body = await request.json();
     const { prompt, contentTypes, fileName, fileContent, fileType, kitId, appendType, customInstructions, itemCount, notesDepth, useChapters, chapters: confirmedChapters } = body;

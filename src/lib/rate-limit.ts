@@ -1,7 +1,7 @@
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 
-let ratelimit: Ratelimit | null = null;
+let ratelimit: InstanceType<typeof Ratelimit> | null = null;
 
 export function getRateLimiter() {
   if (ratelimit) return ratelimit;

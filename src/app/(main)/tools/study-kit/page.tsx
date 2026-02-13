@@ -21,7 +21,6 @@ import {
     Upload,
     Info,
     Plus,
-    Sparkles,
     Send,
     Copy,
     Check,
@@ -233,7 +232,7 @@ const GeneratingView = () => {
                     <div className="relative w-24 h-24 mb-6">
                         <Loader2 className="w-full h-full text-indigo-500 animate-spin" />
                         <div className="absolute inset-0 flex items-center justify-center">
-                            <Sparkles className="w-8 h-8 text-indigo-400 animate-pulse" />
+                            <Zap className="w-8 h-8 text-indigo-400 animate-pulse" />
                         </div>
                     </div>
 
@@ -286,7 +285,7 @@ const GeneratingView = () => {
 
                 <div className="relative z-10 flex flex-col items-center">
                     <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <Sparkles className="w-3 h-3" /> Pro Study Hack
+                        <Zap className="w-3 h-3" /> Pro Study Hack
                     </span>
 
                     <AnimatePresence mode="wait">
@@ -1291,7 +1290,7 @@ function StudyKitContent() {
 
                     {/* Summary Card */}
                     <div className="bg-indigo-600/10 border border-indigo-500/20 rounded-3xl p-6 flex flex-col items-center text-center">
-                        <Sparkles className="w-8 h-8 text-indigo-400 mb-3" />
+                        <Zap className="w-8 h-8 text-indigo-400 mb-3" />
                         <div className="text-zinc-300">
                             I will generate:
                             <div className="flex flex-wrap justify-center gap-2 mt-2">
@@ -1694,7 +1693,7 @@ function StudyKitContent() {
                                                     onClick={() => setShowNotesModal(true)}
                                                     className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl font-bold text-xs transition-all"
                                                 >
-                                                    <Sparkles className="w-3 h-3" />
+                                                    <Plus className="w-3 h-3" />
                                                     Custom Notes
                                                 </button>
                                             </>
@@ -1705,7 +1704,7 @@ function StudyKitContent() {
                                                     disabled={isGeneratingMore}
                                                     className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-xs transition-all"
                                                 >
-                                                    {isGeneratingMore ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                                    {isGeneratingMore ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
                                                     Ad for 10 Quizzes
                                                 </button>
                                                 <button
@@ -1713,14 +1712,14 @@ function StudyKitContent() {
                                                     disabled={isGeneratingMore}
                                                     className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-xs transition-all"
                                                 >
-                                                    {isGeneratingMore ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                                                    {isGeneratingMore ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
                                                     Ad for 10 Flashcards
                                                 </button>
                                                 <button
                                                     onClick={() => handleWatchAd('notes')}
                                                     className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-xl font-bold text-xs transition-all"
                                                 >
-                                                    <Sparkles className="w-3 h-3" />
+                                                    <Plus className="w-3 h-3" />
                                                     Ad for Custom Notes
                                                 </button>
                                             </>
@@ -1901,7 +1900,7 @@ function StudyKitContent() {
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    <Sparkles className="w-4 h-4" />
+                                                                    <Plus className="w-4 h-4" />
                                                                     Watch Ad for 10 More Quizzes
                                                                 </>
                                                             )}
@@ -1964,7 +1963,7 @@ function StudyKitContent() {
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    <Sparkles className="w-4 h-4" />
+                                                                    <Plus className="w-4 h-4" />
                                                                     Watch Ad for 10 More Flashcards
                                                                 </>
                                                             )}
@@ -2206,7 +2205,7 @@ function StudyKitContent() {
                                                                     className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl font-bold text-sm transition-all shadow-lg"
                                                                 >
                                                                     <Crown className="w-4 h-4" />
-                                                                    <Sparkles className="w-4 h-4" />
+                                                                    <Plus className="w-4 h-4" />
                                                                     Generate Custom Notes
                                                                 </button>
                                                             ) : (
@@ -2214,7 +2213,7 @@ function StudyKitContent() {
                                                                     onClick={() => handleWatchAd('notes')}
                                                                     className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-xl font-bold text-sm transition-all shadow-lg"
                                                                 >
-                                                                    <Sparkles className="w-4 h-4" />
+                                                                    <Plus className="w-4 h-4" />
                                                                     Watch Ad for Custom Notes
                                                                 </button>
                                                             )}
@@ -2462,7 +2461,7 @@ function StudyKitContent() {
                                 className="bg-zinc-900 border border-zinc-700 rounded-3xl p-8 max-w-md w-full text-center"
                             >
                                 <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <Sparkles className="w-8 h-8 text-amber-400" />
+                                    <Plus className="w-8 h-8 text-amber-400" />
                                 </div>
                                 <h3 className="text-2xl font-bold mb-2">Unlock More Content</h3>
                                 <p className="text-zinc-400 mb-6">

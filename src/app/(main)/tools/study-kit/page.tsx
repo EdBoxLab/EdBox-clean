@@ -429,6 +429,11 @@ function StudyKitContent() {
     const [detectedChapters, setDetectedChapters] = useState<any[]>([]);
     const [showChapterReview, setShowChapterReview] = useState(false);
     const [chapterDetectionMeta, setChapterDetectionMeta] = useState<any>(null);
+    
+    // Chapter viewing state
+    const [hasChapters, setHasChapters] = useState(false);
+    const [chapterContent, setChapterContent] = useState<any[]>([]);
+    const [viewMode, setViewMode] = useState<'chapters' | 'flat'>('flat');
 
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -505,10 +510,19 @@ function StudyKitContent() {
     const normalizeContent = (content: any, requestedTypes: string[] = []) => {
         console.log('🔍 Starting normalization with:', JSON.stringify(content, null, 2));
 
-        // If content has chapters, flatten into standard shape first
+        // If content has chapters, store them separately and set viewing mode
         if (content?.chapters && Array.isArray(content.chapters)) {
-            console.log('📖 Detected chapter-based content — flattening...');
+            console.log('📖 Detected chapter-based content — preserving chapter structure...');
+            setHasChapters(true);
+            setChapterContent(content.chapters);
+            setViewMode('chapters');
+            setActiveChapter(0);
+            // Still flatten for backward compatibility with existing rendering
             content = flattenChapterContent(content);
+        } else {
+            setHasChapters(false);
+            setChapterContent([]);
+            setViewMode('flat');
         }
 
         const parseIfString = (data: any) => {
@@ -712,6 +726,27 @@ function StudyKitContent() {
         );
     };
 
+    // Get content to display based on view mode
+    const getDisplayContent = () => {
+        if (!generatedContent) return null;
+        
+        // If not in chapter view mode or no chapters, return full content
+        if (viewMode === 'flat' || !hasChapters || chapterContent.length === 0) {
+            return generatedContent;
+        }
+        
+        // In chapter view mode, return only the active chapter's content
+        const currentChapter = chapterContent[activeChapter];
+        if (!currentChapter) return generatedContent;
+        
+        return {
+            quizzes: currentChapter.quizzes || [],
+            flashcards: currentChapter.flashcards || [],
+            notes: currentChapter.notes || { deepExplanation: '', cheatsheet: '', application: '', tables: '' },
+            mindmaps: currentChapter.mindmaps || null
+        };
+    };
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setError('');
         if (e.target.files && e.target.files[0]) {
@@ -882,6 +917,13 @@ function StudyKitContent() {
 
                 setTimeout(() => {
                     setSelectedTypes(types);
+                    // Store chapter structure before flattening
+                    if (data.content?.chapters && Array.isArray(data.content.chapters)) {
+                        setHasChapters(true);
+                        setChapterContent(data.content.chapters);
+                        setViewMode('chapters');
+                        setActiveChapter(0);
+                    }
                     const flatContent = flattenChapterContent(data.content);
                     setGeneratedContent(flatContent);
                     setActiveTab(types[0] || null);
@@ -1485,6 +1527,90 @@ function StudyKitContent() {
                             return null;
                         })()}
 
+                        {/* Chapter Navigation and View Toggle */}
+                        {hasChapters && chapterContent.length > 0 && (
+                            <div className="mb-6 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-lg font-semibold text-white">Study by Chapters</h3>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setViewMode('chapters')}
+                                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                                                viewMode === 'chapters'
+                                                    ? 'bg-indigo-600 text-white'
+                                                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                            }`}
+                                        >
+                                            By Chapter
+                                        </button>
+                                        <button
+                                            onClick={() => setViewMode('flat')}
+                                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                                                viewMode === 'flat'
+                                                    ? 'bg-indigo-600 text-white'
+                                                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                            }`}
+                                        >
+                                            All Content
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                {viewMode === 'chapters' && (
+                                    <div className="bg-zinc-900/50 rounded-xl p-4 border border-zinc-800">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <button
+                                                onClick={() => setActiveChapter(Math.max(0, activeChapter - 1))}
+                                                disabled={activeChapter === 0}
+                                                className="flex items-center gap-1 px-3 py-1.5 text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                            >
+                                                <ArrowLeft className="w-4 h-4" />
+                                                Previous
+                                            </button>
+                                            
+                                            <div className="text-sm text-zinc-400">
+                                                Chapter {activeChapter + 1} of {chapterContent.length}
+                                            </div>
+                                            
+                                            <button
+                                                onClick={() => setActiveChapter(Math.min(chapterContent.length - 1, activeChapter + 1))}
+                                                disabled={activeChapter === chapterContent.length - 1}
+                                                className="flex items-center gap-1 px-3 py-1.5 text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                            >
+                                                Next
+                                                <ArrowLeft className="w-4 h-4 rotate-180" />
+                                            </button>
+                                        </div>
+
+                                        <div className="flex gap-2 overflow-x-auto pb-2">
+                                            {chapterContent.map((chapter, index) => (
+                                                <button
+                                                    key={chapter.id || index}
+                                                    onClick={() => setActiveChapter(index)}
+                                                    className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition ${
+                                                        index === activeChapter
+                                                            ? 'bg-indigo-600 text-white'
+                                                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                                    }`}
+                                                >
+                                                    {index + 1}. {chapter.title?.replace(/^(Chapter \d+:?\s*)?/i, '').slice(0, 20) || `Chapter ${index + 1}`}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="mt-4 bg-zinc-800/50 rounded-lg p-3">
+                                            <h4 className="font-semibold text-white mb-1">
+                                                {chapterContent[activeChapter]?.title || `Chapter ${activeChapter + 1}`}
+                                            </h4>
+                                            <p className="text-sm text-zinc-400">
+                                                {chapterContent[activeChapter]?.summary || 'No summary available'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Tabs */}
                         <div className="flex overflow-x-auto pb-2 gap-2 border-b border-zinc-800">
                             {selectedTypes.map(typeId => {
@@ -1606,13 +1732,19 @@ function StudyKitContent() {
                             <AnimatePresence mode="wait">
 
                                 <motion.div
-                                    key={activeTab}
+                                    key={`${activeTab}-${viewMode}-${activeChapter}`}
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
                                     transition={{ duration: 0.2 }}
                                 >
-                                    {activeTab === 'quizzes' && generatedContent.quizzes && (
+                                    {(() => {
+                                        const displayContent = getDisplayContent();
+                                        if (!displayContent) return null;
+
+                                        return (
+                                            <>
+                                                {activeTab === 'quizzes' && displayContent.quizzes && (
                                         <div className="grid gap-6">
                                             {(() => {
                                                 const handleOptionSelect = (quizIndex: number, optionIndex: number) => {
@@ -1631,13 +1763,13 @@ function StudyKitContent() {
                                                     // Update score if all are confirmed
                                                     if (newStates.every(s => s.isConfirmed)) {
                                                         const correctCount = newStates.reduce((acc, s, idx) => {
-                                                            return acc + (s.selectedOption === generatedContent.quizzes[idx].correctAnswer ? 1 : 0);
+                                                            return acc + (s.selectedOption === displayContent.quizzes[idx].correctAnswer ? 1 : 0);
                                                         }, 0);
-                                                        setScore({ correct: correctCount, total: generatedContent.quizzes.length });
+                                                        setScore({ correct: correctCount, total: displayContent.quizzes.length });
                                                     }
                                                 };
 
-                                                let quizData = generatedContent.quizzes;
+                                                let quizData = displayContent.quizzes;
                                                 if (!Array.isArray(quizData) && quizData.questions) quizData = quizData.questions;
                                                 if (!Array.isArray(quizData) || quizData.length === 0) return <div className="p-6 bg-zinc-900 rounded-xl text-center text-zinc-400">No quizzes available</div>;
 
@@ -1780,11 +1912,11 @@ function StudyKitContent() {
                                         </div>
                                     )}
 
-                                    {activeTab === 'flashcards' && generatedContent.flashcards && (
+                                    {activeTab === 'flashcards' && displayContent.flashcards && (
                                         <div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                                 {(() => {
-                                                    let flashcardData = generatedContent.flashcards;
+                                                    let flashcardData = displayContent.flashcards;
                                                     if (!Array.isArray(flashcardData)) {
                                                         if (flashcardData.flashcards) flashcardData = flashcardData.flashcards;
                                                         else if (flashcardData.cards) flashcardData = flashcardData.cards;
@@ -1843,10 +1975,10 @@ function StudyKitContent() {
                                         </div>
                                     )}
 
-                                    {activeTab === 'notes' && generatedContent.notes && (
+                                    {activeTab === 'notes' && displayContent.notes && (
                                         <div className="space-y-6 relative">
                                             {/* Note Navigation HUD */}
-                                            <NoteNavigation content={generatedContent.notes?.[activeNoteType] || ''} />
+                                            <NoteNavigation content={displayContent.notes?.[activeNoteType] || ''} />
 
                                             {/* Genie Interaction */}
                                             <TextSelectionTooltip onAskGenie={handleAskGenie} />
@@ -1878,7 +2010,7 @@ function StudyKitContent() {
                                                     </div>
                                                     <button
                                                         onClick={() => {
-                                                            const notes = generatedContent.notes;
+                                                            const notes = displayContent.notes;
                                                             const currentNote = notes?.[activeNoteType] || '';
                                                             navigator.clipboard.writeText(currentNote);
                                                         }}
@@ -1895,7 +2027,7 @@ function StudyKitContent() {
                                                 {noteSubTabs.map(tab => {
                                                     const Icon = tab.icon;
                                                     const isActive = activeNoteType === tab.id;
-                                                    const hasContent = !!(generatedContent.notes?.[tab.id]);
+                                                    const hasContent = !!(displayContent.notes?.[tab.id]);
                                                     return (
                                                         <button
                                                             key={tab.id}
@@ -2053,7 +2185,7 @@ function StudyKitContent() {
                                                                 }
                                                             }}
                                                         >
-                                                            {generatedContent.notes?.[activeNoteType] || 'No content available for this note type.'}
+                                                            {displayContent.notes?.[activeNoteType] || 'No content available for this note type.'}
                                                         </ReactMarkdown>
 
                                                     </article>
@@ -2142,7 +2274,7 @@ function StudyKitContent() {
                                         </div>
                                     )}
 
-                                    {activeTab === 'mindmaps' && generatedContent.mindmaps && (
+                                    {activeTab === 'mindmaps' && displayContent.mindmaps && (
                                         <div className="space-y-6">
                                             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl h-[600px] flex flex-col items-center shadow-2xl overflow-hidden relative touch-none">
                                                 <div className="absolute top-4 left-4 flex items-center gap-2 z-50 pointer-events-none">
@@ -2151,7 +2283,7 @@ function StudyKitContent() {
                                                 </div>
 
                                                 {(() => {
-                                                    const data = generatedContent.mindmaps;
+                                                    const data = displayContent.mindmaps;
                                                     if (!data || (!data.central && !data.center)) return <div className="text-zinc-500 mt-20">Generating visualization...</div>;
 
                                                     const centralTopic = data.central || (typeof data.center === 'object' ? data.center.topic : data.center);
@@ -2286,6 +2418,9 @@ function StudyKitContent() {
                                             </AnimatePresence>
                                         </div>
                                     )}
+                                </>
+                            );
+                        })()}
 
                                 </motion.div>
                             </AnimatePresence>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { grantAdCredit } from '@/lib/rate-limit';
+import { grantAdCredit } from '@/lib/usage';
 
 /**
  * Grant ad credits after user watches ads

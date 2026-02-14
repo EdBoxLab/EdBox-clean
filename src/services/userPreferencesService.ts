@@ -6,6 +6,7 @@ export interface DBUserPreferences {
   interests: string[];
   learning_style: 'visual' | 'auditory' | 'theoretical';
   onboarded: boolean;
+  supademo_seen: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -30,7 +31,8 @@ export const getUserPreferences = async (userId: string): Promise<UserPreference
       interests: data.interests,
       learningStyle: data.learning_style,
       onboarded: data.onboarded,
-      tour_completed: data.tour_completed
+      tour_completed: data.tour_completed,
+      supademo_seen: data.supademo_seen
     };
   } catch (error) {
     console.error('Error fetching user preferences:', error);
@@ -51,6 +53,7 @@ export const saveUserPreferences = async (
         learning_style: preferences.learningStyle,
         onboarded: preferences.onboarded,
         tour_completed: preferences.tour_completed,
+        supademo_seen: preferences.supademo_seen,
         updated_at: new Date().toISOString()
       }, {
         onConflict: 'id'

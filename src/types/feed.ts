@@ -189,6 +189,7 @@ export interface UserPreferences {
   learningStyle: 'visual' | 'auditory' | 'theoretical';
   onboarded: boolean;
   tour_completed?: boolean;
+  supademo_seen?: boolean;
 }
 
 export interface UserStats {

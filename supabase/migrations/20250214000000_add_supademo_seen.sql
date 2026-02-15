@@ -1,0 +1,2 @@
+ALTER TABLE user_preferences 
+ADD COLUMN IF NOT EXISTS supademo_seen BOOLEAN DEFAULT FALSE;

@@ -1,0 +1,7 @@
+{
+  "name": "The Pulse - Immersive Learning OS",
+  "description": "A next-generation course-taking environment featuring a glassmorphic OS-like interface and an AI Genie that co-pilots your learning journey with dynamic interactive tools.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

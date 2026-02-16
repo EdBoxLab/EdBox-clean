@@ -6,7 +6,7 @@ import "./globals.css";
 import { seoConfig } from "@/lib/seo/config";
 import { OrganizationSchema, WebsiteSchema, SoftwareApplicationSchema } from "@/lib/seo/structured-data";
 import ClientLayout from "./ClientLayout";
-
+import { SpeedInsights } from "@vercel/speed-insights/next"
 const inter = Inter({
   variable: "--font-primary",
   subsets: ["latin"],
@@ -100,20 +100,20 @@ export default function RootLayout({
       <head>
         {/* PWA Theme Colors - Dark Mode Only */}
         <meta name="theme-color" content={EDBOX_BRAND.colors.bgDark} />
-        
+
         {/* Apple PWA - Enhanced */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="EdBox" />
-        
+
         {/* Icons - Using EdBoxLogo.png */}
         <link rel="apple-touch-icon" href="/EdBoxLogo.png" />
         <link rel="icon" type="image/png" href="/EdBoxLogo.png" />
         <link rel="icon" type="image/x-icon" href="/logo_new.ico" />
-        
+
         {/* Verification */}
         <meta name="google-site-verification" content="YzGOxq7ul48yIOan9gd3sigS4kTp-9aiimYHo01po0s" />
-        
+
         {/* AdSense - For Verification */}
         <script
           async

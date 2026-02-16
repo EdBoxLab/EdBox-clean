@@ -11,7 +11,6 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 const CodeStudio = dynamic(() => import('@/lib/courseCreation/engines/codestudio/App'), { ssr: false });
 const WriteLab = dynamic(() => import('@/lib/courseCreation/engines/writingstudio/App'), { ssr: false });
 const MathLab = dynamic(() => import('@/lib/courseCreation/engines/mathlab/App'), { ssr: false });
-const LinguaLab = dynamic(() => import('@/lib/courseCreation/engines/lingualab/App'), { ssr: false });
 
 interface ImmersiveEngineViewProps {
     selectedSkill: SkillNode | null;

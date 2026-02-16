@@ -10,7 +10,6 @@ import dynamic from 'next/dynamic';
 const CodeStudio = dynamic(() => import('@/lib/courseCreation/engines/codestudio/App'), { ssr: false });
 const WriteLab = dynamic(() => import('@/lib/courseCreation/engines/writingstudio/App'), { ssr: false });
 const MathLab = dynamic(() => import('@/lib/courseCreation/engines/mathlab/App'), { ssr: false });
-const LinguaLab = dynamic(() => import('@/lib/courseCreation/engines/lingualab/App'), { ssr: false });
 
 const DEMO_SKILL_GRAPH: SkillGraph = {
     id: 'demo_graph_1',

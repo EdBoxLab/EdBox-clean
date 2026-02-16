@@ -76,8 +76,6 @@ export default function EngineModal({
         return <WriteLab {...commonProps} />;
       case 'mathlab':
         return <MathLab {...commonProps} />;
-      case 'lingualab':
-        return <LinguaLab {...commonProps} />;
       case 'finlab':
         return <WriteLab {...commonProps} />; // Default fallback
       default:
@@ -127,9 +125,8 @@ export default function EngineModal({
                   {/* Concept / Explanation Item */}
                   <button
                     onClick={() => onChallengeSelect(-1)}
-                    className={`flex-shrink-0 sm:w-full flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg text-left transition-colors ${
-                      activeChallengeIndex === -1 ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'
-                    }`}
+                    className={`flex-shrink-0 sm:w-full flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg text-left transition-colors ${activeChallengeIndex === -1 ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'
+                      }`}
                   >
                     <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/10 flex items-center justify-center shrink-0">
                       <Info size={12} className="sm:w-3.5 sm:h-3.5" />
@@ -154,13 +151,11 @@ export default function EngineModal({
                       <button
                         key={challengeId}
                         onClick={() => onChallengeSelect(idx)}
-                        className={`flex-shrink-0 sm:w-full flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg text-left transition-colors ${
-                          activeChallengeIndex === idx ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'
-                        }`}
+                        className={`flex-shrink-0 sm:w-full flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg text-left transition-colors ${activeChallengeIndex === idx ? 'bg-indigo-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'
+                          }`}
                       >
-                        <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center shrink-0 ${
-                          activeChallengeIndex === idx ? 'bg-white/20' : 'bg-zinc-800'
-                        }`}>
+                        <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center shrink-0 ${activeChallengeIndex === idx ? 'bg-white/20' : 'bg-zinc-800'
+                          }`}>
                           <span className="text-xs font-bold">{idx + 1}</span>
                         </div>
                         <div className="min-w-0 hidden sm:block">

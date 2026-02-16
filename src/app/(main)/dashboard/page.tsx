@@ -70,7 +70,7 @@ const Dashboard: React.FC = () => {
                 type: 'Course',
                 progress: Math.round((coursesJson.progress?.[c.id] || 0) * 100),
                 icon: <Book className="w-8 h-8 text-indigo-300" />,
-                href: `/learning-path/${c.id}`
+                href: `/pulse?type=COURSE&id=${c.id}`
               }));
               setCourses(mappedCourses);
 
@@ -99,7 +99,7 @@ const Dashboard: React.FC = () => {
                 id: n.id,
                 title: n.title || 'Untitled Note',
                 type: 'Note',
-                href: `/tools/notes?id=${n.id}`,
+                href: `/pulse?type=NOTE&id=${n.id}`,
                 icon: <FileText className="w-8 h-8 text-green-300" />
               })));
             }
@@ -119,7 +119,7 @@ const Dashboard: React.FC = () => {
                 id: kit.id,
                 title: kit.title || 'Untitled Study Kit',
                 type: 'Study Kit',
-                href: `/tools/study-kit?id=${kit.id}`,
+                href: `/pulse?type=STUDY_KIT&id=${kit.id}`,
                 icon: <Zap className="w-8 h-8 text-yellow-300" />
               })));
             }

@@ -97,7 +97,6 @@ export default function ImmersiveEngineView({
             case 'codestudio': return <CodeStudio {...commonProps} />;
             case 'writingstudio': return <WriteLab {...commonProps} />;
             case 'mathlab': return <MathLab {...commonProps} />;
-            case 'lingualab': return <LinguaLab {...commonProps} />;
             default: return <div className="p-8 text-center text-gray-500">Engine {engineStr} is currently being optimized...</div>;
         }
     };

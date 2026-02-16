@@ -139,8 +139,6 @@ export default function DemoCourse() {
                 return <WriteLab challenge={currentChallenge} />;
             case 'mathlab':
                 return <MathLab challenge={currentChallenge} />;
-            case 'lingualab':
-                return <LinguaLab challenge={currentChallenge} />;
             default:
                 return <div className="text-white">Engine not available for this skill.</div>;
         }

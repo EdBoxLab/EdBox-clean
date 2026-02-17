@@ -1,32 +1,36 @@
 
-import { GoogleGenAI } from "@google/genai";
 import { SYSTEM_INSTRUCTION, GENIE_TOOLS } from './genie-tooling';
 import { PulseWindow } from '../types';
-
-const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || ''; // Injected by environment
+import { getGoogleGenAIClient, hasGeminiKey } from '@/lib/ai-providers';
 
 class GenieService {
   private ai: any = null;
   private chat: any = null;
+  private isInitialized = false;
 
-  constructor() {
-    if (API_KEY) {
-      try {
-        this.ai = new GoogleGenAI({ apiKey: API_KEY });
-        this.chat = this.ai.chats.create({
-          model: 'gemini-3-flash-preview',
-          config: {
-            systemInstruction: SYSTEM_INSTRUCTION,
-            tools: GENIE_TOOLS,
-          }
-        });
-      } catch (error) {
-        console.error("Failed to initialize Genie:", error);
-      }
+  private async initialize() {
+    if (this.isInitialized) return;
+    this.isInitialized = true;
+
+    if (!hasGeminiKey()) return;
+
+    try {
+      this.ai = await getGoogleGenAIClient();
+      this.chat = this.ai.chats.create({
+        model: 'gemini-3-flash-preview',
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          tools: GENIE_TOOLS,
+        }
+      });
+    } catch (error) {
+      console.error("Failed to initialize Genie:", error);
     }
   }
 
   async sendMessage(message: string, currentWindows: PulseWindow[], onToolCall: (toolName: string, args: any) => void): Promise<string> {
+    await this.initialize();
+    
     if (!this.chat) {
       // Fallback simulation for when no API key is present (Demo Mode)
       if (message.toLowerCase().includes('neuron') || message.toLowerCase().includes('brain')) {

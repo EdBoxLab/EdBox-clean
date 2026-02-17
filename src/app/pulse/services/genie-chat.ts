@@ -1,31 +1,33 @@
 
-import { GoogleGenAI } from "@google/genai";
 import { PulseWindow } from '../types';
 import { genieToolingService } from './genie-tooling';
 import { interactionTracker } from './interaction-tracker';
-
-const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+import { getGoogleGenAIClient, hasGeminiKey } from '@/lib/ai-providers';
 
 class GenieChatService {
   private ai: any = null;
   private chat: any = null;
+  private isInitialized = false;
 
-  constructor() {
-    if (API_KEY) {
-      try {
-        this.ai = new GoogleGenAI({ apiKey: API_KEY });
-        const config = genieToolingService.getConfig();
+  private async initialize() {
+    if (this.isInitialized) return;
+    this.isInitialized = true;
 
-        this.chat = this.ai.chats.create({
-          model: 'gemini-3-flash-preview',
-          config: {
-            systemInstruction: config.systemInstruction,
-            tools: config.tools,
-          }
-        });
-      } catch (error) {
-        console.error("Failed to initialize Genie Chat:", error);
-      }
+    if (!hasGeminiKey()) return;
+
+    try {
+      this.ai = await getGoogleGenAIClient();
+      const config = genieToolingService.getConfig();
+
+      this.chat = this.ai.chats.create({
+        model: 'gemini-3-flash-preview',
+        config: {
+          systemInstruction: config.systemInstruction,
+          tools: config.tools,
+        }
+      });
+    } catch (error) {
+      console.error("Failed to initialize Genie Chat:", error);
     }
   }
 
@@ -33,6 +35,8 @@ class GenieChatService {
    * Sends a message to the Genie.
    */
   async sendMessage(message: string, currentWindows: PulseWindow[], onToolCall: (toolName: string, args: any) => void): Promise<string> {
+    await this.initialize();
+    
     if (!this.chat) {
       // Fallback simulation
       if (message.toLowerCase().includes('neuron') || message.toLowerCase().includes('brain')) {

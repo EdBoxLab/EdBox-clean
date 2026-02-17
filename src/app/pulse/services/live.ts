@@ -1,9 +1,7 @@
 
-import { GoogleGenAI } from '@google/genai';
 import { createBlob, decode, decodeAudioData } from '../utils/audioUtils';
 import { genieToolingService } from './genie-tooling';
-
-const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+import { getGoogleGenAIClient, hasGeminiKey } from '@/lib/ai-providers';
 
 interface LiveCallbacks {
   onToolCall: (name: string, args: any) => void;
@@ -13,7 +11,7 @@ interface LiveCallbacks {
 }
 
 export class LiveGenieService {
-  private ai: any;
+  private ai: any = null;
   private session: any = null;
   private inputAudioContext: AudioContext | null = null;
   private outputAudioContext: AudioContext | null = null;
@@ -25,13 +23,24 @@ export class LiveGenieService {
   private isConnected = false;
   private isPaused = false;
 
-  constructor() {
-    this.ai = new GoogleGenAI({ apiKey: API_KEY });
+  private async initialize() {
+    if (this.ai) return this.ai;
+    
+    if (!hasGeminiKey()) return null;
+    
+    this.ai = await getGoogleGenAIClient();
+    return this.ai;
   }
 
   async connect(callbacks: LiveCallbacks) {
     if (this.isConnected) return;
     this.isPaused = false;
+
+    await this.initialize();
+    if (!this.ai) {
+      callbacks.onError(new Error('Gemini API key not configured'));
+      return;
+    }
 
     try {
       // Force 16kHz sample rate for input to match the model's expectation

@@ -728,3 +728,25 @@ export async function extractContextFromText(text: string): Promise<string[]> {
 
   return Promise.all(contextPromises);
 }
+
+// ============= GOOGLE GENAI SDK (Newer SDK for Live/Chat) =============
+
+let googleGenAIClient: any = null;
+
+export async function getGoogleGenAIClient(): Promise<any> {
+  if (googleGenAIClient) return googleGenAIClient;
+  
+  const apiKey = getNextGeminiKey();
+  if (!apiKey) {
+    throw new Error('No Gemini API key available');
+  }
+  
+  const { GoogleGenAI } = await import('@google/genai');
+  googleGenAIClient = new GoogleGenAI({ apiKey });
+  return googleGenAIClient;
+}
+
+export function hasGeminiKey(): boolean {
+  const keys = getGeminiKeys();
+  return keys.length > 0;
+}

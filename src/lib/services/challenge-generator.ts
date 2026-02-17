@@ -16,7 +16,7 @@ import {
   ChallengeGenerationError,
   SkillProgressionError
 } from '@/types/skill-progression';
-import { callGroq } from '@/lib/courseCreation/engines/shared/groqService';
+import { generateWithFallback } from '@/lib/ai-providers';
 import { skillProgressionDb } from './skill-progression-db';
 import { adaptiveDifficultyService } from './adaptive-difficulty';
 import { skillProgressionCache } from './cache-service';
@@ -57,7 +57,7 @@ export class ChallengeGenerator {
   private db = skillProgressionDb;
   private challengePools = new Map<string, ChallengePool>();
   private fallbackTemplates = new Map<string, ChallengeTemplate[]>();
-  
+
   private config: GenerationConfig = {
     maxRetries: 3,
     timeoutMs: 30000,
@@ -98,22 +98,22 @@ export class ChallengeGenerator {
 
       // Try AI generation first
       const challenge = await this.generateWithAI(adjustedRequest);
-      
+
       // Cache the generated challenge
       skillProgressionCache.setChallenge(adjustedRequest.skillId, challenge);
-      
+
       // Add to pool if successful
       await this.addToPool(adjustedRequest.skillId, challenge);
-      
+
       return challenge;
     } catch (error) {
       console.error(`AI challenge generation failed for skill ${request.skillId}:`, error);
-      
+
       // Fall back to template-based generation if enabled
       if (this.config.fallbackEnabled) {
         return await this.generateFromTemplate(request);
       }
-      
+
       throw new ChallengeGenerationError(
         `Failed to generate challenge for skill ${request.skillId}: ${error}`,
         request.skillId,
@@ -174,7 +174,7 @@ export class ChallengeGenerator {
     if (!pool) {
       return [];
     }
-    
+
     return pool.challenges;
   }
 
@@ -182,13 +182,13 @@ export class ChallengeGenerator {
    * Ensure minimum pool size for a skill with adaptive difficulty for a specific user
    */
   async ensurePoolSize(
-    skillId: string, 
+    skillId: string,
     userId?: string,
     targetSize: number = this.config.poolSize.min
   ): Promise<void> {
     const currentPool = await this.getChallengePool(skillId);
     const needed = Math.max(0, targetSize - currentPool.length);
-    
+
     if (needed === 0) {
       return;
     }
@@ -211,7 +211,7 @@ export class ChallengeGenerator {
 
     // Generate needed challenges
     const generationPromises: Promise<GeneratedChallenge>[] = [];
-    
+
     for (let i = 0; i < needed; i++) {
       const request: ChallengeGenerationRequest = {
         skillId,
@@ -219,7 +219,7 @@ export class ChallengeGenerator {
         difficultyLevel: startingDifficulty,
         challengeType: skillConfig.challengeTypes[i % skillConfig.challengeTypes.length]
       };
-      
+
       generationPromises.push(this.generateChallenge(request));
     }
 
@@ -235,8 +235,8 @@ export class ChallengeGenerator {
    * Generate challenge variety for the same skill with adaptive difficulty
    */
   async generateVariedChallenges(
-    skillId: string, 
-    count: number, 
+    skillId: string,
+    count: number,
     difficultyLevel: DifficultyLevel,
     userId?: string
   ): Promise<GeneratedChallenge[]> {
@@ -272,7 +272,7 @@ export class ChallengeGenerator {
 
     for (let i = 0; i < count; i++) {
       const challengeType = skillConfig.challengeTypes[i % skillConfig.challengeTypes.length];
-      
+
       const request: ChallengeGenerationRequest = {
         skillId,
         userId,
@@ -284,12 +284,12 @@ export class ChallengeGenerator {
       try {
         const challenge = await this.generateUniqueChallenge(request, usedScenarios);
         challenges.push(challenge);
-        
+
         // Track scenario to ensure variety
         usedScenarios.add(this.extractScenario(challenge));
       } catch (error) {
         console.warn(`Failed to generate challenge ${i + 1} for skill ${skillId}:`, error);
-        
+
         // Try fallback if available
         if (this.config.fallbackEnabled) {
           try {
@@ -313,24 +313,28 @@ export class ChallengeGenerator {
     const userPrompt = this.buildUserPrompt(request);
 
     let lastError: Error | null = null;
-    
+
     for (let attempt = 1; attempt <= this.config.maxRetries; attempt++) {
       try {
-        const response = await Promise.race([
-          callGroq(systemPrompt, userPrompt, process.env.GROQ_MODEL || 'llama-3.1-8b-instant'),
-          new Promise<never>((_, reject) => 
+        const result = await Promise.race([
+          generateWithFallback({
+            systemPrompt,
+            prompt: userPrompt,
+            model: (process.env.GROQ_MODEL as any) || 'llama-3.1-8b-instant'
+          }),
+          new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('Generation timeout')), this.config.timeoutMs)
           )
         ]);
 
-        const challenge = this.parseAIResponse(response, request);
+        const challenge = this.parseAIResponse(result.text, request);
         this.validateChallenge(challenge);
-        
+
         return challenge;
       } catch (error) {
         lastError = error as Error;
         console.warn(`AI generation attempt ${attempt} failed:`, error);
-        
+
         if (attempt < this.config.maxRetries) {
           // Wait before retry with exponential backoff
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
@@ -349,8 +353,8 @@ export class ChallengeGenerator {
    * Generate challenge from fallback template
    */
   private async generateFromTemplate(request: ChallengeGenerationRequest): Promise<GeneratedChallenge> {
-    const templates = this.fallbackTemplates.get(request.challengeType || 'default') || 
-                     this.fallbackTemplates.get('default') || [];
+    const templates = this.fallbackTemplates.get(request.challengeType || 'default') ||
+      this.fallbackTemplates.get('default') || [];
 
     if (templates.length === 0) {
       throw new ChallengeGenerationError(
@@ -362,7 +366,7 @@ export class ChallengeGenerator {
 
     // Select template based on difficulty
     const suitableTemplates = templates.filter(t => t.difficultyLevel === request.difficultyLevel);
-    const template = suitableTemplates.length > 0 
+    const template = suitableTemplates.length > 0
       ? suitableTemplates[Math.floor(Math.random() * suitableTemplates.length)]
       : templates[Math.floor(Math.random() * templates.length)];
 
@@ -385,11 +389,11 @@ export class ChallengeGenerator {
    * Generate unique challenge avoiding similar scenarios
    */
   private async generateUniqueChallenge(
-    request: ChallengeGenerationRequest, 
+    request: ChallengeGenerationRequest,
     usedScenarios: Set<string>
   ): Promise<GeneratedChallenge> {
     const maxAttempts = 5;
-    
+
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const challenge = await this.generateWithAI({
         ...request,
@@ -412,7 +416,7 @@ export class ChallengeGenerator {
    */
   private async addToPool(skillId: string, challenge: GeneratedChallenge): Promise<void> {
     let pool = this.challengePools.get(skillId);
-    
+
     if (!pool) {
       pool = {
         skillId,
@@ -471,7 +475,7 @@ Return ONLY valid JSON matching this exact structure:
    */
   private buildUserPrompt(request: ChallengeGenerationRequest): string {
     let prompt = `Generate a ${request.difficultyLevel} challenge for skill: ${request.skillId}`;
-    
+
     if (request.challengeType) {
       prompt += `\nChallenge type: ${request.challengeType}`;
     }
@@ -480,7 +484,7 @@ Return ONLY valid JSON matching this exact structure:
       const recentAttempts = request.userHistory.slice(-3);
       const successRate = recentAttempts.filter(a => a.success).length / recentAttempts.length;
       prompt += `\nUser's recent performance: ${(successRate * 100).toFixed(0)}% success rate`;
-      
+
       if (successRate < 0.5) {
         prompt += `\nNote: User is struggling - provide extra scaffolding and clearer instructions`;
       } else if (successRate > 0.8) {
@@ -503,7 +507,7 @@ Return ONLY valid JSON matching this exact structure:
         .trim();
 
       const parsed = JSON.parse(cleanedResponse);
-      
+
       return {
         id: `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         skillId: request.skillId,
@@ -571,7 +575,7 @@ Return ONLY valid JSON matching this exact structure:
       .filter(word => word.length > 4)
       .slice(0, 2)
       .join(' ');
-    
+
     return `${titleWords}_${descWords}`;
   }
 

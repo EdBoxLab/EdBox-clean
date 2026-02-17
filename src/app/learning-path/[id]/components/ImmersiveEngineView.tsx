@@ -2,16 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import dynamic from 'next/dynamic';
 import { SkillNode, Challenge } from '@/lib/courseCreation/types';
 import InteractiveCourseSession from '@/components/InteractiveCourseSession';
 import { X, Trophy } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-
-const CodeStudio = dynamic(() => import('@/lib/courseCreation/engines/codestudio/App'), { ssr: false });
-const WriteLab = dynamic(() => import('@/lib/courseCreation/engines/writingstudio/App'), { ssr: false });
-const MathLab = dynamic(() => import('@/lib/courseCreation/engines/mathlab/App'), { ssr: false });
-const LinguaLab = dynamic(() => import('@/lib/courseCreation/engines/lingualab/App'), { ssr: false });
 
 interface ImmersiveEngineViewProps {
     selectedSkill: SkillNode | null;
@@ -36,7 +30,7 @@ export default function ImmersiveEngineView({
     onChallengeSelect,
     onChallengeComplete
 }: ImmersiveEngineViewProps) {
-    const [viewState, setViewState] = useState<'interactive' | 'engine' | 'success'>('interactive');
+    const [viewState, setViewState] = useState<'interactive' | 'success'>('interactive');
     const [user, setUser] = useState<any>(null);
 
     const userFetchedRef = useRef(false);
@@ -54,53 +48,13 @@ export default function ImmersiveEngineView({
     }, []);
 
     const handleInteractiveComplete = () => {
-        setViewState('engine');
-
-        if (activeChallengeIndex === -1 && sessionChallenges.length > 0) {
-            setTimeout(() => {
-                onChallengeSelect(0);
-            }, 100);
-        }
+        setViewState('success');
+        setTimeout(() => onChallengeComplete(true), 2500);
     };
-
-    const handleChallengeComplete = async (success: boolean) => {
-        if (success) {
-            setViewState('success');
-            setTimeout(() => onChallengeComplete(true), 2500);
-        } else {
-            await onChallengeComplete(false);
-        }
-    };
-
-    useEffect(() => {
-        if (activeChallengeIndex === -1) {
-            setViewState('interactive');
-        } else if (viewState !== 'success') {
-            setViewState('engine');
-        }
-    }, [activeChallengeIndex, viewState]);
 
     if (!selectedSkill) return null;
 
     const skillTitle = selectedSkill.title || (selectedSkill as any).name || 'this skill';
-
-    const renderEngine = () => {
-        if (!currentChallenge) return null;
-        const commonProps = {
-            challenge: currentChallenge,
-            onComplete: handleChallengeComplete
-        };
-
-        const engineStr = String(currentChallenge.engine || 'default').toLowerCase();
-
-        switch (engineStr) {
-            case 'codestudio': return <CodeStudio {...commonProps} />;
-            case 'writingstudio': return <WriteLab {...commonProps} />;
-            case 'mathlab': return <MathLab {...commonProps} />;
-            case 'lingualab': return <LinguaLab {...commonProps} />;
-            default: return <div className="p-8 text-center text-gray-500">Engine {engineStr} is currently being optimized...</div>;
-        }
-    };
 
     return (
         <div className="fixed inset-0 bg-gray-950 text-white z-50 flex flex-col overflow-hidden">
@@ -136,38 +90,14 @@ export default function ImmersiveEngineView({
                                 <div className="text-center">
                                     <p className="text-gray-400 mb-4">Please log in to start your learning session</p>
                                     <button
-                                        onClick={handleInteractiveComplete}
+                                        onClick={onClose}
                                         className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl font-semibold transition-all"
                                     >
-                                        Continue to Practice
+                                        Go Back
                                     </button>
                                 </div>
                             </div>
                         )}
-                    </motion.div>
-                )}
-
-                {viewState === 'engine' && (
-                    <motion.div
-                        key="engine"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className="flex-1 flex flex-col"
-                    >
-                        <header className="px-6 py-4 border-b border-gray-800 bg-gray-900/50 backdrop-blur-md flex items-center justify-between">
-                            <h1 className="text-lg font-semibold text-white">{skillTitle}</h1>
-                            <button
-                                onClick={onClose}
-                                className="p-2 hover:bg-gray-800 rounded-xl transition-colors"
-                                aria-label="Close"
-                            >
-                                <X className="w-5 h-5 text-gray-400" />
-                            </button>
-                        </header>
-                        <div className="flex-1 min-h-0">
-                            {renderEngine()}
-                        </div>
                     </motion.div>
                 )}
 

@@ -1,0 +1,185 @@
+﻿node.exe : [baseline-brows
+er-mapping] The data in 
+this module is over two 
+months old.  To ensure 
+accurate Baseline data, 
+please update: `npm i base
+line-browser-mapping@lates
+t -D`
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: ([  
+  baseline-brows...ping   
+ @latest -D`:String) [    
+], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+[baseline-browser-mapping]
+ The data in this module 
+is over two months old.  
+To ensure accurate 
+Baseline data, please 
+update: `npm i baseline-br
+owser-mapping@latest -D`
+  console.log
+    DEBUG: AI Response text: {"title":"Test Challenge","description":"Test Description","validationCriteria":["Criteria 1"],"hints":["Hint 1"],"estimatedTime":15,"learningObjectives":["Objective 1"]}
+
+      at ChallengeGenerator.log [as generateWithAI] (src/lib/services/challenge-generator.ts:330:17)
+
+  console.log
+    DEBUG: Parsed challenge: {
+      "id": "ai_1771338348148_gkq0bjhbv",
+      "skillId": "Y*H$P>",
+      "title": "Test Challenge",
+      "description": "Test Description",
+      "validationCriteria": [
+        "Criteria 1"
+      ],
+      "hints": [
+        "Hint 1"
+      ],
+      "difficultyLevel": "Easy",
+      "estimatedTime": 15,
+      "learningObjectives": [
+        "Objective 1"
+      ]
+    }
+
+      at ChallengeGenerator.log [as generateWithAI] (src/lib/services/challenge-generator.ts:332:17)
+
+  console.warn
+    AI generation attempt 1 failed: Error: AI service unavailable
+        at C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:178:56
+        at AsyncProperty.predicate (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\property\AsyncProperty.js:17:96)
+        at AsyncProperty.run (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\property\AsyncProperty.generic.js:46:39)
+        at asyncRunIt (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\runner\Runner.js:28:36)
+        at processTicksAndRejections (node:internal/process/task_queues:103:5)
+        at Object.<anonymous> (C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:171:7)
+
+    [0m [90m 336 |[39m       } [36mcatch[39m (error) {
+     [90m 337 |[39m         lastError [33m=[39m error [36mas[39m [33mError[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 338 |[39m         console[33m.[39mwarn([32m`AI generation attempt ${attempt} failed:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                 [31m[1m^[22m[39m
+     [90m 339 |[39m
+     [90m 340 |[39m         [36mif[39m (attempt [33m<[39m [36mthis[39m[33m.[39mconfig[33m.[39mmaxRetries) {
+     [90m 341 |[39m           [90m// Wait before retry with exponential backoff[39m[0m
+
+      at ChallengeGenerator.warn [as generateWithAI] (src/lib/services/challenge-generator.ts:338:17)
+      at ChallengeGenerator.generateChallenge (src/lib/services/challenge-generator.ts:100:25)
+      at src/lib/services/__tests__/challenge-generator.test.ts:181:33
+      at AsyncProperty.run (node_modules/fast-check/lib/cjs/check/property/AsyncProperty.generic.js:46:28)
+      at asyncRunIt (node_modules/fast-check/lib/cjs/check/runner/Runner.js:28:21)
+      at Object.<anonymous> (src/lib/services/__tests__/challenge-generator.test.ts:171:7)
+
+  console.warn
+    AI generation attempt 2 failed: Error: AI service unavailable
+        at C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:178:56
+        at AsyncProperty.predicate (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\property\AsyncProperty.js:17:96)
+        at AsyncProperty.run (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\property\AsyncProperty.generic.js:46:39)
+        at asyncRunIt (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\runner\Runner.js:28:36)
+        at processTicksAndRejections (node:internal/process/task_queues:103:5)
+        at Object.<anonymous> (C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:171:7)
+
+    [0m [90m 336 |[39m       } [36mcatch[39m (error) {
+     [90m 337 |[39m         lastError [33m=[39m error [36mas[39m [33mError[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 338 |[39m         console[33m.[39mwarn([32m`AI generation attempt ${attempt} failed:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                 [31m[1m^[22m[39m
+     [90m 339 |[39m
+     [90m 340 |[39m         [36mif[39m (attempt [33m<[39m [36mthis[39m[33m.[39mconfig[33m.[39mmaxRetries) {
+     [90m 341 |[39m           [90m// Wait before retry with exponential backoff[39m[0m
+
+      at ChallengeGenerator.warn [as generateWithAI] (src/lib/services/challenge-generator.ts:338:17)
+      at ChallengeGenerator.generateChallenge (src/lib/services/challenge-generator.ts:100:25)
+      at src/lib/services/__tests__/challenge-generator.test.ts:181:33
+      at AsyncProperty.run (node_modules/fast-check/lib/cjs/check/property/AsyncProperty.generic.js:46:28)
+      at asyncRunIt (node_modules/fast-check/lib/cjs/check/runner/Runner.js:28:21)
+      at Object.<anonymous> (src/lib/services/__tests__/challenge-generator.test.ts:171:7)
+
+FAIL src/lib/services/__te
+sts__/challenge-generator.
+test.ts (8.863 s)
+  ChallengeGenerator 
+Property Tests
+    Property 4: Challenge 
+Generation Completeness
+      ΓêÜ should generate 
+complete challenges with 
+all required components 
+(62 ms)
+      ├ù should handle AI 
+generation failures with 
+fallback system (5015 ms)
+
+  ΓùÅ ChallengeGenerator 
+Property Tests ΓÇ║ 
+Property 4: Challenge 
+Generation Completeness 
+ΓÇ║ should handle AI 
+generation failures with 
+fallback system
+
+    thrown: "Exceeded 
+timeout of 5000 ms for a 
+test.
+    Add a timeout value 
+to this test to increase 
+the timeout, if this is a 
+long-running test. See htt
+ps://jestjs.io/docs/api#te
+stname-fn-timeout."
+
+    [0m [90m 168 |[39m 
+    })[33m;[39m
+     [90m 169 |[39m
+    
+[31m[1m>[22m[39m[90m 
+170 |[39m     
+it([32m'should handle AI 
+generation failures with 
+fallback 
+system'[39m[33m,[39m 
+[36masync[39m () 
+[33m=>[39m {
+     [90m     |[39m     
+[31m[1m^[22m[39m
+     [90m 171 |[39m     
+  [36mawait[39m 
+fc[33m.[39massert(
+     [90m 172 |[39m     
+    fc[33m.[39masyncProp
+erty(
+     [90m 173 |[39m     
+      challengeRequestArb
+[33m,[39m[0m
+
+      at it (src/lib/servi
+ces/__tests__/challenge-ge
+nerator.test.ts:170:5)
+      at describe (src/lib
+/services/__tests__/challe
+nge-generator.test.ts:91:3
+)
+      at Object.describe (
+src/lib/services/__tests__
+/challenge-generator.test.
+ts:25:1)
+
+Test Suites: 1 failed, 1 
+total
+Tests:       1 failed, 1 
+passed, 2 total
+Snapshots:   0 total
+Time:        10.746 s
+Ran all test suites 
+matching /src\\lib\\servic
+es\\__tests__\\challenge-g
+enerator.test.ts/i.

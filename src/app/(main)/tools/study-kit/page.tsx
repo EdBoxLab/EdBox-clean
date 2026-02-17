@@ -52,6 +52,7 @@ import { RotateCcw } from 'lucide-react';
 import { NoteNavigation } from '@/components/NoteNavigation';
 import { TextSelectionTooltip } from '@/components/TextSelectionTooltip';
 import { GenieSidePanel } from '@/components/GenieSidePanel';
+import { useStudyKitStream } from '@/lib/hooks/useStudyKitStream';
 
 // Hook for safe window size usage (prevents hydration mismatch)
 function useWindowSize() {
@@ -381,6 +382,10 @@ function StudyKitContent() {
     const windowSize = useWindowSize();
     const { isPremium } = useSubscription();
 
+    const { streamGenerate, isStreaming, progress } = useStudyKitStream({
+        onComplete: (id, title) => setCurrentStep('result')
+    });
+
     const [prompt, setPrompt] = useState('');
     const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -428,7 +433,7 @@ function StudyKitContent() {
     const [detectedChapters, setDetectedChapters] = useState<any[]>([]);
     const [showChapterReview, setShowChapterReview] = useState(false);
     const [chapterDetectionMeta, setChapterDetectionMeta] = useState<any>(null);
-    
+
     // Chapter viewing state
     const [hasChapters, setHasChapters] = useState(false);
     const [chapterContent, setChapterContent] = useState<any[]>([]);
@@ -728,16 +733,16 @@ function StudyKitContent() {
     // Get content to display based on view mode
     const getDisplayContent = () => {
         if (!generatedContent) return null;
-        
+
         // If not in chapter view mode or no chapters, return full content
         if (viewMode === 'flat' || !hasChapters || chapterContent.length === 0) {
             return generatedContent;
         }
-        
+
         // In chapter view mode, return only the active chapter's content
         const currentChapter = chapterContent[activeChapter];
         if (!currentChapter) return generatedContent;
-        
+
         return {
             quizzes: currentChapter.quizzes || [],
             flashcards: currentChapter.flashcards || [],
@@ -787,7 +792,7 @@ function StudyKitContent() {
 
         setIsGenerating(true);
         setCurrentStep('generating');
-        setGeneratedContent(null); // Clear old content
+        setGeneratedContent(null);
         setActiveTab(null);
 
         try {
@@ -806,6 +811,41 @@ function StudyKitContent() {
                     type: uploadedFile.type,
                     content: content
                 };
+            }
+
+            // Use streaming for prompt-only generation
+            if (!uploadedFile && prompt.trim()) {
+                const result = await streamGenerate({
+                    prompt,
+                    contentTypes: types,
+                    itemCount: countOption,
+                    notesDepth: depthOption
+                });
+
+                if (result) {
+                    const normalized = normalizeContent(result, types);
+
+                    posthog.capture('study_kit_generated', {
+                        prompt: prompt,
+                        content_types: types,
+                        item_count: countOption,
+                        notes_depth: depthOption,
+                        has_file: false
+                    });
+
+                    setSelectedTypes(types);
+                    setGeneratedContent(normalized);
+                    setActiveTab(types[0]);
+
+                    if (normalized.quizzes && Array.isArray(normalized.quizzes)) {
+                        setCurrentQuizStates(normalized.quizzes.map(() => ({
+                            selectedOption: null,
+                            isConfirmed: false
+                        })));
+                        setScore(null);
+                    }
+                }
+                return;
             }
 
             const response = await fetch('/api/study-kit/generate', {
@@ -1534,27 +1574,25 @@ function StudyKitContent() {
                                     <div className="flex items-center gap-2">
                                         <button
                                             onClick={() => setViewMode('chapters')}
-                                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                                                viewMode === 'chapters'
-                                                    ? 'bg-indigo-600 text-white'
-                                                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                                            }`}
+                                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${viewMode === 'chapters'
+                                                ? 'bg-indigo-600 text-white'
+                                                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                                }`}
                                         >
                                             By Chapter
                                         </button>
                                         <button
                                             onClick={() => setViewMode('flat')}
-                                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                                                viewMode === 'flat'
-                                                    ? 'bg-indigo-600 text-white'
-                                                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                                            }`}
+                                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${viewMode === 'flat'
+                                                ? 'bg-indigo-600 text-white'
+                                                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                                }`}
                                         >
                                             All Content
                                         </button>
                                     </div>
                                 </div>
-                                
+
                                 {viewMode === 'chapters' && (
                                     <div className="bg-zinc-900/50 rounded-xl p-4 border border-zinc-800">
                                         <div className="flex items-center justify-between mb-4">
@@ -1566,11 +1604,11 @@ function StudyKitContent() {
                                                 <ArrowLeft className="w-4 h-4" />
                                                 Previous
                                             </button>
-                                            
+
                                             <div className="text-sm text-zinc-400">
                                                 Chapter {activeChapter + 1} of {chapterContent.length}
                                             </div>
-                                            
+
                                             <button
                                                 onClick={() => setActiveChapter(Math.min(chapterContent.length - 1, activeChapter + 1))}
                                                 disabled={activeChapter === chapterContent.length - 1}
@@ -1586,11 +1624,10 @@ function StudyKitContent() {
                                                 <button
                                                     key={chapter.id || index}
                                                     onClick={() => setActiveChapter(index)}
-                                                    className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition ${
-                                                        index === activeChapter
-                                                            ? 'bg-indigo-600 text-white'
-                                                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                                                    }`}
+                                                    className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition ${index === activeChapter
+                                                        ? 'bg-indigo-600 text-white'
+                                                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                                                        }`}
                                                 >
                                                     {index + 1}. {chapter.title?.replace(/^(Chapter \d+:?\s*)?/i, '').slice(0, 20) || `Chapter ${index + 1}`}
                                                 </button>
@@ -1744,316 +1781,316 @@ function StudyKitContent() {
                                         return (
                                             <>
                                                 {activeTab === 'quizzes' && displayContent.quizzes && (
-                                        <div className="grid gap-6">
-                                            {(() => {
-                                                const handleOptionSelect = (quizIndex: number, optionIndex: number) => {
-                                                    if (currentQuizStates[quizIndex]?.isConfirmed) return;
-
-                                                    const newStates = [...currentQuizStates];
-                                                    newStates[quizIndex] = { ...newStates[quizIndex], selectedOption: optionIndex };
-                                                    setCurrentQuizStates(newStates);
-                                                };
-
-                                                const handleConfirm = (quizIndex: number) => {
-                                                    const newStates = [...currentQuizStates];
-                                                    newStates[quizIndex] = { ...newStates[quizIndex], isConfirmed: true };
-                                                    setCurrentQuizStates(newStates);
-
-                                                    // Update score if all are confirmed
-                                                    if (newStates.every(s => s.isConfirmed)) {
-                                                        const correctCount = newStates.reduce((acc, s, idx) => {
-                                                            return acc + (s.selectedOption === displayContent.quizzes[idx].correctAnswer ? 1 : 0);
-                                                        }, 0);
-                                                        setScore({ correct: correctCount, total: displayContent.quizzes.length });
-                                                    }
-                                                };
-
-                                                let quizData = displayContent.quizzes;
-                                                if (!Array.isArray(quizData) && quizData.questions) quizData = quizData.questions;
-                                                if (!Array.isArray(quizData) || quizData.length === 0) return <div className="p-6 bg-zinc-900 rounded-xl text-center text-zinc-400">No quizzes available</div>;
-
-                                                return (
-                                                    <>
-                                                        {score && (
-                                                            <motion.div
-                                                                initial={{ opacity: 0, scale: 0.9 }}
-                                                                animate={{ opacity: 1, scale: 1 }}
-                                                                className="bg-indigo-600 rounded-xl p-6 text-center mb-6"
-                                                            >
-                                                                <h4 className="text-2xl font-bold mb-2">Quiz Complete!</h4>
-                                                                <p className="text-indigo-100 text-lg">Your Score: {score.correct} / {score.total} ({Math.round((score.correct / score.total) * 100)}%)</p>
-                                                            </motion.div>
-                                                        )}
-                                                        {quizData.map((quiz: any, i: number) => {
-                                                            const state = currentQuizStates[i];
-                                                            const isCorrect = state?.selectedOption === quiz.correctAnswer;
-                                                            const showExplanation = state?.isConfirmed;
-
-                                                            return (
-                                                                <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                                                                    <div className="flex justify-between items-start mb-4">
-                                                                        <h3 className="font-bold text-lg flex gap-3">
-                                                                            <span className="bg-indigo-500/20 text-indigo-400 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm">
-                                                                                {i + 1}
-                                                                            </span>
-                                                                            {quiz.question}
-                                                                        </h3>
-                                                                        {quiz.difficulty && (
-                                                                            <span className={`text-xs px-2 py-1 rounded-full ${quiz.difficulty === 'Hard' ? 'bg-red-500/10 text-red-400' :
-                                                                                quiz.difficulty === 'Medium' ? 'bg-yellow-500/10 text-yellow-400' :
-                                                                                    'bg-green-500/10 text-green-400'
-                                                                                }`}>
-                                                                                {quiz.difficulty}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="space-y-2 pl-11">
-                                                                        {quiz.options?.map((opt: string, optIndex: number) => {
-                                                                            const isSelected = state?.selectedOption === optIndex;
-                                                                            const isAnswer = optIndex === quiz.correctAnswer;
-
-                                                                            let borderColor = 'border-zinc-800';
-                                                                            let bgColor = 'bg-zinc-950/50';
-
-                                                                            if (state?.isConfirmed) {
-                                                                                if (isAnswer) {
-                                                                                    borderColor = 'border-green-500';
-                                                                                    bgColor = 'bg-green-500/10';
-                                                                                } else if (isSelected && !isCorrect) {
-                                                                                    borderColor = 'border-red-500';
-                                                                                    bgColor = 'bg-red-500/10';
-                                                                                }
-                                                                            } else if (isSelected) {
-                                                                                borderColor = 'border-indigo-500';
-                                                                                bgColor = 'bg-indigo-500/10';
-                                                                            }
-
-                                                                            return (
-                                                                                <button
-                                                                                    key={optIndex}
-                                                                                    disabled={state?.isConfirmed}
-                                                                                    onClick={() => handleOptionSelect(i, optIndex)}
-                                                                                    className={`w-full text-left p-3 rounded-lg border transition ${borderColor} ${bgColor} ${!state?.isConfirmed && 'hover:border-zinc-600'}`}
-                                                                                >
-                                                                                    {opt}
-                                                                                </button>
-                                                                            );
-                                                                        })}
-                                                                        {!state?.isConfirmed && state?.selectedOption !== null && (
-                                                                            <button
-                                                                                onClick={() => handleConfirm(i)}
-                                                                                className="mt-4 px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-bold transition"
-                                                                            >
-                                                                                Check Answer
-                                                                            </button>
-                                                                        )}
-                                                                        {showExplanation && (
-                                                                            <motion.div
-                                                                                initial={{ opacity: 0, height: 0 }}
-                                                                                animate={{ opacity: 1, height: 'auto' }}
-                                                                                className="mt-4 p-4 bg-zinc-800/50 rounded-lg text-sm border-l-4 border-indigo-500"
-                                                                            >
-                                                                                <p className="font-bold text-indigo-400 mb-1">Explanation:</p>
-                                                                                <p className="text-zinc-300">{quiz.explanation}</p>
-                                                                            </motion.div>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </>
-                                                );
-                                            })()}
-
-                                            {/* Generate More Quizzes Button - Always Visible */}
-                                            {studyKit && (
-                                                <div className="mt-6 flex justify-center">
-                                                    {isPremium ? (
-                                                        <button
-                                                            onClick={() => handleGenerateMore('quizzes')}
-                                                            disabled={isGeneratingMore}
-                                                            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-sm transition-all shadow-lg"
-                                                        >
-                                                            {isGeneratingMore ? (
-                                                                <>
-                                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                                    Generating...
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <Crown className="w-4 h-4" />
-                                                                    <Plus className="w-4 h-4" />
-                                                                    Generate 10 More Quizzes
-                                                                </>
-                                                            )}
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => handleWatchAd('quizzes')}
-                                                            disabled={isGeneratingMore}
-                                                            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-sm transition-all shadow-lg"
-                                                        >
-                                                            {isGeneratingMore ? (
-                                                                <>
-                                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                                    Generating...
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <Plus className="w-4 h-4" />
-                                                                    Watch Ad for 10 More Quizzes
-                                                                </>
-                                                            )}
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {activeTab === 'flashcards' && displayContent.flashcards && (
-                                        <div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                                {(() => {
-                                                    let flashcardData = displayContent.flashcards;
-                                                    if (!Array.isArray(flashcardData)) {
-                                                        if (flashcardData.flashcards) flashcardData = flashcardData.flashcards;
-                                                        else if (flashcardData.cards) flashcardData = flashcardData.cards;
-                                                    }
-                                                    if (!Array.isArray(flashcardData) || flashcardData.length === 0) return <div className="col-span-full p-6 bg-zinc-900 rounded-xl text-center text-zinc-400">No flashcards available</div>;
-
-                                                    return flashcardData.map((card: any, i: number) => (
-                                                        <FlashcardItem key={i} card={card} />
-                                                    ));
-                                                })()}
-                                            </div>
-
-                                            {/* Generate More Flashcards Button - Always Visible */}
-                                            {studyKit && (
-                                                <div className="mt-6 flex justify-center">
-                                                    {isPremium ? (
-                                                        <button
-                                                            onClick={() => handleGenerateMore('flashcards')}
-                                                            disabled={isGeneratingMore}
-                                                            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-sm transition-all shadow-lg"
-                                                        >
-                                                            {isGeneratingMore ? (
-                                                                <>
-                                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                                    Generating...
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <Crown className="w-4 h-4" />
-                                                                    <Plus className="w-4 h-4" />
-                                                                    Generate 10 More Flashcards
-                                                                </>
-                                                            )}
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => handleWatchAd('flashcards')}
-                                                            disabled={isGeneratingMore}
-                                                            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-sm transition-all shadow-lg"
-                                                        >
-                                                            {isGeneratingMore ? (
-                                                                <>
-                                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                                    Generating...
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <Plus className="w-4 h-4" />
-                                                                    Watch Ad for 10 More Flashcards
-                                                                </>
-                                                            )}
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {activeTab === 'notes' && displayContent.notes && (
-                                        <div className="space-y-6 relative">
-                                            {/* Note Navigation HUD */}
-                                            <NoteNavigation content={displayContent.notes?.[activeNoteType] || ''} />
-
-                                            {/* Genie Interaction */}
-                                            <TextSelectionTooltip onAskGenie={handleAskGenie} />
-                                            <GenieSidePanel
-                                                isOpen={isGenieOpen}
-                                                onClose={() => setIsGenieOpen(false)}
-                                                contextText={genieContext}
-                                            />
-
-                                            {/* Notes Header */}
-                                            <div className="bg-gradient-to-br from-indigo-950/80 via-zinc-900 to-purple-950/50 border border-indigo-500/20 rounded-3xl p-6 sm:p-8">
-                                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                                    <div className="flex items-center gap-4">
+                                                    <div className="grid gap-6">
                                                         {(() => {
-                                                            const activeSubTab = noteSubTabs.find(t => t.id === activeNoteType);
-                                                            const Icon = activeSubTab?.icon || FileText;
+                                                            const handleOptionSelect = (quizIndex: number, optionIndex: number) => {
+                                                                if (currentQuizStates[quizIndex]?.isConfirmed) return;
+
+                                                                const newStates = [...currentQuizStates];
+                                                                newStates[quizIndex] = { ...newStates[quizIndex], selectedOption: optionIndex };
+                                                                setCurrentQuizStates(newStates);
+                                                            };
+
+                                                            const handleConfirm = (quizIndex: number) => {
+                                                                const newStates = [...currentQuizStates];
+                                                                newStates[quizIndex] = { ...newStates[quizIndex], isConfirmed: true };
+                                                                setCurrentQuizStates(newStates);
+
+                                                                // Update score if all are confirmed
+                                                                if (newStates.every(s => s.isConfirmed)) {
+                                                                    const correctCount = newStates.reduce((acc, s, idx) => {
+                                                                        return acc + (s.selectedOption === displayContent.quizzes[idx].correctAnswer ? 1 : 0);
+                                                                    }, 0);
+                                                                    setScore({ correct: correctCount, total: displayContent.quizzes.length });
+                                                                }
+                                                            };
+
+                                                            let quizData = displayContent.quizzes;
+                                                            if (!Array.isArray(quizData) && quizData.questions) quizData = quizData.questions;
+                                                            if (!Array.isArray(quizData) || quizData.length === 0) return <div className="p-6 bg-zinc-900 rounded-xl text-center text-zinc-400">No quizzes available</div>;
+
                                                             return (
-                                                                <div className={`w-12 h-12 ${activeSubTab?.bg || 'bg-indigo-500/20'} rounded-2xl flex items-center justify-center`}>
-                                                                    <Icon className={`w-6 h-6 ${activeSubTab?.color || 'text-indigo-400'}`} />
-                                                                </div>
+                                                                <>
+                                                                    {score && (
+                                                                        <motion.div
+                                                                            initial={{ opacity: 0, scale: 0.9 }}
+                                                                            animate={{ opacity: 1, scale: 1 }}
+                                                                            className="bg-indigo-600 rounded-xl p-6 text-center mb-6"
+                                                                        >
+                                                                            <h4 className="text-2xl font-bold mb-2">Quiz Complete!</h4>
+                                                                            <p className="text-indigo-100 text-lg">Your Score: {score.correct} / {score.total} ({Math.round((score.correct / score.total) * 100)}%)</p>
+                                                                        </motion.div>
+                                                                    )}
+                                                                    {quizData.map((quiz: any, i: number) => {
+                                                                        const state = currentQuizStates[i];
+                                                                        const isCorrect = state?.selectedOption === quiz.correctAnswer;
+                                                                        const showExplanation = state?.isConfirmed;
+
+                                                                        return (
+                                                                            <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                                                                                <div className="flex justify-between items-start mb-4">
+                                                                                    <h3 className="font-bold text-lg flex gap-3">
+                                                                                        <span className="bg-indigo-500/20 text-indigo-400 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm">
+                                                                                            {i + 1}
+                                                                                        </span>
+                                                                                        {quiz.question}
+                                                                                    </h3>
+                                                                                    {quiz.difficulty && (
+                                                                                        <span className={`text-xs px-2 py-1 rounded-full ${quiz.difficulty === 'Hard' ? 'bg-red-500/10 text-red-400' :
+                                                                                            quiz.difficulty === 'Medium' ? 'bg-yellow-500/10 text-yellow-400' :
+                                                                                                'bg-green-500/10 text-green-400'
+                                                                                            }`}>
+                                                                                            {quiz.difficulty}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                                <div className="space-y-2 pl-11">
+                                                                                    {quiz.options?.map((opt: string, optIndex: number) => {
+                                                                                        const isSelected = state?.selectedOption === optIndex;
+                                                                                        const isAnswer = optIndex === quiz.correctAnswer;
+
+                                                                                        let borderColor = 'border-zinc-800';
+                                                                                        let bgColor = 'bg-zinc-950/50';
+
+                                                                                        if (state?.isConfirmed) {
+                                                                                            if (isAnswer) {
+                                                                                                borderColor = 'border-green-500';
+                                                                                                bgColor = 'bg-green-500/10';
+                                                                                            } else if (isSelected && !isCorrect) {
+                                                                                                borderColor = 'border-red-500';
+                                                                                                bgColor = 'bg-red-500/10';
+                                                                                            }
+                                                                                        } else if (isSelected) {
+                                                                                            borderColor = 'border-indigo-500';
+                                                                                            bgColor = 'bg-indigo-500/10';
+                                                                                        }
+
+                                                                                        return (
+                                                                                            <button
+                                                                                                key={optIndex}
+                                                                                                disabled={state?.isConfirmed}
+                                                                                                onClick={() => handleOptionSelect(i, optIndex)}
+                                                                                                className={`w-full text-left p-3 rounded-lg border transition ${borderColor} ${bgColor} ${!state?.isConfirmed && 'hover:border-zinc-600'}`}
+                                                                                            >
+                                                                                                {opt}
+                                                                                            </button>
+                                                                                        );
+                                                                                    })}
+                                                                                    {!state?.isConfirmed && state?.selectedOption !== null && (
+                                                                                        <button
+                                                                                            onClick={() => handleConfirm(i)}
+                                                                                            className="mt-4 px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-bold transition"
+                                                                                        >
+                                                                                            Check Answer
+                                                                                        </button>
+                                                                                    )}
+                                                                                    {showExplanation && (
+                                                                                        <motion.div
+                                                                                            initial={{ opacity: 0, height: 0 }}
+                                                                                            animate={{ opacity: 1, height: 'auto' }}
+                                                                                            className="mt-4 p-4 bg-zinc-800/50 rounded-lg text-sm border-l-4 border-indigo-500"
+                                                                                        >
+                                                                                            <p className="font-bold text-indigo-400 mb-1">Explanation:</p>
+                                                                                            <p className="text-zinc-300">{quiz.explanation}</p>
+                                                                                        </motion.div>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </>
                                                             );
                                                         })()}
-                                                        <div>
-                                                            <h3 className="text-xl font-bold text-white">Study Notes</h3>
-                                                            <p className="text-sm text-zinc-400">
-                                                                {noteSubTabs.find(t => t.id === activeNoteType)?.tag || 'AI-generated comprehensive notes'}
-                                                            </p>
-                                                        </div>
+
+                                                        {/* Generate More Quizzes Button - Always Visible */}
+                                                        {studyKit && (
+                                                            <div className="mt-6 flex justify-center">
+                                                                {isPremium ? (
+                                                                    <button
+                                                                        onClick={() => handleGenerateMore('quizzes')}
+                                                                        disabled={isGeneratingMore}
+                                                                        className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-sm transition-all shadow-lg"
+                                                                    >
+                                                                        {isGeneratingMore ? (
+                                                                            <>
+                                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                                                Generating...
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <Crown className="w-4 h-4" />
+                                                                                <Plus className="w-4 h-4" />
+                                                                                Generate 10 More Quizzes
+                                                                            </>
+                                                                        )}
+                                                                    </button>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => handleWatchAd('quizzes')}
+                                                                        disabled={isGeneratingMore}
+                                                                        className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-sm transition-all shadow-lg"
+                                                                    >
+                                                                        {isGeneratingMore ? (
+                                                                            <>
+                                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                                                Generating...
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <Plus className="w-4 h-4" />
+                                                                                Watch Ad for 10 More Quizzes
+                                                                            </>
+                                                                        )}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    <button
-                                                        onClick={() => {
-                                                            const notes = displayContent.notes;
-                                                            const currentNote = notes?.[activeNoteType] || '';
-                                                            navigator.clipboard.writeText(currentNote);
-                                                        }}
-                                                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-sm font-bold transition-all"
-                                                    >
-                                                        <Copy className="w-4 h-4" />
-                                                        Copy
-                                                    </button>
-                                                </div>
-                                            </div>
+                                                )}
 
-                                            {/* Note Sub-Tabs */}
-                                            <div className="flex overflow-x-auto gap-2 pb-1">
-                                                {noteSubTabs.map(tab => {
-                                                    const Icon = tab.icon;
-                                                    const isActive = activeNoteType === tab.id;
-                                                    const hasContent = !!(displayContent.notes?.[tab.id]);
-                                                    return (
-                                                        <button
-                                                            key={tab.id}
-                                                            onClick={() => setActiveNoteType(tab.id)}
-                                                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap border ${isActive
-                                                                ? `${tab.bg} ${tab.border} ${tab.color}`
-                                                                : hasContent
-                                                                    ? 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:border-zinc-700'
-                                                                    : 'border-zinc-800/50 bg-zinc-900/30 text-zinc-600 cursor-default'
-                                                                }`}
-                                                            disabled={!hasContent}
-                                                        >
-                                                            <Icon className="w-4 h-4" />
-                                                            <span className="hidden sm:inline">{tab.label}</span>
-                                                            <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
+                                                {activeTab === 'flashcards' && displayContent.flashcards && (
+                                                    <div>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                            {(() => {
+                                                                let flashcardData = displayContent.flashcards;
+                                                                if (!Array.isArray(flashcardData)) {
+                                                                    if (flashcardData.flashcards) flashcardData = flashcardData.flashcards;
+                                                                    else if (flashcardData.cards) flashcardData = flashcardData.cards;
+                                                                }
+                                                                if (!Array.isArray(flashcardData) || flashcardData.length === 0) return <div className="col-span-full p-6 bg-zinc-900 rounded-xl text-center text-zinc-400">No flashcards available</div>;
 
-                                            {/* Notes Content */}
-                                            <div className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl">
-                                                {/* Decorative top bar */}
-                                                <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+                                                                return flashcardData.map((card: any, i: number) => (
+                                                                    <FlashcardItem key={i} card={card} />
+                                                                ));
+                                                            })()}
+                                                        </div>
 
-                                                <div className="p-6 sm:p-10">
-                                                    <article className="prose prose-invert max-w-none 
+                                                        {/* Generate More Flashcards Button - Always Visible */}
+                                                        {studyKit && (
+                                                            <div className="mt-6 flex justify-center">
+                                                                {isPremium ? (
+                                                                    <button
+                                                                        onClick={() => handleGenerateMore('flashcards')}
+                                                                        disabled={isGeneratingMore}
+                                                                        className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-sm transition-all shadow-lg"
+                                                                    >
+                                                                        {isGeneratingMore ? (
+                                                                            <>
+                                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                                                Generating...
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <Crown className="w-4 h-4" />
+                                                                                <Plus className="w-4 h-4" />
+                                                                                Generate 10 More Flashcards
+                                                                            </>
+                                                                        )}
+                                                                    </button>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => handleWatchAd('flashcards')}
+                                                                        disabled={isGeneratingMore}
+                                                                        className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-zinc-700 disabled:to-zinc-700 rounded-xl font-bold text-sm transition-all shadow-lg"
+                                                                    >
+                                                                        {isGeneratingMore ? (
+                                                                            <>
+                                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                                                Generating...
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <Plus className="w-4 h-4" />
+                                                                                Watch Ad for 10 More Flashcards
+                                                                            </>
+                                                                        )}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {activeTab === 'notes' && displayContent.notes && (
+                                                    <div className="space-y-6 relative">
+                                                        {/* Note Navigation HUD */}
+                                                        <NoteNavigation content={displayContent.notes?.[activeNoteType] || ''} />
+
+                                                        {/* Genie Interaction */}
+                                                        <TextSelectionTooltip onAskGenie={handleAskGenie} />
+                                                        <GenieSidePanel
+                                                            isOpen={isGenieOpen}
+                                                            onClose={() => setIsGenieOpen(false)}
+                                                            contextText={genieContext}
+                                                        />
+
+                                                        {/* Notes Header */}
+                                                        <div className="bg-gradient-to-br from-indigo-950/80 via-zinc-900 to-purple-950/50 border border-indigo-500/20 rounded-3xl p-6 sm:p-8">
+                                                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                                                <div className="flex items-center gap-4">
+                                                                    {(() => {
+                                                                        const activeSubTab = noteSubTabs.find(t => t.id === activeNoteType);
+                                                                        const Icon = activeSubTab?.icon || FileText;
+                                                                        return (
+                                                                            <div className={`w-12 h-12 ${activeSubTab?.bg || 'bg-indigo-500/20'} rounded-2xl flex items-center justify-center`}>
+                                                                                <Icon className={`w-6 h-6 ${activeSubTab?.color || 'text-indigo-400'}`} />
+                                                                            </div>
+                                                                        );
+                                                                    })()}
+                                                                    <div>
+                                                                        <h3 className="text-xl font-bold text-white">Study Notes</h3>
+                                                                        <p className="text-sm text-zinc-400">
+                                                                            {noteSubTabs.find(t => t.id === activeNoteType)?.tag || 'AI-generated comprehensive notes'}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const notes = displayContent.notes;
+                                                                        const currentNote = notes?.[activeNoteType] || '';
+                                                                        navigator.clipboard.writeText(currentNote);
+                                                                    }}
+                                                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-sm font-bold transition-all"
+                                                                >
+                                                                    <Copy className="w-4 h-4" />
+                                                                    Copy
+                                                                </button>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Note Sub-Tabs */}
+                                                        <div className="flex overflow-x-auto gap-2 pb-1">
+                                                            {noteSubTabs.map(tab => {
+                                                                const Icon = tab.icon;
+                                                                const isActive = activeNoteType === tab.id;
+                                                                const hasContent = !!(displayContent.notes?.[tab.id]);
+                                                                return (
+                                                                    <button
+                                                                        key={tab.id}
+                                                                        onClick={() => setActiveNoteType(tab.id)}
+                                                                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap border ${isActive
+                                                                            ? `${tab.bg} ${tab.border} ${tab.color}`
+                                                                            : hasContent
+                                                                                ? 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:border-zinc-700'
+                                                                                : 'border-zinc-800/50 bg-zinc-900/30 text-zinc-600 cursor-default'
+                                                                            }`}
+                                                                        disabled={!hasContent}
+                                                                    >
+                                                                        <Icon className="w-4 h-4" />
+                                                                        <span className="hidden sm:inline">{tab.label}</span>
+                                                                        <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+
+                                                        {/* Notes Content */}
+                                                        <div className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl">
+                                                            {/* Decorative top bar */}
+                                                            <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+
+                                                            <div className="p-6 sm:p-10">
+                                                                <article className="prose prose-invert max-w-none 
                                                         prose-headings:font-black prose-headings:tracking-tight
                                                         prose-h1:text-4xl sm:prose-h1:text-5xl prose-h1:mb-12 prose-h1:pb-8 prose-h1:border-b-4 prose-h1:border-indigo-500/50 prose-h1:bg-gradient-to-r prose-h1:from-white prose-h1:via-indigo-200 prose-h1:to-purple-200 prose-h1:bg-clip-text prose-h1:text-transparent
                                                         prose-h2:text-3xl prose-h2:mt-16 prose-h2:mb-8 prose-h2:text-indigo-400 prose-h2:flex prose-h2:items-center prose-h2:gap-4 prose-h2:uppercase prose-h2:tracking-wider
@@ -2067,359 +2104,359 @@ function StudyKitContent() {
                                                         prose-th:bg-zinc-900 prose-th:text-indigo-400 prose-th:font-black prose-th:tracking-widest prose-th:py-4
                                                         prose-td:py-4 prose-td:text-zinc-300
                                                     ">
-                                                        <ReactMarkdown
-                                                            remarkPlugins={[remarkGfm, remarkMath]}
-                                                            rehypePlugins={[rehypeKatex]}
-                                                            components={{
-                                                                h1: ({ children }) => (
-                                                                    <h1 className="relative flex items-center gap-4">
-                                                                        <Zap className="w-10 h-10 text-indigo-400 shrink-0" />
-                                                                        {children}
-                                                                    </h1>
-                                                                ),
-                                                                h2: ({ children }) => {
-                                                                    // Extract emoji if present to use as icon
-                                                                    const text = String(children);
-                                                                    const emojiMatch = text.match(/^([\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}])/u);
-                                                                    const emoji = emojiMatch ? emojiMatch[0] : null;
-                                                                    const cleanText = emoji ? text.replace(emoji, '').trim() : text;
+                                                                    <ReactMarkdown
+                                                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                                                        rehypePlugins={[rehypeKatex]}
+                                                                        components={{
+                                                                            h1: ({ children }) => (
+                                                                                <h1 className="relative flex items-center gap-4">
+                                                                                    <Zap className="w-10 h-10 text-indigo-400 shrink-0" />
+                                                                                    {children}
+                                                                                </h1>
+                                                                            ),
+                                                                            h2: ({ children }) => {
+                                                                                // Extract emoji if present to use as icon
+                                                                                const text = String(children);
+                                                                                const emojiMatch = text.match(/^([\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}])/u);
+                                                                                const emoji = emojiMatch ? emojiMatch[0] : null;
+                                                                                const cleanText = emoji ? text.replace(emoji, '').trim() : text;
 
-                                                                    return (
-                                                                        <h2 className="group flex items-center gap-4">
-                                                                            {emoji ? (
-                                                                                <span className="w-12 h-12 flex items-center justify-center bg-zinc-900 border border-zinc-800 rounded-2xl text-2xl group-hover:border-indigo-500 transition-all shadow-xl shadow-indigo-500/10">
-                                                                                    {emoji}
-                                                                                </span>
-                                                                            ) : (
-                                                                                <span className="w-12 h-12 flex items-center justify-center bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-indigo-400 text-xl font-black group-hover:bg-indigo-500/20 transition-all">§</span>
-                                                                            )}
-                                                                            {cleanText}
-                                                                        </h2>
-                                                                    );
-                                                                },
-                                                                blockquote: ({ children }) => (
-                                                                    <blockquote className="relative overflow-hidden">
-                                                                        <div className="absolute top-0 right-0 p-4 opacity-10">
-                                                                            <Crown className="w-20 h-20 text-indigo-400" />
-                                                                        </div>
-                                                                        <div className="relative z-10">
-                                                                            {children}
-                                                                        </div>
-                                                                    </blockquote>
-                                                                ),
-                                                                ul: ({ children }) => (
-                                                                    <ul className="space-y-4 my-8">
-                                                                        {children}
-                                                                    </ul>
-                                                                ),
-                                                                li: ({ children }) => (
-                                                                    <li className="flex items-start gap-4">
-                                                                        <div className="mt-2.5 w-2.5 h-2.5 rounded-full bg-indigo-500/50 border border-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.5)] shrink-0"></div>
-                                                                        <span className="flex-1">{children}</span>
-                                                                    </li>
-                                                                ),
-                                                                table: ({ children }) => (
-                                                                    <CustomEdBoxTable>{children}</CustomEdBoxTable>
-                                                                ),
-                                                                thead: ({ children }) => (
-                                                                    <CustomEdBoxThead>{children}</CustomEdBoxThead>
-                                                                ),
-                                                                tbody: ({ children }) => (
-                                                                    <tbody className="divide-y divide-zinc-800/50">{children}</tbody>
-                                                                ),
-                                                                tr: ({ children }) => (
-                                                                    <CustomEdBoxTr>{children}</CustomEdBoxTr>
-                                                                ),
-                                                                th: ({ children }) => (
-                                                                    <CustomEdBoxTh>{children}</CustomEdBoxTh>
-                                                                ),
-                                                                td: ({ children }) => (
-                                                                    <CustomEdBoxTd>{children}</CustomEdBoxTd>
-                                                                ),
-
-                                                                code({ node, inline, className, children, ...props }: any) {
-                                                                    const match = /language-(\w+)/.exec(className || '');
-                                                                    const language = match ? match[1] : '';
-                                                                    const content = String(children).replace(/\n$/, '');
-
-                                                                    if (!inline && language) {
-                                                                        return (
-                                                                            <div className="relative group my-6 rounded-xl overflow-hidden border border-zinc-700 bg-zinc-950">
-                                                                                <div className="bg-zinc-900 px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500 font-bold border-b border-zinc-700 flex items-center justify-between">
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <div className="flex gap-1.5">
-                                                                                            <div className="w-3 h-3 rounded-full bg-red-500/50"></div>
-                                                                                            <div className="w-3 h-3 rounded-full bg-yellow-500/50"></div>
-                                                                                            <div className="w-3 h-3 rounded-full bg-green-500/50"></div>
-                                                                                        </div>
-                                                                                        <span className="ml-2">{language}</span>
+                                                                                return (
+                                                                                    <h2 className="group flex items-center gap-4">
+                                                                                        {emoji ? (
+                                                                                            <span className="w-12 h-12 flex items-center justify-center bg-zinc-900 border border-zinc-800 rounded-2xl text-2xl group-hover:border-indigo-500 transition-all shadow-xl shadow-indigo-500/10">
+                                                                                                {emoji}
+                                                                                            </span>
+                                                                                        ) : (
+                                                                                            <span className="w-12 h-12 flex items-center justify-center bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-indigo-400 text-xl font-black group-hover:bg-indigo-500/20 transition-all">§</span>
+                                                                                        )}
+                                                                                        {cleanText}
+                                                                                    </h2>
+                                                                                );
+                                                                            },
+                                                                            blockquote: ({ children }) => (
+                                                                                <blockquote className="relative overflow-hidden">
+                                                                                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                                                                                        <Crown className="w-20 h-20 text-indigo-400" />
                                                                                     </div>
-                                                                                    <button
-                                                                                        onClick={() => navigator.clipboard.writeText(content)}
-                                                                                        className="text-zinc-500 hover:text-white transition flex items-center gap-1"
-                                                                                    >
-                                                                                        <Copy className="w-3 h-3" />
-                                                                                        Copy
-                                                                                    </button>
-                                                                                </div>
-                                                                                <SyntaxHighlighter
-                                                                                    style={vscDarkPlus}
-                                                                                    language={language}
-                                                                                    PreTag="div"
-                                                                                    className="!bg-zinc-950 !p-4 !m-0 custom-scrollbar"
-                                                                                    {...props}
-                                                                                >
-                                                                                    {content}
-                                                                                </SyntaxHighlighter>
-                                                                            </div>
-                                                                        );
-                                                                    }
-
-                                                                    return (
-                                                                        <code className={`${className} bg-zinc-800/80 px-2 py-1 rounded-md text-cyan-300`} {...props}>
-                                                                            {children}
-                                                                        </code>
-                                                                    );
-
-                                                                }
-                                                            }}
-                                                        >
-                                                            {displayContent.notes?.[activeNoteType] || 'No content available for this note type.'}
-                                                        </ReactMarkdown>
-
-                                                    </article>
-                                                </div>
-
-                                                {/* Decorative bottom */}
-                                                <div className="h-px w-full bg-gradient-to-r from-transparent via-zinc-700 to-transparent"></div>
-                                            </div>
-
-                                            {/* Custom Notes Section - Always Visible */}
-                                            {studyKit && (
-                                                <div className="mt-6">
-                                                    {!showNotesModal ? (
-                                                        <div className="flex justify-center">
-                                                            {isPremium ? (
-                                                                <button
-                                                                    onClick={() => setShowNotesModal(true)}
-                                                                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl font-bold text-sm transition-all shadow-lg"
-                                                                >
-                                                                    <Crown className="w-4 h-4" />
-                                                                    <Plus className="w-4 h-4" />
-                                                                    Generate Custom Notes
-                                                                </button>
-                                                            ) : (
-                                                                <button
-                                                                    onClick={() => handleWatchAd('notes')}
-                                                                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-xl font-bold text-sm transition-all shadow-lg"
-                                                                >
-                                                                    <Plus className="w-4 h-4" />
-                                                                    Watch Ad for Custom Notes
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <motion.div
-                                                            initial={{ opacity: 0, y: 10 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            className="bg-zinc-900 border border-amber-500/30 rounded-2xl p-6"
-                                                        >
-                                                            <div className="flex items-center gap-2 mb-4">
-                                                                <Crown className="w-5 h-5 text-amber-400" />
-                                                                <h3 className="font-bold text-lg text-white">Generate Custom Notes</h3>
-                                                            </div>
-                                                            <p className="text-sm text-zinc-400 mb-4">
-                                                                Specify exactly what you want in your notes - topics, depth, examples, format, etc.
-                                                            </p>
-                                                            <textarea
-                                                                value={notesSpecification}
-                                                                onChange={(e) => setNotesSpecification(e.target.value)}
-                                                                placeholder="e.g., I need detailed notes on the causes and effects of the French Revolution, with a focus on economic factors. Include a timeline of key events and at least 3 primary source quotes..."
-                                                                className="w-full h-32 bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 transition resize-none"
-                                                            />
-                                                            <div className="flex items-center justify-end gap-3 mt-4">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setShowNotesModal(false);
-                                                                        setNotesSpecification('');
-                                                                        setNotesAdRewarded(false);
-                                                                    }}
-                                                                    className="px-4 py-2 text-zinc-400 hover:text-white transition"
-                                                                >
-                                                                    Cancel
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleGenerateMore('notes', undefined, notesAdRewarded)}
-                                                                    disabled={!notesSpecification.trim() || isGeneratingMore}
-                                                                    className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-zinc-700 disabled:to-zinc-700 rounded-lg font-bold text-sm transition-all"
-                                                                >
-                                                                    {isGeneratingMore ? (
-                                                                        <>
-                                                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                                                            Generating...
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <Send className="w-4 h-4" />
-                                                                            Generate Notes
-                                                                        </>
-                                                                    )}
-                                                                </button>
-                                                            </div>
-                                                        </motion.div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {activeTab === 'mindmaps' && displayContent.mindmaps && (
-                                        <div className="space-y-6">
-                                            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl h-[600px] flex flex-col items-center shadow-2xl overflow-hidden relative touch-none">
-                                                <div className="absolute top-4 left-4 flex items-center gap-2 z-50 pointer-events-none">
-                                                    <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
-                                                    <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500">Interactive Map • Drag to Pan</span>
-                                                </div>
-
-                                                {(() => {
-                                                    const data = displayContent.mindmaps;
-                                                    if (!data || (!data.central && !data.center)) return <div className="text-zinc-500 mt-20">Generating visualization...</div>;
-
-                                                    const centralTopic = data.central || (typeof data.center === 'object' ? data.center.topic : data.center);
-                                                    const branches = data.branches || (typeof data.center === 'object' ? data.center.subtopics : []);
-
-                                                    return (
-                                                        <>
-                                                            <div className="absolute top-4 right-4 z-50">
-                                                                <button
-                                                                    onClick={() => setMindmapDragPosition({ x: 0, y: 0 })}
-                                                                    className="p-2 bg-zinc-800/80 backdrop-blur-md border border-zinc-700 hover:border-indigo-500/50 rounded-full text-zinc-400 hover:text-indigo-400 transition-all shadow-lg hover:shadow-indigo-500/20"
-                                                                    title="Reset View"
-                                                                >
-                                                                    <RotateCcw className="w-4 h-4" />
-                                                                </button>
-                                                            </div>
-                                                            <motion.div
-                                                                drag
-                                                                dragConstraints={{ left: -1000, right: 1000, top: -1000, bottom: 1000 }}
-                                                                animate={mindmapDragPosition}
-                                                                onDragEnd={(e, info) => {
-                                                                    setMindmapDragPosition({ x: info.point.x, y: info.point.y });
-                                                                }}
-                                                                className="relative w-full h-full cursor-grab active:cursor-grabbing flex items-center justify-center p-20"
-                                                            >
-                                                                {/* Central Node */}
-                                                                <motion.div
-                                                                    initial={{ scale: 0 }}
-                                                                    animate={{ scale: 1 }}
-                                                                    className="bg-indigo-600 text-white px-6 py-4 sm:px-8 sm:py-5 rounded-3xl font-bold text-lg sm:text-2xl shadow-[0_0_50px_rgba(79,70,229,0.3)] z-50 relative border-2 border-indigo-400 text-center max-w-[200px] sm:max-w-none"
-                                                                >
-                                                                    {centralTopic}
-                                                                </motion.div>
-
-                                                                {/* Branches */}
-                                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                                    {branches.map((branch: any, i: number, arr: any[]) => {
-                                                                        const angle = (i / arr.length) * 2 * Math.PI;
-                                                                        const isMobile = windowSize.width < 768;
-                                                                        const radius = isMobile ? 220 : 300;
-                                                                        const x = Math.cos(angle) * radius;
-                                                                        const y = Math.sin(angle) * (radius * 0.7);
-
-                                                                        const branchTopic = typeof branch === 'string' ? branch : branch.topic || branch.name;
-                                                                        const subtopics = branch.subtopics || [];
-
-                                                                        return (
-                                                                            <motion.div
-                                                                                key={i}
-                                                                                initial={{ opacity: 0, x: 0, y: 0 }}
-                                                                                animate={{ opacity: 1, x, y }}
-                                                                                transition={{ delay: i * 0.1, duration: 0.8, type: 'spring' }}
-                                                                                className="absolute flex flex-col items-center z-10 pointer-events-auto"
-                                                                            >
-                                                                                <button
-                                                                                    onClick={() => setSelectedNodeData(branch)}
-                                                                                    className="bg-zinc-950 border border-zinc-800 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xl w-40 sm:w-56 hover:border-indigo-500 hover:bg-zinc-900 transition-all group text-left"
-                                                                                >
-                                                                                    <h5 className="font-bold text-[11px] sm:text-sm text-white mb-2 group-hover:text-indigo-300 transition-colors line-clamp-2">{branchTopic}</h5>
-                                                                                    {subtopics.length > 0 && (
-                                                                                        <div className="space-y-1">
-                                                                                            {subtopics.slice(0, 3).map((s: string, idx: number) => (
-                                                                                                <div key={idx} className="text-[9px] sm:text-[10px] text-zinc-400 flex items-center gap-1">
-                                                                                                    <span className="w-1 h-1 rounded-full bg-zinc-600 shrink-0"></span>
-                                                                                                    <span className="line-clamp-1">{s}</span>
-                                                                                                </div>
-                                                                                            ))}
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {branch.details && (
-                                                                                        <div className="mt-2 flex items-center gap-1 text-[9px] text-indigo-400 font-bold uppercase tracking-tighter">
-                                                                                            <Plus className="w-2.5 h-2.5" /> View Details
-                                                                                        </div>
-                                                                                    )}
-                                                                                </button>
-                                                                            </motion.div>
-                                                                        );
-                                                                    })}
-                                                                </div>
-
-                                                                {/* Decorative Background Glows */}
-                                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] bg-indigo-600/5 rounded-full blur-[100px] -z-10"></div>
-                                                            </motion.div>
-                                                        </>
-                                                    );
-                                                })()}
-                                            </div >
-
-                                            {/* Node Details Panel */}
-                                            <AnimatePresence>
-                                                {
-                                                    selectedNodeData && (
-                                                        <motion.div
-                                                            initial={{ opacity: 0, height: 0 }}
-                                                            animate={{ opacity: 1, height: 'auto' }}
-                                                            exit={{ opacity: 0, height: 0 }}
-                                                            className="bg-zinc-900 border-2 border-indigo-500/30 rounded-2xl overflow-hidden"
-                                                        >
-                                                            <div className="p-6">
-                                                                <div className="flex items-center justify-between mb-4">
-                                                                    <h4 className="text-xl font-bold text-white">{selectedNodeData.topic}</h4>
-                                                                    <button
-                                                                        onClick={() => setSelectedNodeData(null)}
-                                                                        className="p-2 hover:bg-zinc-800 rounded-lg transition"
-                                                                    >
-                                                                        <X className="w-5 h-5" />
-                                                                    </button>
-                                                                </div>
-                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                                                    <div className="space-y-4">
-                                                                        <h5 className="text-xs font-bold uppercase tracking-widest text-indigo-400">Key Points</h5>
-                                                                        <ul className="space-y-2">
-                                                                            {selectedNodeData.subtopics?.map((s: string, i: number) => (
-                                                                                <li key={i} className="flex items-start gap-3 text-zinc-300">
-                                                                                    <CheckCircle2 className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
-                                                                                    {s}
+                                                                                    <div className="relative z-10">
+                                                                                        {children}
+                                                                                    </div>
+                                                                                </blockquote>
+                                                                            ),
+                                                                            ul: ({ children }) => (
+                                                                                <ul className="space-y-4 my-8">
+                                                                                    {children}
+                                                                                </ul>
+                                                                            ),
+                                                                            li: ({ children }) => (
+                                                                                <li className="flex items-start gap-4">
+                                                                                    <div className="mt-2.5 w-2.5 h-2.5 rounded-full bg-indigo-500/50 border border-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.5)] shrink-0"></div>
+                                                                                    <span className="flex-1">{children}</span>
                                                                                 </li>
-                                                                            ))}
-                                                                        </ul>
-                                                                    </div>
-                                                                    <div className="space-y-4">
-                                                                        <h5 className="text-xs font-bold uppercase tracking-widest text-indigo-400">In-Depth Details</h5>
-                                                                        <p className="text-zinc-300 leading-relaxed bg-zinc-800/50 p-4 rounded-xl border border-zinc-700">
-                                                                            {selectedNodeData.details || "No additional details available for this topic."}
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
+                                                                            ),
+                                                                            table: ({ children }) => (
+                                                                                <CustomEdBoxTable>{children}</CustomEdBoxTable>
+                                                                            ),
+                                                                            thead: ({ children }) => (
+                                                                                <CustomEdBoxThead>{children}</CustomEdBoxThead>
+                                                                            ),
+                                                                            tbody: ({ children }) => (
+                                                                                <tbody className="divide-y divide-zinc-800/50">{children}</tbody>
+                                                                            ),
+                                                                            tr: ({ children }) => (
+                                                                                <CustomEdBoxTr>{children}</CustomEdBoxTr>
+                                                                            ),
+                                                                            th: ({ children }) => (
+                                                                                <CustomEdBoxTh>{children}</CustomEdBoxTh>
+                                                                            ),
+                                                                            td: ({ children }) => (
+                                                                                <CustomEdBoxTd>{children}</CustomEdBoxTd>
+                                                                            ),
+
+                                                                            code({ node, inline, className, children, ...props }: any) {
+                                                                                const match = /language-(\w+)/.exec(className || '');
+                                                                                const language = match ? match[1] : '';
+                                                                                const content = String(children).replace(/\n$/, '');
+
+                                                                                if (!inline && language) {
+                                                                                    return (
+                                                                                        <div className="relative group my-6 rounded-xl overflow-hidden border border-zinc-700 bg-zinc-950">
+                                                                                            <div className="bg-zinc-900 px-4 py-2 text-[10px] uppercase tracking-widest text-zinc-500 font-bold border-b border-zinc-700 flex items-center justify-between">
+                                                                                                <div className="flex items-center gap-2">
+                                                                                                    <div className="flex gap-1.5">
+                                                                                                        <div className="w-3 h-3 rounded-full bg-red-500/50"></div>
+                                                                                                        <div className="w-3 h-3 rounded-full bg-yellow-500/50"></div>
+                                                                                                        <div className="w-3 h-3 rounded-full bg-green-500/50"></div>
+                                                                                                    </div>
+                                                                                                    <span className="ml-2">{language}</span>
+                                                                                                </div>
+                                                                                                <button
+                                                                                                    onClick={() => navigator.clipboard.writeText(content)}
+                                                                                                    className="text-zinc-500 hover:text-white transition flex items-center gap-1"
+                                                                                                >
+                                                                                                    <Copy className="w-3 h-3" />
+                                                                                                    Copy
+                                                                                                </button>
+                                                                                            </div>
+                                                                                            <SyntaxHighlighter
+                                                                                                style={vscDarkPlus}
+                                                                                                language={language}
+                                                                                                PreTag="div"
+                                                                                                className="!bg-zinc-950 !p-4 !m-0 custom-scrollbar"
+                                                                                                {...props}
+                                                                                            >
+                                                                                                {content}
+                                                                                            </SyntaxHighlighter>
+                                                                                        </div>
+                                                                                    );
+                                                                                }
+
+                                                                                return (
+                                                                                    <code className={`${className} bg-zinc-800/80 px-2 py-1 rounded-md text-cyan-300`} {...props}>
+                                                                                        {children}
+                                                                                    </code>
+                                                                                );
+
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        {displayContent.notes?.[activeNoteType] || 'No content available for this note type.'}
+                                                                    </ReactMarkdown>
+
+                                                                </article>
                                                             </div>
-                                                        </motion.div>
-                                                    )
-                                                }
-                                            </AnimatePresence>
-                                        </div>
-                                    )}
-                                </>
-                            );
-                        })()}
+
+                                                            {/* Decorative bottom */}
+                                                            <div className="h-px w-full bg-gradient-to-r from-transparent via-zinc-700 to-transparent"></div>
+                                                        </div>
+
+                                                        {/* Custom Notes Section - Always Visible */}
+                                                        {studyKit && (
+                                                            <div className="mt-6">
+                                                                {!showNotesModal ? (
+                                                                    <div className="flex justify-center">
+                                                                        {isPremium ? (
+                                                                            <button
+                                                                                onClick={() => setShowNotesModal(true)}
+                                                                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl font-bold text-sm transition-all shadow-lg"
+                                                                            >
+                                                                                <Crown className="w-4 h-4" />
+                                                                                <Plus className="w-4 h-4" />
+                                                                                Generate Custom Notes
+                                                                            </button>
+                                                                        ) : (
+                                                                            <button
+                                                                                onClick={() => handleWatchAd('notes')}
+                                                                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 rounded-xl font-bold text-sm transition-all shadow-lg"
+                                                                            >
+                                                                                <Plus className="w-4 h-4" />
+                                                                                Watch Ad for Custom Notes
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <motion.div
+                                                                        initial={{ opacity: 0, y: 10 }}
+                                                                        animate={{ opacity: 1, y: 0 }}
+                                                                        className="bg-zinc-900 border border-amber-500/30 rounded-2xl p-6"
+                                                                    >
+                                                                        <div className="flex items-center gap-2 mb-4">
+                                                                            <Crown className="w-5 h-5 text-amber-400" />
+                                                                            <h3 className="font-bold text-lg text-white">Generate Custom Notes</h3>
+                                                                        </div>
+                                                                        <p className="text-sm text-zinc-400 mb-4">
+                                                                            Specify exactly what you want in your notes - topics, depth, examples, format, etc.
+                                                                        </p>
+                                                                        <textarea
+                                                                            value={notesSpecification}
+                                                                            onChange={(e) => setNotesSpecification(e.target.value)}
+                                                                            placeholder="e.g., I need detailed notes on the causes and effects of the French Revolution, with a focus on economic factors. Include a timeline of key events and at least 3 primary source quotes..."
+                                                                            className="w-full h-32 bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 transition resize-none"
+                                                                        />
+                                                                        <div className="flex items-center justify-end gap-3 mt-4">
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setShowNotesModal(false);
+                                                                                    setNotesSpecification('');
+                                                                                    setNotesAdRewarded(false);
+                                                                                }}
+                                                                                className="px-4 py-2 text-zinc-400 hover:text-white transition"
+                                                                            >
+                                                                                Cancel
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleGenerateMore('notes', undefined, notesAdRewarded)}
+                                                                                disabled={!notesSpecification.trim() || isGeneratingMore}
+                                                                                className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-zinc-700 disabled:to-zinc-700 rounded-lg font-bold text-sm transition-all"
+                                                                            >
+                                                                                {isGeneratingMore ? (
+                                                                                    <>
+                                                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                                                        Generating...
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <>
+                                                                                        <Send className="w-4 h-4" />
+                                                                                        Generate Notes
+                                                                                    </>
+                                                                                )}
+                                                                            </button>
+                                                                        </div>
+                                                                    </motion.div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {activeTab === 'mindmaps' && displayContent.mindmaps && (
+                                                    <div className="space-y-6">
+                                                        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl h-[600px] flex flex-col items-center shadow-2xl overflow-hidden relative touch-none">
+                                                            <div className="absolute top-4 left-4 flex items-center gap-2 z-50 pointer-events-none">
+                                                                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                                                                <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500">Interactive Map • Drag to Pan</span>
+                                                            </div>
+
+                                                            {(() => {
+                                                                const data = displayContent.mindmaps;
+                                                                if (!data || (!data.central && !data.center)) return <div className="text-zinc-500 mt-20">Generating visualization...</div>;
+
+                                                                const centralTopic = data.central || (typeof data.center === 'object' ? data.center.topic : data.center);
+                                                                const branches = data.branches || (typeof data.center === 'object' ? data.center.subtopics : []);
+
+                                                                return (
+                                                                    <>
+                                                                        <div className="absolute top-4 right-4 z-50">
+                                                                            <button
+                                                                                onClick={() => setMindmapDragPosition({ x: 0, y: 0 })}
+                                                                                className="p-2 bg-zinc-800/80 backdrop-blur-md border border-zinc-700 hover:border-indigo-500/50 rounded-full text-zinc-400 hover:text-indigo-400 transition-all shadow-lg hover:shadow-indigo-500/20"
+                                                                                title="Reset View"
+                                                                            >
+                                                                                <RotateCcw className="w-4 h-4" />
+                                                                            </button>
+                                                                        </div>
+                                                                        <motion.div
+                                                                            drag
+                                                                            dragConstraints={{ left: -1000, right: 1000, top: -1000, bottom: 1000 }}
+                                                                            animate={mindmapDragPosition}
+                                                                            onDragEnd={(e, info) => {
+                                                                                setMindmapDragPosition({ x: info.point.x, y: info.point.y });
+                                                                            }}
+                                                                            className="relative w-full h-full cursor-grab active:cursor-grabbing flex items-center justify-center p-20"
+                                                                        >
+                                                                            {/* Central Node */}
+                                                                            <motion.div
+                                                                                initial={{ scale: 0 }}
+                                                                                animate={{ scale: 1 }}
+                                                                                className="bg-indigo-600 text-white px-6 py-4 sm:px-8 sm:py-5 rounded-3xl font-bold text-lg sm:text-2xl shadow-[0_0_50px_rgba(79,70,229,0.3)] z-50 relative border-2 border-indigo-400 text-center max-w-[200px] sm:max-w-none"
+                                                                            >
+                                                                                {centralTopic}
+                                                                            </motion.div>
+
+                                                                            {/* Branches */}
+                                                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                                                {branches.map((branch: any, i: number, arr: any[]) => {
+                                                                                    const angle = (i / arr.length) * 2 * Math.PI;
+                                                                                    const isMobile = windowSize.width < 768;
+                                                                                    const radius = isMobile ? 220 : 300;
+                                                                                    const x = Math.cos(angle) * radius;
+                                                                                    const y = Math.sin(angle) * (radius * 0.7);
+
+                                                                                    const branchTopic = typeof branch === 'string' ? branch : branch.topic || branch.name;
+                                                                                    const subtopics = branch.subtopics || [];
+
+                                                                                    return (
+                                                                                        <motion.div
+                                                                                            key={i}
+                                                                                            initial={{ opacity: 0, x: 0, y: 0 }}
+                                                                                            animate={{ opacity: 1, x, y }}
+                                                                                            transition={{ delay: i * 0.1, duration: 0.8, type: 'spring' }}
+                                                                                            className="absolute flex flex-col items-center z-10 pointer-events-auto"
+                                                                                        >
+                                                                                            <button
+                                                                                                onClick={() => setSelectedNodeData(branch)}
+                                                                                                className="bg-zinc-950 border border-zinc-800 p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xl w-40 sm:w-56 hover:border-indigo-500 hover:bg-zinc-900 transition-all group text-left"
+                                                                                            >
+                                                                                                <h5 className="font-bold text-[11px] sm:text-sm text-white mb-2 group-hover:text-indigo-300 transition-colors line-clamp-2">{branchTopic}</h5>
+                                                                                                {subtopics.length > 0 && (
+                                                                                                    <div className="space-y-1">
+                                                                                                        {subtopics.slice(0, 3).map((s: string, idx: number) => (
+                                                                                                            <div key={idx} className="text-[9px] sm:text-[10px] text-zinc-400 flex items-center gap-1">
+                                                                                                                <span className="w-1 h-1 rounded-full bg-zinc-600 shrink-0"></span>
+                                                                                                                <span className="line-clamp-1">{s}</span>
+                                                                                                            </div>
+                                                                                                        ))}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                                {branch.details && (
+                                                                                                    <div className="mt-2 flex items-center gap-1 text-[9px] text-indigo-400 font-bold uppercase tracking-tighter">
+                                                                                                        <Plus className="w-2.5 h-2.5" /> View Details
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </button>
+                                                                                        </motion.div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+
+                                                                            {/* Decorative Background Glows */}
+                                                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] bg-indigo-600/5 rounded-full blur-[100px] -z-10"></div>
+                                                                        </motion.div>
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </div >
+
+                                                        {/* Node Details Panel */}
+                                                        <AnimatePresence>
+                                                            {
+                                                                selectedNodeData && (
+                                                                    <motion.div
+                                                                        initial={{ opacity: 0, height: 0 }}
+                                                                        animate={{ opacity: 1, height: 'auto' }}
+                                                                        exit={{ opacity: 0, height: 0 }}
+                                                                        className="bg-zinc-900 border-2 border-indigo-500/30 rounded-2xl overflow-hidden"
+                                                                    >
+                                                                        <div className="p-6">
+                                                                            <div className="flex items-center justify-between mb-4">
+                                                                                <h4 className="text-xl font-bold text-white">{selectedNodeData.topic}</h4>
+                                                                                <button
+                                                                                    onClick={() => setSelectedNodeData(null)}
+                                                                                    className="p-2 hover:bg-zinc-800 rounded-lg transition"
+                                                                                >
+                                                                                    <X className="w-5 h-5" />
+                                                                                </button>
+                                                                            </div>
+                                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                                                <div className="space-y-4">
+                                                                                    <h5 className="text-xs font-bold uppercase tracking-widest text-indigo-400">Key Points</h5>
+                                                                                    <ul className="space-y-2">
+                                                                                        {selectedNodeData.subtopics?.map((s: string, i: number) => (
+                                                                                            <li key={i} className="flex items-start gap-3 text-zinc-300">
+                                                                                                <CheckCircle2 className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
+                                                                                                {s}
+                                                                                            </li>
+                                                                                        ))}
+                                                                                    </ul>
+                                                                                </div>
+                                                                                <div className="space-y-4">
+                                                                                    <h5 className="text-xs font-bold uppercase tracking-widest text-indigo-400">In-Depth Details</h5>
+                                                                                    <p className="text-zinc-300 leading-relaxed bg-zinc-800/50 p-4 rounded-xl border border-zinc-700">
+                                                                                        {selectedNodeData.details || "No additional details available for this topic."}
+                                                                                    </p>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </motion.div>
+                                                                )
+                                                            }
+                                                        </AnimatePresence>
+                                                    </div>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
 
                                 </motion.div>
                             </AnimatePresence>

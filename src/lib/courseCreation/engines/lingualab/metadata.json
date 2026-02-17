@@ -1,7 +1,0 @@
-{
-  "name": "LinguaLab Studio",
-  "description": "An advanced linguistics studio for analyzing syntax, phonetics, and semantics using AI-driven visualization.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}

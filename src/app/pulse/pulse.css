@@ -1,0 +1,34 @@
+/* Pulse Global Styles */
+.pulse-body {
+  font-family: 'Inter', sans-serif;
+  background-color: #0f172a;
+  overflow: hidden; /* OS-like feel, no body scroll */
+  color: #e2e8f0;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Custom scrollbar for chat/content */
+.pulse-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.pulse-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pulse-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+.pulse-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}

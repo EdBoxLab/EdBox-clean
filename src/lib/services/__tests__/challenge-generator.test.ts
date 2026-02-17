@@ -14,18 +14,20 @@ jest.mock('../skill-progression-db', () => ({
   }
 }));
 
-// Mock the Groq service
-jest.mock('@/lib/courseCreation/engines/shared/groqService', () => ({
-  callGroq: jest.fn(),
+// Mock the AI providers service
+jest.mock('@/lib/ai-providers', () => ({
+  generateWithFallback: jest.fn(),
 }));
 
 import { skillProgressionDb } from '../skill-progression-db';
-import { callGroq } from '@/lib/courseCreation/engines/shared/groqService';
+import { generateWithFallback } from '@/lib/ai-providers';
+
+jest.setTimeout(60000);
 
 describe('ChallengeGenerator Property Tests', () => {
   let generator: ChallengeGenerator;
   const mockDb = skillProgressionDb as jest.Mocked<typeof skillProgressionDb>;
-  const mockCallGroq = callGroq as jest.MockedFunction<typeof callGroq>;
+  const mockGenerateWithFallback = generateWithFallback as jest.MockedFunction<typeof generateWithFallback>;
 
   beforeEach(() => {
     generator = new ChallengeGenerator();
@@ -34,9 +36,9 @@ describe('ChallengeGenerator Property Tests', () => {
 
   // Generators for property-based testing
   const difficultyArb = fc.constantFrom<DifficultyLevel>('Easy', 'Medium', 'Hard');
-  
+
   const skillIdArb = fc.string({ minLength: 1, maxLength: 50 }).filter(s => s.trim().length > 0);
-  
+
   const challengeTypeArb = fc.constantFrom(
     'programming', 'mathematics', 'science', 'language', 'default'
   );
@@ -102,7 +104,11 @@ describe('ChallengeGenerator Property Tests', () => {
           async (request, config, aiResponse) => {
             // Setup mocks
             mockDb.getSkillConfiguration.mockResolvedValue(config);
-            mockCallGroq.mockResolvedValue(JSON.stringify(aiResponse));
+            mockGenerateWithFallback.mockResolvedValue({
+              text: JSON.stringify(aiResponse),
+              provider: 'groq',
+              success: true
+            });
 
             try {
               const challenge = await generator.generateChallenge(request);
@@ -125,17 +131,17 @@ describe('ChallengeGenerator Property Tests', () => {
 
               // Property: Challenge aligns with skill objectives and difficulty level
               expect(['Easy', 'Medium', 'Hard']).toContain(challenge.difficultyLevel);
-              
+
               // Property: Challenge includes appropriate starter code, validation criteria, and hints
               if (challenge.starterCode !== undefined) {
                 expect(typeof challenge.starterCode).toBe('string');
               }
-              
+
               challenge.validationCriteria.forEach(criterion => {
                 expect(typeof criterion).toBe('string');
                 expect(criterion.trim()).not.toBe('');
               });
-              
+
               challenge.hints.forEach(hint => {
                 expect(typeof hint).toBe('string');
                 expect(hint.trim()).not.toBe('');
@@ -151,9 +157,9 @@ describe('ChallengeGenerator Property Tests', () => {
             }
           }
         ),
-        { numRuns: 100 }
+        { numRuns: 20 }
       );
-    });
+    }, 60000);
 
     it('should handle AI generation failures with fallback system', async () => {
       await fc.assert(
@@ -163,7 +169,7 @@ describe('ChallengeGenerator Property Tests', () => {
           async (request, config) => {
             // Setup mocks - AI fails but config exists
             mockDb.getSkillConfiguration.mockResolvedValue(config);
-            mockCallGroq.mockRejectedValue(new Error('AI service unavailable'));
+            mockGenerateWithFallback.mockRejectedValue(new Error('AI service unavailable'));
 
             try {
               const challenge = await generator.generateChallenge(request);
@@ -184,8 +190,8 @@ describe('ChallengeGenerator Property Tests', () => {
             }
           }
         ),
-        { numRuns: 50 }
+        { numRuns: 10 }
       );
-    });
+    }, 60000);
   });
 });

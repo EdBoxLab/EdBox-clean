@@ -52,6 +52,7 @@ import { RotateCcw } from 'lucide-react';
 import { NoteNavigation } from '@/components/NoteNavigation';
 import { TextSelectionTooltip } from '@/components/TextSelectionTooltip';
 import { GenieSidePanel } from '@/components/GenieSidePanel';
+import { useStudyKitStream } from '@/lib/hooks/useStudyKitStream';
 
 // Hook for safe window size usage (prevents hydration mismatch)
 function useWindowSize() {
@@ -380,6 +381,10 @@ function StudyKitContent() {
     // Call custom hooks first to ensure consistent hook order
     const windowSize = useWindowSize();
     const { isPremium } = useSubscription();
+
+    const { streamGenerate, isStreaming, progress } = useStudyKitStream({
+        onComplete: (id, title) => setCurrentStep('result')
+    });
 
     const [prompt, setPrompt] = useState('');
     const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -787,7 +792,7 @@ function StudyKitContent() {
 
         setIsGenerating(true);
         setCurrentStep('generating');
-        setGeneratedContent(null); // Clear old content
+        setGeneratedContent(null);
         setActiveTab(null);
 
         try {
@@ -806,6 +811,41 @@ function StudyKitContent() {
                     type: uploadedFile.type,
                     content: content
                 };
+            }
+
+            // Use streaming for prompt-only generation
+            if (!uploadedFile && prompt.trim()) {
+                const result = await streamGenerate({
+                    prompt,
+                    contentTypes: types,
+                    itemCount: countOption,
+                    notesDepth: depthOption
+                });
+
+                if (result) {
+                    const normalized = normalizeContent(result, types);
+
+                    posthog.capture('study_kit_generated', {
+                        prompt: prompt,
+                        content_types: types,
+                        item_count: countOption,
+                        notes_depth: depthOption,
+                        has_file: false
+                    });
+
+                    setSelectedTypes(types);
+                    setGeneratedContent(normalized);
+                    setActiveTab(types[0]);
+
+                    if (normalized.quizzes && Array.isArray(normalized.quizzes)) {
+                        setCurrentQuizStates(normalized.quizzes.map(() => ({
+                            selectedOption: null,
+                            isConfirmed: false
+                        })));
+                        setScore(null);
+                    }
+                }
+                return;
             }
 
             const response = await fetch('/api/study-kit/generate', {

@@ -46,8 +46,8 @@ const App: React.FC = () => {
         // If we have a deep link, clear current windows (optional) or just add the new one
         if (type === 'STUDY_KIT') {
           addWindow(WindowType.STUDY_KIT, { kitId: id });
-        } else if (type === 'COURSE') {
-          addWindow(WindowType.SMART_BOARD, { courseId: id, mode: 'tutor' });
+        } else if (type === 'COURSE' || type === 'SKILL_GRAPH') {
+          addWindow(WindowType.SKILL_GRAPH, { graphId: id });
         } else if (type === 'NOTE') {
           addWindow(WindowType.NOTE_WRITER, { noteId: id });
         }

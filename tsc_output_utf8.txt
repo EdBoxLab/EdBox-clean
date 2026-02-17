@@ -1,0 +1,11 @@
+﻿src/lib/services/adaptive-difficulty.ts(12,8): error TS2307: Cannot find module '@/types/skill-progression' or its corresponding type declarations.
+src/lib/services/cache-service.ts(11,8): error TS2307: Cannot find module '@/types/skill-progression' or its corresponding type declarations.
+src/lib/services/cache-service.ts(129,25): error TS2802: Type 'MapIterator<CacheEntry<T>>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
+src/lib/services/cache-service.ts(157,32): error TS2802: Type 'MapIterator<[string, CacheEntry<T>]>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
+src/lib/services/cache-service.ts(185,32): error TS2802: Type 'MapIterator<[string, CacheEntry<T>]>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
+src/lib/services/challenge-generator.ts(14,8): error TS2307: Cannot find module '@/types/skill-progression' or its corresponding type declarations.
+src/lib/services/challenge-generator.ts(18,8): error TS2307: Cannot find module '@/types/skill-progression' or its corresponding type declarations.
+src/lib/services/challenge-generator.ts(19,38): error TS2307: Cannot find module '@/lib/ai-providers' or its corresponding type declarations.
+src/lib/services/skill-progression-db.ts(6,44): error TS2307: Cannot find module '@/lib/supabase/client' or its corresponding type declarations.
+src/lib/services/skill-progression-db.ts(14,8): error TS2307: Cannot find module '@/types/skill-progression' or its corresponding type declarations.
+src/lib/services/skill-progression-db.ts(18,8): error TS2307: Cannot find module '@/types/skill-progression' or its corresponding type declarations.

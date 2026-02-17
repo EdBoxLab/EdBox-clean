@@ -7,9 +7,6 @@ import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { X, Sparkles, Trophy, Clock, Target, Zap } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
-const CodeStudio = dynamic(() => import('@/lib/courseCreation/engines/codestudio/App'), { ssr: false });
-const WriteLab = dynamic(() => import('@/lib/courseCreation/engines/writingstudio/App'), { ssr: false });
-const MathLab = dynamic(() => import('@/lib/courseCreation/engines/mathlab/App'), { ssr: false });
 
 const DEMO_SKILL_GRAPH: SkillGraph = {
     id: 'demo_graph_1',
@@ -132,12 +129,6 @@ export default function DemoCourse() {
         if (!currentChallenge) return null;
         const engineStr = String(currentChallenge.engine).toLowerCase();
         switch (engineStr) {
-            case 'codestudio':
-                return <CodeStudio challenge={currentChallenge} />;
-            case 'writingstudio':
-                return <WriteLab challenge={currentChallenge} />;
-            case 'mathlab':
-                return <MathLab challenge={currentChallenge} />;
             default:
                 return <div className="text-white">Engine not available for this skill.</div>;
         }

@@ -17,6 +17,7 @@ export const WIDGET_CONFIGS: Record<string, { defaultTitle: string, defaultWidth
   [WindowType.STUDY_KIT]: createConfig('Study Kit', 800, 600),
   [WindowType.DASHBOARD_SUMMARY]: createConfig('Overview', 400, 500),
   [WindowType.NOTE_WRITER]: createConfig('Rich Notes', 400, 500),
+  [WindowType.SKILL_GRAPH]: createConfig('Learning Path', 800, 600),
 
   // Math
   [WindowType.MATH_GRAPHING_CALC]: createConfig('Graphing Calculator', 500, 400),

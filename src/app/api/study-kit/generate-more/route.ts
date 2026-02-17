@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
         systemPrompt: 'Output ONLY valid JSON with no extra text.',
         temperature: 0.7,
         maxTokens: 4000,
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant',
       });
 
       newContent = extractJSON(result.text, contentType);

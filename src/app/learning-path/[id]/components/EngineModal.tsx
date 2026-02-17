@@ -6,10 +6,6 @@ import { X, Info, Target } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { SkillNode, Challenge } from '@/lib/courseCreation/types';
 
-// Dynamic imports for engines
-const CodeStudio = dynamic(() => import('@/lib/courseCreation/engines/codestudio/App'), { ssr: false });
-const WriteLab = dynamic(() => import('@/lib/courseCreation/engines/writingstudio/App'), { ssr: false });
-const MathLab = dynamic(() => import('@/lib/courseCreation/engines/mathlab/App'), { ssr: false });
 
 interface EngineModalProps {
   selectedSkill: SkillNode | null;
@@ -69,14 +65,6 @@ export default function EngineModal({
     };
 
     switch (engineStr) {
-      case 'codestudio':
-        return <CodeStudio {...commonProps} />;
-      case 'writingstudio':
-        return <WriteLab {...commonProps} />;
-      case 'mathlab':
-        return <MathLab {...commonProps} />;
-      case 'finlab':
-        return <WriteLab {...commonProps} />; // Default fallback
       default:
         console.log('No matching engine for:', engineStr);
         return <div className="text-white">Engine not available for: {engineStr}</div>;

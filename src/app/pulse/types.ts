@@ -11,6 +11,7 @@ export enum WindowType {
   STUDY_KIT = 'STUDY_KIT',
   DASHBOARD_SUMMARY = 'DASHBOARD_SUMMARY',
   CUSTOM_GENERATED = 'CUSTOM_GENERATED', // New Type for AI Created Widgets
+  SKILL_GRAPH = 'SKILL_GRAPH', // Learning path with progress tracking
 
   // Math (10)
   MATH_GRAPHING_CALC = 'MATH_GRAPHING_CALC',
@@ -133,3 +134,4 @@ export interface GenieState {
   mode: 'regular' | 'tutor';
   currentTopic?: string;
 }
+

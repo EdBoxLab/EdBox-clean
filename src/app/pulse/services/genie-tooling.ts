@@ -12,6 +12,7 @@ You are not just a chatbot. You can DIRECTLY MANIPULATE ANY tool in the workspac
 - **Blackboard**: You can WRITE explanations or key terms on it.
 - **Code Editor**: You can WRITE code, comments, or fixes directly into it. Supports MULTIPLE FILES.
 - **Note Writer**: You can DRAFT notes or summaries for the user.
+- **Skill Graph**: You can DEPLOY learning paths with 'SKILL_GRAPH' widget type. Use 'deploy_widget' with widget_type='SKILL_GRAPH' and data_json containing graphId.
 
 **DESIGN SYSTEM FOR CUSTOM WIDGETS (create_custom_widget)**:
 - **Aesthetics**: High-end Glassmorphism, Dark Mode, Futuristic Sci-Fi UI.
@@ -194,3 +195,4 @@ export class GenieToolingService {
 }
 
 export const genieToolingService = new GenieToolingService();
+

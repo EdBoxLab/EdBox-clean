@@ -10,6 +10,7 @@ import PulseStudyKit from '../Widgets/PulseStudyKit';
 import NoteWriter from '../Widgets/NoteWriter';
 import UniversalWidget from '../Widgets/UniversalWidget';
 import DynamicWidget from '../Widgets/DynamicWidget';
+import SkillGraphWidget from '../Widgets/SkillGraphWidget';
 
 interface CanvasProps {
   windows: PulseWindow[];
@@ -33,10 +34,7 @@ const Canvas: React.FC<CanvasProps> = ({ windows, setWindows, onRunCode, onMinim
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Filter out minimized windows for the workspace view
   const activeWindows = windows.filter(w => !w.isMinimized);
-
-  // On mobile, show max 1. On desktop, max 2.
   const visibleWindows = isMobile ? activeWindows.slice(-1) : activeWindows.slice(-2);
 
   const handleClose = (id: string) => {
@@ -75,7 +73,6 @@ const Canvas: React.FC<CanvasProps> = ({ windows, setWindows, onRunCode, onMinim
   }, [isResizing]);
 
   const renderWidgetContent = (window: PulseWindow) => {
-    // Generic update handler for any widget
     const onUpdate = (newData: any) => handleUpdateWindowData(window.id, newData);
 
     switch (window.type) {
@@ -84,7 +81,6 @@ const Canvas: React.FC<CanvasProps> = ({ windows, setWindows, onRunCode, onMinim
       case WindowType.NEURON_VISUALIZER:
         return <NeuronVisualizer data={window.data} onUpdate={onUpdate} />;
       case WindowType.CODE_EDITOR:
-        // Backwards compatibility for single-code string data
         const files = window.data?.files || (window.data?.code ? [{
           id: 'default',
           name: 'script.js',
@@ -114,6 +110,8 @@ const Canvas: React.FC<CanvasProps> = ({ windows, setWindows, onRunCode, onMinim
             onUpdate={(text) => handleUpdateWindowData(window.id, { text })}
           />
         );
+      case WindowType.SKILL_GRAPH:
+        return <SkillGraphWidget window={window} />;
       default:
         return <UniversalWidget type={window.type} data={window.data} />;
     }
@@ -129,14 +127,12 @@ const Canvas: React.FC<CanvasProps> = ({ windows, setWindows, onRunCode, onMinim
       style={{ width: widthPercent }}
       className="h-full flex flex-col border-r border-white/5 last:border-0 relative bg-slate-900/80 backdrop-blur-md transition-[width] duration-75 ease-linear overflow-hidden shadow-2xl"
     >
-      {/* Header */}
       <div className="h-9 flex items-center justify-between px-4 bg-white/5 border-b border-white/10 select-none shrink-0 group">
         <span className="text-xs font-semibold text-cyan-200/80 uppercase tracking-wider truncate flex-1 flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-cyan-500/50 group-hover:bg-cyan-400 group-hover:shadow-[0_0_10px_rgba(34,211,238,0.5)] transition-all"></div>
           {window.title}
         </span>
       </div>
-      {/* Content */}
       <div className="flex-1 overflow-hidden relative">
         {renderWidgetContent(window)}
       </div>
@@ -145,13 +141,11 @@ const Canvas: React.FC<CanvasProps> = ({ windows, setWindows, onRunCode, onMinim
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-slate-950 flex flex-col">
-      {/* Background Ambience */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-900/10 rounded-full blur-3xl opacity-50 animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-cyan-900/10 rounded-full blur-3xl opacity-40" />
       </div>
 
-      {/* Workspace Container */}
       <div ref={containerRef} className="flex-1 flex relative z-10 w-full h-full">
         <AnimatePresence mode='popLayout'>
           {visibleWindows.length === 0 && (
@@ -172,7 +166,6 @@ const Canvas: React.FC<CanvasProps> = ({ windows, setWindows, onRunCode, onMinim
             <>
               {renderPane(visibleWindows[0], `${splitRatio * 100}%`)}
 
-              {/* Resizer Handle */}
               <div
                 onMouseDown={startResize}
                 className="w-1 hover:w-2 bg-black/50 hover:bg-cyan-500/50 cursor-col-resize z-50 transition-all flex items-center justify-center group"
@@ -190,4 +183,10 @@ const Canvas: React.FC<CanvasProps> = ({ windows, setWindows, onRunCode, onMinim
   );
 };
 
+
 export default Canvas;
+
+
+
+
+

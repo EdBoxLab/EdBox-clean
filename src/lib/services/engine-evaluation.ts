@@ -8,7 +8,7 @@
  * Requirements: 5.1, 5.2, 5.3
  */
 
-import { callGroq } from '@/lib/courseCreation/engines/shared/groqService';
+import { generateWithFallback } from '@/lib/ai-providers';
 import { DifficultyLevel } from '@/types/skill-progression';
 
 /**
@@ -80,7 +80,7 @@ export interface HintRequest {
  * Provides comprehensive evaluation and feedback for all learning engines
  */
 export class EngineEvaluationService {
-  
+
   /**
    * Evaluate a submission using the appropriate engine evaluator
    */
@@ -150,9 +150,12 @@ Current submission: ${JSON.stringify(request.submission)}
 Generate helpful hints to guide the student toward the correct solution.`;
 
     try {
-      const response = await callGroq(systemPrompt, userPrompt);
-      const hints = JSON.parse(response);
-      return Array.isArray(hints) ? hints : [response];
+      const result = await generateWithFallback({
+        systemPrompt,
+        prompt: userPrompt
+      });
+      const hints = JSON.parse(result.text);
+      return Array.isArray(hints) ? hints : [result.text];
     } catch (error) {
       // Fallback to generic hints if parsing fails
       return this.generateFallbackHints(request);
@@ -521,26 +524,29 @@ Engine: ${request.engine}`;
     request: EvaluationRequest
   ): Promise<EvaluationResult> {
     try {
-      const response = await callGroq(systemPrompt, userPrompt);
-      const result = JSON.parse(response);
+      const result = await generateWithFallback({
+        systemPrompt,
+        prompt: userPrompt
+      });
+      const parsedResult = JSON.parse(result.text);
 
       // Generate targeted hints if the submission was not successful
-      const hints = result.success ? [] : await this.generateTargetedHints({
+      const hints = parsedResult.success ? [] : await this.generateTargetedHints({
         engine: request.engine,
         challengeDescription: `Challenge ${request.challengeId}`,
         submission: request.submission,
         previousHints: [],
         difficultyLevel: request.difficultyLevel,
-        specificIssues: result.detailedAnalysis?.weaknesses || []
+        specificIssues: parsedResult.detailedAnalysis?.weaknesses || []
       });
 
       return {
-        success: result.success || false,
-        score: result.score || 0,
-        feedback: result.feedback || 'No feedback provided',
-        performanceMetrics: result.performanceMetrics || this.getDefaultMetrics(),
+        success: parsedResult.success || false,
+        score: parsedResult.score || 0,
+        feedback: parsedResult.feedback || 'No feedback provided',
+        performanceMetrics: parsedResult.performanceMetrics || this.getDefaultMetrics(),
         hints,
-        detailedAnalysis: result.detailedAnalysis || this.getDefaultAnalysis(),
+        detailedAnalysis: parsedResult.detailedAnalysis || this.getDefaultAnalysis(),
         timeSpent: request.timeSpent,
         hintsUsed: request.hintsUsed
       };

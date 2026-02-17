@@ -1,0 +1,429 @@
+﻿node.exe : [baseline-
+browser-mapping] The 
+data in this module 
+is over two months 
+old.  To ensure 
+accurate Baseline 
+data, please update: 
+`npm i baseline-brows
+er-mapping@latest -D`
+At line:1 char:1
++ & "C:\Program Files
+\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: ([baseli   
+ ne-brows...ping@    
+latest -D`:Strin    
+g) [], RemoteExc    
+eption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+[baseline-browser-map
+ping] The data in 
+this module is over 
+two months old.  To 
+ensure accurate 
+Baseline data, 
+please update: `npm 
+i baseline-browser-ma
+pping@latest -D`
+  console.warn
+    AI generation attempt 1 failed: ChallengeGenerationError: Invalid challenge: Challenge must have a title
+        at ChallengeGenerator.validateChallenge (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:559:13)
+        at ChallengeGenerator.validateChallenge [as generateWithAI] (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:331:14)
+        at processTicksAndRejections (node:internal/process/task_queues:103:5)
+        at ChallengeGenerator.generateChallenge (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:100:25)
+        at C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:112:33
+        at AsyncProperty.run (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\property\AsyncProperty.generic.js:46:28)
+        at asyncRunIt (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\runner\Runner.js:28:21)
+        at Object.<anonymous> (C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:97:7) {
+      code: 'CHALLENGE_GENERATION_FAILED',
+      skillId: '!',
+      userId: undefined,
+      retryable: true
+    }
+
+    [0m [90m 334 |[39m       } [36mcatch[39m (error) {
+     [90m 335 |[39m         lastError [33m=[39m error [36mas[39m [33mError[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 336 |[39m         console[33m.[39mwarn([32m`AI generation attempt ${attempt} failed:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                 [31m[1m^[22m[39m
+     [90m 337 |[39m
+     [90m 338 |[39m         [36mif[39m (attempt [33m<[39m [36mthis[39m[33m.[39mconfig[33m.[39mmaxRetries) {
+     [90m 339 |[39m           [90m// Wait before retry with exponential backoff[39m[0m
+
+      at ChallengeGenerator.warn [as generateWithAI] (src/lib/services/challenge-generator.ts:336:17)
+      at ChallengeGenerator.generateChallenge (src/lib/services/challenge-generator.ts:100:25)
+      at src/lib/services/__tests__/challenge-generator.test.ts:112:33
+      at AsyncProperty.run (node_modules/fast-check/lib/cjs/check/property/AsyncProperty.generic.js:46:28)
+      at asyncRunIt (node_modules/fast-check/lib/cjs/check/runner/Runner.js:28:21)
+      at Object.<anonymous> (src/lib/services/__tests__/challenge-generator.test.ts:97:7)
+
+  console.warn
+    AI generation attempt 2 failed: ChallengeGenerationError: Invalid challenge: Challenge must have a title
+        at ChallengeGenerator.validateChallenge (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:559:13)
+        at ChallengeGenerator.validateChallenge [as generateWithAI] (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:331:14)
+        at ChallengeGenerator.generateChallenge (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:100:25)
+        at C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:112:33
+        at AsyncProperty.run (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\property\AsyncProperty.generic.js:46:28)
+        at asyncRunIt (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\runner\Runner.js:28:21)
+        at Object.<anonymous> (C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:97:7) {
+      code: 'CHALLENGE_GENERATION_FAILED',
+      skillId: '!',
+      userId: undefined,
+      retryable: true
+    }
+
+    [0m [90m 334 |[39m       } [36mcatch[39m (error) {
+     [90m 335 |[39m         lastError [33m=[39m error [36mas[39m [33mError[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 336 |[39m         console[33m.[39mwarn([32m`AI generation attempt ${attempt} failed:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                 [31m[1m^[22m[39m
+     [90m 337 |[39m
+     [90m 338 |[39m         [36mif[39m (attempt [33m<[39m [36mthis[39m[33m.[39mconfig[33m.[39mmaxRetries) {
+     [90m 339 |[39m           [90m// Wait before retry with exponential backoff[39m[0m
+
+      at ChallengeGenerator.warn [as generateWithAI] (src/lib/services/challenge-generator.ts:336:17)
+      at ChallengeGenerator.generateChallenge (src/lib/services/challenge-generator.ts:100:25)
+      at src/lib/services/__tests__/challenge-generator.test.ts:112:33
+      at AsyncProperty.run (node_modules/fast-check/lib/cjs/check/property/AsyncProperty.generic.js:46:28)
+      at asyncRunIt (node_modules/fast-check/lib/cjs/check/runner/Runner.js:28:21)
+      at Object.<anonymous> (src/lib/services/__tests__/challenge-generator.test.ts:97:7)
+
+  console.warn
+    AI generation attempt 1 failed: Error: AI service unavailable
+        at C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:170:56
+        at AsyncProperty.predicate (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\property\AsyncProperty.js:17:96)
+        at AsyncProperty.run (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\property\AsyncProperty.generic.js:46:39)
+        at asyncRunIt (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\runner\Runner.js:28:36)
+        at Object.<anonymous> (C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:163:7)
+
+    [0m [90m 334 |[39m       } [36mcatch[39m (error) {
+     [90m 335 |[39m         lastError [33m=[39m error [36mas[39m [33mError[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 336 |[39m         console[33m.[39mwarn([32m`AI generation attempt ${attempt} failed:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                 [31m[1m^[22m[39m
+     [90m 337 |[39m
+     [90m 338 |[39m         [36mif[39m (attempt [33m<[39m [36mthis[39m[33m.[39mconfig[33m.[39mmaxRetries) {
+     [90m 339 |[39m           [90m// Wait before retry with exponential backoff[39m[0m
+
+      at ChallengeGenerator.warn [as generateWithAI] (src/lib/services/challenge-generator.ts:336:17)
+      at ChallengeGenerator.generateChallenge (src/lib/services/challenge-generator.ts:100:25)
+      at src/lib/services/__tests__/challenge-generator.test.ts:173:33
+      at AsyncProperty.run (node_modules/fast-check/lib/cjs/check/property/AsyncProperty.generic.js:46:28)
+      at asyncRunIt (node_modules/fast-check/lib/cjs/check/runner/Runner.js:28:21)
+      at Object.<anonymous> (src/lib/services/__tests__/challenge-generator.test.ts:163:7)
+
+  console.warn
+    AI generation attempt 3 failed: Error: AI service unavailable
+        at C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:170:56
+        at AsyncProperty.predicate (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\property\AsyncProperty.js:17:96)
+        at AsyncProperty.run (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\property\AsyncProperty.generic.js:46:39)
+        at asyncRunIt (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\runner\Runner.js:28:36)
+        at Object.<anonymous> (C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:163:7)
+
+    [0m [90m 334 |[39m       } [36mcatch[39m (error) {
+     [90m 335 |[39m         lastError [33m=[39m error [36mas[39m [33mError[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 336 |[39m         console[33m.[39mwarn([32m`AI generation attempt ${attempt} failed:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                 [31m[1m^[22m[39m
+     [90m 337 |[39m
+     [90m 338 |[39m         [36mif[39m (attempt [33m<[39m [36mthis[39m[33m.[39mconfig[33m.[39mmaxRetries) {
+     [90m 339 |[39m           [90m// Wait before retry with exponential backoff[39m[0m
+
+      at ChallengeGenerator.warn [as generateWithAI] (src/lib/services/challenge-generator.ts:336:17)
+      at ChallengeGenerator.generateChallenge (src/lib/services/challenge-generator.ts:100:25)
+      at src/lib/services/__tests__/challenge-generator.test.ts:112:33
+      at AsyncProperty.run (node_modules/fast-check/lib/cjs/check/property/AsyncProperty.generic.js:46:28)
+      at asyncRunIt (node_modules/fast-check/lib/cjs/check/runner/Runner.js:28:21)
+      at Object.<anonymous> (src/lib/services/__tests__/challenge-generator.test.ts:97:7)
+
+  console.error
+    AI challenge generation failed for skill !: ChallengeGenerationError: AI generation failed after 3 attempts: AI service unavailable
+        at ChallengeGenerator.generateWithAI (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:345:11)
+        at ChallengeGenerator.generateChallenge (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:100:25)
+        at C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:112:33
+        at AsyncProperty.run (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\property\AsyncProperty.generic.js:46:28)
+        at asyncRunIt (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\runner\Runner.js:28:21)
+        at Object.<anonymous> (C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:97:7) {
+      code: 'CHALLENGE_GENERATION_FAILED',
+      skillId: '!',
+      userId: undefined,
+      retryable: true
+    }
+
+    [0m [90m 108 |[39m       [36mreturn[39m challenge[33m;[39m
+     [90m 109 |[39m     } [36mcatch[39m (error) {
+    [31m[1m>[22m[39m[90m 110 |[39m       console[33m.[39merror([32m`AI challenge generation failed for skill ${request.skillId}:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m               [31m[1m^[22m[39m
+     [90m 111 |[39m
+     [90m 112 |[39m       [90m// Fall back to template-based generation if enabled[39m
+     [90m 113 |[39m       [36mif[39m ([36mthis[39m[33m.[39mconfig[33m.[39mfallbackEnabled) {[0m
+
+      at ChallengeGenerator.error [as generateChallenge] (src/lib/services/challenge-generator.ts:110:15)
+      at src/lib/services/__tests__/challenge-generator.test.ts:112:33
+      at AsyncProperty.run (node_modules/fast-check/lib/cjs/check/property/AsyncProperty.generic.js:46:28)
+      at asyncRunIt (node_modules/fast-check/lib/cjs/check/runner/Runner.js:28:21)
+      at Object.<anonymous> (src/lib/services/__tests__/challenge-generator.test.ts:97:7)
+
+  console.warn
+    AI generation attempt 1 failed: ChallengeGenerationError: Invalid challenge: Challenge must have a title
+        at ChallengeGenerator.validateChallenge (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:559:13)
+        at ChallengeGenerator.validateChallenge [as generateWithAI] (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:331:14)
+        at ChallengeGenerator.generateChallenge (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:100:25)
+        at C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:112:33
+        at AsyncProperty.run (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\property\AsyncProperty.generic.js:46:28)
+        at asyncRunIt (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\runner\Runner.js:28:21)
+        at Object.<anonymous> (C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:97:7) {
+      code: 'CHALLENGE_GENERATION_FAILED',
+      skillId: '!',
+      userId: undefined,
+      retryable: true
+    }
+
+    [0m [90m 334 |[39m       } [36mcatch[39m (error) {
+     [90m 335 |[39m         lastError [33m=[39m error [36mas[39m [33mError[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 336 |[39m         console[33m.[39mwarn([32m`AI generation attempt ${attempt} failed:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                 [31m[1m^[22m[39m
+     [90m 337 |[39m
+     [90m 338 |[39m         [36mif[39m (attempt [33m<[39m [36mthis[39m[33m.[39mconfig[33m.[39mmaxRetries) {
+     [90m 339 |[39m           [90m// Wait before retry with exponential backoff[39m[0m
+
+      at ChallengeGenerator.warn [as generateWithAI] (src/lib/services/challenge-generator.ts:336:17)
+      at ChallengeGenerator.generateChallenge (src/lib/services/challenge-generator.ts:100:25)
+      at src/lib/services/__tests__/challenge-generator.test.ts:112:33
+      at AsyncProperty.run (node_modules/fast-check/lib/cjs/check/property/AsyncProperty.generic.js:46:28)
+      at asyncRunIt (node_modules/fast-check/lib/cjs/check/runner/Runner.js:28:21)
+      at Object.<anonymous> (src/lib/services/__tests__/challenge-generator.test.ts:97:7)
+
+  console.warn
+    AI generation attempt 2 failed: ChallengeGenerationError: Invalid challenge: Challenge must have a title
+        at ChallengeGenerator.validateChallenge (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:559:13)
+        at ChallengeGenerator.validateChallenge [as generateWithAI] (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:331:14)
+        at ChallengeGenerator.generateChallenge (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:100:25)
+        at C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:173:33
+        at AsyncProperty.run (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\property\AsyncProperty.generic.js:46:28)
+        at asyncRunIt (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\runner\Runner.js:28:21)
+        at Object.<anonymous> (C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:163:7) {
+      code: 'CHALLENGE_GENERATION_FAILED',
+      skillId: 'eS__look',
+      userId: undefined,
+      retryable: true
+    }
+
+    [0m [90m 334 |[39m       } [36mcatch[39m (error) {
+     [90m 335 |[39m         lastError [33m=[39m error [36mas[39m [33mError[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 336 |[39m         console[33m.[39mwarn([32m`AI generation attempt ${attempt} failed:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                 [31m[1m^[22m[39m
+     [90m 337 |[39m
+     [90m 338 |[39m         [36mif[39m (attempt [33m<[39m [36mthis[39m[33m.[39mconfig[33m.[39mmaxRetries) {
+     [90m 339 |[39m           [90m// Wait before retry with exponential backoff[39m[0m
+
+      at ChallengeGenerator.warn [as generateWithAI] (src/lib/services/challenge-generator.ts:336:17)
+      at ChallengeGenerator.generateChallenge (src/lib/services/challenge-generator.ts:100:25)
+      at src/lib/services/__tests__/challenge-generator.test.ts:173:33
+      at AsyncProperty.run (node_modules/fast-check/lib/cjs/check/property/AsyncProperty.generic.js:46:28)
+      at asyncRunIt (node_modules/fast-check/lib/cjs/check/runner/Runner.js:28:21)
+      at Object.<anonymous> (src/lib/services/__tests__/challenge-generator.test.ts:163:7)
+
+  console.warn
+    AI generation attempt 2 failed: ChallengeGenerationError: Invalid challenge: Challenge must have a title
+        at ChallengeGenerator.validateChallenge (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:559:13)
+        at ChallengeGenerator.validateChallenge [as generateWithAI] (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:331:14)
+        at runNextTicks (node:internal/process/task_queues:64:5)
+        at processTimers (node:internal/timers:538:9)
+        at ChallengeGenerator.generateChallenge (C:\Users\HP\EdBox-clean\src\lib\services\challenge-generator.ts:100:25)
+        at C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:112:33
+        at AsyncProperty.run (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\property\AsyncProperty.generic.js:46:28)
+        at asyncRunIt (C:\Users\HP\EdBox-clean\node_modules\fast-check\lib\cjs\check\runner\Runner.js:28:21)
+        at Object.<anonymous> (C:\Users\HP\EdBox-clean\src\lib\services\__tests__\challenge-generator.test.ts:97:7) {
+      code: 'CHALLENGE_GENERATION_FAILED',
+      skillId: '!',
+      userId: undefined,
+      retryable: true
+    }
+
+    [0m [90m 334 |[39m       } [36mcatch[39m (error) {
+     [90m 335 |[39m         lastError [33m=[39m error [36mas[39m [33mError[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 336 |[39m         console[33m.[39mwarn([32m`AI generation attempt ${attempt} failed:`[39m[33m,[39m error)[33m;[39m
+     [90m     |[39m                 [31m[1m^[22m[39m
+     [90m 337 |[39m
+     [90m 338 |[39m         [36mif[39m (attempt [33m<[39m [36mthis[39m[33m.[39mconfig[33m.[39mmaxRetries) {
+     [90m 339 |[39m           [90m// Wait before retry with exponential backoff[39m[0m
+
+      at ChallengeGenerator.warn [as generateWithAI] (src/lib/services/challenge-generator.ts:336:17)
+      at ChallengeGenerator.generateChallenge (src/lib/services/challenge-generator.ts:100:25)
+      at src/lib/services/__tests__/challenge-generator.test.ts:112:33
+      at AsyncProperty.run (node_modules/fast-check/lib/cjs/check/property/AsyncProperty.generic.js:46:28)
+      at asyncRunIt (node_modules/fast-check/lib/cjs/check/runner/Runner.js:28:21)
+      at Object.<anonymous> (src/lib/services/__tests__/challenge-generator.test.ts:97:7)
+
+FAIL src/lib/services
+/__tests__/challenge-
+generator.test.ts 
+(13.494 s)
+  ChallengeGenerator 
+Property Tests
+    Property 4: 
+Challenge Generation 
+Completeness
+      ├ù should 
+generate complete 
+challenges with all 
+required components 
+(5020 ms)
+      ├ù should 
+handle AI generation 
+failures with 
+fallback system 
+(5002 ms)
+
+  ΓùÅ 
+ChallengeGenerator 
+Property Tests ΓÇ║ 
+Property 4: 
+Challenge Generation 
+Completeness ΓÇ║ 
+should generate 
+complete challenges 
+with all required 
+components
+
+    thrown: 
+"Exceeded timeout of 
+5000 ms for a test.
+    Add a timeout 
+value to this test 
+to increase the 
+timeout, if this is 
+a long-running test. 
+See https://jestjs.io
+/docs/api#testname-fn
+-timeout."
+
+    [0m [90m 94 
+|[39m [90m     * 
+Validates: 
+Requirements 4.1, 
+4.2, 4.3[39m
+     [90m 95 |[39m 
+[90m     */[39m
+    [31m[1m>[22m[
+39m[90m 96 |[39m   
+  it([32m'should 
+generate complete 
+challenges with all 
+required components'
+[39m[33m,[39m 
+[36masync[39m () 
+[33m=>[39m {
+     [90m    |[39m 
+    
+[31m[1m^[22m[39m
+     [90m 97 |[39m 
+      
+[36mawait[39m 
+fc[33m.[39massert(
+     [90m 98 |[39m 
+        fc[33m.[39m
+asyncProperty(
+     [90m 99 |[39m 
+          challengeRe
+questArb[33m,[39m[
+0m
+
+      at it (src/lib/
+services/__tests__/ch
+allenge-generator.tes
+t.ts:96:5)
+      at describe (sr
+c/lib/services/__test
+s__/challenge-generat
+or.test.ts:91:3)
+      at 
+Object.describe (src/
+lib/services/__tests_
+_/challenge-generator
+.test.ts:25:1)
+
+  ΓùÅ 
+ChallengeGenerator 
+Property Tests ΓÇ║ 
+Property 4: 
+Challenge Generation 
+Completeness ΓÇ║ 
+should handle AI 
+generation failures 
+with fallback system
+
+    thrown: 
+"Exceeded timeout of 
+5000 ms for a test.
+    Add a timeout 
+value to this test 
+to increase the 
+timeout, if this is 
+a long-running test. 
+See https://jestjs.io
+/docs/api#testname-fn
+-timeout."
+
+    [0m [90m 160 
+|[39m     
+})[33m;[39m
+     [90m 161 |[39m
+    [31m[1m>[22m[
+39m[90m 162 |[39m  
+   it([32m'should 
+handle AI generation 
+failures with 
+fallback system'[39m
+[33m,[39m 
+[36masync[39m () 
+[33m=>[39m {
+     [90m     
+|[39m     
+[31m[1m^[22m[39m
+     [90m 163 
+|[39m       
+[36mawait[39m 
+fc[33m.[39massert(
+     [90m 164 
+|[39m         fc[33
+m.[39masyncProperty(
+     [90m 165 
+|[39m           chal
+lengeRequestArb[33m,
+[39m[0m
+
+      at it (src/lib/
+services/__tests__/ch
+allenge-generator.tes
+t.ts:162:5)
+      at describe (sr
+c/lib/services/__test
+s__/challenge-generat
+or.test.ts:91:3)
+      at 
+Object.describe (src/
+lib/services/__tests_
+_/challenge-generator
+.test.ts:25:1)
+
+Test Suites: 1 
+failed, 1 total
+Tests:       2 
+failed, 2 total
+Snapshots:   0 total
+Time:        15.157 s
+Ran all test suites 
+matching /src\\lib\\s
+ervices\\__tests__\\c
+hallenge-generator.te
+st.ts/i.

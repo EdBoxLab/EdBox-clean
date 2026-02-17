@@ -161,7 +161,7 @@ export interface GenerateOptions {
     mimeType: string;
     data: string; // base64
   }[];
-  model?: 'versatile' | 'oss' | 'vision' | 'llama-3.3-70b-versatile';
+  model?: 'versatile' | 'oss' | 'vision' | 'llama-3.3-70b-versatile' | 'llama-3.1-8b-instant';
   continuationContext?: string; // Used to resume from partial responses
 }
 

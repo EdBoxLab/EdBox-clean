@@ -739,25 +739,29 @@ export async function POST(request: NextRequest) {
     }
 
     if (useChapters && confirmedChapters && confirmedChapters.length > 0) {
-      const chapterContents: ChapterContent[] = [];
       const typesToGenerate = contentTypes || ['quizzes', 'flashcards', 'mindmaps', 'notes'];
       const totalStart = Date.now();
-      const allWarnings: string[] = [];
 
-      console.log(`\n🚀 Starting chapter-based generation: ${confirmedChapters.length} chapter(s), types: [${typesToGenerate.join(', ')}]`);
+      console.log(`\n🚀 Starting PARALLEL chapter-based generation: ${confirmedChapters.length} chapter(s), types: [${typesToGenerate.join(', ')}]`);
 
-      for (let i = 0; i < (confirmedChapters as DetectedChapter[]).length; i++) {
-        const chapter = (confirmedChapters as DetectedChapter[])[i];
-        console.log(`\n━━━ Chapter ${i + 1}/${confirmedChapters.length}: "${chapter.title}" ━━━`);
+      const chapterPromises = (confirmedChapters as DetectedChapter[]).map(async (chapter, i) => {
+        console.log(`\n━━━ Starting Chapter ${i + 1}/${confirmedChapters.length}: "${chapter.title}" ━━━`);
         const chapterContent = await generateChapterContent(chapter, typesToGenerate, customInstructions, itemCount, notesDepth);
-        chapterContents.push(chapterContent);
-        if ((chapterContent as any).warnings?.length > 0) {
-          allWarnings.push(...(chapterContent as any).warnings);
-        }
-      }
+        console.log(`\n✅ Completed Chapter ${i + 1}/${confirmedChapters.length}: "${chapter.title}"`);
+        return { index: i, chapterContent };
+      });
+
+      const chapterResults = await Promise.all(chapterPromises);
+      
+      const chapterContents: ChapterContent[] = chapterResults
+        .sort((a, b) => a.index - b.index)
+        .map(r => r.chapterContent);
+      
+      const allWarnings: string[] = chapterContents
+        .flatMap(c => (c as any).warnings || []);
 
       const totalElapsed = ((Date.now() - totalStart) / 1000).toFixed(1);
-      console.log(`\n🏁 All chapters complete in ${totalElapsed}s — ${allWarnings.length} total warning(s)`);
+      console.log(`\n🏁 All chapters complete in ${totalElapsed}s (PARALLEL) — ${allWarnings.length} total warning(s)`);
       if (allWarnings.length > 0) {
         allWarnings.forEach(w => console.warn(`  ⚠️ ${w}`));
       }
@@ -956,6 +960,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ studyKits: data || [] });
   } catch (error) {
+    return NextResponse.json({ error: 'Fetch failed' }, { status: 500 });
+  }
+}  } catch (error) {
     return NextResponse.json({ error: 'Fetch failed' }, { status: 500 });
   }
 }

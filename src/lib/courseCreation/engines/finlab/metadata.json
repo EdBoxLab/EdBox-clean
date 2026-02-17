@@ -1,7 +1,0 @@
-{
-  "name": "FinLab",
-  "description": "A comprehensive financial simulation and analysis studio for commerce students and professionals. Features AI-powered tutoring, interactive visualizations, and modular financial tools.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}

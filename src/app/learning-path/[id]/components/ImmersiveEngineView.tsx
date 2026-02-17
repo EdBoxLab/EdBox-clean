@@ -8,10 +8,6 @@ import InteractiveCourseSession from '@/components/InteractiveCourseSession';
 import { X, Trophy } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
-const CodeStudio = dynamic(() => import('@/lib/courseCreation/engines/codestudio/App'), { ssr: false });
-const WriteLab = dynamic(() => import('@/lib/courseCreation/engines/writingstudio/App'), { ssr: false });
-const MathLab = dynamic(() => import('@/lib/courseCreation/engines/mathlab/App'), { ssr: false });
-
 interface ImmersiveEngineViewProps {
     selectedSkill: SkillNode | null;
     parentGraph?: any;
@@ -93,9 +89,6 @@ export default function ImmersiveEngineView({
         const engineStr = String(currentChallenge.engine || 'default').toLowerCase();
 
         switch (engineStr) {
-            case 'codestudio': return <CodeStudio {...commonProps} />;
-            case 'writingstudio': return <WriteLab {...commonProps} />;
-            case 'mathlab': return <MathLab {...commonProps} />;
             default: return <div className="p-8 text-center text-gray-500">Engine {engineStr} is currently being optimized...</div>;
         }
     };

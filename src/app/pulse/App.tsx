@@ -7,7 +7,7 @@ import Chat from './components/Genie/Chat';
 import Canvas from './components/Workspace/Canvas';
 import { PulseWindow, WindowType, ChatMessage, GenieState } from './types';
 import { WIDGET_CONFIGS } from './constants';
-import { genieChatService } from './services/genie-chat';
+import { sendChatMessage, ChatMessage as APIMessage } from './services/chat-client';
 import { liveGenieService } from './services/live';
 import { interactionTracker } from './services/interaction-tracker';
 
@@ -29,6 +29,7 @@ const App: React.FC = () => {
   const [genieState, setGenieState] = useState<GenieState>({ isThinking: false, mood: 'neutral', mode: 'regular' });
   const [isLiveActive, setIsLiveActive] = useState(false);
   const [isLivePaused, setIsLivePaused] = useState(false);
+  const [sessionId] = useState(() => `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
 
   // Mobile View State
   const [mobileTab, setMobileTab] = useState<'chat' | 'workspace'>('chat');
@@ -231,11 +232,36 @@ const App: React.FC = () => {
     setGenieState(prev => ({ ...prev, isThinking: true, mood: 'focused' }));
     interactionTracker.log({ type: 'type', details: `User sent message: ${text.substring(0, 50)}...` });
 
+    console.log('[PULSE] Sending message via API route:', { sessionId, messageLength: text.length });
+
     try {
-      const responseText = await genieChatService.sendMessage(text, windows, handleToolCall);
+      const activityContext = interactionTracker.getContextSummary();
+      
+      const response = await sendChatMessage({
+        message: text,
+        sessionId,
+        currentWindows: windows,
+        activityContext,
+      });
+
+      console.log('[PULSE] API response received:', { 
+        success: response.success, 
+        responseLength: response.response?.length,
+        toolCallsCount: response.toolCalls?.length 
+      });
+
+      if (response.toolCalls && response.toolCalls.length > 0) {
+        console.log('[PULSE] Processing tool calls:', response.toolCalls.map(tc => tc.name));
+        response.toolCalls.forEach(toolCall => {
+          handleToolCall(toolCall.name, toolCall.args);
+        });
+      }
+
+      const responseText = response.response || "I'm here to help. What would you like to explore?";
       const modelMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'model', text: responseText, timestamp: Date.now() };
       setMessages(prev => [...prev, modelMsg]);
     } catch (err) {
+      console.error('[PULSE] API call failed:', err);
       const errorMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'model', text: "Connection interrupted.", timestamp: Date.now() };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
@@ -246,7 +272,6 @@ const App: React.FC = () => {
   const handleRunCode = async (code: string, language: string, widgetId: string) => {
     setGenieState(prev => ({ ...prev, isThinking: true, mood: 'focused' }));
     try {
-      // Construct a specific system prompt for code execution
       const executionPrompt = `SYSTEM_COMMAND: The user is requesting to RUN code in the Code Editor (ID: ${widgetId}).
           Language: ${language}
           Code:
@@ -262,9 +287,22 @@ const App: React.FC = () => {
           5. DO NOT just chat the output. Update the widget.
           `;
 
-      await genieChatService.sendMessage(executionPrompt, windows, handleToolCall);
+      console.log('[PULSE] Running code via API route:', { language, widgetId });
+
+      const response = await sendChatMessage({
+        message: executionPrompt,
+        sessionId,
+        currentWindows: windows,
+      });
+
+      if (response.toolCalls && response.toolCalls.length > 0) {
+        console.log('[PULSE] Code execution tool calls:', response.toolCalls.map(tc => tc.name));
+        response.toolCalls.forEach(toolCall => {
+          handleToolCall(toolCall.name, toolCall.args);
+        });
+      }
     } catch (err) {
-      console.error("Execution failed", err);
+      console.error("[PULSE] Code execution failed:", err);
     } finally {
       setGenieState(prev => ({ ...prev, isThinking: false, mood: 'neutral' }));
     }

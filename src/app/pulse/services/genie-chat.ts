@@ -1,44 +1,74 @@
 
 import { PulseWindow } from '../types';
-import { genieToolingService } from './genie-tooling';
+import { SYSTEM_INSTRUCTION, GENIE_TOOLS } from './genie-tooling';
 import { interactionTracker } from './interaction-tracker';
-import { getGoogleGenAIClient, hasGeminiKey } from '@/lib/ai-providers';
+import { getNextGroqKey, getGroqKeys } from '@/lib/ai-providers';
 
-class GenieChatService {
-  private ai: any = null;
-  private chat: any = null;
-  private isInitialized = false;
+interface ChatMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string;
+  tool_call_id?: string;
+  name?: string;
+}
 
-  private async initialize() {
-    if (this.isInitialized) return;
-    this.isInitialized = true;
+interface GroqToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
 
-    if (!hasGeminiKey()) return;
-
-    try {
-      this.ai = await getGoogleGenAIClient();
-      const config = genieToolingService.getConfig();
-
-      this.chat = this.ai.chats.create({
-        model: 'gemini-3-flash-preview',
-        config: {
-          systemInstruction: config.systemInstruction,
-          tools: config.tools,
-        }
-      });
-    } catch (error) {
-      console.error("Failed to initialize Genie Chat:", error);
+function convertToGroqTools(geminiTools: any[]): any[] {
+  const tools: any[] = [];
+  
+  for (const tool of geminiTools) {
+    if (tool.functionDeclarations) {
+      for (const decl of tool.functionDeclarations) {
+        tools.push({
+          type: 'function',
+          function: {
+            name: decl.name,
+            description: decl.description,
+            parameters: {
+              type: 'object',
+              properties: decl.parameters?.properties || {},
+              required: decl.parameters?.required || []
+            }
+          }
+        });
+      }
     }
   }
+  
+  return tools;
+}
 
-  /**
-   * Sends a message to the Genie.
-   */
-  async sendMessage(message: string, currentWindows: PulseWindow[], onToolCall: (toolName: string, args: any) => void): Promise<string> {
-    await this.initialize();
+const GROQ_TOOLS = convertToGroqTools(GENIE_TOOLS);
+
+class GenieChatService {
+  private messages: ChatMessage[] = [];
+  private isInitialized = false;
+
+  private initialize() {
+    if (this.isInitialized) return;
+    this.isInitialized = true;
     
-    if (!this.chat) {
-      // Fallback simulation
+    this.messages = [{
+      role: 'system',
+      content: SYSTEM_INSTRUCTION
+    }];
+  }
+
+  private hasGroqKey(): boolean {
+    return getGroqKeys().length > 0;
+  }
+
+  async sendMessage(message: string, currentWindows: PulseWindow[], onToolCall: (toolName: string, args: any) => void): Promise<string> {
+    this.initialize();
+    
+    if (!this.hasGroqKey()) {
       if (message.toLowerCase().includes('neuron') || message.toLowerCase().includes('brain')) {
         setTimeout(() => onToolCall('deploy_widget', { widget_type: 'NEURON_VISUALIZER' }), 800);
         return "I've deployed an interactive Neuron Visualizer. Try adjusting the bias to see how it affects the activation threshold.";
@@ -46,10 +76,8 @@ class GenieChatService {
       return "I'm The Genie. I'm here to guide you. What are we exploring today?";
     }
 
-    // 1. Get User Activity Context from Tracker
     const activityContext = interactionTracker.getContextSummary();
 
-    // 2. Get Workspace State Context
     let stateContext = "";
     if (currentWindows.length > 0) {
       stateContext += "\n\n[ACTIVE WORKSPACE STATE]:\n";
@@ -64,31 +92,88 @@ class GenieChatService {
       });
     }
 
+    const fullPrompt = `${message}\n\n${activityContext}${stateContext}`;
+    this.messages.push({ role: 'user', content: fullPrompt });
+
     try {
-      // Combine all context
-      const fullPrompt = `${message}\n\n${activityContext}${stateContext}`;
+      const Groq = (await import('groq-sdk')).default;
+      const apiKey = getNextGroqKey();
+      const groq = new Groq({ apiKey });
 
-      // 3. Send Message
-      const result = await this.chat.sendMessage({ message: fullPrompt });
+      const response = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: this.messages as any,
+        tools: GROQ_TOOLS,
+        tool_choice: 'auto',
+        temperature: 0.7,
+        max_tokens: 4096,
+      });
 
-      // 4. Handle Tool Calls
-      // CRITICAL FIX: Check functionCalls BEFORE accessing .text to prevent SDK errors/warnings with mixed content
-      const toolCalls = result.functionCalls;
-      let responseText = "";
+      const assistantMessage = response.choices[0]?.message;
+      
+      if (!assistantMessage) {
+        return "I'm having trouble connecting to the neural link. Let's try that again.";
+      }
 
-      if (toolCalls && toolCalls.length > 0) {
-        const toolResponses = await genieToolingService.processToolCalls(toolCalls, onToolCall);
-        const finalResult = await this.chat.sendMessage({ message: toolResponses });
-        responseText = finalResult.text || "";
+      let responseText = assistantMessage.content || "";
+
+      if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+        const toolCallsMessage: ChatMessage = {
+          role: 'assistant',
+          content: assistantMessage.content || '',
+          tool_call_id: undefined
+        };
+        
+        const toolResults: ChatMessage[] = [];
+
+        for (const call of assistantMessage.tool_calls as GroqToolCall[]) {
+          const args = JSON.parse(call.function.arguments);
+          onToolCall(call.function.name, args);
+
+          let result = 'Widget deployed successfully';
+          if (call.function.name === 'write_code') result = 'Code updated in editor';
+          if (call.function.name === 'run_code') result = 'Code execution started';
+          if (call.function.name === 'close_widget') result = 'Widget closed';
+          if (call.function.name === 'update_widget') result = 'Widget state updated';
+
+          toolResults.push({
+            role: 'tool',
+            tool_call_id: call.id,
+            name: call.function.name,
+            content: JSON.stringify({ result })
+          });
+        }
+
+        this.messages.push(toolCallsMessage as any);
+        this.messages.push(...toolResults as any);
+
+        const finalResponse = await groq.chat.completions.create({
+          model: 'llama-3.3-70b-versatile',
+          messages: this.messages as any,
+          temperature: 0.7,
+          max_tokens: 4096,
+        });
+
+        responseText = finalResponse.choices[0]?.message?.content || "";
+        
+        if (finalResponse.choices[0]?.message) {
+          this.messages.push({
+            role: 'assistant',
+            content: responseText
+          });
+        }
       } else {
-        // Only access text if no tools were called, ensuring we don't trigger the "non-text parts" warning
-        responseText = result.text || "";
+        this.messages.push({
+          role: 'assistant',
+          content: responseText
+        });
       }
 
       return responseText;
 
     } catch (error: any) {
       console.error("Genie Chat Error:", error);
+      this.messages.pop();
       return "I'm having trouble connecting to the neural link. Let's try that again.";
     }
   }

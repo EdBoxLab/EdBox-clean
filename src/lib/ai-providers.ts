@@ -33,7 +33,7 @@ function getGeminiKeys(): string[] {
   ].filter(Boolean) as string[];
 }
 
-function getGroqKeys(): string[] {
+export function getGroqKeys(): string[] {
   return [
     process.env.GROQ_API_KEY,
     process.env.GROQ_API_KEY_2,

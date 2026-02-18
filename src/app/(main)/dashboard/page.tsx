@@ -119,7 +119,7 @@ const Dashboard: React.FC = () => {
                 id: kit.id,
                 title: kit.title || 'Untitled Study Kit',
                 type: 'Study Kit',
-                href: `/pulse?type=STUDY_KIT&id=${kit.id}`,
+                href: `/tools/study-kit?id=${kit.id}`,
                 icon: <Zap className="w-8 h-8 text-yellow-300" />
               })));
             }

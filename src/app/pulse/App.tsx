@@ -10,18 +10,13 @@ import { WIDGET_CONFIGS } from './constants';
 import { sendChatMessage, ChatMessage as APIMessage } from './services/chat-client';
 import { liveGenieService } from './services/live';
 import { interactionTracker } from './services/interaction-tracker';
+import { saveWidget, upsertSessionProgress } from './services/widget-persistence';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 const MotionDiv = motion.div as any;
 
 const App: React.FC = () => {
-  const [windows, setWindows] = useState<PulseWindow[]>([{
-    id: 'init-blackboard',
-    type: WindowType.BLACKBOARD,
-    title: WIDGET_CONFIGS[WindowType.BLACKBOARD].defaultTitle,
-    width: 0, height: 0, x: 0, y: 0, zIndex: 1,
-    isMinimized: false,
-    data: {}
-  }]);
+  const [windows, setWindows] = useState<PulseWindow[]>([]);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: '1', role: 'system', text: 'Welcome to The Pulse. I am your Genie. You can chat with me or start a Live Voice Session.', timestamp: Date.now() }
@@ -33,6 +28,7 @@ const App: React.FC = () => {
 
   // Mobile View State
   const [mobileTab, setMobileTab] = useState<'chat' | 'workspace'>('chat');
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   // --- Persistence & Deep Linking Logic ---
 
@@ -47,6 +43,18 @@ const App: React.FC = () => {
         // If we have a deep link, clear current windows (optional) or just add the new one
         if (type === 'STUDY_KIT') {
           addWindow(WindowType.STUDY_KIT, { kitId: id });
+        } else if (type === 'SKILL_SESSION') {
+          const skillId = params.get('skillId');
+          const graphId = params.get('graphId');
+          addWindow(WindowType.SKILL_SESSION, { skillId, graphId }, 'Skill Session');
+          // Add a contextual Genie message
+          const skillTitle = params.get('skillTitle') || 'this skill';
+          setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            role: 'system',
+            text: `📚 Skill session started for **${decodeURIComponent(skillTitle)}**. I'll guide you from foundation to mastery. When you're ready, click "Start Learning with Genie" in the workspace.`,
+            timestamp: Date.now()
+          }]);
         } else if (type === 'COURSE' || type === 'SKILL_GRAPH') {
           addWindow(WindowType.SKILL_GRAPH, { graphId: id });
         } else if (type === 'NOTE') {
@@ -84,6 +92,14 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('pulse_session_messages', JSON.stringify(messages));
   }, [messages]);
+
+  // Fetch current user for widget persistence
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setCurrentUser(user);
+    });
+  }, []);
 
 
   // --- Window Management ---
@@ -221,6 +237,45 @@ const App: React.FC = () => {
       case 'run_code':
         updateActiveWidget(WindowType.CODE_EDITOR, w => ({ ...w, data: { ...w.data, executionTrigger: (w.data?.executionTrigger || 0) + 1 } }));
         break;
+      case 'update_skill_progress': {
+        // Handle Genie's skill mastery progress updates
+        const skillSessionWindow = windows.find(w => w.type === WindowType.SKILL_SESSION);
+        if (skillSessionWindow && currentUser) {
+          const { action, topic, next_stage, signal, confidence, summary } = args;
+          const { skillId, graphId } = skillSessionWindow.data || {};
+          if (!skillId || !graphId) break;
+
+          if (action === 'topic_covered' && topic) {
+            upsertSessionProgress({
+              user_id: currentUser.id,
+              skill_id: skillId,
+              graph_id: graphId,
+              topics_covered: [topic],
+              conversation_summary: summary || '',
+            });
+            console.log('[PULSE] Topic covered:', topic);
+          } else if (action === 'advance_stage' && next_stage) {
+            upsertSessionProgress({
+              user_id: currentUser.id,
+              skill_id: skillId,
+              graph_id: graphId,
+              current_stage: next_stage,
+              conversation_summary: summary || '',
+            });
+            console.log('[PULSE] Advanced to stage:', next_stage);
+          } else if (action === 'mastery_signal') {
+            upsertSessionProgress({
+              user_id: currentUser.id,
+              skill_id: skillId,
+              graph_id: graphId,
+              mastery_signals: { [signal || 'general']: confidence || 0.5 },
+              conversation_summary: summary || '',
+            });
+            console.log('[PULSE] Mastery signal:', signal, confidence);
+          }
+        }
+        break;
+      }
       default:
         console.log("Unknown tool:", toolName);
     }
@@ -236,7 +291,7 @@ const App: React.FC = () => {
 
     try {
       const activityContext = interactionTracker.getContextSummary();
-      
+
       const response = await sendChatMessage({
         message: text,
         sessionId,
@@ -244,10 +299,10 @@ const App: React.FC = () => {
         activityContext,
       });
 
-      console.log('[PULSE] API response received:', { 
-        success: response.success, 
+      console.log('[PULSE] API response received:', {
+        success: response.success,
         responseLength: response.response?.length,
-        toolCallsCount: response.toolCalls?.length 
+        toolCallsCount: response.toolCalls?.length
       });
 
       if (response.toolCalls && response.toolCalls.length > 0) {
@@ -397,7 +452,14 @@ const App: React.FC = () => {
       <div className={`${mobileTab === 'workspace' ? 'flex' : 'hidden'} md:flex flex-1 relative bg-slate-950 flex-col h-full md:h-auto`}>
         {/* Main Canvas Area */}
         <div className="flex-1 overflow-hidden relative">
-          <Canvas windows={windows} setWindows={setWindows} onRunCode={handleRunCode} onMinimize={toggleMinimize} />
+          <Canvas
+            windows={windows}
+            setWindows={setWindows}
+            onRunCode={handleRunCode}
+            onMinimize={toggleMinimize}
+            onSendGenieMessage={handleSendMessage}
+            onOpenWidget={(type, data) => addWindow(type, data)}
+          />
         </div>
 
         {/* Dock / Taskbar */}

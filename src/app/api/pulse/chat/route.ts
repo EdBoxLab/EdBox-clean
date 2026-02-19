@@ -20,7 +20,7 @@ interface GroqToolCall {
 
 function convertToGroqTools(geminiTools: any[]): any[] {
   const tools: any[] = [];
-  
+
   for (const tool of geminiTools) {
     if (tool.functionDeclarations) {
       for (const decl of tool.functionDeclarations) {
@@ -39,7 +39,7 @@ function convertToGroqTools(geminiTools: any[]): any[] {
       }
     }
   }
-  
+
   return tools;
 }
 
@@ -58,32 +58,64 @@ function log(prefix: string, message: string, data?: any) {
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  
+
   try {
     const body = await request.json();
     const { message, sessionId, currentWindows, activityContext, demoMode } = body;
-    
+
+    // --- Parse Skill Session Context ---
+    // SkillSessionWidget injects a [SKILL_SESSION_ACTIVE] block at the top of the message
+    let cleanMessage = message;
+    let activeSkillTitle = '';
+    let activeSkillId = '';
+    let activeGraphId = '';
+
+    if (typeof message === 'string' && message.startsWith('[SKILL_SESSION_ACTIVE]')) {
+      const lines = message.split('\n');
+      const headerEnd = lines.findIndex((l: string) => l.trim() === '');
+      const header = lines.slice(0, headerEnd > 0 ? headerEnd : 4);
+      for (const line of header) {
+        const [key, ...rest] = line.split(':');
+        const val = rest.join(':').trim();
+        if (key === 'skillTitle') activeSkillTitle = val;
+        if (key === 'skillId') activeSkillId = val;
+        if (key === 'graphId') activeGraphId = val;
+      }
+      // Strip the header block from the actual message sent to Genie
+      cleanMessage = lines.slice(headerEnd > 0 ? headerEnd + 1 : 4).join('\n').trim();
+    } else {
+      // Fall back to detecting active SKILL_SESSION window in workspace
+      const skillWin = (currentWindows || []).find((w: any) => w.type === 'SKILL_SESSION');
+      if (skillWin) {
+        activeSkillTitle = skillWin.data?.skillTitle || '';
+        activeSkillId = skillWin.data?.skillId || '';
+        activeGraphId = skillWin.data?.graphId || '';
+      }
+    }
+
     log('PULSE-CHAT', 'Request received', {
-      messageLength: message?.length,
+      messageLength: cleanMessage?.length,
       sessionId,
       windowsCount: currentWindows?.length || 0,
       hasActivityContext: !!activityContext,
+      isSkillSession: !!activeSkillTitle,
+      skillTitle: activeSkillTitle,
       demoMode
     });
 
-    if (!message) {
+    if (!cleanMessage) {
       log('PULSE-CHAT', 'Error: No message provided');
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
     const groqKeys = getGroqKeys();
     const hasGroqKey = groqKeys.length > 0;
-    
+
     log('PULSE-CHAT', 'Groq keys available', { keyCount: groqKeys.length });
 
     if (!hasGroqKey || demoMode) {
       log('PULSE-CHAT', 'Running in demo mode', { hasGroqKey, demoMode });
-      
+
       if (message.toLowerCase().includes('neuron') || message.toLowerCase().includes('brain')) {
         return NextResponse.json({
           response: "I've deployed an interactive Neuron Visualizer. Try adjusting the bias to see how it affects the activation threshold.",
@@ -104,6 +136,12 @@ export async function POST(request: NextRequest) {
     }
 
     let stateContext = "";
+
+    // Skill session context gets priority
+    if (activeSkillTitle) {
+      stateContext += `\n\n[ACTIVE SKILL SESSION]:\nSkill: "${activeSkillTitle}"\nSkill ID: ${activeSkillId}\nGraph ID: ${activeGraphId}\nThis is an active tutoring session. You are in TUTOR MODE. Follow the SKILL SESSION TUTOR MODE guidelines.\n---\n`;
+    }
+
     if (currentWindows && currentWindows.length > 0) {
       stateContext += "\n\n[ACTIVE WORKSPACE STATE]:\n";
       currentWindows.forEach((w: any) => {
@@ -117,9 +155,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const fullPrompt = `${message}\n\n${activityContext || ''}${stateContext}`;
+    const fullPrompt = `${cleanMessage}\n\n${activityContext || ''}${stateContext}`;
     messages.push({ role: 'user', content: fullPrompt });
-    
+
     log('PULSE-CHAT', 'Message added to context', {
       stateContextLength: stateContext.length,
       activityContextLength: activityContext?.length || 0,
@@ -145,7 +183,7 @@ export async function POST(request: NextRequest) {
     });
 
     const assistantMessage = response.choices[0]?.message;
-    
+
     if (!assistantMessage) {
       log('PULSE-CHAT', 'Error: No response from Groq');
       messages.pop();
@@ -158,7 +196,7 @@ export async function POST(request: NextRequest) {
     const toolCallsToReturn: { name: string; args: any }[] = [];
 
     if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-      log('PULSE-CHAT', 'Tool calls received', { 
+      log('PULSE-CHAT', 'Tool calls received', {
         count: assistantMessage.tool_calls.length,
         tools: assistantMessage.tool_calls.map((tc: any) => tc.function.name)
       });
@@ -168,7 +206,7 @@ export async function POST(request: NextRequest) {
         content: assistantMessage.content || '',
         tool_call_id: undefined
       };
-      
+
       const toolResults: ChatMessage[] = [];
 
       for (const call of assistantMessage.tool_calls as GroqToolCall[]) {
@@ -202,7 +240,7 @@ export async function POST(request: NextRequest) {
       });
 
       responseText = finalResponse.choices[0]?.message?.content || "";
-      
+
       if (finalResponse.choices[0]?.message) {
         messages.push({
           role: 'assistant',
@@ -217,7 +255,7 @@ export async function POST(request: NextRequest) {
     }
 
     const duration = Date.now() - startTime;
-    log('PULSE-CHAT', 'Request completed', { 
+    log('PULSE-CHAT', 'Request completed', {
       responseLength: responseText.length,
       toolCallsCount: toolCallsToReturn.length,
       duration: `${duration}ms`
@@ -235,7 +273,7 @@ export async function POST(request: NextRequest) {
       stack: error.stack,
       duration: `${duration}ms`
     });
-    
+
     return NextResponse.json({
       error: "I'm having trouble connecting to the neural link. Let's try that again.",
       details: error.message
@@ -246,14 +284,14 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const sessionId = searchParams.get('sessionId');
-  
+
   log('PULSE-CHAT', 'Session clear requested', { sessionId });
-  
+
   if (sessionId && sessionMessages.has(sessionId)) {
     sessionMessages.delete(sessionId);
     log('PULSE-CHAT', 'Session cleared', { sessionId });
     return NextResponse.json({ success: true });
   }
-  
+
   return NextResponse.json({ success: false, message: 'Session not found' });
 }

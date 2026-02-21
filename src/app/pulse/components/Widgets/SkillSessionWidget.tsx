@@ -6,7 +6,7 @@ import { SkillGraph, SkillNode } from '@/lib/courseCreation/types';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Loader2, ArrowLeft, Sparkles, BookOpen, Target, Trophy, ChevronRight, Play, CheckCircle2, Circle } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { getSessionProgress, SkillSessionProgress } from '../../services/widget-persistence';
+import { getSessionProgress, upsertSessionProgress, SkillSessionProgress } from '../../services/widget-persistence';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface CurriculumStage {
@@ -68,24 +68,30 @@ const SkillSessionWidget: React.FC<SkillSessionWidgetProps> = ({ window: pulseWi
         getUser();
     }, []);
 
-    // Fetch skill data + curriculum + progress
+    // Fetch skill data + curriculum + progress — wait for user so we can check cached curriculum
     useEffect(() => {
         if (!skillId || !graphId) {
             setError('Missing skill or graph ID');
             setLoading(false);
             return;
         }
-        fetchSkillData();
-    }, [skillId, graphId]);
+        if (!user) return; // wait for auth before loading
 
-    // Load existing progress when user is available + subscribe to realtime updates
-    useEffect(() => {
-        if (user && skillId && graphId) {
-            loadProgress();
+        const init = async () => {
+            // Load progress first — may contain cached curriculum
+            const progress = await getSessionProgress(user.id, skillId, graphId);
+            if (progress) {
+                setSessionProgress(progress);
+                setSessionStarted(true);
+            }
+            // Then fetch skill data, passing any saved curriculum
+            await fetchSkillData(progress?.curriculum);
+            // Subscribe to realtime updates
             subscribeToProgress();
-        }
+        };
+        init();
+
         return () => {
-            // Cleanup realtime channel on unmount
             if (realtimeChannelRef.current) {
                 const supabase = createSupabaseBrowserClient();
                 supabase.removeChannel(realtimeChannelRef.current);
@@ -140,16 +146,7 @@ const SkillSessionWidget: React.FC<SkillSessionWidgetProps> = ({ window: pulseWi
         realtimeChannelRef.current = channel;
     };
 
-    const loadProgress = async () => {
-        if (!user || !skillId || !graphId) return;
-        const progress = await getSessionProgress(user.id, skillId, graphId);
-        if (progress) {
-            setSessionProgress(progress);
-            setSessionStarted(true);
-        }
-    };
-
-    const fetchSkillData = async () => {
+    const fetchSkillData = async (savedCurriculum?: any) => {
         try {
             const supabase = createSupabaseBrowserClient();
 
@@ -166,7 +163,7 @@ const SkillSessionWidget: React.FC<SkillSessionWidgetProps> = ({ window: pulseWi
             if (!foundSkill) throw new Error('Skill not found in graph');
             setSkill(foundSkill as SkillNode);
 
-            await fetchCurriculum(foundSkill, graphData.goal);
+            await fetchCurriculum(foundSkill, graphData.goal, savedCurriculum);
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -174,7 +171,14 @@ const SkillSessionWidget: React.FC<SkillSessionWidgetProps> = ({ window: pulseWi
         }
     };
 
-    const fetchCurriculum = async (skillNode: SkillNode, graphGoal: string) => {
+    const fetchCurriculum = async (skillNode: SkillNode, graphGoal: string, savedCurriculum?: any) => {
+        // Use cached curriculum from DB if available
+        if (savedCurriculum && savedCurriculum.stages && savedCurriculum.stages.length > 0) {
+            console.log('[SkillSession] Using cached curriculum from DB');
+            setCurriculum(savedCurriculum);
+            return;
+        }
+
         setCurriculumLoading(true);
         try {
             const res = await fetch('/api/skill-curriculum/generate', {
@@ -192,6 +196,17 @@ const SkillSessionWidget: React.FC<SkillSessionWidgetProps> = ({ window: pulseWi
             if (!res.ok) throw new Error('Failed to generate curriculum');
             const data = await res.json();
             setCurriculum(data.curriculum);
+
+            // Save the generated curriculum to DB so we don't regenerate next time
+            if (user && skillId && graphId && data.curriculum) {
+                console.log('[SkillSession] Saving curriculum to DB for future use');
+                upsertSessionProgress({
+                    user_id: user.id,
+                    skill_id: skillId,
+                    graph_id: graphId,
+                    curriculum: data.curriculum,
+                });
+            }
         } catch (err: any) {
             console.error('Curriculum generation failed:', err);
         } finally {

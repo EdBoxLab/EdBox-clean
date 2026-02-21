@@ -429,6 +429,40 @@ export class SkillProgressionDatabase {
   }
 
   /**
+   * Get user's completed skills (at least 1 challenge completed)
+   * Less strict than getMasteredSkills — used for unlock logic
+   */
+  async getCompletedSkills(userId: string): Promise<string[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('user_skill_progress')
+        .select('skill_id')
+        .eq('user_id', userId)
+        .gte('challenges_completed', 1);
+
+      if (error) {
+        throw new ProgressTrackingError(
+          `Failed to get completed skills: ${error.message}`,
+          'all',
+          userId
+        );
+      }
+
+      return data.map((row: any) => row.skill_id);
+
+    } catch (error) {
+      if (error instanceof ProgressTrackingError) {
+        throw error;
+      }
+      throw new ProgressTrackingError(
+        `Database error getting completed skills: ${error}`,
+        'all',
+        userId
+      );
+    }
+  }
+
+  /**
    * Get recent challenge attempts for a user and skill (for adaptive difficulty)
    */
   async getRecentChallengeAttempts(

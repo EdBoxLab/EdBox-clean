@@ -66,7 +66,8 @@ export const SkillGraphView: React.FC<SkillGraphViewProps> = ({
 
     const isUnlocked = (node: SkillNode): boolean => {
         if (!node.prerequisites || node.prerequisites.length === 0) return true;
-        return node.prerequisites.every(prereqId => (userProgress[prereqId] || 0) >= 0.8);
+        // Unlock once prerequisites have any progress (completed at least once)
+        return node.prerequisites.every(prereqId => (userProgress[prereqId] || 0) > 0);
     };
 
     const getMasteryLevel = (nodeId: string): number => {
@@ -241,8 +242,8 @@ export const SkillGraphView: React.FC<SkillGraphViewProps> = ({
                                     </h3>
 
                                     <span className={`${isMobile ? 'text-[8px] px-1 py-0.5' : 'text-xs px-2 py-0.5'} rounded-full ${status === 'locked'
-                                            ? 'bg-zinc-800 text-zinc-600'
-                                            : 'bg-white/10 text-zinc-300'
+                                        ? 'bg-zinc-800 text-zinc-600'
+                                        : 'bg-white/10 text-zinc-300'
                                         }`}>
                                         {node.level}
                                     </span>

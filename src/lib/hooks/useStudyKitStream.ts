@@ -13,6 +13,8 @@ interface StreamState {
     current: number;
     total: number;
     currentItem: string;
+    estimatedSeconds?: number;
+    types?: string[];
   };
   partialContent: any;
   error: string | null;
@@ -38,7 +40,7 @@ export function useStudyKitStream(options: UseStudyKitStreamOptions = {}) {
   const parseSSE = (text: string): StreamEvent[] => {
     const events: StreamEvent[] = [];
     const lines = text.split('\n');
-    
+
     for (const line of lines) {
       if (line.startsWith('data: ')) {
         try {
@@ -50,7 +52,7 @@ export function useStudyKitStream(options: UseStudyKitStreamOptions = {}) {
         }
       }
     }
-    
+
     return events;
   };
 
@@ -110,6 +112,19 @@ export function useStudyKitStream(options: UseStudyKitStreamOptions = {}) {
 
         for (const event of events) {
           switch (event.event) {
+            case 'plan':
+              setState(prev => ({
+                ...prev,
+                progress: {
+                  current: 0,
+                  total: event.data.types?.length || 0,
+                  currentItem: event.data.message || 'Preparing...',
+                  estimatedSeconds: event.data.estimatedSeconds,
+                  types: event.data.types,
+                }
+              }));
+              break;
+
             case 'start':
               setState(prev => ({
                 ...prev,
@@ -127,7 +142,7 @@ export function useStudyKitStream(options: UseStudyKitStreamOptions = {}) {
             case 'content':
             case 'chapter_content':
               const { type, content, chapterIndex, chapterTitle } = event.data;
-              
+
               if (type.startsWith('notes/')) {
                 const noteType = type.split('/')[1];
                 if (!accumulatedContent.notes) accumulatedContent.notes = {};
@@ -142,8 +157,8 @@ export function useStudyKitStream(options: UseStudyKitStreamOptions = {}) {
                 progress: {
                   ...prev.progress,
                   current: (prev.progress.current || 0) + 1,
-                  currentItem: chapterTitle 
-                    ? `${chapterTitle}: ${type}` 
+                  currentItem: chapterTitle
+                    ? `${chapterTitle}: ${type}`
                     : type
                 }
               }));
@@ -182,7 +197,7 @@ export function useStudyKitStream(options: UseStudyKitStreamOptions = {}) {
         console.log('Stream aborted');
         return;
       }
-      
+
       const errorMessage = error.message || 'Stream failed';
       setState(prev => ({
         ...prev,

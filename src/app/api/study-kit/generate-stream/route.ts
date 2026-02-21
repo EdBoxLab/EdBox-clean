@@ -59,10 +59,24 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        sendEvent(controller, 'start', { message: 'Starting generation...' });
-
         const typesToGenerate: ContentType[] = contentTypes || ['quizzes', 'flashcards', 'mindmaps', 'notes'];
         const chapters = confirmedChapters as DetectedChapter[] | undefined;
+
+        // Send plan event with type list and ETA for frontend progress UI
+        const estimatedSeconds = chapters && chapters.length > 0
+          ? chapters.length * 8
+          : Math.max(5, typesToGenerate.length * 4);
+
+        sendEvent(controller, 'plan', {
+          types: typesToGenerate,
+          estimatedSeconds,
+          chapterCount: chapters?.length || 0,
+          message: chapters && chapters.length > 0
+            ? `Generating ${typesToGenerate.join(', ')} across ${chapters.length} chapters...`
+            : `Generating ${typesToGenerate.join(', ')}...`
+        });
+
+        sendEvent(controller, 'start', { message: 'Starting generation...' });
 
         if (chapters && chapters.length > 0) {
           sendEvent(controller, 'chapters_detected', { count: chapters.length });
@@ -108,20 +122,32 @@ export async function POST(request: NextRequest) {
             chapterCount: chapters.length
           });
         } else {
+          // PARALLEL generation — all content types run simultaneously
           const generatedContent: any = {};
 
-          for (const type of typesToGenerate) {
-            generatedContent[type] = await generateSingleContent(
-              type,
-              finalPrompt,
-              itemCount,
-              notesDepth,
-              customInstructions,
-              false,
-              undefined,
-              controller
-            );
-          }
+          const results = await Promise.allSettled(
+            typesToGenerate.map(async (type) => {
+              const content = await generateSingleContent(
+                type,
+                finalPrompt,
+                itemCount,
+                notesDepth,
+                customInstructions,
+                false,
+                undefined,
+                controller
+              );
+              generatedContent[type] = content;
+              return { type, content };
+            })
+          );
+
+          // Log any failures
+          results.forEach((r, i) => {
+            if (r.status === 'rejected') {
+              console.error(`${typesToGenerate[i]} generation failed:`, r.reason);
+            }
+          });
 
           let title = prompt?.slice(0, 100) || fileName?.split('.')[0] || 'Study Kit';
           if (title.length < 3) title = 'My Study Kit';

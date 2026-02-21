@@ -66,6 +66,7 @@ export function extractJSON(text: string, type: ContentType) {
                     : (typeof q.correctAnswer === 'string' ? Math.min(3, Math.max(0, parseInt(q.correctAnswer) || 0)) : 0),
                 explanation: sanitizeMathText(q.explanation || 'No explanation provided.'),
                 difficulty: ['Easy', 'Medium', 'Hard'].includes(q.difficulty) ? q.difficulty : 'Medium',
+                bloomLevel: ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'].includes(q.bloomLevel) ? q.bloomLevel : 'understand',
             }));
         }
 
@@ -74,6 +75,8 @@ export function extractJSON(text: string, type: ContentType) {
                 front: sanitizeMathText(c.front),
                 back: sanitizeMathText(c.back),
                 hint: sanitizeMathText(c.hint || ''),
+                examRelevance: typeof c.examRelevance === 'number' ? Math.min(5, Math.max(1, c.examRelevance)) : 3,
+                keyTakeaway: sanitizeMathText(c.keyTakeaway || ''),
             }));
         }
 
@@ -108,7 +111,7 @@ export function extractContextForType(type: ContentType, fullPrompt: string): st
         case 'mindmaps':
             return `Topic structure and relationships: ${fullPrompt.substring(0, maxLength)}...`;
         case 'notes':
-            return fullPrompt.substring(0, 3000);
+            return fullPrompt.substring(0, 2000);
         default:
             return fullPrompt.substring(0, maxLength);
     }

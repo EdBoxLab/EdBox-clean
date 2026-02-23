@@ -82,7 +82,7 @@ jobs:
             Check the **[Action Run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})** for more details on any failed steps.
             `;
             
-            github.rest.issues.createComment({
+              await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,

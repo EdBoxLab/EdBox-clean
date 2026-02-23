@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, id: studyKit?.id, content: { chapters: chapterContents }, hasChapters: true });
     }
 
-    const typesToGenerate: ContentType[] = appendType ? [appendType] : contentTypes;
+    const typesToGenerate: ContentType[] = appendType ? [appendType] : (contentTypes || ['quizzes', 'flashcards', 'mindmaps', 'notes']);
     const generatedContent: any = {};
     const chunks = (request as any).contextChunks;
 

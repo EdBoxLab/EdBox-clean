@@ -11,7 +11,12 @@ interface GoalTrackerProps {
 }
 
 export default function GoalTracker({ goals, className = '' }: GoalTrackerProps) {
-    if (!goals || goals.length === 0) return null;
+    if (!goals || goals.length === 0) return (
+        <div className={`flex items-center gap-3 p-4 rounded-xl border border-dashed border-gray-700/50 bg-gray-800/20 ${className}`}>
+            <Circle className="w-4 h-4 text-gray-600" />
+            <p className="text-sm text-gray-500 italic">Goals will appear as you start learning</p>
+        </div>
+    );
 
     const completedCount = goals.filter(g => g.status === 'mastered').length;
     const progress = (completedCount / goals.length) * 100;

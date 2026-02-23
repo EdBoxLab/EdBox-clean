@@ -78,7 +78,7 @@ export interface ProgressDisplayData {
 export class ProgressTracker {
   private db = skillProgressionDb;
   private progressionManager = skillProgressionManager;
-  
+
   // XP calculation configuration
   private xpConfig: XPConfig = {
     baseXP: 10,
@@ -199,8 +199,8 @@ export class ProgressTracker {
    * Get progress display data formatted for UI components
    */
   async getProgressDisplayData(
-    userId: string, 
-    skillId: string, 
+    userId: string,
+    skillId: string,
     skillTitle: string,
     skillGraph?: any
   ): Promise<ProgressDisplayData> {
@@ -218,18 +218,20 @@ export class ProgressTracker {
 
       // Get basic progress summary
       const summary = await this.getProgressSummary(userId, skillId);
-      
+
       // Get skill state if skill graph is provided
       let state: 'locked' | 'unlocked' | 'mastered' = 'unlocked';
       if (skillGraph) {
         state = await this.progressionManager.getSkillState(userId, skillId, skillGraph);
       } else if (summary.masteryAchieved) {
         state = 'mastered';
+      } else if (summary.challengesCompleted > 0) {
+        state = 'unlocked';
       }
 
       // Get recent performance data
       const recentPerformance = await this.analyzeRecentPerformance(userId, skillId);
-      
+
       // Estimate time to mastery based on current progress and performance
       const estimatedTimeToMastery = this.estimateTimeToMastery(summary, recentPerformance);
 
@@ -327,7 +329,7 @@ export class ProgressTracker {
   private async getRecentStreak(userId: string, skillId: string): Promise<number> {
     try {
       const attempts = await this.db.getChallengeAttempts(userId, skillId, 10);
-      
+
       let streak = 0;
       for (const attempt of attempts) {
         if (attempt.success) {
@@ -353,7 +355,7 @@ export class ProgressTracker {
   }> {
     try {
       const attempts = await this.db.getChallengeAttempts(userId, skillId, 20);
-      
+
       if (attempts.length < 3) {
         return { trend: 'stable', streakLength: 0 };
       }
@@ -363,14 +365,14 @@ export class ProgressTracker {
       const olderAttempts = attempts.slice(10);
 
       const recentSuccessRate = recentAttempts.filter(a => a.success).length / recentAttempts.length;
-      const olderSuccessRate = olderAttempts.length > 0 
-        ? olderAttempts.filter(a => a.success).length / olderAttempts.length 
+      const olderSuccessRate = olderAttempts.length > 0
+        ? olderAttempts.filter(a => a.success).length / olderAttempts.length
         : recentSuccessRate;
 
       // Determine trend
       let trend: 'improving' | 'stable' | 'declining' = 'stable';
       const difference = recentSuccessRate - olderSuccessRate;
-      
+
       if (difference > 0.1) {
         trend = 'improving';
       } else if (difference < -0.1) {
@@ -398,7 +400,7 @@ export class ProgressTracker {
     }
 
     const remainingChallenges = summary.challengesRequired - summary.challengesCompleted;
-    
+
     if (remainingChallenges <= 0 || summary.totalAttempts === 0) {
       return undefined;
     }
@@ -455,7 +457,7 @@ export class ProgressTracker {
    */
   onProgressUpdate(listener: (event: ProgressUpdateEvent) => void): () => void {
     this.eventListeners.push(listener);
-    
+
     // Return unsubscribe function
     return () => {
       const index = this.eventListeners.indexOf(listener);
@@ -489,7 +491,7 @@ export class ProgressTracker {
       // This would require a more complex query or caching mechanism
       // For now, return basic data
       const userXP = await this.getTotalUserXP(userId);
-      
+
       return {
         rank: 1, // Placeholder - would need proper ranking query
         totalUsers: 1, // Placeholder - would need user count
@@ -544,8 +546,8 @@ export class ProgressTracker {
    * Convert cached progress data to display data format
    */
   private convertProgressToDisplayData(
-    progress: UserSkillProgress, 
-    skillTitle: string, 
+    progress: UserSkillProgress,
+    skillTitle: string,
     skillGraph?: any
   ): ProgressDisplayData | null {
     try {

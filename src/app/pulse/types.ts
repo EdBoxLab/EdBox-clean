@@ -12,6 +12,7 @@ export enum WindowType {
   DASHBOARD_SUMMARY = 'DASHBOARD_SUMMARY',
   CUSTOM_GENERATED = 'CUSTOM_GENERATED', // New Type for AI Created Widgets
   SKILL_GRAPH = 'SKILL_GRAPH', // Learning path with progress tracking
+  SKILL_SESSION = 'SKILL_SESSION', // Immersive skill learning session in Pulse
 
   // Math (10)
   MATH_GRAPHING_CALC = 'MATH_GRAPHING_CALC',

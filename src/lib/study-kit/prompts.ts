@@ -18,6 +18,13 @@ export function buildPrompt(
         case 'quizzes':
             return base + `Generate EXACTLY ${count} high-quality multiple-choice questions.
 
+QUESTION QUALITY REQUIREMENTS:
+- Include questions at multiple Bloom's Taxonomy levels:
+  • 30% Remember/Understand (definitions, recall)
+  • 40% Apply/Analyze (scenarios, problem-solving)
+  • 30% Evaluate/Create (judgment calls, synthesis)
+- Each question MUST include a "bloomLevel" field
+
 CRITICAL REQUIREMENTS:
 - Generate EXACTLY ${count} questions. No more, no less.
 - The output must be a single continuous set of ${count} questions.
@@ -36,7 +43,7 @@ IMPORTANT FOR MATH/SCIENCE TOPICS:
 
 CRITICAL: correctAnswer is 0-indexed (0=first option, 3=fourth option)
 Output ONLY JSON array:
-[{"question":"...","options":["A","B","C","D"],"correctAnswer":0,"explanation":"...","difficulty":"Easy"}]`;
+[{"question":"...","options":["A","B","C","D"],"correctAnswer":0,"explanation":"...","difficulty":"Easy","bloomLevel":"apply"}]`;
 
         case 'flashcards':
             return base + `Generate EXACTLY ${count} professional flashcards that focus on key concepts, terminology, and critical insights.
@@ -47,13 +54,17 @@ Each card should include:
 - Front: The concept or question.
 - Back: The detailed explanation or answer.
 - Hint: A subtle clue to help the learner.
+- ExamRelevance: A score from 1-5 indicating how likely this concept appears on exams (5 = almost certain).
+- KeyTakeaway: A single sentence summarizing why this concept matters.
 
 Format as a JSON array:
 [
   {
     "front": "string",
     "back": "string",
-    "hint": "string"
+    "hint": "string",
+    "examRelevance": 4,
+    "keyTakeaway": "string"
   }
 ]
 \nOutput ONLY JSON array.`;

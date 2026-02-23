@@ -241,24 +241,16 @@ export class SkillProgressionDatabase {
         .eq('user_id', userId)
         .order('updated_at', { ascending: false });
 
+      // Return empty array on RLS block or empty table — do not throw
       if (error) {
-        throw new ProgressTrackingError(
-          `Failed to get user progress: ${error.message}`,
-          'all',
-          userId
-        );
+        console.warn('[SkillProgressionDB] getUserProgressAll error (returning []):', error.message);
+        return [];
       }
 
-      return data.map(this.mapUserSkillProgress);
+      return (data || []).map(this.mapUserSkillProgress);
     } catch (error) {
-      if (error instanceof ProgressTrackingError) {
-        throw error;
-      }
-      throw new ProgressTrackingError(
-        `Database error getting user progress: ${error}`,
-        'all',
-        userId
-      );
+      console.warn('[SkillProgressionDB] getUserProgressAll unexpected error (returning []):', error);
+      return [];
     }
   }
 
@@ -275,7 +267,7 @@ export class SkillProgressionDatabase {
         .from('challenge_attempts')
         .select('*')
         .eq('user_id', userId)
-        .order('timestamp', { ascending: false })
+        .order('created_at', { ascending: false }) // DB column is created_at, not timestamp
         .limit(limit);
 
       if (skillId) {
@@ -285,23 +277,14 @@ export class SkillProgressionDatabase {
       const { data, error } = await query;
 
       if (error) {
-        throw new ProgressTrackingError(
-          `Failed to get challenge attempts: ${error.message}`,
-          skillId || 'all',
-          userId
-        );
+        console.warn('[SkillProgressionDB] getChallengeAttempts error (returning []):', error.message);
+        return [];
       }
 
-      return data.map(this.mapChallengeAttempt);
+      return (data || []).map(this.mapChallengeAttempt);
     } catch (error) {
-      if (error instanceof ProgressTrackingError) {
-        throw error;
-      }
-      throw new ProgressTrackingError(
-        `Database error getting challenge attempts: ${error}`,
-        skillId || 'all',
-        userId
-      );
+      console.warn('[SkillProgressionDB] getChallengeAttempts unexpected error (returning []):', error);
+      return [];
     }
   }
 
@@ -446,6 +429,40 @@ export class SkillProgressionDatabase {
   }
 
   /**
+   * Get user's completed skills (at least 1 challenge completed)
+   * Less strict than getMasteredSkills — used for unlock logic
+   */
+  async getCompletedSkills(userId: string): Promise<string[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('user_skill_progress')
+        .select('skill_id')
+        .eq('user_id', userId)
+        .gte('challenges_completed', 1);
+
+      if (error) {
+        throw new ProgressTrackingError(
+          `Failed to get completed skills: ${error.message}`,
+          'all',
+          userId
+        );
+      }
+
+      return data.map((row: any) => row.skill_id);
+
+    } catch (error) {
+      if (error instanceof ProgressTrackingError) {
+        throw error;
+      }
+      throw new ProgressTrackingError(
+        `Database error getting completed skills: ${error}`,
+        'all',
+        userId
+      );
+    }
+  }
+
+  /**
    * Get recent challenge attempts for a user and skill (for adaptive difficulty)
    */
   async getRecentChallengeAttempts(
@@ -459,27 +476,18 @@ export class SkillProgressionDatabase {
         .select('*')
         .eq('user_id', userId)
         .eq('skill_id', skillId)
-        .order('timestamp', { ascending: false })
+        .order('created_at', { ascending: false }) // DB column is created_at, not timestamp
         .limit(limit);
 
       if (error) {
-        throw new ProgressTrackingError(
-          `Failed to get recent challenge attempts: ${error.message}`,
-          skillId,
-          userId
-        );
+        console.warn('[SkillProgressionDB] getRecentChallengeAttempts error (returning []):', error.message);
+        return [];
       }
 
-      return data.map(this.mapChallengeAttempt);
+      return (data || []).map(this.mapChallengeAttempt);
     } catch (error) {
-      if (error instanceof ProgressTrackingError) {
-        throw error;
-      }
-      throw new ProgressTrackingError(
-        `Database error getting recent challenge attempts: ${error}`,
-        skillId,
-        userId
-      );
+      console.warn('[SkillProgressionDB] getRecentChallengeAttempts unexpected error (returning []):', error);
+      return [];
     }
   }
 
@@ -547,10 +555,10 @@ export class SkillProgressionDatabase {
       success: row.success,
       timeSpent: row.time_spent,
       hintsUsed: row.hints_used,
-      submissionCode: row.submission_code,
+      submissionCode: row.code_submitted || row.submission_code, // DB uses code_submitted
       feedback: row.feedback,
       difficultyLevel: row.difficulty_level as DifficultyLevel,
-      timestamp: new Date(row.timestamp),
+      timestamp: new Date(row.created_at), // DB uses created_at, not timestamp
       createdAt: new Date(row.created_at)
     };
   }

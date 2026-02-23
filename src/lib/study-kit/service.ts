@@ -106,12 +106,14 @@ export async function generateChapterContent(
                 label: noteType,
                 run: async () => {
                     const notePrompt = buildNotePrompt(chapterPrompt, notesDepth, customInstructions, noteType);
+                    // Smart model tiering: 70b for creative reasoning, 8b for structured output
+                    const needs70b = noteType === 'deepExplanation' || noteType === 'application';
                     const noteResult = await generateWithRetry({
                         prompt: notePrompt,
                         systemPrompt: NOTE_SYSTEM_PROMPTS[noteType],
                         temperature: 0.7,
-                        maxTokens: 5000,
-                        model: 'llama-3.3-70b-versatile'
+                        maxTokens: needs70b ? 5000 : 3500,
+                        model: needs70b ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant'
                     });
                     result.notes![noteType] = cleanMarkdown(noteResult.text);
                     reportProgress(noteType, result.notes![noteType], true);
@@ -193,12 +195,14 @@ export async function generateSingleContent(
         const notePromises = NOTE_TYPES.map(async (noteType) => {
             try {
                 const notePrompt = buildNotePrompt(currentChunks[0], notesDepth, customInstructions, noteType);
+                // Smart model tiering: 70b for creative reasoning, 8b for structured output
+                const needs70b = noteType === 'deepExplanation' || noteType === 'application';
                 const result = await generateWithRetry({
                     prompt: notePrompt,
                     systemPrompt: NOTE_SYSTEM_PROMPTS[noteType],
                     temperature: 0.7,
-                    maxTokens: 5000,
-                    model: 'llama-3.3-70b-versatile'
+                    maxTokens: needs70b ? 5000 : 3500,
+                    model: needs70b ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant'
                 });
                 const content = cleanMarkdown(result.text);
                 notes[noteType] = content;

@@ -52,7 +52,7 @@ export class SkillProgressionManager {
     try {
       // Get user's progress for this skill
       const progress = await this.db.getSkillProgress(userId, skillId);
-      
+
       // If user has mastered the skill, return mastered
       if (progress.masteryAchieved) {
         return 'mastered';
@@ -60,7 +60,7 @@ export class SkillProgressionManager {
 
       // Check if skill can be unlocked based on prerequisites
       const unlockStatus = await this.getSkillUnlockStatus(userId, skillId, skillGraph);
-      
+
       return unlockStatus.canUnlock ? 'unlocked' : 'locked';
     } catch (error) {
       if (error instanceof ProgressTrackingError) {
@@ -91,13 +91,17 @@ export class SkillProgressionManager {
         );
       }
 
-      // Get user's mastered skills
+      // Get completed skills (≥1 challenge done) for unlock logic
+      const completedSkills = await this.db.getCompletedSkills(userId);
+      const completedSkillsSet = new Set(completedSkills);
+
+      // Get mastered skills for visual state
       const masteredSkills = await this.db.getMasteredSkills(userId);
       const masteredSkillsSet = new Set(masteredSkills);
 
-      // Check which prerequisites are not met
+      // Prerequisites are met once the user has completed them (≥1 challenge)
       const unmetPrerequisites = skillNode.prerequisites.filter(
-        prereqId => !masteredSkillsSet.has(prereqId)
+        prereqId => !completedSkillsSet.has(prereqId)
       );
 
       // Determine if skill can be unlocked
@@ -141,9 +145,9 @@ export class SkillProgressionManager {
     try {
       // Get user's current progress
       const progress = await this.db.getSkillProgress(userId, skillId);
-      
+
       // Calculate progress percentage
-      const progressPercentage = progress.challengesRequired > 0 
+      const progressPercentage = progress.challengesRequired > 0
         ? Math.min(100, (progress.challengesCompleted / progress.challengesRequired) * 100)
         : 0;
 
@@ -175,8 +179,8 @@ export class SkillProgressionManager {
    * Check if a challenge attempt results in skill mastery
    */
   async checkMasteryAchievement(
-    userId: string, 
-    skillId: string, 
+    userId: string,
+    skillId: string,
     challengeResult: ChallengeResult
   ): Promise<boolean> {
     try {
@@ -217,14 +221,14 @@ export class SkillProgressionManager {
       const unlockedSkills: string[] = [];
 
       // Find all skills that depend on the mastered skill
-      const dependentSkills = skillGraph.nodes.filter(node => 
+      const dependentSkills = skillGraph.nodes.filter(node =>
         node.prerequisites.includes(masteredSkillId)
       );
 
       // Check each dependent skill to see if it can now be unlocked
       for (const skill of dependentSkills) {
         const unlockStatus = await this.getSkillUnlockStatus(userId, skill.id, skillGraph);
-        
+
         // If the skill can now be unlocked and wasn't already unlocked
         if (unlockStatus.canUnlock && unlockStatus.state !== 'mastered') {
           unlockedSkills.push(skill.id);
@@ -256,7 +260,11 @@ export class SkillProgressionManager {
 
       const skillStates = new Map<string, SkillState>();
 
-      // Get all mastered skills for efficiency
+      // Get completed skills (≥1 challenge) for unlock logic
+      const completedSkills = await this.db.getCompletedSkills(userId);
+      const completedSkillsSet = new Set(completedSkills);
+
+      // Get mastered skills for visual state
       const masteredSkills = await this.db.getMasteredSkills(userId);
       const masteredSkillsSet = new Set(masteredSkills);
 
@@ -265,11 +273,11 @@ export class SkillProgressionManager {
         if (masteredSkillsSet.has(node.id)) {
           skillStates.set(node.id, 'mastered');
         } else {
-          // Check if prerequisites are met
+          // Unlock once prerequisites have been completed (≥1 challenge each)
           const unmetPrerequisites = node.prerequisites.filter(
-            prereqId => !masteredSkillsSet.has(prereqId)
+            prereqId => !completedSkillsSet.has(prereqId)
           );
-          
+
           const state = unmetPrerequisites.length === 0 ? 'unlocked' : 'locked';
           skillStates.set(node.id, state);
         }
@@ -344,7 +352,7 @@ export class SkillProgressionManager {
     const duplicateIds = skillGraph.nodes
       .map(node => node.id)
       .filter((id, index, arr) => arr.indexOf(id) !== index);
-    
+
     if (duplicateIds.length > 0) {
       errors.push(`Duplicate skill IDs found: ${duplicateIds.join(', ')}`);
     }
@@ -392,7 +400,7 @@ export class SkillProgressionManager {
       .map(node => `${node.id}:${node.prerequisites.sort().join(',')}`)
       .sort()
       .join('|');
-    
+
     // Simple hash function (for production, consider using a proper hash library)
     let hash = 0;
     for (let i = 0; i < graphSignature.length; i++) {
@@ -400,7 +408,7 @@ export class SkillProgressionManager {
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
-    
+
     return `graph_${Math.abs(hash)}`;
   }
 

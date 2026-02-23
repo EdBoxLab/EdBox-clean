@@ -42,7 +42,7 @@ export default function QuizBubble({
     };
 
     return (
-        <div className="w-full max-w-sm mt-4 space-y-4">
+        <div className="w-full max-w-2xl mt-4 space-y-4">
             <div className="p-5 bg-gray-800/40 border border-gray-700/50 rounded-2xl backdrop-blur-sm shadow-xl">
                 <div className="flex items-center gap-2 mb-4">
                     <div className="p-1.5 bg-blue-500/20 rounded-lg">

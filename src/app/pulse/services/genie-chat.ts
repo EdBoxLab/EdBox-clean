@@ -22,7 +22,7 @@ interface GroqToolCall {
 
 function convertToGroqTools(geminiTools: any[]): any[] {
   const tools: any[] = [];
-  
+
   for (const tool of geminiTools) {
     if (tool.functionDeclarations) {
       for (const decl of tool.functionDeclarations) {
@@ -41,7 +41,7 @@ function convertToGroqTools(geminiTools: any[]): any[] {
       }
     }
   }
-  
+
   return tools;
 }
 
@@ -54,7 +54,7 @@ class GenieChatService {
   private initialize() {
     if (this.isInitialized) return;
     this.isInitialized = true;
-    
+
     this.messages = [{
       role: 'system',
       content: SYSTEM_INSTRUCTION
@@ -67,7 +67,7 @@ class GenieChatService {
 
   async sendMessage(message: string, currentWindows: PulseWindow[], onToolCall: (toolName: string, args: any) => void): Promise<string> {
     this.initialize();
-    
+
     if (!this.hasGroqKey()) {
       if (message.toLowerCase().includes('neuron') || message.toLowerCase().includes('brain')) {
         setTimeout(() => onToolCall('deploy_widget', { widget_type: 'NEURON_VISUALIZER' }), 800);
@@ -110,7 +110,7 @@ class GenieChatService {
       });
 
       const assistantMessage = response.choices[0]?.message;
-      
+
       if (!assistantMessage) {
         return "I'm having trouble connecting to the neural link. Let's try that again.";
       }
@@ -123,7 +123,7 @@ class GenieChatService {
           content: assistantMessage.content || '',
           tool_call_id: undefined
         };
-        
+
         const toolResults: ChatMessage[] = [];
 
         for (const call of assistantMessage.tool_calls as GroqToolCall[]) {
@@ -135,6 +135,7 @@ class GenieChatService {
           if (call.function.name === 'run_code') result = 'Code execution started';
           if (call.function.name === 'close_widget') result = 'Widget closed';
           if (call.function.name === 'update_widget') result = 'Widget state updated';
+          if (call.function.name === 'update_skill_progress') result = `Skill progress updated: ${args.action || 'unknown'}${args.topic ? ' - ' + args.topic : ''}`;
 
           toolResults.push({
             role: 'tool',
@@ -155,7 +156,7 @@ class GenieChatService {
         });
 
         responseText = finalResponse.choices[0]?.message?.content || "";
-        
+
         if (finalResponse.choices[0]?.message) {
           this.messages.push({
             role: 'assistant',

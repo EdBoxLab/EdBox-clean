@@ -14,7 +14,6 @@ import HeroSection from './components/HeroSection';
 import SkillCard from './components/SkillCard';
 import NotificationSystem from './components/NotificationSystem';
 import PrerequisitesModal from './components/PrerequisitesModal';
-import EngineModal from './components/ImmersiveEngineView';
 
 // Import source map utilities
 import { performSourceMapHealthCheck, enhanceConsoleLogging, logComponentError } from './utils/sourceMapUtils';
@@ -41,18 +40,9 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
   }
 
   // Core state
-  const [selectedSkill, setSelectedSkill] = useState<SkillNode | null>(null);
-  const [currentChallenge, setCurrentChallenge] = useState<Challenge | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [showPrerequisites, setShowPrerequisites] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-
-  // Session state for challenges
-  const [sessionChallenges, setSessionChallenges] = useState<Challenge[]>([]);
-  const [conceptExplanation, setConceptExplanation] = useState<string>('');
-  const [activeChallengeIndex, setActiveChallengeIndex] = useState<number>(-1);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [consecutiveFailures, setConsecutiveFailures] = useState<number>(0);
 
   // --- FIX 1: Use a Ref instead of State to track progress history ---
   // This prevents setPreviousProgressData from triggering a re-render loop.
@@ -78,9 +68,8 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
     };
   }, [graph.id]); // Changed from [graph]
 
-  // Pause progress event listening while the engine view is open to prevent mid-session refreshes
-  const { progressData, loading: progressLoading, error: progressError, refreshProgress: refreshGraphProgress } = useMultipleSkillsProgress(progressionGraph, { paused: selectedSkill !== null });
-  const { recordChallengeAttempt } = useProgressTracker(selectedSkill?.id, selectedSkill?.title);
+  const { progressData, loading: progressLoading, error: progressError, refreshProgress: refreshGraphProgress } = useMultipleSkillsProgress(progressionGraph);
+  const { recordChallengeAttempt } = useProgressTracker(undefined, undefined);
 
   useEffect(() => {
     try {
@@ -194,14 +183,7 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
-  const handleCloseEngine = () => {
-    setSelectedSkill(null);
-    setCurrentChallenge(null);
-    // Sync progress to parent after closing the interactive session
-    // This is deferred so we don't cause re-renders during the active session
-    refreshGraphProgress();
-    window.dispatchEvent(new Event('skill-progress-updated'));
-  };
+
 
   const handleSkillClick = async (skillId: string) => {
     const skill = graph.nodes.find((n) => n.id === skillId) || null;
@@ -217,50 +199,14 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
     }
 
     if (skillState === 'unlocked' || skillState === 'mastered') {
-      setSelectedSkill(skill);
-      setSessionChallenges([]);
-      setConceptExplanation('');
-      setActiveChallengeIndex(-1);
-      setConsecutiveFailures(0);
-
-      const existing = challenges[skillId];
-      if (existing) {
-        setSessionChallenges([existing]);
-        setConceptExplanation(existing.explanation || "Let's dive in!");
-        setActiveChallengeIndex(0);
-      } else {
-        // No pre-generated challenges, just start interactive session
-        const skillTitle = skill.title || (skill as any).name || skill.id;
-        setConceptExplanation(`Let's learn about ${skillTitle}!`);
-        setSessionChallenges([]);
-        setActiveChallengeIndex(-1);
-      }
+      // Navigate to Pulse with skill context
+      const skillTitle = encodeURIComponent(skill.title || skill.id);
+      const url = `/pulse?type=SKILL_SESSION&id=${skillId}&skillId=${skillId}&graphId=${graph.id}&skillTitle=${skillTitle}`;
+      window.location.href = url;
     }
   };
 
-  const handleChallengeSelect = (index: number) => {
-    setActiveChallengeIndex(index);
-    setCurrentChallenge(sessionChallenges[index] || null);
-  };
 
-  const handleChallengeComplete = async (success: boolean) => {
-    if (!selectedSkill || activeChallengeIndex === -1) return;
-    const currentChal = sessionChallenges[activeChallengeIndex];
-    if (currentChal) {
-      await recordChallengeAttempt(currentChal.id, success, progressionGraph, {
-        difficultyLevel: (selectedSkill.level as DifficultyLevel) || 'Medium'
-      });
-    }
-    await refreshGraphProgress();
-    if (success) {
-      setConsecutiveFailures(0);
-      if (activeChallengeIndex < sessionChallenges.length - 1) {
-        setTimeout(() => handleChallengeSelect(activeChallengeIndex + 1), 1500);
-      }
-    } else {
-      setConsecutiveFailures(prev => prev + 1);
-    }
-  };
 
   // Stats calculation with defensive checks
   const totalMinutes = useMemo(() => (graph?.nodes || []).reduce((sum, n) => sum + (n.estimatedMinutes || 0), 0), [graph?.id]);
@@ -334,14 +280,6 @@ export default function SkillGraphRenderer({ graph, challenges = {} }: SkillGrap
         getSkillState={getSkillState} getSkillProgress={getSkillProgress}
         getUnmetPrerequisites={getUnmetPrerequisites}
         onClose={() => setShowPrerequisites(null)} onSkillClick={handleSkillClick}
-      />
-      <EngineModal
-        selectedSkill={selectedSkill} 
-        parentGraph={graph}
-        sessionChallenges={sessionChallenges}
-        activeChallengeIndex={activeChallengeIndex} currentChallenge={currentChallenge}
-        isGenerating={isGenerating} onClose={handleCloseEngine}
-        onChallengeSelect={handleChallengeSelect} onChallengeComplete={handleChallengeComplete}
       />
     </div>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, BookOpen, Brain, Trophy, MessageCircle, Menu, X, Loader, AlertCircle } from 'lucide-react';
+import { Send, BookOpen, Brain, Trophy, MessageCircle, Menu, X, Loader, AlertCircle, ChevronRight, Clock, Coffee } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import posthog from 'posthog-js';
 import ReactMarkdown from 'react-markdown';
@@ -130,11 +130,29 @@ export default function InteractiveCourseSession({
   const [learningStage, setLearningStage] = useState<'EXPLAIN' | 'QUIZ' | 'CHALLENGE'>('EXPLAIN');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [resumeBanner, setResumeBanner] = useState<{ goalName: string; progress: string } | null>(null);
+  const [celebration, setCelebration] = useState<{ skillName: string } | null>(null);
+  const [consecutiveFails, setConsecutiveFails] = useState(0);
+  const [sessionStartTime] = useState(() => Date.now());
+  const [elapsedMinutes, setElapsedMinutes] = useState(0);
+  const [showBreakNudge, setShowBreakNudge] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const initializingRef = useRef(false);
   const progressBarRef = useRef<ProgressBarHandle>(null);
+
+  // Session timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const mins = Math.floor((Date.now() - sessionStartTime) / 60000);
+      setElapsedMinutes(mins);
+      if (mins === 45 && !showBreakNudge) {
+        setShowBreakNudge(true);
+      }
+    }, 30000); // Update every 30 seconds
+    return () => clearInterval(timer);
+  }, [sessionStartTime, showBreakNudge]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -164,6 +182,9 @@ export default function InteractiveCourseSession({
 
   useEffect(() => {
     scrollToBottom();
+    if (!isLoading && !isInitializing) {
+      inputRef.current?.focus();
+    }
   }, [messages]);
 
   const scrollToBottom = () => {
@@ -215,6 +236,18 @@ export default function InteractiveCourseSession({
           setMessages(mappedMessages);
           setShowActionButtons(true);
           setIsInitializing(false);
+
+          // Show resume context banner
+          const goals = existingSessionData.learningContext?.goals || [];
+          const currentGoal = goals.find((g: any) => g.status !== 'mastered');
+          const masteredCount = goals.filter((g: any) => g.status === 'mastered').length;
+          if (currentGoal) {
+            setResumeBanner({
+              goalName: currentGoal.text || 'your current topic',
+              progress: `${masteredCount}/${goals.length} goals completed`
+            });
+            setTimeout(() => setResumeBanner(null), 6000);
+          }
           return;
         }
       }
@@ -363,6 +396,10 @@ export default function InteractiveCourseSession({
                   newGoals.forEach((goal: any) => {
                     const prevGoal = previousGoals.find((g: any) => g.id === goal.id);
                     if (goal.status === 'mastered' && prevGoal?.status !== 'mastered') {
+                      // Trigger celebration animation
+                      setCelebration({ skillName: goal.text || 'Skill' });
+                      setTimeout(() => setCelebration(null), 4000);
+
                       posthog.capture('skill_mastered', {
                         course_id: courseId,
                         course_title: courseTitle,
@@ -440,12 +477,13 @@ export default function InteractiveCourseSession({
             success: true,
             session_id: session?.id,
           });
+          setConsecutiveFails(0);
           setActiveChallenge(null);
           handleSendMessage(`I've successfully mastered the challenge: "${title}"!`, true);
         }}
         onFail={() => {
           const title = activeChallenge.title;
-          // Track challenge completed event (failed)
+          setConsecutiveFails(prev => prev + 1);
           posthog.capture('challenge_completed', {
             course_id: courseId,
             course_title: courseTitle,
@@ -541,7 +579,7 @@ export default function InteractiveCourseSession({
         {/* Mobile Sidebar Toggle & Header */}
         <header className="h-16 flex items-center justify-between px-6 border-b border-gray-800 bg-gray-900/50 backdrop-blur-xl sticky top-0 z-20">
           <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={() => setIsSidebarOpen(true)}
               className="lg:hidden p-2 text-gray-400 hover:text-white transition-colors"
             >
@@ -551,15 +589,87 @@ export default function InteractiveCourseSession({
               <span className="text-white">EdBox</span>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 ml-2">Learning</span>
             </h1>
+            {elapsedMinutes > 0 && (
+              <span className="hidden sm:flex items-center gap-1 text-[10px] text-gray-500 font-mono">
+                <Clock className="w-3 h-3" />
+                {elapsedMinutes}m
+              </span>
+            )}
           </div>
-          <ProgressBar ref={progressBarRef} initialProgress={session?.progressState?.overallCourseProgress || 0} />
+          <div className="flex items-center gap-3">
+            {session?.learningContext?.goals && session.learningContext.goals.length > 0 && (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-800/60 rounded-lg border border-gray-700/40">
+                <div className="flex items-center gap-1">
+                  {session.learningContext.goals.map((g: any, i: number) => (
+                    <div
+                      key={i}
+                      className={`w-1.5 h-1.5 rounded-full transition-colors ${g.status === 'mastered' ? 'bg-green-400' : 'bg-gray-600'
+                        }`}
+                    />
+                  ))}
+                </div>
+                <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap">
+                  {session.learningContext.goals.filter((g: any) => g.status === 'mastered').length}/{session.learningContext.goals.length}
+                </span>
+              </div>
+            )}
+            <ProgressBar ref={progressBarRef} initialProgress={session?.progressState?.overallCourseProgress || 0} />
+          </div>
         </header>
 
         <StepProgress goals={session?.learningContext?.goals || []} />
 
+        {/* Mastery Celebration Overlay */}
+        <AnimatePresence>
+          {celebration && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8, y: -20 }}
+              className="absolute inset-x-0 top-20 z-30 flex justify-center pointer-events-none"
+            >
+              <div className="bg-gradient-to-r from-yellow-500/20 via-amber-500/20 to-orange-500/20 border border-yellow-500/30 backdrop-blur-lg rounded-2xl px-8 py-5 shadow-2xl shadow-yellow-500/10 flex items-center gap-4">
+                <motion.div
+                  animate={{ rotate: [0, -10, 10, -10, 0], scale: [1, 1.2, 1] }}
+                  transition={{ duration: 0.6 }}
+                  className="p-3 bg-yellow-500/30 rounded-xl"
+                >
+                  <Trophy className="w-7 h-7 text-yellow-400" />
+                </motion.div>
+                <div>
+                  <p className="text-lg font-bold text-white">Goal Mastered! 🎉</p>
+                  <p className="text-sm text-yellow-200/80">{celebration.skillName}</p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Message List */}
         <div className="flex-1 overflow-y-auto scroll-smooth">
           <div className="w-full px-4 lg:px-6 py-8 space-y-8">
+            {/* Resume Banner */}
+            <AnimatePresence>
+              {resumeBanner && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                  className="flex items-center gap-3 p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl"
+                >
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    <BookOpen className="w-4 h-4 text-blue-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-white">Welcome back!</p>
+                    <p className="text-xs text-gray-400 truncate">Working on: <span className="text-blue-300">{resumeBanner.goalName}</span> · {resumeBanner.progress}</p>
+                  </div>
+                  <button onClick={() => setResumeBanner(null)} className="text-gray-500 hover:text-white transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
             <AnimatePresence>
               {messages.map((message) => (
                 <motion.div
@@ -592,7 +702,11 @@ export default function InteractiveCourseSession({
                         {...message.quizData}
                         onAnswer={(ans, corr) => {
                           const question = message.quizData?.question;
-                          // Track quiz answered event
+                          if (corr) {
+                            setConsecutiveFails(0);
+                          } else {
+                            setConsecutiveFails(prev => prev + 1);
+                          }
                           posthog.capture('quiz_answered', {
                             course_id: courseId,
                             course_title: courseTitle,
@@ -626,46 +740,116 @@ export default function InteractiveCourseSession({
                         </button>
                       </div>
                     ) : message.type === 'error' ? (
-                      <div className="flex flex-col items-center gap-4 p-6 bg-red-500/10 border border-red-500/20 rounded-2xl">
-                        <div className="p-3 bg-red-500/20 rounded-full">
-                          <AlertCircle className="w-6 h-6 text-red-400" />
+                      <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl">
+                        <div className="p-2 bg-red-500/20 rounded-lg shrink-0">
+                          <AlertCircle className="w-5 h-5 text-red-400" />
                         </div>
-                        <div className="text-center">
-                          <p className="text-sm font-medium text-red-200 mb-1">Something went wrong</p>
-                          <p className="text-xs text-red-400/70">Let's try that again</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-red-200">Something went wrong</p>
+                          <p className="text-xs text-red-400/70 mt-0.5">{message.content || "Let's try that again"}</p>
                         </div>
                         <button
                           type="button"
                           onClick={() => {
-                            setMessages(prev => {
-                              const newMessages = [...prev];
-                              const errorIdx = newMessages.findIndex(m => m.id === message.id);
-                              if (errorIdx > 0) {
-                                const lastUserMsg = newMessages[errorIdx - 1];
-                                newMessages.splice(errorIdx - 1, 2);
-                                setTimeout(() => handleSendMessage(lastUserMsg.content, true), 100);
-                              }
-                              return newMessages;
-                            });
+                            // Find the user message before this error and retry it
+                            const errorIdx = messages.findIndex(m => m.id === message.id);
+                            if (errorIdx > 0) {
+                              const lastUserMsg = messages[errorIdx - 1];
+                              // Remove just the error message, keep the user's message
+                              setMessages(prev => prev.filter(m => m.id !== message.id));
+                              setTimeout(() => handleSendMessage(lastUserMsg.content, true), 100);
+                            }
                           }}
-                          className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-xl transition-all active:scale-95 shadow-lg"
+                          className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg transition-all active:scale-95 shrink-0"
                         >
-                          Try Again
+                          Retry
                         </button>
                       </div>
                     ) : (
                       <div className="prose prose-invert max-w-none text-sm leading-relaxed">
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                        <ReactMarkdown
+                          components={{
+                            code({ node, className, children, ...props }: any) {
+                              const match = /language-(\w+)/.exec(className || '');
+                              const inline = !match;
+                              return !inline ? (
+                                <div className="rounded-xl overflow-hidden my-3 border border-gray-700/50">
+                                  <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-700/50">
+                                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{match[1]}</span>
+                                  </div>
+                                  <SyntaxHighlighter
+                                    style={vscDarkPlus}
+                                    language={match[1]}
+                                    PreTag="div"
+                                    customStyle={{ margin: 0, borderRadius: 0, background: '#1a1b26' }}
+                                    {...props}
+                                  >
+                                    {String(children).replace(/\n$/, '')}
+                                  </SyntaxHighlighter>
+                                </div>
+                              ) : (
+                                <code className="px-1.5 py-0.5 bg-gray-700/60 rounded-md text-blue-300 text-xs font-mono" {...props}>
+                                  {children}
+                                </code>
+                              );
+                            }
+                          }}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
                       </div>
                     )}
                   </div>
                 </motion.div>
               ))}
             </AnimatePresence>
-            {isLoading && <div className="text-xs text-gray-500 animate-pulse">Genie is thinking...</div>}
+            {isLoading && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex justify-start"
+              >
+                <div className="bg-gray-800/80 border border-gray-700/50 px-5 py-3.5 rounded-2xl rounded-tl-sm backdrop-blur-sm">
+                  <div className="flex items-center gap-1.5">
+                    <motion.span
+                      animate={{ y: [0, -6, 0] }}
+                      transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
+                      className="w-2 h-2 bg-blue-400 rounded-full"
+                    />
+                    <motion.span
+                      animate={{ y: [0, -6, 0] }}
+                      transition={{ duration: 0.6, repeat: Infinity, delay: 0.15 }}
+                      className="w-2 h-2 bg-purple-400 rounded-full"
+                    />
+                    <motion.span
+                      animate={{ y: [0, -6, 0] }}
+                      transition={{ duration: 0.6, repeat: Infinity, delay: 0.3 }}
+                      className="w-2 h-2 bg-blue-400 rounded-full"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
             <div ref={messagesEndRef} />
           </div>
         </div>
+        {/* Break Nudge */}
+        <AnimatePresence>
+          {showBreakNudge && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mx-4 mt-2 flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl"
+            >
+              <Coffee className="w-4 h-4 text-amber-400 shrink-0" />
+              <p className="text-xs text-amber-200 flex-1">You've been learning for 45+ minutes — great dedication! Consider a short break to recharge. 🧠</p>
+              <button onClick={() => setShowBreakNudge(false)} className="text-amber-400/60 hover:text-amber-200 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Input Footer */}
         <footer className="p-4 border-t border-gray-800 bg-gray-900/80 backdrop-blur-md space-y-3">
@@ -710,6 +894,17 @@ export default function InteractiveCourseSession({
                   <MessageCircle className="w-4 h-4" />
                   Explain More
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLearningStage('EXPLAIN');
+                    handleSendMessage("I understand this topic. Let's move on to the next one!", true, 'EXPLAIN');
+                  }}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 rounded-xl text-sm font-semibold whitespace-nowrap transition-all active:scale-95"
+                >
+                  Next Topic
+                  <ChevronRight className="w-4 h-4" />
+                </button>
                 {onStartChallenge && (
                   <button
                     type="button"
@@ -719,6 +914,21 @@ export default function InteractiveCourseSession({
                     <Trophy className="w-4 h-4" />
                     Start Practice
                   </button>
+                )}
+                {/* Adaptive Simplify Button - appears after 2+ consecutive fails */}
+                {consecutiveFails >= 2 && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    type="button"
+                    onClick={() => {
+                      setConsecutiveFails(0);
+                      handleSendMessage("I'm finding this difficult. Can you explain this topic in simpler terms with an easier example?", true, 'EXPLAIN');
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 rounded-xl text-sm font-semibold whitespace-nowrap transition-all active:scale-95 animate-pulse"
+                  >
+                    💡 Simplify for me
+                  </motion.button>
                 )}
               </motion.div>
             )}

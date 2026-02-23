@@ -1,0 +1,100 @@
+name: CI Logging and Notification
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate_and_build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        id: install
+        run: npm ci
+
+      - name: Run Linter
+        id: lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Run Type Check
+        id: typecheck
+        run: npm run type-check
+        continue-on-error: true
+
+      - name: Run Tests
+        id: test
+        run: npm run test
+        continue-on-error: true
+
+      - name: Run Build
+        id: build
+        run: npm run build
+        continue-on-error: true
+
+      - name: Generate Process Summary Report
+        run: |
+          echo "## CI Process Report 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Process | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 📦 Install Dependencies | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🧹 Linting | ${{ steps.lint.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔍 Type Check | ${{ steps.typecheck.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🧪 Tests | ${{ steps.test.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🏗️ Build | ${{ steps.build.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: PR Notification Comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const lintStatus = '${{ steps.lint.outcome }}' === 'success' ? '✅ Passed' : '❌ Failed';
+            const typecheckStatus = '${{ steps.typecheck.outcome }}' === 'success' ? '✅ Passed' : '❌ Failed';
+            const testStatus = '${{ steps.test.outcome }}' === 'success' ? '✅ Passed' : '❌ Failed';
+            const buildStatus = '${{ steps.build.outcome }}' === 'success' ? '✅ Passed' : '❌ Failed';
+            
+            const message = `
+            ## 🚀 Process Report
+            
+            | Process | Status |
+            |---------|--------|
+            | 📦 Install Dependencies | ✅ Passed |
+            | 🧹 Linting | ${lintStatus} |
+            | 🔍 Type Check | ${typecheckStatus} |
+            | 🧪 Tests | ${testStatus} |
+            | 🏗️ Build | ${buildStatus} |
+            
+            Check the **[Action Run](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})** for more details on any failed steps.
+            `;
+            
+              await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
+
+      - name: Fail Workflow if Any Step Failed
+        if: |
+          steps.lint.outcome == 'failure' ||
+          steps.typecheck.outcome == 'failure' ||
+          steps.test.outcome == 'failure' ||
+          steps.build.outcome == 'failure'
+        run: |
+          echo "One or more processes failed. Check the logs and summary!"
+          exit 1

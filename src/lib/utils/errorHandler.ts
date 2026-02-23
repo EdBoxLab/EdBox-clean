@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { logVercelEvent, is4xxPattern } from './vercel-log-monitor';
 
 export interface ErrorLog {
   timestamp: string;
@@ -46,6 +47,14 @@ export function handleAPIError(error: any, req?: NextRequest, userId?: string): 
     userAgent: req?.headers.get('user-agent') || undefined
   };
 
+  const statusCode = error.statusCode || error.status || 500;
+  
+  logVercelEvent(errorLog.error, statusCode, {
+    path: req?.url,
+    userId,
+    metadata: { stack: errorLog.stack }
+  });
+
   // Log error to support
   logErrorToSupport(errorLog).catch(console.error);
 
@@ -53,10 +62,10 @@ export function handleAPIError(error: any, req?: NextRequest, userId?: string): 
   return NextResponse.json(
     { 
       error: 'Something went wrong. Our team has been notified.',
-      code: 500,
+      code: statusCode,
       support: SUPPORT_CONTACTS
     },
-    { status: 500 }
+    { status: statusCode }
   );
 }
 

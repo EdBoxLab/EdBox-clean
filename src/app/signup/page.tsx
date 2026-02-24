@@ -4,17 +4,17 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowRight, 
-  Mail, 
-  Lock, 
-  Chrome, 
-  Sparkles, 
-  CheckCircle2, 
-  User, 
-  Loader2, 
-  Eye, 
-  EyeOff 
+import {
+  ArrowRight,
+  Mail,
+  Lock,
+  Chrome,
+  Sparkles,
+  CheckCircle2,
+  User,
+  Loader2,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import posthog from 'posthog-js';
@@ -42,8 +42,8 @@ export default function SignUpPage() {
     try {
       // 1. Technical Fix: Passing full_name to user_metadata
       // This ensures the OnboardingForm can pre-fill it and the DB won't crash
-      const { data, error: signUpError } = await supabase.auth.signUp({ 
-        email, 
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
         password,
         options: {
           data: {
@@ -55,15 +55,17 @@ export default function SignUpPage() {
 
       if (signUpError) throw signUpError;
 
-      /*if (data.user) {
+      if (data.user) {
         posthog.identify(data.user.id, { email, name: fullName });
         posthog.capture('user_signed_up', { method: 'email' });
-        
-        setMessage('Account created! Please check your email to confirm your account.');
-        
-        // If email confirmation is disabled in Supabase, we can redirect immediately:
-        // router.push('/onboarding');
-      }*/
+
+        if (data.session) {
+          // If session is present, email confirmation is disabled. Redirect immediately.
+          router.push('/dashboard');
+        } else {
+          setMessage('Account created! Please check your email to confirm your account.');
+        }
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -72,7 +74,8 @@ export default function SignUpPage() {
   };
 
   const handleGoogleSignUp = async () => {
-    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '');
+    // Force origin to avoid cross-domain PKCE issues if NEXT_PUBLIC_APP_URL is mismatched
+    const baseUrl = window.location.origin;
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${baseUrl}/auth/callback` },
@@ -81,7 +84,7 @@ export default function SignUpPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] flex font-sans selection:bg-[#8B5CF6]/30 text-white">
-      
+
       {/* Visual Side (Desktop) - Polished with Gradients */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-[#0F0F10] items-center justify-center p-12">
         <div className="absolute inset-0">
@@ -126,7 +129,7 @@ export default function SignUpPage() {
       {/* Form Side */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative bg-[#0A0A0A]">
         <div className="w-full max-w-[400px] space-y-8">
-          
+
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -219,18 +222,18 @@ export default function SignUpPage() {
 
               <AnimatePresence>
                 {error && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0 }} 
-                    animate={{ opacity: 1, height: 'auto' }} 
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
                     className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-center gap-2"
                   >
                     <Sparkles className="w-4 h-4 rotate-180" /> {error}
                   </motion.div>
                 )}
                 {message && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0 }} 
-                    animate={{ opacity: 1, height: 'auto' }} 
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
                     className="p-3 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-sm flex items-center gap-2"
                   >
                     <CheckCircle2 className="w-4 h-4" /> {message}

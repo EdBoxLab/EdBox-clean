@@ -16,10 +16,10 @@ export default function OnboardingForm({ onComplete }: { onComplete?: (profile: 
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // 1. Added full_name to state
   const [formData, setFormData] = useState({
-    full_name: '', 
+    full_name: '',
     country: '',
     education: '',
     age: '',
@@ -112,7 +112,7 @@ export default function OnboardingForm({ onComplete }: { onComplete?: (profile: 
         .eq('id', user.id)
         .single();
 
-      // 3. Prepare data INCLUDING full_name
+      // 3. Prepare data INCLUDING full_name and last_activity_date
       const profileData = {
         full_name: formData.full_name, // Fixes the NOT NULL constraint
         country: formData.country,
@@ -121,6 +121,7 @@ export default function OnboardingForm({ onComplete }: { onComplete?: (profile: 
         interests: formData.interests,
         goal: formData.goal,
         onboarding_completed: true,
+        last_activity_date: new Date().toISOString(), // Fixes the NOT NULL constraint for last_activity_date
       };
 
       let result;
@@ -198,9 +199,9 @@ export default function OnboardingForm({ onComplete }: { onComplete?: (profile: 
         // 4. Validate name is present and sane length
         return (
           formData.full_name.trim().length > 1 &&
-          formData.country.trim() !== '' && 
-          formData.age !== '' && 
-          parseInt(formData.age) >= 10 && 
+          formData.country.trim() !== '' &&
+          formData.age !== '' &&
+          parseInt(formData.age) >= 10 &&
           parseInt(formData.age) <= 100
         );
       case 2:
@@ -257,11 +258,10 @@ export default function OnboardingForm({ onComplete }: { onComplete?: (profile: 
               {[1, 2, 3, 4].map((s) => (
                 <div
                   key={s}
-                  className={`h-2 rounded-full transition-all ${
-                    s === step ? 'w-8 bg-indigo-500' :
-                    s < step ? 'w-2 bg-indigo-500/50' :
-                    'w-2 bg-zinc-700'
-                  }`}
+                  className={`h-2 rounded-full transition-all ${s === step ? 'w-8 bg-indigo-500' :
+                      s < step ? 'w-2 bg-indigo-500/50' :
+                        'w-2 bg-zinc-700'
+                    }`}
                 />
               ))}
             </div>
@@ -370,11 +370,10 @@ export default function OnboardingForm({ onComplete }: { onComplete?: (profile: 
                           onClick={() => handleEducationSelect(level)}
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
-                          className={`p-4 rounded-xl border-2 transition-all text-left ${
-                            formData.education === level
+                          className={`p-4 rounded-xl border-2 transition-all text-left ${formData.education === level
                               ? 'border-indigo-500 bg-indigo-500/10 text-white'
                               : 'border-zinc-700 bg-zinc-800/30 text-zinc-400 hover:border-zinc-600'
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-medium">{level}</span>
@@ -401,11 +400,10 @@ export default function OnboardingForm({ onComplete }: { onComplete?: (profile: 
                           onClick={() => handleInterestToggle(interest)}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
-                          className={`p-3 rounded-xl border-2 transition-all ${
-                            formData.interests.includes(interest)
+                          className={`p-3 rounded-xl border-2 transition-all ${formData.interests.includes(interest)
                               ? 'border-indigo-500 bg-indigo-500/10 text-white'
                               : 'border-zinc-700 bg-zinc-800/30 text-zinc-400 hover:border-zinc-600'
-                          }`}
+                            }`}
                         >
                           <span className="text-sm font-medium">{interest}</span>
                         </motion.button>
@@ -431,11 +429,10 @@ export default function OnboardingForm({ onComplete }: { onComplete?: (profile: 
                           disabled={isSubmitting}
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.99 }}
-                          className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
-                            formData.goal === goal
+                          className={`w-full p-4 rounded-xl border-2 transition-all text-left ${formData.goal === goal
                               ? 'border-indigo-500 bg-indigo-500/10 text-white'
                               : 'border-zinc-700 bg-zinc-800/30 text-zinc-400 hover:border-zinc-600'
-                          } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-medium">{goal}</span>

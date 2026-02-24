@@ -18,28 +18,43 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-    // Redirect if already logged in or session found
-    useEffect(() => {
-      const checkUser = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          router.replace('/dashboard');
-        }
-      };
-      
-      checkUser();
+  // Parse URL errors (e.g., from auth callback)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const urlError = sp.get('error');
+      const details = sp.get('details');
 
-      // Listen for auth state changes (e.g., from other tabs or automatic re-auth)
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-          router.replace('/dashboard');
-        }
-      });
+      if (urlError === 'auth_code_error') {
+        setError(`Authentication failed. Please try logging in again. ${details ? `(${details})` : ''}`);
+      } else if (urlError) {
+        setError(`Error: ${urlError}. ${details ? details : ''}`);
+      }
+    }
+  }, []);
 
-      return () => {
-        subscription.unsubscribe();
-      };
-    }, [router, supabase]);
+  // Redirect if already logged in or session found
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.replace('/dashboard');
+      }
+    };
+
+    checkUser();
+
+    // Listen for auth state changes (e.g., from other tabs or automatic re-auth)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        router.replace('/dashboard');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [router, supabase]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +87,8 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     posthog.capture('user_logged_in', { method: 'google' });
-    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '');
+    // Force origin to avoid cross-domain PKCE issues if NEXT_PUBLIC_APP_URL is mismatched
+    const baseUrl = window.location.origin;
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${baseUrl}/auth/callback` },

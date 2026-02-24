@@ -4,8 +4,17 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url);
     const code = searchParams.get('code');
+    const authError = searchParams.get('error');
+    const authErrorDescription = searchParams.get('error_description');
+
     // if "next" is in param, use it as the redirect URL
     const next = searchParams.get('next') ?? '/dashboard';
+
+    // Handle standard OAuth errors immediately
+    if (authError) {
+        console.error('Supabase Auth Callback OAuth Error:', authError, authErrorDescription);
+        return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(authError)}&details=${encodeURIComponent(authErrorDescription || '')}`);
+    }
 
     if (code) {
         const supabase = await createSupabaseServerClient();
@@ -23,6 +32,10 @@ export async function GET(request: Request) {
             } else {
                 return NextResponse.redirect(`${origin}${next}`);
             }
+        } else {
+            console.error('Supabase Auth Callback exchangeCodeForSession Error:', error);
+            // Append the error to the redirect so it shows up on the client
+            return NextResponse.redirect(`${origin}/login?error=auth_code_error&details=${encodeURIComponent(error.message)}`);
         }
     }
 

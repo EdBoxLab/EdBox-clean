@@ -29,7 +29,7 @@ export const PRICING_PLANS: Record<Currency, PlanDetails[]> = {
     {
       id: 'premium_monthly',
       name: 'Premium Monthly',
-      price: 9.99,
+      price: 6.99,
       currency: 'USD',
       interval: 'monthly',
       features: [
@@ -44,7 +44,7 @@ export const PRICING_PLANS: Record<Currency, PlanDetails[]> = {
     {
       id: 'premium_yearly',
       name: 'Premium Yearly',
-      price: 101.9, // 15% discount on 9.99 * 12 (119.88)
+      price: 71.29, // 15% discount on 6.99 * 12 (83.88)
       currency: 'USD',
       interval: 'yearly',
       features: [
@@ -120,4 +120,28 @@ export function getRecommendedCurrency(countryCode?: string): Currency {
   if (countryCode === 'NG') return 'NGN';
   // Add other countries here if needed, e.g. India fallback to USD for now or handle INR
   return 'USD';
+}
+
+export async function getLiveExchangeRate(from: Currency, to: Currency): Promise<number> {
+  if (from === to) return 1;
+
+  try {
+    // using a highly available free API, no auth required for base rates
+    const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${from}`, {
+      next: { revalidate: 3600 } // Cache for 1 hour to prevent rate limiting
+    });
+
+    if (!response.ok) throw new Error('Failed to fetch exchange rates');
+
+    const data = await response.json();
+    const rate = data.rates[to];
+
+    if (!rate) throw new Error(`Exchange rate for ${to} not found`);
+
+    return rate;
+  } catch (error) {
+    console.error('Error fetching exchange rate:', error);
+    // Fallback to a safe hardcoded rate if the API fails just in case (e.g., 1 USD = 1500 NGN)
+    return from === 'USD' && to === 'NGN' ? 1500 : 1;
+  }
 }

@@ -42,10 +42,10 @@ interface PaystackResponse {
   data?: any;
 }
 
-// Modified: Now supports recurring payments via plans
+// Modified: Now supports recurring payments via plans, with dynamic USD-NGN conversion & plan creation
 export async function initializeTransaction(
   email: string,
-  amount: number,
+  amount: number, // amount here is originally in cents (e.g. 699 for $6.99) or kobo if NGN
   currency: string,
   planId?: string,
   metadata?: any
@@ -67,18 +67,12 @@ export async function initializeTransaction(
       throw new Error('Amount must be greater than 0');
     }
 
-    // Get the plan code for recurring payments
-    const planKey = `PREMIUM_${planId?.includes('yearly') ? 'YEARLY' : 'MONTHLY'}_${currency}` as keyof typeof PAYSTACK_PLANS;
-    const plan = PAYSTACK_PLANS[planKey];
-
-    if (!plan) {
-      throw new Error(`Invalid plan: ${planKey}`);
-    }
+    // We import dynamically to avoid circular dependencies if getLiveExchangeRate isn't readily available
+    const { getLiveExchangeRate } = await import('@/lib/utils/pricing');
 
     const payload: any = {
       email,
       amount,
-      currency,
       metadata: {
         ...metadata,
         plan_id: planId,
@@ -87,10 +81,56 @@ export async function initializeTransaction(
       channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
     };
 
+    let finalPlanCode: string | undefined = undefined;
+
+    if (currency === 'USD') {
+      // It's a USD payment, we must convert it to NGN and create a dynamic plan
+      // amount is currently in cents (e.g., 699 = $6.99)
+      const usdAmount = amount / 100;
+
+      const liveRate = await getLiveExchangeRate('USD', 'NGN');
+
+      // Calculate NGN equivalent (in Kobo). Round up.
+      const ngnAmount = Math.ceil(usdAmount * liveRate);
+      const ngnAmountKobo = ngnAmount * 100;
+
+      // Override payload to strictly use NGN
+      payload.amount = ngnAmountKobo;
+      payload.currency = 'NGN';
+
+      const interval = planId?.includes('yearly') ? 'annually' : 'monthly';
+
+      // Create a unique name to avoid naming collisions but be recognizable
+      const planName = `EdBox ${interval === 'monthly' ? 'Monthly' : 'Yearly'} Global (NGN eqv of $${usdAmount})`;
+
+      // Call Paystack to create this plan on the fly
+      // Note: If a user checks out today at 6.99 with rate 1500 -> 10,485 NGN
+      // The plan will be created. We could technically reuse it via DB, but creating on the fly solves Option 1 directly.
+      const newPlan = await createPlan(planName, ngnAmountKobo, interval, 'NGN');
+      finalPlanCode = newPlan.data?.plan_code;
+
+    } else {
+      // Standard NGN process
+      const planKey = `PREMIUM_${planId?.includes('yearly') ? 'YEARLY' : 'MONTHLY'}_${currency}` as keyof typeof PAYSTACK_PLANS;
+      const staticPlan = PAYSTACK_PLANS[planKey];
+
+      if (!staticPlan) {
+        throw new Error(`Invalid static plan: ${planKey}`);
+      }
+
+      payload.currency = currency;
+      finalPlanCode = staticPlan.plan_code;
+    }
+
     // Add plan code for recurring payments
-    if (plan.plan_code) {
-      payload.plan = plan.plan_code;
-      console.log('Using plan for recurring payment:', plan.plan_code);
+    if (finalPlanCode) {
+      payload.plan = finalPlanCode;
+      console.log('Using plan for recurring payment:', finalPlanCode);
+    }
+
+    // Only pass currency if it's NGN, or omit entirely as per user request to bypass USD restriction
+    if (currency && currency !== 'USD') {
+      payload.currency = currency;
     }
 
     const response = await fetch(`${PAYSTACK_BASE_URL}/transaction/initialize`, {

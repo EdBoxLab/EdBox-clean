@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 
-export function PricingClient() {
-  const [currency, setCurrency] = useState<Currency>('USD');
+export function PricingClient({ initialCurrency }: { initialCurrency: Currency }) {
+  const currency = initialCurrency;
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [loading, setLoading] = useState<string | null>(null);
   const { toast } = useToast();
@@ -78,17 +78,9 @@ export function PricingClient() {
 
         <div className="flex flex-col items-center mt-8 gap-6">
           <div className="flex items-center gap-4">
-            <span className={`text-sm ${currency === 'USD' ? 'font-bold' : 'text-muted-foreground'}`}>Global (USD)</span>
-            <button
-              onClick={() => setCurrency(currency === 'USD' ? 'NGN' : 'USD')}
-              className="relative w-12 h-6 bg-primary/20 rounded-full p-1 transition-colors"
-            >
-              <div
-                className={`w-4 h-4 bg-primary rounded-full transition-transform ${currency === 'NGN' ? 'translate-x-6' : 'translate-x-0'
-                  }`}
-              />
-            </button>
-            <span className={`text-sm ${currency === 'NGN' ? 'font-bold' : 'text-muted-foreground'}`}>Nigeria (NGN)</span>
+            <span className="text-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
+              {currency === 'NGN' ? 'Pricing shown in Nigerian Naira (₦)' : 'Pricing shown in USD ($)'}
+            </span>
           </div>
 
           <div className="flex items-center gap-4 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800">

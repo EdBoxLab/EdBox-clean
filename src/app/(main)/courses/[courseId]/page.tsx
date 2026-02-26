@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useParams } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { XPStreakDisplay } from '@/components/XPStreakDisplay';
 import InteractiveCourseSession from '@/components/InteractiveCourseSession';
 import ShareButton from '@/components/ShareButton';
@@ -12,6 +12,7 @@ import { Users } from 'lucide-react';
 
 
 export default function CoursePlayerPage() {
+    const router = useRouter();
     const params = useParams();
     const courseId = params.courseId as string;
     const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
@@ -89,6 +90,12 @@ export default function CoursePlayerPage() {
 
         fetchData();
     }, [courseId, supabase]);
+
+    useEffect(() => {
+        router.push('/unavailable');
+    }, [router]);
+
+    return null;
 
     const handleModuleComplete = async (moduleId: string) => {
         // Since modules are not used, this might be simplified or removed

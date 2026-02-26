@@ -29,7 +29,8 @@ import {
     BookOpen,
     Briefcase,
     Table2,
-    Crown
+    Crown,
+    Construction
 } from 'lucide-react';
 import ShareButton from '@/components/ShareButton';
 import ShareModal, { useShareModal } from '@/components/ShareModal';
@@ -1097,7 +1098,14 @@ function StudyKitContent() {
                 <p className="text-zinc-400">Select one or more tools for your study kit</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                <div className="flex items-center gap-3 text-amber-400">
+                    <Construction className="w-5 h-5" />
+                    <p className="text-sm font-medium">Creating new study kits is temporarily unavailable. We're working to bring it back soon!</p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 opacity-50 pointer-events-none">
                 {contentTypes.map((type) => {
                     const Icon = type.icon;
                     const isSelected = multiSelectedTypes.includes(type.id);
@@ -1130,11 +1138,11 @@ function StudyKitContent() {
                 })}
             </div>
 
-            <div className="flex justify-center pt-4">
+            <div className="flex justify-center pt-4 opacity-50 pointer-events-none">
                 <button
                     onClick={() => setCurrentStep('options')}
                     disabled={multiSelectedTypes.length === 0}
-                    className="px-12 py-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-xl font-bold transition-all shadow-xl shadow-indigo-950/50"
+                    className="px-12 py-4 bg-zinc-800 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-xl font-bold transition-all"
                 >
                     Continue to Setup
                 </button>

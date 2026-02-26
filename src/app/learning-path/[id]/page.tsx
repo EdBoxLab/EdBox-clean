@@ -14,6 +14,24 @@ export default async function LearningPathPage({ params }: Props) {
     return <div className="text-white p-8">Invalid skill graph ID.</div>;
   }
 
+  // Temporary Restriction
+  return (
+    <div className="min-h-screen bg-slate-900 border-t border-zinc-800 text-white p-4 sm:p-6 md:p-8 flex items-center justify-center">
+      <div className="text-center">
+        <h2 className="text-3xl font-bold mb-4">Learning Path Unavailable</h2>
+        <p className="text-gray-400 mb-8 max-w-md mx-auto">
+          We are currently updating our courses and learning paths feature. Please check back later.
+        </p>
+        <a
+          href="/dashboard"
+          className="inline-block px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-colors"
+        >
+          Return to Dashboard
+        </a>
+      </div>
+    </div>
+  );
+
   try {
     const supabase = await createSupabaseServerClient();
 
@@ -34,7 +52,7 @@ export default async function LearningPathPage({ params }: Props) {
       .from('skill_graphs')
       .select('*')
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq('user_id', user?.id)
       .single();
 
     if (graphError || !graphDataRaw) {

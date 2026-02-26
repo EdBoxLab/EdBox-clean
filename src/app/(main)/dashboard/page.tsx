@@ -70,7 +70,7 @@ const Dashboard: React.FC = () => {
                 type: 'Course',
                 progress: Math.round((coursesJson.progress?.[c.id] || 0) * 100),
                 icon: <Book className="w-8 h-8 text-indigo-300" />,
-                href: `/pulse?type=COURSE&id=${c.id}`
+                href: `/unavailable`/*/pulse?type=COURSE&id=${c.id}*/
               }));
               setCourses(mappedCourses);
 

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, Trash2, Terminal, Users, Plus, File, X, FileCode, FolderOpen, ChevronDown, Save, Edit2, PanelLeftClose, GripHorizontal } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { interactionTracker } from '../../services/interaction-tracker';
+import { widgetTelemetry } from '../../services/widget-telemetry';
 import { CodeFile } from '../../types';
 
 interface CodeEditorProps {
@@ -156,6 +157,11 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ files: propFiles, activeFileId:
         widgetType: 'CODE_EDITOR',
         details: `User edited ${activeFile.name}`
       });
+      widgetTelemetry.fire({
+        event_type: 'code_typed',
+        widget_type: 'CODE_EDITOR',
+        event_data: { language: activeFile.language, lines: val.split('\n').length }
+      });
     }, 1000);
   };
 
@@ -201,6 +207,11 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ files: propFiles, activeFileId:
 
   const runCode = () => {
     interactionTracker.log({ type: 'click', widgetType: 'CODE_EDITOR', details: `User ran ${activeFile.name}` });
+    widgetTelemetry.fire({
+      event_type: 'code_executed',
+      widget_type: 'CODE_EDITOR',
+      event_data: { language: activeFile.language, filename: activeFile.name }
+    });
 
     // Set immediate feedback logs
     setLogs([

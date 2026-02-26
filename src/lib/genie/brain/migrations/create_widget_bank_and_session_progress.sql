@@ -58,3 +58,28 @@ CREATE POLICY "Users can manage their own widgets" ON public.pulse_widget_bank
 
 CREATE POLICY "Users can manage their own session progress" ON public.skill_session_progress
   FOR ALL USING (auth.uid() = user_id);
+
+-- 3. Widget Snapshots — point-in-time snapshots of widget content for history/restoration
+CREATE TABLE IF NOT EXISTS public.pulse_widget_snapshots (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  widget_id text NOT NULL,
+  user_id uuid NOT NULL,
+  widget_type text NOT NULL,
+  widget_title text,
+  widget_data jsonb DEFAULT '{}'::jsonb,
+  snapshot_label text DEFAULT 'Auto-snapshot',
+  created_at timestamptz DEFAULT now(),
+  CONSTRAINT pulse_widget_snapshots_pkey PRIMARY KEY (id),
+  CONSTRAINT pulse_widget_snapshots_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_widget_snapshots_widget_id ON public.pulse_widget_snapshots USING btree (widget_id);
+CREATE INDEX IF NOT EXISTS idx_widget_snapshots_user_id ON public.pulse_widget_snapshots USING btree (user_id);
+CREATE INDEX IF NOT EXISTS idx_widget_snapshots_user_widget ON public.pulse_widget_snapshots USING btree (user_id, widget_id);
+CREATE INDEX IF NOT EXISTS idx_widget_snapshots_created ON public.pulse_widget_snapshots USING btree (created_at DESC);
+
+ALTER TABLE public.pulse_widget_snapshots ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own widget snapshots"
+  ON public.pulse_widget_snapshots
+  FOR ALL USING (auth.uid() = user_id);

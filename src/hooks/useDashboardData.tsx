@@ -71,7 +71,7 @@ export const useDashboardData = () => {
                                 type: 'Course',
                                 progress: Math.round((coursesJson.progress?.[c.id] || 0) * 100),
                                 icon: <Book className="w-8 h-8 text-indigo-300" />,
-                href: `/unavailable`/*/pulse?type=COURSE&id=${c.id}*/
+                                href: `/unavailable`/*/pulse?type=COURSE&id=${c.id}*/
                             }));
                             setCourses(mappedCourses);
 
@@ -100,7 +100,7 @@ export const useDashboardData = () => {
                                 id: n.id,
                                 title: n.title || 'Untitled Note',
                                 type: 'Note',
-                                href: `/pulse?type=NOTE&id=${n.id}`,
+                                href: `/tools/notes?id=${n.id}`,
                                 icon: <FileText className="w-8 h-8 text-green-300" />
                             })));
                         }

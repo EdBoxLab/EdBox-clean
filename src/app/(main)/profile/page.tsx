@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SkillRadarChart from '@/components/profile/SkillRadarChart';
 import ActivityHeatmap from '@/components/profile/ActivityHeatmap';
 import SkillDomainCard from '@/components/profile/SkillDomainCard';
-import type { SkillGraphData } from '@/lib/services/skill-score-calculator';
+
 
 const AVAILABLE_AVATARS = [
   '😀', '😎', '🤓', '🚀', '🎨', '🎯', '💡', '⚡', '🌟', '🔥',
@@ -38,8 +38,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [uploadMode, setUploadMode] = useState<'emoji' | 'upload'>('emoji');
 
-  // Skill graph data
-  const [skillGraph, setSkillGraph] = useState<SkillGraphData | null>(null);
+  // Knowledge graph data
+  const [knowledgeGraph, setKnowledgeGraph] = useState<any>(null);
   const [summary, setSummary] = useState<any>(null);
   const [graphLoading, setGraphLoading] = useState(true);
 
@@ -66,13 +66,13 @@ export default function ProfilePage() {
         }
       }
 
-      // Fetch skill graph + summary in parallel
+      // Fetch knowledge graph + summary in parallel
       const [graphRes, summaryRes] = await Promise.all([
-        fetch('/api/profile/skill-graph'),
+        fetch('/api/knowledge-graph/generate'),
         fetch('/api/profile/summary')
       ]);
 
-      if (graphRes.ok) setSkillGraph(await graphRes.json());
+      if (graphRes.ok) setKnowledgeGraph(await graphRes.json());
       if (summaryRes.ok) setSummary(await summaryRes.json());
       setGraphLoading(false);
     };
@@ -126,7 +126,7 @@ export default function ProfilePage() {
   const copyShareLink = () => {
     if (!user) return;
     navigator.clipboard.writeText(`${window.location.origin}/profile/${user.id}/public`);
-    toast({ title: 'Link copied!', description: 'Share your Skill Graph with anyone' });
+    toast({ title: 'Link copied!', description: 'Share your Knowledge Graph with anyone' });
   };
 
   const currentAvatar = selectedEmoji || avatarUrl;
@@ -194,56 +194,59 @@ export default function ProfilePage() {
           </motion.div>
         )}
 
-        {/* ── SKILL GRAPH AS CV ── */}
+        {/* ── KNOWLEDGE GRAPH ── */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-          <div className="bg-[#0F172A] border border-slate-800 rounded-2xl overflow-hidden">
+          <div className="border border-border/50 rounded-2xl overflow-hidden bg-card shadow-sm">
+
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center">
-                  <Brain className="w-4.5 h-4.5 text-blue-400" />
+            <div className="flex items-center justify-between px-8 py-6 border-b border-border/30">
+              <div className="flex items-center gap-4">
+                <div className="w-11 h-11 bg-blue-500/10 border border-blue-500/15 rounded-xl flex items-center justify-center">
+                  <Brain className="w-5 h-5 text-blue-400" />
                 </div>
                 <div>
-                  <h2 className="text-base font-semibold text-white">Skill Graph</h2>
-                  <p className="text-xs text-slate-500">
-                    {skillGraph ? `${skillGraph.totalEvidencePoints} verified interactions · ${skillGraph.totalSkillsTracked} skills tracked` : 'Powered by your Pulse sessions'}
+                  <h2 className="text-lg font-bold text-foreground tracking-tight">Knowledge Graph</h2>
+                  <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                    {knowledgeGraph ? `${knowledgeGraph.totalEvidencePoints} verified interactions · ${knowledgeGraph.totalSkillsTracked} skills tracked` : 'Powered by your learning sessions'}
                   </p>
                 </div>
               </div>
-              {skillGraph && (
+              {knowledgeGraph && (
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-white">{skillGraph.overallCVScore}<span className="text-slate-500 text-sm font-normal">%</span></div>
-                  <div className="text-[10px] text-slate-600 uppercase tracking-wider">CV Score</div>
+                  <div className="text-3xl font-black font-mono text-foreground tracking-tight">{knowledgeGraph.overallCVScore}<span className="text-muted-foreground text-sm font-semibold">%</span></div>
+                  <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-0.5">CV Score</div>
                 </div>
               )}
             </div>
 
             {graphLoading ? (
-              <div className="flex items-center justify-center h-48 gap-2 text-slate-500">
-                <Loader2 className="w-4 h-4 animate-spin" /> Building your Skill Graph…
+              <div className="flex items-center justify-center h-56 gap-3 text-muted-foreground">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-500" /> <span className="text-sm font-medium">Synthesizing Knowledge Graph…</span>
               </div>
-            ) : skillGraph && skillGraph.domains.length > 0 ? (
-              <div className="p-6 space-y-6">
+            ) : knowledgeGraph && knowledgeGraph.domains.length > 0 ? (
+              <div className="p-8 space-y-8">
                 {/* Radar + Heatmap */}
-                <div className="grid md:grid-cols-2 gap-6 items-start">
+                <div className="flex flex-col lg:flex-row gap-8 items-start">
                   {/* Radar */}
-                  <div className="flex flex-col items-center">
-                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Domain Map</h3>
+                  <div className="flex-1 w-full flex flex-col items-center">
+                    <h3 className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-6 w-full text-center">Domain Map</h3>
                     <SkillRadarChart
-                      labels={skillGraph.radarLabels}
-                      values={skillGraph.radarValues}
-                      size={280}
+                      labels={knowledgeGraph.radarLabels}
+                      values={knowledgeGraph.radarValues}
+                      size={300}
                     />
                   </div>
 
                   {/* Heatmap */}
-                  <div>
-                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Learning Activity</h3>
-                    <ActivityHeatmap data={skillGraph.activityTimeline} />
-                    {skillGraph.strongestDomain && (
-                      <div className="mt-4 p-3 bg-blue-500/5 border border-blue-500/15 rounded-xl">
-                        <span className="text-xs text-slate-500">Strongest domain: </span>
-                        <span className="text-xs font-semibold text-blue-400">{skillGraph.strongestDomain}</span>
+                  <div className="flex-1 w-full">
+                    <ActivityHeatmap data={knowledgeGraph.activityTimeline} />
+                    {knowledgeGraph.strongestDomain && (
+                      <div className="mt-5 p-4 bg-emerald-500/5 border border-emerald-500/15 rounded-xl flex items-center gap-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm">
+                        <Trophy className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <div className="text-xs">
+                          <span className="text-muted-foreground">Strongest: </span>
+                          <span className="font-bold text-emerald-400">{knowledgeGraph.strongestDomain}</span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -251,9 +254,9 @@ export default function ProfilePage() {
 
                 {/* Domain Cards */}
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Skills by Domain</h3>
+                  <h3 className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-4">Skills by Domain</h3>
                   <div className="space-y-3">
-                    {skillGraph.domains.map(domain => (
+                    {knowledgeGraph.domains.map((domain: any) => (
                       <SkillDomainCard
                         key={domain.graphId}
                         name={domain.name}
@@ -264,25 +267,25 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Verified badge */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-                  <div className="flex items-center gap-2 text-xs text-slate-600">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Verified by EdBox Genie · Interactively scored
+                {/* Footer */}
+                <div className="flex items-center justify-between pt-4 border-t border-border/30">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Verified by EdBox · Interactively scored
                   </div>
                   <button
                     onClick={copyShareLink}
-                    className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-blue-400 transition-colors"
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-blue-400 hover:-translate-y-0.5 active:scale-95 transition-all duration-200"
                   >
-                    <ExternalLink className="w-3 h-3" /> Share this profile
+                    <ExternalLink className="w-3 h-3" /> Share
                   </button>
                 </div>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-48 text-center px-6">
-                <Brain className="w-8 h-8 text-slate-700 mb-3" />
-                <p className="text-sm font-medium text-slate-500">No skill data yet</p>
-                <p className="text-xs text-slate-700 mt-1">Start a Skill Session in Pulse to build your graph</p>
+                <Brain className="w-8 h-8 text-muted-foreground/30 mb-3" />
+                <p className="text-sm font-semibold text-muted-foreground">No skill data yet</p>
+                <p className="text-xs text-muted-foreground/60 mt-1.5 leading-relaxed">Start a Skill Session in Pulse to build your graph</p>
               </div>
             )}
           </div>

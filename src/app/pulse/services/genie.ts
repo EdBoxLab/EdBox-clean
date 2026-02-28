@@ -20,7 +20,7 @@ interface GroqToolCall {
 
 function convertToGroqTools(geminiTools: any[]): any[] {
   const tools: any[] = [];
-  
+
   for (const tool of geminiTools) {
     if (tool.functionDeclarations) {
       for (const decl of tool.functionDeclarations) {
@@ -39,7 +39,7 @@ function convertToGroqTools(geminiTools: any[]): any[] {
       }
     }
   }
-  
+
   return tools;
 }
 
@@ -52,7 +52,7 @@ class GenieService {
   private initialize() {
     if (this.isInitialized) return;
     this.isInitialized = true;
-    
+
     this.messages = [{
       role: 'system',
       content: SYSTEM_INSTRUCTION
@@ -65,7 +65,7 @@ class GenieService {
 
   async sendMessage(message: string, currentWindows: PulseWindow[], onToolCall: (toolName: string, args: any) => void): Promise<string> {
     this.initialize();
-    
+
     if (!this.hasGroqKey()) {
       if (message.toLowerCase().includes('neuron') || message.toLowerCase().includes('brain')) {
         setTimeout(() => onToolCall('deploy_neuron_visualizer', { topic: 'Neuron' }), 800);
@@ -109,7 +109,7 @@ class GenieService {
       });
 
       const assistantMessage = response.choices[0]?.message;
-      
+
       if (!assistantMessage) {
         return "I'm having trouble connecting to the neural link. Let's try that again.";
       }
@@ -122,7 +122,7 @@ class GenieService {
           content: assistantMessage.content || '',
           tool_call_id: undefined
         };
-        
+
         const toolResults: ChatMessage[] = [];
 
         for (const call of assistantMessage.tool_calls as GroqToolCall[]) {
@@ -149,12 +149,14 @@ class GenieService {
         const finalResponse = await groq.chat.completions.create({
           model: 'llama-3.3-70b-versatile',
           messages: this.messages as any,
+          tools: GROQ_TOOLS,
+          tool_choice: 'auto',
           temperature: 0.7,
           max_tokens: 4096,
         });
 
         responseText = finalResponse.choices[0]?.message?.content || "";
-        
+
         if (finalResponse.choices[0]?.message) {
           this.messages.push({
             role: 'assistant',

@@ -5,101 +5,115 @@ import { SkillScore, MasteryLabel } from '@/lib/services/skill-score-calculator'
 import { ChevronDown, Zap, Brain, Clock, BarChart2, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const MASTERY_COLORS: Record<MasteryLabel, { bg: string; text: string; ring: string }> = {
-    Building: { bg: 'bg-slate-700/50', text: 'text-slate-400', ring: 'ring-slate-600' },
-    Developing: { bg: 'bg-blue-900/40', text: 'text-blue-400', ring: 'ring-blue-700' },
-    Proficient: { bg: 'bg-indigo-900/40', text: 'text-indigo-400', ring: 'ring-indigo-700' },
-    Advanced: { bg: 'bg-purple-900/40', text: 'text-purple-400', ring: 'ring-purple-700' },
-    Expert: { bg: 'bg-emerald-900/40', text: 'text-emerald-400', ring: 'ring-emerald-700' },
+/* ── Mastery color system — solid colors with opacity, NO gradients ── */
+const MASTERY: Record<MasteryLabel, { pill: string; label: string; bar: string }> = {
+    Building: { pill: 'bg-slate-500/10 text-slate-400 border-border/30', label: 'text-slate-400', bar: 'bg-slate-500' },
+    Developing: { pill: 'bg-blue-500/10 text-blue-400 border-blue-500/20', label: 'text-blue-400', bar: 'bg-blue-500' },
+    Proficient: { pill: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20', label: 'text-indigo-400', bar: 'bg-indigo-500' },
+    Advanced: { pill: 'bg-purple-500/10 text-purple-400 border-purple-500/20', label: 'text-purple-400', bar: 'bg-purple-500' },
+    Expert: { pill: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', label: 'text-emerald-400', bar: 'bg-emerald-500' },
 };
 
-interface SkillPillProps {
-    skill: SkillScore;
-}
-
-function SkillPill({ skill }: SkillPillProps) {
-    const [open, setOpen] = useState(false);
-    const colors = MASTERY_COLORS[skill.masteryLabel];
-
+/* ── Skill Pill ── */
+function SkillPill({ skill, isActive, onSelect }: { skill: SkillScore; isActive: boolean; onSelect: () => void }) {
+    const m = MASTERY[skill.masteryLabel];
     return (
-        <div className="relative">
-            <button
-                onClick={() => setOpen(o => !o)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 hover:scale-105 active:scale-95 ${colors.bg} ${colors.text} ring-1 ${colors.ring}`}
-            >
-                {skill.skillTitle.length > 20 ? skill.skillTitle.substring(0, 19) + '…' : skill.skillTitle}
-                <span className="opacity-60 font-normal">{skill.overallScore}%</span>
-                <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
-            </button>
-
-            <AnimatePresence>
-                {open && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -6, scale: 0.97 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -6, scale: 0.97 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute left-0 top-full mt-2 z-50 w-64 bg-[#0F172A] border border-slate-800 rounded-xl p-4 shadow-2xl"
-                    >
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="text-sm font-semibold text-white">{skill.skillTitle}</span>
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colors.bg} ${colors.text}`}>
-                                {skill.masteryLabel}
-                            </span>
-                        </div>
-
-                        {/* Stage progress */}
-                        <div className="text-xs text-slate-500 mb-3 flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                            Stage: <span className="text-slate-300 font-medium">{skill.currentStage}</span>
-                            · {skill.topicsCovered}{skill.totalTopics > 0 ? `/${skill.totalTopics}` : ''} topics
-                        </div>
-
-                        {/* Dimension bars */}
-                        <div className="space-y-2">
-                            {([
-                                { label: 'Comprehension', value: skill.comprehension, icon: Brain, color: 'bg-blue-500' },
-                                { label: 'Depth', value: skill.depth, icon: BarChart2, color: 'bg-purple-500' },
-                                { label: 'Engagement', value: skill.engagement, icon: Zap, color: 'bg-amber-500' },
-                                { label: 'Consistency', value: skill.consistency, icon: Clock, color: 'bg-emerald-500' },
-                            ] as const).map(({ label, value, icon: Icon, color }) => (
-                                <div key={label}>
-                                    <div className="flex items-center justify-between mb-0.5">
-                                        <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                                            <Icon className="w-3 h-3" /> {label}
-                                        </span>
-                                        <span className="text-[11px] font-semibold text-slate-300">{value}%</span>
-                                    </div>
-                                    <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                                        <motion.div
-                                            initial={{ width: 0 }}
-                                            animate={{ width: `${value}%` }}
-                                            transition={{ duration: 0.5, ease: 'easeOut' }}
-                                            className={`h-full rounded-full ${color}`}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between">
-                            <span className="text-[10px] text-slate-600">Evidence</span>
-                            <span className="text-[10px] font-semibold text-slate-400">{skill.evidenceCount} interactions</span>
-                        </div>
-
-                        {skill.evidenceCount >= 5 && (
-                            <div className="mt-2 flex items-center gap-1.5 text-[10px] text-emerald-500">
-                                <CheckCircle2 className="w-3 h-3" />
-                                Verified by EdBox Genie
-                            </div>
-                        )}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
+        <button
+            onClick={onSelect}
+            className={`
+                group flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border
+                transition-all duration-200 active:scale-95
+                focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
+                ${isActive
+                    ? 'bg-blue-500/10 border-blue-500/30 text-white shadow-sm'
+                    : `${m.pill} hover:-translate-y-0.5 hover:shadow-sm`}
+            `}
+        >
+            <span className={isActive ? 'text-white' : ''}>
+                {skill.skillTitle.length > 24 ? skill.skillTitle.substring(0, 23) + '…' : skill.skillTitle}
+            </span>
+            <span className="font-mono text-[11px] opacity-60">{skill.overallScore}%</span>
+        </button>
     );
 }
 
+/* ── Detail drawer — the ONE memorable detail per SKILL.md §1 ── */
+function SkillDetail({ skill }: { skill: SkillScore }) {
+    const m = MASTERY[skill.masteryLabel];
+    const dims = [
+        { key: 'Comprehension', val: skill.comprehension, Icon: Brain, color: 'bg-blue-500' },
+        { key: 'Depth', val: skill.depth, Icon: BarChart2, color: 'bg-purple-500' },
+        { key: 'Engagement', val: skill.engagement, Icon: Zap, color: 'bg-amber-500' },
+        { key: 'Consistency', val: skill.consistency, Icon: Clock, color: 'bg-emerald-500' },
+    ] as const;
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+        >
+            <div className="mt-4 rounded-xl border border-border/40 bg-card p-5">
+                {/* Title row */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                    <div>
+                        <h4 className="text-base font-bold text-foreground tracking-tight">{skill.skillTitle}</h4>
+                        <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
+                            <span className={`px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border ${m.pill}`}>{skill.masteryLabel}</span>
+                            <span>Stage {skill.currentStage}</span>
+                            <span>·</span>
+                            <span>{skill.evidenceCount} interactions</span>
+                        </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                        <div className="text-3xl font-black font-mono text-foreground tracking-tight">
+                            {skill.overallScore}<span className="text-muted-foreground text-base font-semibold">%</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 4-dimension grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {dims.map(({ key, val, Icon, color }) => (
+                        <div key={key} className="rounded-lg border border-border/30 bg-background/50 p-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5">
+                                    <Icon className="w-3 h-3" /> {key}
+                                </span>
+                                <span className="text-[11px] font-bold font-mono text-foreground">{val}%</span>
+                            </div>
+                            <div className="h-1 bg-border/40 rounded-full overflow-hidden">
+                                <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${val}%` }}
+                                    transition={{ duration: 0.6, ease: 'easeOut', delay: 0.15 }}
+                                    className={`h-full rounded-full ${color}`}
+                                />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Verified badge */}
+                {skill.evidenceCount >= 5 && (
+                    <div className="mt-4 pt-3 border-t border-border/30 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Verified by EdBox
+                        </div>
+                        <span className="text-muted-foreground">
+                            {skill.topicsCovered}/{skill.totalTopics} topics
+                        </span>
+                    </div>
+                )}
+            </div>
+        </motion.div>
+    );
+}
+
+/* ── Domain Card ── */
 interface SkillDomainCardProps {
     name: string;
     domainScore: number;
@@ -107,64 +121,75 @@ interface SkillDomainCardProps {
 }
 
 export default function SkillDomainCard({ name, domainScore, skills }: SkillDomainCardProps) {
-    const [expanded, setExpanded] = useState(true);
-
-    const expertCount = skills.filter(s => s.masteryLabel === 'Expert' || s.masteryLabel === 'Advanced').length;
+    const [open, setOpen] = useState(false);
+    const [activeId, setActiveId] = useState<string | null>(null);
+    const advancedCount = skills.filter(s => s.masteryLabel === 'Expert' || s.masteryLabel === 'Advanced').length;
 
     return (
-        <div className="bg-[#0F172A] border border-slate-800 rounded-2xl overflow-hidden transition-all duration-300 hover:border-slate-700 hover:shadow-lg hover:shadow-black/20">
-            {/* Header */}
+        <div className="rounded-2xl border border-border/50 bg-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/10 hover:border-border">
+            {/* Header — clickable */}
             <button
-                onClick={() => setExpanded(e => !e)}
-                className="w-full flex items-center justify-between p-5 text-left group"
+                onClick={() => { setOpen(o => !o); if (open) setActiveId(null); }}
+                className="w-full flex items-center justify-between p-6 text-left group focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-2xl"
             >
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                        <Brain className="w-5 h-5 text-blue-400" />
+                <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-10 h-10 shrink-0 rounded-xl bg-blue-500/10 border border-blue-500/15 flex items-center justify-center group-hover:bg-blue-500/15 transition-colors duration-200">
+                        <Brain className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform duration-200" />
                     </div>
-                    <div>
-                        <h3 className="text-sm font-semibold text-white">{name}</h3>
-                        <p className="text-xs text-slate-500">
-                            {skills.length} skill{skills.length !== 1 ? 's' : ''} · {expertCount} advanced
+                    <div className="min-w-0">
+                        <h3 className="text-sm font-bold text-foreground truncate group-hover:text-blue-400 transition-colors duration-200">{name}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            {skills.length} skill{skills.length !== 1 ? 's' : ''}{advancedCount > 0 ? ` · ${advancedCount} advanced` : ''}
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    <div className="text-right">
-                        <div className="text-lg font-bold text-white">{domainScore}<span className="text-slate-500 text-xs font-normal">%</span></div>
-                    </div>
-                    <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+
+                <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-xl font-black font-mono text-foreground group-hover:text-blue-400 transition-colors duration-200">
+                        {domainScore}<span className="text-muted-foreground text-xs font-semibold">%</span>
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
                 </div>
             </button>
 
-            {/* Score bar */}
-            <div className="px-5 pb-1">
-                <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+            {/* Progress bar */}
+            <div className="px-6 pb-2">
+                <div className="h-px bg-border/40 rounded-full overflow-hidden">
                     <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${domainScore}%` }}
-                        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
-                        className="h-full bg-blue-500 rounded-full"
+                        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
+                        className="h-full bg-blue-500"
                     />
                 </div>
             </div>
 
-            {/* Skills pills */}
-            <AnimatePresence>
-                {expanded && (
+            {/* Expanded content */}
+            <AnimatePresence initial={false}>
+                {open && (
                     <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
+                        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                         className="overflow-hidden"
                     >
-                        <div className="px-5 pb-5 pt-3">
+                        <div className="px-6 pb-6 pt-3">
                             <div className="flex flex-wrap gap-2">
-                                {skills.map(skill => (
-                                    <SkillPill key={skill.skillId} skill={skill} />
+                                {skills.map(s => (
+                                    <SkillPill
+                                        key={s.skillId}
+                                        skill={s}
+                                        isActive={activeId === s.skillId}
+                                        onSelect={() => setActiveId(activeId === s.skillId ? null : s.skillId)}
+                                    />
                                 ))}
                             </div>
+                            <AnimatePresence mode="wait">
+                                {activeId && (
+                                    <SkillDetail key={activeId} skill={skills.find(s => s.skillId === activeId)!} />
+                                )}
+                            </AnimatePresence>
                         </div>
                     </motion.div>
                 )}

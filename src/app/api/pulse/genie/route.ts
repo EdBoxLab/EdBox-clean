@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SYSTEM_INSTRUCTION, GENIE_TOOLS } from '@/app/pulse/services/genie-tooling';
 import { getNextGroqKey, getGroqKeys } from '@/lib/ai-providers';
+import { getStudentModelService } from '@/lib/services/student-model';
+import { buildAdaptiveContext } from '@/lib/services/adaptive-context-builder';
+import { getSpacedRepetitionService } from '@/lib/services/spaced-repetition';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -137,7 +140,18 @@ export async function POST(request: NextRequest) {
         `graphId: ${skillWindow.data?.graphId || 'unknown'}`,
         '',
       ].join('\n');
-      log('PULSE-GENIE', 'Auto-injected SKILL_SESSION_ACTIVE');
+      // Inject full adaptive context: student model + spaced repetition + session state
+      try {
+        const adaptiveCtx = await buildAdaptiveContext({
+          userId: sessionId,
+          skillId: skillWindow.data?.skillId || 'unknown',
+          graphId: skillWindow.data?.graphId || 'unknown',
+        });
+        contextString += '\n' + adaptiveCtx + '\n';
+      } catch (e) {
+        log('PULSE-GENIE', 'Adaptive context build failed (non-fatal)', { error: String(e) });
+      }
+      log('PULSE-GENIE', 'Auto-injected SKILL_SESSION_ACTIVE + adaptive context');
     }
 
     // Workspace widget state
@@ -220,6 +234,43 @@ export async function POST(request: NextRequest) {
       for (const call of assistantMessage.tool_calls as GroqToolCall[]) {
         const args = JSON.parse(call.function.arguments);
         toolCallsToReturn.push({ name: call.function.name, args });
+
+        // Side-effect: update the student knowledge model on learning signals
+        if (call.function.name === 'record_learning_signal' && skillWindow) {
+          try {
+            await getStudentModelService().updateFromSignal(
+              sessionId,
+              skillWindow.data?.skillId || 'unknown',
+              skillWindow.data?.graphId || 'unknown',
+              {
+                signalType: args.signal_type,
+                topic: args.topic,
+                confidence: args.confidence ?? 0.5,
+                depth: args.depth,
+                attempts: args.attempts,
+                widgetsUsed: args.widgets_used,
+                note: args.note,
+              },
+            );
+          } catch (e) {
+            log('PULSE-GENIE', 'Student model update failed (non-fatal)', { error: String(e) });
+          }
+        }
+
+        // Side-effect: schedule spaced repetition when a topic is covered
+        if (call.function.name === 'update_skill_progress' && args.action === 'topic_covered' && skillWindow) {
+          try {
+            await getSpacedRepetitionService().scheduleReview(
+              sessionId,
+              args.topic || 'unknown',
+              skillWindow.data?.skillId || 'unknown',
+              Math.max(0, Math.min(1, args.confidence ?? 0.7)),
+            );
+            log('PULSE-GENIE', 'Scheduled spaced repetition review', { topic: args.topic });
+          } catch (e) {
+            log('PULSE-GENIE', 'Spaced repetition scheduling failed (non-fatal)', { error: String(e) });
+          }
+        }
 
         toolResults.push({
           role: 'tool',

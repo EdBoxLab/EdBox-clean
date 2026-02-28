@@ -6,43 +6,54 @@ interface ActivityHeatmapProps {
     data: ActivityDay[];
 }
 
-function getIntensityClass(count: number): string {
-    if (count === 0) return 'bg-slate-800/60';
-    if (count <= 2) return 'bg-blue-900/70';
-    if (count <= 5) return 'bg-blue-700/80';
-    if (count <= 10) return 'bg-blue-500/90';
-    return 'bg-blue-400';
+function getIntensityStyle(count: number): React.CSSProperties {
+    if (count === 0) return { background: '#1E293B', boxShadow: 'inset 0 0 0 1px rgba(51,65,85,0.5)' };
+    if (count <= 2) return { background: 'rgba(30,58,138,0.5)', boxShadow: 'inset 0 0 0 1px rgba(30,58,138,0.7)' };
+    if (count <= 5) return { background: 'rgba(30,64,175,0.65)', boxShadow: 'inset 0 0 0 1px rgba(37,99,235,0.5)' };
+    if (count <= 10) return { background: 'rgba(37,99,235,0.8)', boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.15), 0 0 8px rgba(37,99,235,0.3)' };
+    return { background: '#3B82F6', boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.25), 0 0 12px rgba(59,130,246,0.5)' };
 }
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const CELL_SIZE = 14;
+const GAP = 3;
 
 export default function ActivityHeatmap({ data }: ActivityHeatmapProps) {
     if (!data || data.length === 0) {
-        return <div className="h-24 flex items-center justify-center text-slate-600 text-sm">No activity data yet</div>;
+        return (
+            <div className="flex flex-col items-center justify-center h-48 bg-slate-900/20 border border-slate-800/50 rounded-2xl w-full">
+                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center mb-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-600" />
+                </div>
+                <span className="text-sm font-medium text-slate-500">No activity yet</span>
+            </div>
+        );
     }
 
-    // Pad start so the first day lines up with the correct day of week
     const firstDate = new Date(data[0].date);
-    const startDayOfWeek = firstDate.getDay(); // 0=Sun
-    const padded: (ActivityDay | null)[] = [
-        ...Array.from({ length: startDayOfWeek }, () => null),
-        ...data
-    ];
+    const startDayOfWeek = firstDate.getUTCDay();
 
-    // Build weeks
+    const startPadding = Array.from({ length: startDayOfWeek }, () => null);
+    const initialPadded = [...startPadding, ...data];
+    const endPaddingLength = (7 - (initialPadded.length % 7)) % 7;
+    const endPadding = Array.from({ length: endPaddingLength }, () => null);
+
+    const padded: (ActivityDay | null)[] = [...initialPadded, ...endPadding];
+
     const weeks: (ActivityDay | null)[][] = [];
     for (let i = 0; i < padded.length; i += 7) {
         weeks.push(padded.slice(i, i + 7));
     }
 
-    // Month labels: find week index where month changes
     const monthLabels: { weekIdx: number; label: string }[] = [];
     let lastMonth = -1;
+
     weeks.forEach((week, wi) => {
         const firstDay = week.find(d => d !== null);
         if (firstDay) {
-            const m = new Date(firstDay.date).getMonth();
+            const m = new Date(firstDay.date).getUTCMonth();
             if (m !== lastMonth) {
                 monthLabels.push({ weekIdx: wi, label: MONTHS[m] });
                 lastMonth = m;
@@ -52,60 +63,96 @@ export default function ActivityHeatmap({ data }: ActivityHeatmapProps) {
 
     const totalEvents = data.reduce((sum, d) => sum + d.count, 0);
     const activeDays = data.filter(d => d.count > 0).length;
+    const numWeeks = weeks.length;
+
+    const dayLabelWidth = 28;
+    const gridWidth = dayLabelWidth + numWeeks * (CELL_SIZE + GAP);
 
     return (
-        <div className="w-full">
-            <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Activity</span>
-                <span className="text-xs text-slate-500">{totalEvents} interactions across {activeDays} days</span>
+        <div className="w-full bg-card border border-border/40 rounded-2xl p-6 shadow-sm">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
+                <div>
+                    <h3 className="text-sm font-bold text-foreground tracking-tight">Learning Activity</h3>
+                    <p className="text-xs font-medium text-muted-foreground mt-0.5">Your daily interactions and code executions</p>
+                </div>
+                <div className="flex items-center gap-4 bg-background/50 rounded-lg px-3 py-1.5 border border-border/40">
+                    <div className="text-sm font-bold font-mono text-foreground">{totalEvents}</div>
+                    <div className="w-px h-5 bg-border/40" />
+                    <div className="text-sm font-bold font-mono text-blue-400">
+                        {activeDays} <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Days</span>
+                    </div>
+                </div>
             </div>
 
-            <div className="overflow-x-auto">
-                <div className="inline-flex flex-col gap-0 min-w-max">
-                    {/* Month labels */}
-                    <div className="flex gap-[3px] mb-1 ml-8">
-                        {weeks.map((_, wi) => {
-                            const label = monthLabels.find(m => m.weekIdx === wi);
-                            return (
-                                <div key={wi} className="w-3 text-[9px] text-slate-600 font-medium">
-                                    {label?.label || ''}
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Day rows */}
-                    {[0, 1, 2, 3, 4, 5, 6].map(dayIdx => (
-                        <div key={dayIdx} className="flex items-center gap-[3px]">
-                            {/* Day label (only for Mon, Wed, Fri) */}
-                            <div className="w-6 text-[9px] text-slate-600 text-right mr-1 shrink-0">
-                                {dayIdx % 2 === 1 ? DAYS[dayIdx] : ''}
-                            </div>
-                            {weeks.map((week, wi) => {
-                                const cell = week[dayIdx];
-                                if (!cell) {
-                                    return <div key={wi} className="w-3 h-3 rounded-[2px]" />;
-                                }
+            {/* Scrollable heatmap */}
+            <div style={{ minWidth: 0, width: '100%' }}>
+                <div className="overflow-x-auto overflow-y-hidden pb-3 rounded-lg" style={{ minWidth: 0 }}>
+                    <div style={{ width: gridWidth }}>
+                        {/* Month labels row */}
+                        <div style={{ display: 'flex', gap: GAP, marginLeft: dayLabelWidth, marginBottom: 4 }}>
+                            {weeks.map((_, wi) => {
+                                const label = monthLabels.find(m => m.weekIdx === wi);
                                 return (
                                     <div
-                                        key={wi}
-                                        title={`${cell.date}: ${cell.count} interaction${cell.count !== 1 ? 's' : ''}`}
-                                        className={`w-3 h-3 rounded-[2px] transition-all duration-200 hover:scale-125 hover:ring-1 hover:ring-blue-400/50 cursor-default ${getIntensityClass(cell.count)}`}
-                                    />
+                                        key={`month-${wi}`}
+                                        style={{ width: CELL_SIZE, fontSize: 10, flexShrink: 0, whiteSpace: 'nowrap' }}
+                                        className="text-slate-500 font-semibold"
+                                    >
+                                        {label?.label || ''}
+                                    </div>
                                 );
                             })}
                         </div>
-                    ))}
+
+                        {/* Day rows */}
+                        {[0, 1, 2, 3, 4, 5, 6].map(dayIdx => (
+                            <div key={`day-${dayIdx}`} style={{ display: 'flex', alignItems: 'center', gap: GAP, marginBottom: GAP }}>
+                                {/* Day label */}
+                                <div
+                                    style={{ width: dayLabelWidth - GAP, flexShrink: 0, fontSize: 10 }}
+                                    className="text-slate-500 font-medium text-right pr-1"
+                                >
+                                    {DAYS[dayIdx]}
+                                </div>
+
+                                {/* Week cells */}
+                                {weeks.map((week, wi) => {
+                                    const cell = week[dayIdx];
+                                    return (
+                                        <div
+                                            key={`cell-${dayIdx}-${wi}`}
+                                            title={cell ? `${cell.date}: ${cell.count} interaction${cell.count !== 1 ? 's' : ''}` : ''}
+                                            style={{
+                                                width: CELL_SIZE,
+                                                height: CELL_SIZE,
+                                                flexShrink: 0,
+                                                borderRadius: 3,
+                                                ...(cell ? getIntensityStyle(cell.count) : { background: 'transparent' }),
+                                            }}
+                                            className="cursor-default transition-transform duration-200 hover:scale-150 hover:z-10"
+                                        />
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
 
             {/* Legend */}
-            <div className="flex items-center gap-2 mt-3">
-                <span className="text-[10px] text-slate-600">Less</span>
-                {[0, 2, 5, 8, 12].map(v => (
-                    <div key={v} className={`w-3 h-3 rounded-[2px] ${getIntensityClass(v)}`} />
-                ))}
-                <span className="text-[10px] text-slate-600">More</span>
+            <div className="flex items-center justify-end gap-2.5 mt-2 pt-4 border-t border-border/30">
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Less</span>
+                <div className="flex gap-1.5">
+                    {[0, 2, 5, 8, 12].map(v => (
+                        <div
+                            key={`legend-${v}`}
+                            className="rounded-[3px]"
+                            style={{ width: 12, height: 12, ...getIntensityStyle(v) }}
+                        />
+                    ))}
+                </div>
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">More</span>
             </div>
         </div>
     );

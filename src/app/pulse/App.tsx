@@ -10,7 +10,8 @@ import { WIDGET_CONFIGS } from './constants';
 import { sendChatMessage, ChatMessage as APIMessage } from './services/chat-client';
 import { liveGenieService } from './services/live';
 import { interactionTracker } from './services/interaction-tracker';
-import { saveWidget, upsertSessionProgress } from './services/widget-persistence';
+import { saveWidget, updateSavedWidget, snapshotWidget, upsertSessionProgress, hasWidgetContent } from './services/widget-persistence';
+import { widgetTelemetry } from './services/widget-telemetry';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 const MotionDiv = motion.div as any;
@@ -123,10 +124,21 @@ const App: React.FC = () => {
       if (visible.length >= 2) {
         const oldestVisibleId = visible[0].id;
         updated = updated.map(w => w.id === oldestVisibleId ? { ...w, isMinimized: true } : w);
+        // Track dwell on auto-minimized widget
+        const oldestWidget = visible[0];
+        widgetTelemetry.onWidgetClosed(oldestWidget.id, oldestWidget.type);
       }
 
       return [...updated, newWindow];
     });
+
+    // Track widget open
+    widgetTelemetry.onWidgetOpened(newWindow.id, type);
+
+    // Persist new widget to DB (fire-and-forget)
+    if (currentUser) {
+      saveWidget(currentUser.id, sessionId, newWindow);
+    }
 
     // Auto-switch to workspace on mobile when a new window is added
     if (window.innerWidth < 768) {
@@ -139,12 +151,20 @@ const App: React.FC = () => {
       const target = prev.find(w => w.id === id);
       if (!target) return prev;
 
+      // Track dwell when minimizing
+      if (!target.isMinimized) {
+        widgetTelemetry.onWidgetClosed(id, target.type);
+      } else {
+        widgetTelemetry.onWidgetOpened(id, target.type);
+      }
+
       // If we are restoring (un-minimizing)
       if (target.isMinimized) {
         const visible = prev.filter(w => !w.isMinimized && w.id !== id);
         // If we already have 2 visible, minimize the oldest one to make room
         if (visible.length >= 2) {
           const oldestId = visible[0].id;
+          widgetTelemetry.onWidgetClosed(oldestId, visible[0].type);
           return prev.map(w => {
             if (w.id === oldestId) return { ...w, isMinimized: true };
             if (w.id === id) return { ...w, isMinimized: false };
@@ -218,7 +238,20 @@ const App: React.FC = () => {
           if (newData.content && !newData.action) { newData.action = 'write'; }
           if (newData.content) { newData.timestamp = Date.now(); }
         }
-        updateActiveWidget(targetType, (w) => ({ ...w, data: { ...w.data, ...newData } }));
+        updateActiveWidget(targetType, (w) => {
+          const updated = { ...w, data: { ...w.data, ...newData } };
+          // Persist content update to DB and take a snapshot (fire-and-forget)
+          if (currentUser && hasWidgetContent(updated.data)) {
+            updateSavedWidget(currentUser.id, sessionId, updated.id, updated.data);
+            snapshotWidget(currentUser.id, {
+              id: updated.id,
+              type: updated.type,
+              title: updated.title,
+              data: updated.data,
+            }, 'Content added by Genie');
+          }
+          return updated;
+        });
         break;
       // ... Legacy Handlers 
       case 'update_blackboard':
@@ -232,11 +265,28 @@ const App: React.FC = () => {
         break;
       case 'write_code':
       case 'update_code':
-        updateActiveWidget(WindowType.CODE_EDITOR, w => ({ ...w, data: { ...w.data, code: args.code } }));
+        updateActiveWidget(WindowType.CODE_EDITOR, w => {
+          const updated = { ...w, data: { ...w.data, code: args.code } };
+          if (currentUser && args.code) {
+            updateSavedWidget(currentUser.id, sessionId, updated.id, updated.data);
+            snapshotWidget(currentUser.id, {
+              id: updated.id,
+              type: updated.type,
+              title: updated.title,
+              data: updated.data,
+            }, 'Code written by Genie');
+          }
+          return updated;
+        });
         break;
       case 'run_code':
         updateActiveWidget(WindowType.CODE_EDITOR, w => ({ ...w, data: { ...w.data, executionTrigger: (w.data?.executionTrigger || 0) + 1 } }));
         break;
+      case 'record_learning_signal': {
+        // Persist Genie-observed learning quality signal to pulse_session_events
+        widgetTelemetry.onLearningSignal(args);
+        break;
+      }
       case 'update_skill_progress': {
         // Handle Genie's skill mastery progress updates
         const skillSessionWindow = windows.find(w => w.type === WindowType.SKILL_SESSION);
@@ -244,6 +294,9 @@ const App: React.FC = () => {
           const { action, topic, next_stage, signal, confidence, summary } = args;
           const { skillId, graphId } = skillSessionWindow.data || {};
           if (!skillId || !graphId) break;
+
+          // Set the active telemetry session context for this skill
+          widgetTelemetry.setSession(currentUser.id, skillId, graphId);
 
           if (action === 'topic_covered' && topic) {
             upsertSessionProgress({

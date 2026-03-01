@@ -151,6 +151,8 @@ class GenieChatService {
         const finalResponse = await groq.chat.completions.create({
           model: 'llama-3.3-70b-versatile',
           messages: this.messages as any,
+          tools: GROQ_TOOLS,
+          tool_choice: 'auto',
           temperature: 0.7,
           max_tokens: 4096,
         });

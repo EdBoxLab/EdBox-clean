@@ -7,6 +7,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Loader2, ArrowLeft, Sparkles, BookOpen, Target, Trophy, ChevronRight, Play, CheckCircle2, Circle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getSessionProgress, upsertSessionProgress, SkillSessionProgress } from '../../services/widget-persistence';
+import { widgetTelemetry } from '../../services/widget-telemetry';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface CurriculumStage {
@@ -84,6 +85,8 @@ const SkillSessionWidget: React.FC<SkillSessionWidgetProps> = ({ window: pulseWi
                 setSessionProgress(progress);
                 setSessionStarted(true);
             }
+            // Set telemetry session context so all subsequent events are tagged to this skill
+            widgetTelemetry.setSession(user.id, skillId, graphId);
             // Then fetch skill data, passing any saved curriculum
             await fetchSkillData(progress?.curriculum);
             // Subscribe to realtime updates
@@ -218,6 +221,19 @@ const SkillSessionWidget: React.FC<SkillSessionWidgetProps> = ({ window: pulseWi
         if (!skill || !curriculum || !onSendGenieMessage) return;
 
         setSessionStarted(true);
+
+        // Fire telemetry event
+        const isResume = (sessionProgress?.topics_covered?.length ?? 0) > 0;
+        widgetTelemetry.fire({
+            event_type: isResume ? 'skill_session_resumed' : 'skill_session_started',
+            widget_type: 'SKILL_SESSION',
+            event_data: {
+                skill_id: skillId,
+                graph_id: graphId,
+                current_stage: sessionProgress?.current_stage || 'Foundation',
+                topics_covered_count: sessionProgress?.topics_covered?.length || 0
+            }
+        });
 
         // Build a rich context message for Genie
         const stagesSummary = curriculum.stages.map((s, i) =>

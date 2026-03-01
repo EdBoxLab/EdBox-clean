@@ -7,6 +7,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { interactionTracker } from '../../services/interaction-tracker';
+import { widgetTelemetry } from '../../services/widget-telemetry';
 import mermaid from 'mermaid';
 
 // --- Mermaid Support ---
@@ -56,7 +57,10 @@ const SmartBoard: React.FC<SmartBoardProps> = ({ data, onUpdate }) => {
 
     useEffect(() => {
         if (!data) return;
-        if (data.content !== undefined && data.content !== textContent) setTextContent(data.content);
+        if (data.content !== undefined && data.content !== textContent) {
+            setTextContent(data.content);
+            widgetTelemetry.fire({ event_type: 'blackboard_read', widget_type: 'BLACKBOARD', event_data: { content_length: data.content.length } });
+        }
         if (data.action === 'clear' && canvasRef.current) {
             const ctx = canvasRef.current.getContext('2d');
             if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -68,6 +72,7 @@ const SmartBoard: React.FC<SmartBoardProps> = ({ data, onUpdate }) => {
     const saveState = () => {
         if (canvasRef.current && onUpdate) {
             onUpdate({ imageData: canvasRef.current.toDataURL() });
+            widgetTelemetry.fire({ event_type: 'blackboard_drawn', widget_type: 'BLACKBOARD' });
         }
     };
 

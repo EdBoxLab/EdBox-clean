@@ -311,3 +311,72 @@ export async function upsertSessionProgress(
     }
 }
 
+
+// ============= SNAPSHOTS =============
+
+/**
+ * Returns true if widget_data has meaningful content worth snapshotting.
+ * Avoids snapshotting empty/stub widgets.
+ */
+export function hasWidgetContent(data: any): boolean {
+    if (!data || typeof data !== 'object') return false;
+    const keys = Object.keys(data);
+    if (keys.length === 0) return false;
+    return keys.some(k => {
+        const v = data[k];
+        if (v === null || v === undefined) return false;
+        if (typeof v === 'string') return v.trim().length > 0;
+        if (Array.isArray(v)) return v.length > 0;
+        if (typeof v === 'object') return Object.keys(v).length > 0;
+        return true;
+    });
+}
+
+/**
+ * Takes a snapshot of a widget's current state into pulse_widget_snapshots.
+ * Only snapshots widgets that have meaningful content.
+ */
+export async function snapshotWidget(
+    userId: string,
+    widget: { id: string; type: string; title: string; data: any },
+    label = 'Auto-snapshot'
+): Promise<void> {
+    if (!hasWidgetContent(widget.data)) return;
+    try {
+        const supabase = createSupabaseBrowserClient();
+        await supabase.from('pulse_widget_snapshots').insert({
+            widget_id: widget.id,
+            user_id: userId,
+            widget_type: widget.type,
+            widget_title: widget.title,
+            widget_data: widget.data,
+            snapshot_label: label,
+        });
+    } catch (e) {
+        console.warn('Failed to take widget snapshot:', e);
+    }
+}
+
+/**
+ * Fetches all snapshots for a widget, newest first (up to 20).
+ */
+export async function getWidgetSnapshots(
+    userId: string,
+    widgetId: string
+): Promise<Array<{ id: string; snapshot_label: string; widget_data: any; created_at: string }>> {
+    try {
+        const supabase = createSupabaseBrowserClient();
+        const { data, error } = await supabase
+            .from('pulse_widget_snapshots')
+            .select('id, snapshot_label, widget_data, created_at')
+            .eq('user_id', userId)
+            .eq('widget_id', widgetId)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (error || !data) return [];
+        return data;
+    } catch {
+        return [];
+    }
+}

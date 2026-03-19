@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import Groq from 'groq-sdk';
 import pdf from 'pdf-parse';
 import { processFileContent as processFileUtility } from '@/lib/utils/fileProcessing';
 
@@ -487,19 +486,7 @@ FORMATTING RULES:
 - Write clearly and directly without asterisk-based formatting`;
     }
 
-    const groqApiKey =
-      process.env.GROQ_API_KEY ||
-      process.env.GROQ_API_KEY_3 ||
-      process.env.GROQ_API_KEY_10 ||
-      process.env.GROQ_API_KEY_15 ||
-      process.env.GROQ_API_KEY_32 ||
-      process.env.GROQ_API_KEY_4;
 
-    if (!groqApiKey) {
-      return NextResponse.json({ error: 'AI service unavailable' }, { status: 500 });
-    }
-
-    const groq = new Groq({ apiKey: groqApiKey });
 
     let aiResponse: string;
 
@@ -577,19 +564,19 @@ FORMATTING RULES:
         const data = await response.json();
         aiResponse = data.choices?.[0]?.message?.content || "I couldn't analyze the images. Please try again.";
       } else {
-        // Use Groq for text-only
-        const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-        console.log(`🤖 Using Groq model: ${model}`);
+        const { generateChat } = await import('@/lib/ai-providers');
+        console.log('🤖 Using AI provider (Groq → Gemini fallback)...');
 
-        const completion = await groq.chat.completions.create({
-          messages,
-          model,
+        const result = await generateChat({
+          messages: messages.map((m: any) => ({
+            role: m.role as 'system' | 'user' | 'assistant',
+            content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+          })),
           temperature: 0.7,
-          max_tokens: isInteractiveCourse ? 800 : 500,
-          top_p: 1,
+          maxTokens: isInteractiveCourse ? 800 : 500,
         });
 
-        aiResponse = completion.choices?.[0]?.message?.content || "I couldn't generate a response. Please try again.";
+        aiResponse = result.text || "I couldn't generate a response. Please try again.";
       }
 
       // 🔥 POST-PROCESSING: Remove any asterisks that might have slipped through

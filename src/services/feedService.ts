@@ -1,19 +1,6 @@
-import Groq from 'groq-sdk';
 import { FeedItem, FeedItemType } from '@/types/feed';
 import { supabase } from '@/lib/supabase/client';
 
-// Groq API Keys
-const GROQ_KEYS = [
-  process.env.NEXT_PUBLIC_GROQ_API_KEY_9,
-  process.env.NEXT_PUBLIC_GROQ_API_KEY_20,
-  process.env.NEXT_PUBLIC_GROQ_API_KEY_25,
-].filter(Boolean) as string[];
-
-const getRandomGroqKey = () => GROQ_KEYS[Math.floor(Math.random() * GROQ_KEYS.length)];
-
-// Helper functions (removed - not needed for Groq)
-
-// Helper for retries with exponential backoff
 async function retryOperation<T>(operation: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
   try {
     return await operation();
@@ -57,36 +44,11 @@ export const generateFeedBatch = async (
   });
 };
 
-
 export const generateLessonAudio = async (text: string): Promise<string | undefined> => {
   if (!text) return undefined;
-
-  return retryOperation(async () => {
-    try {
-      const apiKey = getRandomGroqKey();
-      if (!apiKey) {
-        console.warn('No Groq API keys available for audio generation');
-        return undefined;
-      }
-
-      const groq = new Groq({ apiKey, dangerouslyAllowBrowser: true });
-
-      // Use Groq for text processing (Groq doesn't do TTS, so we'll return text-to-speech URL from a free service)
-      // Or just return the text for client-side speech synthesis
-      
-      // For now, return undefined and use browser's Web Speech API instead
-      console.log('Audio generation requested, using browser speech synthesis instead');
-      return undefined;
-      
-      // Alternative: Use a TTS service like ElevenLabs, Play.ht, or browser's SpeechSynthesis API
-    } catch (e) {
-      console.error("Audio generation failed", e);
-      return undefined;
-    }
-  });
+  console.log('Audio generation requested, using browser speech synthesis instead');
+  return undefined;
 };
-
-// Database Persistence Helpers
 
 export const persistFeedItems = async (items: FeedItem[], userId?: string) => {
   try {
@@ -97,7 +59,6 @@ export const persistFeedItems = async (items: FeedItem[], userId?: string) => {
       generated_at: new Date().toISOString()
     }));
 
-    // Use localStorage for persistence (client-only)
     if (typeof window !== 'undefined' && window.localStorage) {
       const existing = JSON.parse(localStorage.getItem(key) || '[]');
       localStorage.setItem(key, JSON.stringify([...existing, ...rows]));
@@ -115,10 +76,8 @@ export const trackInteraction = async (
   type: 'like' | 'dislike' | 'save' | 'skip' | 'got_it' | 'answered'
 ): Promise<boolean> => {
   try {
-    // Log to console for now - no database table needed
     console.log('📊 Interaction tracked:', { userId, itemId, type, timestamp: new Date().toISOString() });
     
-    // Store in localStorage as fallback tracking
     if (typeof window !== 'undefined' && window.localStorage) {
       const key = `interactions_${userId}`;
       const existing = JSON.parse(localStorage.getItem(key) || '[]');
@@ -128,7 +87,6 @@ export const trackInteraction = async (
         timestamp: new Date().toISOString()
       });
       
-      // Keep only last 100 interactions
       if (existing.length > 100) {
         existing.shift();
       }
@@ -142,4 +100,3 @@ export const trackInteraction = async (
     return false;
   }
 };
-

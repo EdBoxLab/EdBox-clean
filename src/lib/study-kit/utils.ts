@@ -81,13 +81,30 @@ export function extractJSON(text: string, type: ContentType) {
         try {
             parsed = JSON.parse(cleaned);
         } catch (parseError) {
-            cleaned = cleaned.replace(/\\(?!["\\])/g, '\\\\').replace(/[\u0000-\u001F]/g, '');
+            cleaned = cleaned.replace(/\\(?!["\\\/bfnrtu])/g, '\\\\').replace(/[\u0000-\u001F]/g, '');
             try {
                 parsed = JSON.parse(cleaned);
             } catch (e) {
-                // Last resort: try to fix missing commas between objects
-                const repaired = cleaned.replace(/\}\s*\{/g, '},{');
-                parsed = JSON.parse(repaired);
+                let repaired = cleaned
+                    .replace(/\}\s*\{/g, '},{')
+                    .replace(/,\s*([}\]])/g, '$1');
+                try {
+                    parsed = JSON.parse(repaired);
+                } catch (e2) {
+                    const lastValid = type === 'mindmaps'
+                        ? repaired.lastIndexOf('}')
+                        : repaired.lastIndexOf(']');
+                    if (lastValid > 0) {
+                        const truncated = repaired.substring(0, lastValid + 1);
+                        try {
+                            parsed = JSON.parse(truncated);
+                        } catch (e3) {
+                            throw e2;
+                        }
+                    } else {
+                        throw e2;
+                    }
+                }
             }
         }
 

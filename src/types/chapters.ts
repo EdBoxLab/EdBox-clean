@@ -110,7 +110,7 @@ export interface ChapterDetectionOptions {
   minChapterLength?: number;
   preferExplicit?: boolean;
   maxTokens?: number;
-  model?: 'versatile' | 'oss' | 'vision' | 'llama-3.3-70b-versatile';
+  model?: 'versatile' | 'oss' | 'vision';
 }
 
 export const DEFAULT_DETECTION_OPTIONS: ChapterDetectionOptions = {
@@ -119,5 +119,4 @@ export const DEFAULT_DETECTION_OPTIONS: ChapterDetectionOptions = {
   minChapterLength: 3000,
   preferExplicit: true,
   maxTokens: 4000,
-  model: 'llama-3.3-70b-versatile'
 };

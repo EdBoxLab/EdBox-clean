@@ -4,6 +4,8 @@ import { buildPrompt, buildNotePrompt } from './prompts';
 import { extractJSON, cleanMarkdown, sendEvent } from './utils';
 import type { DetectedChapter, ChapterContent } from '@/types/chapters';
 
+const STUDY_KIT_MODEL = 'gemini-3-flash-preview';
+
 const NOTE_TYPES: NoteType[] = ['deepExplanation', 'cheatsheet', 'application', 'tables'];
 
 const NOTE_SYSTEM_PROMPTS: Record<NoteType, string> = {
@@ -57,7 +59,7 @@ export async function generateChapterContent(
                     systemPrompt: 'Output ONLY valid JSON.',
                     temperature: 0.7,
                     maxTokens: 4000,
-                    model: 'llama-3.1-8b-instant'
+                    geminiModel: STUDY_KIT_MODEL,
                 });
                 result.quizzes = extractJSON(quizResult.text, 'quizzes');
                 reportProgress('quizzes', result.quizzes);
@@ -74,7 +76,7 @@ export async function generateChapterContent(
                     systemPrompt: 'Output ONLY valid JSON.',
                     temperature: 0.7,
                     maxTokens: 4000,
-                    model: 'llama-3.1-8b-instant'
+                    geminiModel: STUDY_KIT_MODEL,
                 });
                 result.flashcards = extractJSON(fcResult.text, 'flashcards');
                 reportProgress('flashcards', result.flashcards);
@@ -91,7 +93,7 @@ export async function generateChapterContent(
                     systemPrompt: 'Output ONLY valid JSON.',
                     temperature: 0.7,
                     maxTokens: 4000,
-                    model: 'llama-3.1-8b-instant'
+                    geminiModel: STUDY_KIT_MODEL,
                 });
                 result.mindmaps = extractJSON(mmResult.text, 'mindmaps');
                 reportProgress('mindmaps', result.mindmaps);
@@ -106,14 +108,12 @@ export async function generateChapterContent(
                 label: noteType,
                 run: async () => {
                     const notePrompt = buildNotePrompt(chapterPrompt, notesDepth, customInstructions, noteType);
-                    // Smart model tiering: 70b for creative reasoning, 8b for structured output
-                    const needs70b = noteType === 'deepExplanation' || noteType === 'application';
                     const noteResult = await generateWithRetry({
                         prompt: notePrompt,
                         systemPrompt: NOTE_SYSTEM_PROMPTS[noteType],
                         temperature: 0.7,
-                        maxTokens: needs70b ? 5000 : 3500,
-                        model: needs70b ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant'
+                        maxTokens: 5000,
+                        geminiModel: STUDY_KIT_MODEL,
                     });
                     result.notes![noteType] = cleanMarkdown(noteResult.text);
                     reportProgress(noteType, result.notes![noteType], true);
@@ -174,7 +174,7 @@ export async function generateSingleContent(
                     systemPrompt: 'Output ONLY valid JSON.',
                     temperature: 0.7,
                     maxTokens: 4000,
-                    model: 'llama-3.1-8b-instant',
+                    geminiModel: STUDY_KIT_MODEL,
                 });
                 const content = extractJSON(result.text, type);
                 return content;
@@ -195,14 +195,12 @@ export async function generateSingleContent(
         const notePromises = NOTE_TYPES.map(async (noteType) => {
             try {
                 const notePrompt = buildNotePrompt(currentChunks[0], notesDepth, customInstructions, noteType);
-                // Smart model tiering: 70b for creative reasoning, 8b for structured output
-                const needs70b = noteType === 'deepExplanation' || noteType === 'application';
                 const result = await generateWithRetry({
                     prompt: notePrompt,
                     systemPrompt: NOTE_SYSTEM_PROMPTS[noteType],
                     temperature: 0.7,
-                    maxTokens: needs70b ? 5000 : 3500,
-                    model: needs70b ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant'
+                    maxTokens: 5000,
+                    geminiModel: STUDY_KIT_MODEL,
                 });
                 const content = cleanMarkdown(result.text);
                 notes[noteType] = content;
@@ -224,7 +222,7 @@ export async function generateSingleContent(
             systemPrompt: 'Output ONLY valid JSON.',
             temperature: 0.7,
             maxTokens: 4000,
-            model: 'llama-3.1-8b-instant'
+            geminiModel: STUDY_KIT_MODEL,
         });
         const content = extractJSON(result.text, type);
         if (controller) {

@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { generateWithRetry, extractContextFromText } from '@/lib/ai-providers';
+import { generateWithRetry, extractContextFromText, getGoogleGenAIClient } from '@/lib/ai-providers';
 import { detectCourseCategory, injectTemplateIntoPrompt } from './templates';
 import { CourseCategory } from '@/lib/courseCreation/types';
 import { checkCache, saveToCache } from '@/lib/ai-cache';
@@ -129,6 +129,36 @@ async function retryWithBackoff<T>(
   throw new Error('Max retries exceeded');
 }
 
+// ============= WEB RESEARCH =============
+
+async function researchGoalFromWeb(goal: string): Promise<string> {
+  try {
+    const ai = await getGoogleGenAIClient();
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: `Research the following learning goal and provide a comprehensive summary of:
+1. Key skills and sub-topics that should be covered
+2. Current industry standards and best practices (as of 2025-2026)
+3. Recommended learning progression (beginner to advanced)
+4. Popular tools, frameworks, or resources commonly used
+5. Real-world applications and career relevance
+
+Goal: "${goal}"
+
+Provide factual, structured information that can be used to build a comprehensive learning path.`,
+      config: {
+        tools: [{ googleSearch: {} }],
+        temperature: 0.3,
+        maxOutputTokens: 2000,
+      }
+    });
+    return response.text || '';
+  } catch (error: any) {
+    console.warn(`⚠️ Web research failed: ${error.message}`);
+    return '';
+  }
+}
+
 // ============= AI GENERATION FUNCTIONS =============
 
 /**
@@ -138,7 +168,8 @@ async function analyzeGoal(
   goal: string,
   context: LearningContext,
   timeAvailable?: string,
-  uploadedFileContent?: string
+  uploadedFileContent?: string,
+  webResearch?: string
 ): Promise<{
   parsedGoal: string;
   domain: string;
@@ -179,6 +210,10 @@ Return: {Valid JSON object with keys: actual_goal, domain, target_proficiency, t
     ? `\n\nIMPORTANT: Use the following extracted document context as the primary source for the course structure and content. Only generate what is relevant to this context:\n${uploadedFileContent}`
     : '';
 
+  const webContext = webResearch
+    ? `\n\nWEB RESEARCH (use this for up-to-date information about tools, frameworks, and industry standards):\n${webResearch}`
+    : '';
+
   const schema = {
     type: "object",
     properties: {
@@ -192,7 +227,7 @@ Return: {Valid JSON object with keys: actual_goal, domain, target_proficiency, t
   };
 
   const result = await generateWithRetry({
-    prompt: `Goal: "${goal}"${fileContext}`,
+    prompt: `Goal: "${goal}"${fileContext}${webContext}`,
     systemPrompt,
     schema,
     temperature: 1.0,
@@ -214,7 +249,8 @@ async function generateSkillGraph(
   context: LearningContext,
   targetProficiency: string,
   primaryEngine: EngineType,
-  category: CourseCategory
+  category: CourseCategory,
+  webResearch?: string
 ): Promise<{
   skillPaths: SkillPath[];
   miniProjects: MiniProject[];
@@ -276,7 +312,7 @@ Micro-skill naming: Be SPECIFIC and ACTION-oriented
 
 Each skill unlocks when prerequisites are mastered.
 
-Respond ONLY with valid JSON.`;
+${webResearch ? `WEB RESEARCH CONTEXT (use for accurate, current skill names and tools):\n${webResearch}\n\n` : ''}Respond ONLY with valid JSON.`;
 
   const systemPrompt = injectTemplateIntoPrompt(basePrompt, category);
 
@@ -439,12 +475,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    console.log('🔍 Step 0: Researching goal from web...');
+    const webResearch = await researchGoalFromWeb(goal);
+    if (webResearch) {
+      console.log(`✅ Web research complete (${webResearch.length} chars)`);
+    }
+
     console.log('🧠 Step 1: Analyzing goal...');
     const analysis = await analyzeGoal(
       goal,
       context,
       timeAvailable,
-      extractedContext
+      extractedContext,
+      webResearch
     );
 
     console.log(`✅ Analysis complete:`, {
@@ -461,7 +504,8 @@ export async function POST(request: NextRequest) {
       context,
       analysis.targetProficiency,
       analysis.recommendedEngine as EngineType,
-      analysis.category
+      analysis.category,
+      webResearch
     );
 
     const totalSkills = skillGraphData.skillPaths.reduce(

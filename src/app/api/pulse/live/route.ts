@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       configured: true,
       apiKey,
-      model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+      model: 'gemini-3-pro-preview',
       systemInstruction: toolingConfig.systemInstruction,
       tools: toolingConfig.tools,
       voiceName: 'Kore'

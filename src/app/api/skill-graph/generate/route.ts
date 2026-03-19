@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Groq from 'groq-sdk';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-
-// ============= TYPES =============
+import { generateWithFallback, cleanJsonResponse } from '@/lib/ai-providers';
 
 enum LearningContext {
     HighSchool = "high_school",
@@ -46,26 +44,6 @@ interface MiniProject {
     shareTemplate: string;
 }
 
-// ============= API KEY MANAGEMENT =============
-
-const GROQ_API_KEYS = [
-    process.env.GROQ_API_KEY,
-    process.env.GROQ_API_KEY_2,
-    process.env.GROQ_API_KEY_3,
-    process.env.GROQ_API_KEY_4,
-    process.env.GROQ_API_KEY_5,
-].filter(Boolean) as string[];
-
-let currentKeyIndex = 0;
-
-const getApiKey = () => {
-    const key = GROQ_API_KEYS[currentKeyIndex];
-    currentKeyIndex = (currentKeyIndex + 1) % GROQ_API_KEYS.length;
-    return key;
-};
-
-// ============= CONTEXT PERSONALIZATION =============
-
 const getContextGuidance = (context: LearningContext) => {
     const guidance = {
         [LearningContext.HighSchool]: `
@@ -96,8 +74,6 @@ const getContextGuidance = (context: LearningContext) => {
     return guidance[context];
 };
 
-// ============= MAIN GENERATION =============
-
 export async function POST(request: NextRequest) {
     try {
         const supabase = await createSupabaseServerClient();
@@ -113,12 +89,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Goal is required' }, { status: 400 });
         }
 
-        const apiKey = getApiKey();
-        if (!apiKey) throw new Error("No Groq API Key provided");
-
-        const groq = new Groq({ apiKey });
-
-        // Generate comprehensive skill graph with Groq
         const systemPrompt = `You are an expert curriculum designer for Gen Z learners.
 
 Create a comprehensive skill graph with:
@@ -202,21 +172,17 @@ Return ONLY valid JSON (no markdown):
   }
 }`;
 
-        const response = await groq.chat.completions.create({
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-                { role: 'system', content: 'You are a JSON-only API. Return valid JSON without markdown formatting.' },
-                { role: 'user', content: systemPrompt }
-            ],
+        const result = await generateWithFallback({
+            prompt: systemPrompt,
+            systemPrompt: 'You are a JSON-only API. Return valid JSON without markdown formatting.',
+            schema: true,
             temperature: 0.8,
-            max_tokens: 4000,
+            maxTokens: 4000,
         });
 
-        const text = response.choices[0]?.message?.content || "{}";
-        const cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const cleanedText = cleanJsonResponse(result.text);
         const graphData = JSON.parse(cleanedText);
 
-        // Flatten skills for database storage
         const allSkills: MicroSkill[] = [];
         const edges: Array<{ source: string, target: string }> = [];
 
@@ -224,14 +190,12 @@ Return ONLY valid JSON (no markdown):
             path.skills.forEach((skill: MicroSkill) => {
                 allSkills.push(skill);
 
-                // Create edges from prerequisites
                 skill.prerequisites.forEach(prereq => {
                     edges.push({ source: prereq, target: skill.id });
                 });
             });
         });
 
-        // Save to database
         const { data: savedGraph, error: saveError } = await supabase
             .from('skill_graphs')
             .insert({

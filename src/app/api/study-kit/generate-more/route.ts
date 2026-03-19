@@ -79,7 +79,6 @@ export async function POST(request: NextRequest) {
         systemPrompt: 'You are an expert study note creator. Output only Markdown formatted notes.',
         temperature: 0.7,
         maxTokens: 3000,
-        model: 'llama-3.3-70b-versatile',
       });
 
       newContent = cleanMarkdown(result.text);

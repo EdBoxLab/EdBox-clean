@@ -1,10 +1,12 @@
+declare const process: { env: Record<string, string | undefined> };
+
 /**
  * AI Provider Management Utility
- * Handles API key rotation for Gemini and Groq with automatic fallback
+ * Handles API key rotation for Gemini and Groq as co-primary providers
  * 
  * STRATEGY: 
- * 1. Loop through ALL Groq keys (Priority)
- * 2. If all Groq keys fail, loop through ALL Gemini keys
+ * 1. Loop through ALL Groq keys (Primary)
+ * 2. Loop through ALL Gemini keys (Co-Primary / Fallback)
  * 3. Use Voyage AI for all embeddings (Primary)
  * 4. Continuity handover ensures seamless explanation across key rotations
  */
@@ -13,7 +15,7 @@ import { VoyageAIClient } from 'voyageai';
 
 // ============= KEY HELPERS =============
 
-function getGeminiKeys(): string[] {
+export function getGeminiKeys(): string[] {
   return [
     process.env.GEMINI_API_KEY_1,
     process.env.GEMINI_API_KEY_2,
@@ -161,7 +163,8 @@ export interface GenerateOptions {
     mimeType: string;
     data: string; // base64
   }[];
-  model?: 'versatile' | 'oss' | 'vision' | 'llama-3.3-70b-versatile' | 'llama-3.1-8b-instant';
+  model?: 'versatile' | 'oss' | 'vision';
+  geminiModel?: string;
   continuationContext?: string; // Used to resume from partial responses
 }
 
@@ -287,67 +290,7 @@ export async function* streamWithFallback(options: GenerateOptions): AsyncGenera
     }
   }
 
-  // 1. TRY ALL GROQ KEYS
-  const groqKeys = getGroqKeys();
-  let keyIndex = 0;
-
-  while (keyIndex < groqKeys.length) {
-    const key = groqKeys[keyIndex];
-    if (exhaustedKeys.has(key)) {
-      keyIndex++;
-      continue;
-    }
-
-    try {
-      const Groq = (await import('groq-sdk')).default;
-      const groq = new Groq({ apiKey: key });
-
-      // Groq vision is decommissioned, only use for text
-      const groqModel = 'llama-3.3-70b-versatile';
-
-      const messages: any[] = [];
-      if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-
-      // If we have accumulated text, we are resuming
-      if (accumulatedText) {
-        messages.push({ role: 'user', content: createContinuationPrompt(prompt, accumulatedText) });
-      } else {
-        messages.push({ role: 'user', content: prompt });
-      }
-
-      const stream = await groq.chat.completions.create({
-        model: groqModel,
-        messages,
-        temperature,
-        max_tokens: maxTokens,
-        stream: true,
-      });
-
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || '';
-        if (content) {
-          accumulatedText += content;
-          yield content;
-        }
-      }
-
-      // If we finished successfully, return
-      return;
-
-    } catch (error: any) {
-      const isRateLimit = error.status === 429 || error.message?.includes('rate limit');
-      if (isRateLimit) {
-        exhaustedKeys.add(key);
-        console.warn(`⚠️ Groq key ${keyIndex + 1} exhausted mid-stream, rotating...`);
-        keyIndex++;
-        continue;
-      }
-      console.error(`❌ Groq streaming error: ${error.message}`);
-      break; // Try Gemini
-    }
-  }
-
-  // 2. FALLBACK TO ALL GEMINI KEYS
+  // 1. TRY ALL GEMINI KEYS FIRST (Primary)
   const geminiKeys = getGeminiKeys();
   let geminiIndex = 0;
 
@@ -362,7 +305,7 @@ export async function* streamWithFallback(options: GenerateOptions): AsyncGenera
       const { GoogleGenerativeAI } = await import("@google/generative-ai");
       const genAI = new GoogleGenerativeAI(key);
       const geminiModel = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: options.geminiModel || 'gemini-3-pro-preview',
         systemInstruction: systemPrompt
       });
 
@@ -394,6 +337,63 @@ export async function* streamWithFallback(options: GenerateOptions): AsyncGenera
         continue;
       }
       console.error(`❌ Gemini streaming error: ${error.message}`);
+      break;
+    }
+  }
+
+  // 2. FALLBACK TO ALL GROQ KEYS
+  const groqKeys = getGroqKeys();
+  let keyIndex = 0;
+
+  while (keyIndex < groqKeys.length) {
+    const key = groqKeys[keyIndex];
+    if (exhaustedKeys.has(key)) {
+      keyIndex++;
+      continue;
+    }
+
+    try {
+      const Groq = (await import('groq-sdk')).default;
+      const groq = new Groq({ apiKey: key });
+
+      const groqModel = 'llama-3.3-70b-versatile';
+
+      const messages: any[] = [];
+      if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+
+      if (accumulatedText) {
+        messages.push({ role: 'user', content: createContinuationPrompt(prompt, accumulatedText) });
+      } else {
+        messages.push({ role: 'user', content: prompt });
+      }
+
+      const stream = await groq.chat.completions.create({
+        model: groqModel,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        stream: true,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          accumulatedText += content;
+          yield content;
+        }
+      }
+
+      return;
+
+    } catch (error: any) {
+      const isRateLimit = error.status === 429 || error.message?.includes('rate limit');
+      if (isRateLimit) {
+        exhaustedKeys.add(key);
+        console.warn(`⚠️ Groq key ${keyIndex + 1} exhausted mid-stream, rotating...`);
+        keyIndex++;
+        continue;
+      }
+      console.error(`❌ Groq streaming error: ${error.message}`);
       break;
     }
   }
@@ -495,7 +495,7 @@ export function cleanJsonResponse(text: string): string {
 }
 
 /**
- * Generate AI content with prioritized Groq Loop then Gemini Loop
+ * Generate AI content with prioritized Gemini Loop then Groq Loop
  */
 export async function generateWithFallback(options: GenerateOptions): Promise<GenerateResult> {
   const { prompt, systemPrompt, schema, temperature = 0.7, maxTokens = 4000, attachments = [] }: GenerateOptions = options;
@@ -556,51 +556,12 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
           continue;
         }
         console.warn(`⚠️ OpenRouter error: ${orError.message}`);
-        break; // Try fallbacks
+        break;
       }
     }
   }
 
-  // 1. TRY ALL GROQ KEYS FIRST
-  const groqKeys = getGroqKeys();
-  for (const key of groqKeys) {
-    if (exhaustedKeys.has(key)) continue;
-    try {
-      const Groq = (await import('groq-sdk')).default;
-      const groq = new Groq({ apiKey: key });
-
-      const messages: any[] = [];
-      if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-
-      // Groq vision model is decommissioned, so we've handled vision above.
-      // If images somehow reach here, we'll strip them to avoid errors.
-      messages.push({ role: 'user', content: prompt });
-
-      const response = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        temperature,
-        max_tokens: maxTokens,
-        response_format: schema ? { type: 'json_object' } : undefined,
-      });
-
-      return {
-        text: response.choices[0]?.message?.content || '',
-        provider: 'groq',
-        success: true,
-      };
-    } catch (groqError: any) {
-      if (groqError.status === 429 || groqError.message?.includes('rate limit')) {
-        exhaustedKeys.add(key);
-        console.warn(`⚠️ Groq key exhausted, trying next...`);
-        continue;
-      }
-      console.warn(`⚠️ Groq error with key: ${groqError.message}`);
-      break; // Non-rate-limit error, move to Gemini
-    }
-  }
-
-  // 2. FALLBACK TO ALL GEMINI KEYS
+  // 1. TRY ALL GEMINI KEYS FIRST (Primary)
   const geminiKeys = getGeminiKeys();
   for (const key of geminiKeys) {
     if (exhaustedKeys.has(key)) continue;
@@ -627,7 +588,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
       }
 
       const geminiModel = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: options.geminiModel || 'gemini-3-pro-preview',
         systemInstruction: systemPrompt
       });
 
@@ -651,7 +612,43 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
     }
   }
 
-  throw new Error('AI generation failed: All Groq and Gemini keys are exhausted or errored.');
+  // 2. FALLBACK TO ALL GROQ KEYS
+  const groqKeys = getGroqKeys();
+  for (const key of groqKeys) {
+    if (exhaustedKeys.has(key)) continue;
+    try {
+      const Groq = (await import('groq-sdk')).default;
+      const groq = new Groq({ apiKey: key });
+
+      const messages: any[] = [];
+      if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+      messages.push({ role: 'user', content: prompt });
+
+      const response = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        response_format: schema ? { type: 'json_object' } : undefined,
+      });
+
+      return {
+        text: response.choices[0]?.message?.content || '',
+        provider: 'groq',
+        success: true,
+      };
+    } catch (groqError: any) {
+      if (groqError.status === 429 || groqError.message?.includes('rate limit')) {
+        exhaustedKeys.add(key);
+        console.warn(`⚠️ Groq key exhausted, trying next...`);
+        continue;
+      }
+      console.warn(`⚠️ Groq error with key: ${groqError.message}`);
+      break;
+    }
+  }
+
+  throw new Error('AI generation failed: All Gemini and Groq keys are exhausted or errored.');
 }
 
 /**
@@ -749,4 +746,96 @@ export async function getGoogleGenAIClient(): Promise<any> {
 export function hasGeminiKey(): boolean {
   const keys = getGeminiKeys();
   return keys.length > 0;
+}
+
+export function hasAnyAIKey(): boolean {
+  return getGroqKeys().length > 0 || getGeminiKeys().length > 0;
+}
+
+export interface ChatOptions {
+  messages: { role: 'system' | 'user' | 'assistant'; content: string }[];
+  temperature?: number;
+  maxTokens?: number;
+  jsonMode?: boolean;
+  geminiModel?: string;
+}
+
+export async function generateChat(options: ChatOptions): Promise<GenerateResult> {
+  const { messages, temperature = 0.7, maxTokens = 4000, jsonMode = false } = options;
+
+  const systemMsg = messages.find(m => m.role === 'system')?.content;
+  const nonSystemMessages = messages.filter(m => m.role !== 'system');
+
+  // 1. TRY ALL GEMINI KEYS FIRST (Primary)
+  const geminiKeys = getGeminiKeys();
+  for (const key of geminiKeys) {
+    if (exhaustedKeys.has(key)) continue;
+    try {
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(key);
+
+      const config: any = { temperature, maxOutputTokens: maxTokens };
+      if (jsonMode) config.responseMimeType = 'application/json';
+
+      const geminiModel = genAI.getGenerativeModel({
+        model: options.geminiModel || 'gemini-3-pro-preview',
+        systemInstruction: systemMsg,
+      });
+
+      const contents = nonSystemMessages.map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      }));
+
+      const result = await geminiModel.generateContent({ contents, generationConfig: config });
+      const response = await result.response;
+
+      return {
+        text: response.text(),
+        provider: 'gemini',
+        success: true,
+      };
+    } catch (geminiError: any) {
+      const isRateLimit = geminiError.message?.includes('429') || geminiError.message?.includes('quota');
+      if (isRateLimit) {
+        exhaustedKeys.add(key);
+        continue;
+      }
+      console.error(`❌ Gemini chat error: ${geminiError.message}`);
+      break;
+    }
+  }
+
+  // 2. FALLBACK TO ALL GROQ KEYS
+  const groqKeys = getGroqKeys();
+  for (const key of groqKeys) {
+    if (exhaustedKeys.has(key)) continue;
+    try {
+      const Groq = (await import('groq-sdk')).default;
+      const groq = new Groq({ apiKey: key });
+
+      const response = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: messages as any,
+        temperature,
+        max_tokens: maxTokens,
+        response_format: jsonMode ? { type: 'json_object' } : undefined,
+      });
+
+      return {
+        text: response.choices[0]?.message?.content || '',
+        provider: 'groq',
+        success: true,
+      };
+    } catch (groqError: any) {
+      if (groqError.status === 429 || groqError.message?.includes('rate limit')) {
+        exhaustedKeys.add(key);
+        continue;
+      }
+      console.warn(`⚠️ Groq chat error: ${groqError.message}`);
+      break;
+    }
+  }
+
+  throw new Error('Chat generation failed: All Gemini and Groq keys exhausted or errored.');
 }

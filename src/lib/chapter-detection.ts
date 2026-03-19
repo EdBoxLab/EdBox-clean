@@ -1,4 +1,6 @@
 import { generateWithRetry } from './ai-providers';
+
+const STUDY_KIT_MODEL = 'gemini-3-flash-preview';
 import type {
   DetectedChapter,
   ChapterDetectionResult,
@@ -83,7 +85,6 @@ async function processChunkForChapters(
       systemPrompt: SEMANTIC_DETECTION_SYSTEM_PROMPT,
       temperature: 0.2,
       maxTokens: options.maxTokens || 4000,
-      model: 'llama-3.3-70b-versatile'
     });
     
     const parsed = parseDetectionResponse(result.text);
@@ -495,11 +496,31 @@ function parseDetectionResponse(responseText: string): ChapterDetectionResult | 
     
     const objectStart = responseText.indexOf('{');
     const objectEnd = responseText.lastIndexOf('}');
-    if (objectStart !== -1 && objectEnd !== -1) {
-      return JSON.parse(responseText.slice(objectStart, objectEnd + 1));
+    if (objectStart === -1 || objectEnd === -1) return null;
+
+    let raw = responseText.slice(objectStart, objectEnd + 1);
+
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      raw = raw
+        .replace(/[\u0000-\u001F]/g, ' ')
+        .replace(/\\(?!["\\\/bfnrtu])/g, '\\\\')
+        .replace(/,\s*([}\]])/g, '$1')
+        .replace(/}\s*{/g, '},{');
+
+      try {
+        return JSON.parse(raw);
+      } catch (e2) {
+        const lastBrace = raw.lastIndexOf('}');
+        if (lastBrace > 0) {
+          try {
+            return JSON.parse(raw.substring(0, lastBrace + 1));
+          } catch (e3) {}
+        }
+        throw e2;
+      }
     }
-    
-    return null;
   } catch (error) {
     console.error('Failed to parse detection response:', error);
     return null;
@@ -573,7 +594,7 @@ async function detectSemanticBoundaries(
       systemPrompt: SEMANTIC_DETECTION_SYSTEM_PROMPT,
       temperature: 0.2,
       maxTokens: options.maxTokens || 4000,
-      model: options.model || 'llama-3.3-70b-versatile'
+      geminiModel: STUDY_KIT_MODEL,
     });
     
     const parsed = parseDetectionResponse(result.text);

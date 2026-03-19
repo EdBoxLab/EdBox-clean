@@ -1,20 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Groq from 'groq-sdk';
-
-const GROQ_API_KEYS = [
-    process.env.GROQ_API_KEY,
-    process.env.GROQ_API_KEY_2,
-    process.env.GROQ_API_KEY_3,
-    process.env.GROQ_API_KEY_4,
-    process.env.GROQ_API_KEY_5,
-].filter(Boolean) as string[];
-
-let currentKeyIndex = 0;
-const getApiKey = () => {
-    const key = GROQ_API_KEYS[currentKeyIndex];
-    currentKeyIndex = (currentKeyIndex + 1) % GROQ_API_KEYS.length;
-    return key;
-};
+import { generateWithFallback, cleanJsonResponse } from '@/lib/ai-providers';
 
 export async function POST(request: NextRequest) {
     try {
@@ -24,12 +9,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        const apiKey = getApiKey();
-        if (!apiKey) throw new Error("No Groq API Key provided");
-
-        const groq = new Groq({ apiKey });
-
-        const systemPrompt = `You are an expert educator creating learning content for: "${skillTitle}"
+        const userPrompt = `You are an expert educator creating learning content for: "${skillTitle}"
 
 Description: ${skillDescription}
 Engine: ${engine}
@@ -65,18 +45,15 @@ Return ONLY valid JSON (no markdown):
   "estimatedReadTime": 5
 }`;
 
-        const response = await groq.chat.completions.create({
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-                { role: 'system', content: 'You are a JSON-only API. Return valid JSON without markdown formatting.' },
-                { role: 'user', content: systemPrompt }
-            ],
+        const result = await generateWithFallback({
+            prompt: userPrompt,
+            systemPrompt: 'You are a JSON-only API. Return valid JSON without markdown formatting.',
+            schema: true,
             temperature: 0.7,
-            max_tokens: 3000,
+            maxTokens: 3000,
         });
 
-        const text = response.choices[0]?.message?.content || "{}";
-        const cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const cleanedText = cleanJsonResponse(result.text);
         const learningContent = JSON.parse(cleanedText);
 
         return NextResponse.json({

@@ -18,12 +18,16 @@ export async function POST(request: NextRequest) {
 
   const ratelimit = getRateLimiter();
   if (ratelimit) {
-    const { success, reset } = await ratelimit.limit(user.id);
-    if (!success) {
-      return new Response(JSON.stringify({
-        error: 'Rate limit exceeded',
-        retryAfter: Math.ceil((reset - Date.now()) / 1000),
-      }), { status: 429 });
+    try {
+      const { success, reset } = await ratelimit.limit(user.id);
+      if (!success) {
+        return new Response(JSON.stringify({
+          error: 'Rate limit exceeded',
+          retryAfter: Math.ceil((reset - Date.now()) / 1000),
+        }), { status: 429 });
+      }
+    } catch (e: any) {
+      console.warn(`⚠️ Rate limiter unavailable (skipping): ${e.message}`);
     }
   }
 

@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/admin';
-import Groq from 'groq-sdk';
-
-const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY,
-});
+import { generateWithFallback } from '@/lib/ai-providers';
 
 export async function POST(request: NextRequest) {
     try {
@@ -19,7 +15,6 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Build context for AI analysis
         const statsContext = `
 Platform Statistics Analysis Request:
 
@@ -53,26 +48,15 @@ Please provide:
 Format your response in clear markdown with sections.
     `;
 
-        const completion = await groq.chat.completions.create({
-            messages: [
-                {
-                    role: 'system',
-                    content: 'You are an expert data analyst and product manager specializing in educational technology platforms. Provide insightful, actionable analysis based on platform metrics.',
-                },
-                {
-                    role: 'user',
-                    content: statsContext,
-                },
-            ],
-            model: 'llama-3.3-70b-versatile',
+        const result = await generateWithFallback({
+            prompt: statsContext,
+            systemPrompt: 'You are an expert data analyst and product manager specializing in educational technology platforms. Provide insightful, actionable analysis based on platform metrics.',
             temperature: 0.8,
-            max_tokens: 2000,
+            maxTokens: 2000,
         });
 
-        const analysis = completion.choices[0]?.message?.content || 'Unable to generate analysis.';
-
         return NextResponse.json({
-            analysis,
+            analysis: result.text,
             generatedAt: new Date().toISOString(),
         });
     } catch (error: any) {

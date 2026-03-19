@@ -1,49 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SYSTEM_INSTRUCTION, GENIE_TOOLS } from '@/app/pulse/services/genie-tooling';
-import { getNextGroqKey, getGroqKeys } from '@/lib/ai-providers';
+import { getNextGeminiKey, getGeminiKeys } from '@/lib/ai-providers';
 
 interface ChatMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
-  tool_call_id?: string;
-  name?: string;
+  role: 'user' | 'model';
+  parts: any[];
 }
-
-interface GroqToolCall {
-  id: string;
-  type: 'function';
-  function: {
-    name: string;
-    arguments: string;
-  };
-}
-
-function convertToGroqTools(geminiTools: any[]): any[] {
-  const tools: any[] = [];
-
-  for (const tool of geminiTools) {
-    if (tool.functionDeclarations) {
-      for (const decl of tool.functionDeclarations) {
-        tools.push({
-          type: 'function',
-          function: {
-            name: decl.name,
-            description: decl.description,
-            parameters: {
-              type: 'object',
-              properties: decl.parameters?.properties || {},
-              required: decl.parameters?.required || []
-            }
-          }
-        });
-      }
-    }
-  }
-
-  return tools;
-}
-
-const GROQ_TOOLS = convertToGroqTools(GENIE_TOOLS);
 
 const sessionMessages = new Map<string, ChatMessage[]>();
 
@@ -63,8 +25,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { message, sessionId, currentWindows, activityContext, demoMode } = body;
 
-    // --- Parse Skill Session Context ---
-    // SkillSessionWidget injects a [SKILL_SESSION_ACTIVE] block at the top of the message
     let cleanMessage = message;
     let activeSkillTitle = '';
     let activeSkillId = '';
@@ -81,10 +41,8 @@ export async function POST(request: NextRequest) {
         if (key === 'skillId') activeSkillId = val;
         if (key === 'graphId') activeGraphId = val;
       }
-      // Strip the header block from the actual message sent to Genie
       cleanMessage = lines.slice(headerEnd > 0 ? headerEnd + 1 : 4).join('\n').trim();
     } else {
-      // Fall back to detecting active SKILL_SESSION window in workspace
       const skillWin = (currentWindows || []).find((w: any) => w.type === 'SKILL_SESSION');
       if (skillWin) {
         activeSkillTitle = skillWin.data?.skillTitle || '';
@@ -104,18 +62,12 @@ export async function POST(request: NextRequest) {
     });
 
     if (!cleanMessage) {
-      log('PULSE-CHAT', 'Error: No message provided');
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    const groqKeys = getGroqKeys();
-    const hasGroqKey = groqKeys.length > 0;
-
-    log('PULSE-CHAT', 'Groq keys available', { keyCount: groqKeys.length });
-
-    if (!hasGroqKey || demoMode) {
-      log('PULSE-CHAT', 'Running in demo mode', { hasGroqKey, demoMode });
-
+    const geminiKeys = getGeminiKeys();
+    if (geminiKeys.length === 0 || demoMode) {
+      log('PULSE-CHAT', 'Running in demo mode');
       if (message.toLowerCase().includes('neuron') || message.toLowerCase().includes('brain')) {
         return NextResponse.json({
           response: "I've deployed an interactive Neuron Visualizer. Try adjusting the bias to see how it affects the activation threshold.",
@@ -128,20 +80,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    let messages = sessionMessages.get(sessionId);
-    if (!messages) {
-      messages = [{ role: 'system', content: SYSTEM_INSTRUCTION }];
-      sessionMessages.set(sessionId, messages);
+    let history = sessionMessages.get(sessionId);
+    if (!history) {
+      history = [];
+      sessionMessages.set(sessionId, history);
       log('PULSE-CHAT', 'New session initialized', { sessionId });
     }
 
     let stateContext = "";
-
-    // Skill session context gets priority
     if (activeSkillTitle) {
       stateContext += `\n\n[ACTIVE SKILL SESSION]:\nSkill: "${activeSkillTitle}"\nSkill ID: ${activeSkillId}\nGraph ID: ${activeGraphId}\nThis is an active tutoring session. You are in TUTOR MODE. Follow the SKILL SESSION TUTOR MODE guidelines.\n---\n`;
     }
-
     if (currentWindows && currentWindows.length > 0) {
       stateContext += "\n\n[ACTIVE WORKSPACE STATE]:\n";
       currentWindows.forEach((w: any) => {
@@ -156,102 +105,90 @@ export async function POST(request: NextRequest) {
     }
 
     const fullPrompt = `${cleanMessage}\n\n${activityContext || ''}${stateContext}`;
-    messages.push({ role: 'user', content: fullPrompt });
+    history.push({ role: 'user', parts: [{ text: fullPrompt }] });
 
-    log('PULSE-CHAT', 'Message added to context', {
-      stateContextLength: stateContext.length,
-      activityContextLength: activityContext?.length || 0,
-      totalMessages: messages.length
+    const apiKey = getNextGeminiKey();
+    log('PULSE-CHAT', 'Using Gemini 2.5 Flash');
+
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3-pro-preview',
+      systemInstruction: SYSTEM_INSTRUCTION,
+      tools: GENIE_TOOLS as any,
     });
 
-    const apiKey = getNextGroqKey();
-    const keyIndex = groqKeys.indexOf(apiKey);
-    log('PULSE-CHAT', 'Using Groq API key', { keyIndex: keyIndex >= 0 ? keyIndex + 1 : 'unknown' });
-
-    const Groq = (await import('groq-sdk')).default;
-    const groq = new Groq({ apiKey });
-
-    log('PULSE-CHAT', 'Calling Groq API', { model: 'llama-3.3-70b-versatile' });
-
-    const response = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: messages as any,
-      tools: GROQ_TOOLS,
-      tool_choice: 'auto',
-      temperature: 0.7,
-      max_tokens: 4096,
+    const result = await model.generateContent({
+      contents: history,
+      generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
     });
 
-    const assistantMessage = response.choices[0]?.message;
+    const response = result.response;
+    const candidate = response.candidates?.[0];
 
-    if (!assistantMessage) {
-      log('PULSE-CHAT', 'Error: No response from Groq');
-      messages.pop();
+    if (!candidate) {
+      history.pop();
       return NextResponse.json({
         error: "I'm having trouble connecting to the neural link. Let's try that again."
       }, { status: 500 });
     }
 
-    let responseText = assistantMessage.content || "";
+    const functionCalls = candidate.content?.parts?.filter((p: any) => p.functionCall) || [];
+    const textParts = candidate.content?.parts?.filter((p: any) => p.text) || [];
+    const responseText = textParts.map((p: any) => p.text).join('') || '';
+
     const toolCallsToReturn: { name: string; args: any }[] = [];
+    for (const part of functionCalls) {
+      const fc = (part as any).functionCall;
+      toolCallsToReturn.push({ name: fc.name, args: fc.args });
+    }
 
-    if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-      log('PULSE-CHAT', 'Tool calls received', {
-        count: assistantMessage.tool_calls.length,
-        tools: assistantMessage.tool_calls.map((tc: any) => tc.function.name)
+    history.push({
+      role: 'model',
+      parts: candidate.content?.parts || [{ text: responseText }]
+    });
+
+    if (functionCalls.length > 0) {
+      const functionResponses = functionCalls.map((part: any) => {
+        const fc = part.functionCall;
+        let resultText = 'Widget deployed successfully';
+        if (fc.name === 'write_code') resultText = 'Code updated in editor';
+        if (fc.name === 'run_code') resultText = 'Code execution started';
+        if (fc.name === 'close_widget') resultText = 'Widget closed';
+        if (fc.name === 'update_widget') resultText = 'Widget state updated';
+        return {
+          functionResponse: {
+            name: fc.name,
+            response: { result: resultText }
+          }
+        };
       });
 
-      const toolCallsMessage: ChatMessage = {
-        role: 'assistant',
-        content: assistantMessage.content || '',
-        tool_call_id: undefined
-      };
+      history.push({ role: 'user', parts: functionResponses });
 
-      const toolResults: ChatMessage[] = [];
+      const followUp = await model.generateContent({
+        contents: history,
+        generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
+      });
 
-      for (const call of assistantMessage.tool_calls as GroqToolCall[]) {
-        const args = JSON.parse(call.function.arguments);
-        toolCallsToReturn.push({ name: call.function.name, args });
+      const followUpCandidate = followUp.response.candidates?.[0];
+      if (followUpCandidate) {
+        const followUpText = followUpCandidate.content?.parts
+          ?.filter((p: any) => p.text)
+          .map((p: any) => p.text)
+          .join('') || '';
 
-        let result = 'Widget deployed successfully';
-        if (call.function.name === 'write_code') result = 'Code updated in editor';
-        if (call.function.name === 'run_code') result = 'Code execution started';
-        if (call.function.name === 'close_widget') result = 'Widget closed';
-        if (call.function.name === 'update_widget') result = 'Widget state updated';
-
-        toolResults.push({
-          role: 'tool',
-          tool_call_id: call.id,
-          name: call.function.name,
-          content: JSON.stringify({ result })
-        });
+        if (followUpText) {
+          history.push({
+            role: 'model',
+            parts: followUpCandidate.content?.parts || [{ text: followUpText }]
+          });
+          const finalText = responseText ? `${responseText}\n\n${followUpText}` : followUpText;
+          const duration = Date.now() - startTime;
+          log('PULSE-CHAT', 'Request completed with tool follow-up', { duration: `${duration}ms` });
+          return NextResponse.json({ response: finalText, toolCalls: toolCallsToReturn });
+        }
       }
-
-      messages.push(toolCallsMessage as any);
-      messages.push(...toolResults as any);
-
-      log('PULSE-CHAT', 'Making follow-up Groq call after tool execution');
-
-      const finalResponse = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: messages as any,
-        temperature: 0.7,
-        max_tokens: 4096,
-      });
-
-      responseText = finalResponse.choices[0]?.message?.content || "";
-
-      if (finalResponse.choices[0]?.message) {
-        messages.push({
-          role: 'assistant',
-          content: responseText
-        });
-      }
-    } else {
-      messages.push({
-        role: 'assistant',
-        content: responseText
-      });
     }
 
     const duration = Date.now() - startTime;
@@ -261,19 +198,11 @@ export async function POST(request: NextRequest) {
       duration: `${duration}ms`
     });
 
-    return NextResponse.json({
-      response: responseText,
-      toolCalls: toolCallsToReturn
-    });
+    return NextResponse.json({ response: responseText, toolCalls: toolCallsToReturn });
 
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    log('PULSE-CHAT', 'Error occurred', {
-      error: error.message,
-      stack: error.stack,
-      duration: `${duration}ms`
-    });
-
+    log('PULSE-CHAT', 'Error occurred', { error: error.message, duration: `${duration}ms` });
     return NextResponse.json({
       error: "I'm having trouble connecting to the neural link. Let's try that again.",
       details: error.message
@@ -285,11 +214,8 @@ export async function DELETE(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const sessionId = searchParams.get('sessionId');
 
-  log('PULSE-CHAT', 'Session clear requested', { sessionId });
-
   if (sessionId && sessionMessages.has(sessionId)) {
     sessionMessages.delete(sessionId);
-    log('PULSE-CHAT', 'Session cleared', { sessionId });
     return NextResponse.json({ success: true });
   }
 

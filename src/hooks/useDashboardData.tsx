@@ -71,7 +71,7 @@ export const useDashboardData = () => {
                                 type: 'Course',
                                 progress: Math.round((coursesJson.progress?.[c.id] || 0) * 100),
                                 icon: <Book className="w-8 h-8 text-indigo-300" />,
-                                href: `/unavailable`/*/pulse?type=COURSE&id=${c.id}*/
+                                href: `/courses/${c.id}`
                             }));
                             setCourses(mappedCourses);
 

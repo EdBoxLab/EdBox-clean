@@ -19,29 +19,33 @@ export async function POST(request: NextRequest) {
 
     const ratelimit = getRateLimiter();
     if (ratelimit) {
-      const { success, limit, reset, remaining } = await ratelimit.limit(user.id);
-      if (!success) {
-        const resetDate = new Date(reset);
-        const retryAfter = Math.ceil((reset - Date.now()) / 1000);
-        return NextResponse.json(
-          {
-            error: 'Rate limit exceeded',
-            message: 'You have exceeded the maximum number of study kit generation requests. Please try again later.',
-            retryAfter,
-            resetAt: resetDate.toISOString(),
-            limit,
-            remaining: 0
-          },
-          {
-            status: 429,
-            headers: {
-              'X-RateLimit-Limit': limit.toString(),
-              'X-RateLimit-Remaining': remaining.toString(),
-              'X-RateLimit-Reset': reset.toString(),
-              'Retry-After': retryAfter.toString()
+      try {
+        const { success, limit, reset, remaining } = await ratelimit.limit(user.id);
+        if (!success) {
+          const resetDate = new Date(reset);
+          const retryAfter = Math.ceil((reset - Date.now()) / 1000);
+          return NextResponse.json(
+            {
+              error: 'Rate limit exceeded',
+              message: 'You have exceeded the maximum number of study kit generation requests. Please try again later.',
+              retryAfter,
+              resetAt: resetDate.toISOString(),
+              limit,
+              remaining: 0
+            },
+            {
+              status: 429,
+              headers: {
+                'X-RateLimit-Limit': limit.toString(),
+                'X-RateLimit-Remaining': remaining.toString(),
+                'X-RateLimit-Reset': reset.toString(),
+                'Retry-After': retryAfter.toString()
+              }
             }
-          }
-        );
+          );
+        }
+      } catch (e: any) {
+        console.warn(`⚠️ Rate limiter unavailable (skipping): ${e.message}`);
       }
     }
 

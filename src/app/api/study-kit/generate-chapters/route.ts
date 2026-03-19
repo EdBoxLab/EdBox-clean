@@ -407,7 +407,6 @@ async function generateChapterContent(
           systemPrompt: systemPromptMap[noteType],
           temperature: 0.7,
           maxTokens: 5000,
-          model: 'llama-3.3-70b-versatile'
         });
         return { noteType, text: cleanMarkdown(result.text) };
       });
@@ -429,7 +428,6 @@ async function generateChapterContent(
         systemPrompt: 'Output ONLY valid JSON with no extra text.',
         temperature: 0.7,
         maxTokens: 4000,
-        model: 'llama-3.1-8b-instant'
       });
       return { quizzes: extractJSON(result.text, type) };
     }
@@ -440,7 +438,6 @@ async function generateChapterContent(
         systemPrompt: 'Output ONLY valid JSON with no extra text.',
         temperature: 0.7,
         maxTokens: 4000,
-        model: 'llama-3.1-8b-instant'
       });
       return { flashcards: extractJSON(result.text, type) };
     }
@@ -451,7 +448,6 @@ async function generateChapterContent(
         systemPrompt: 'Output ONLY valid JSON with no extra text.',
         temperature: 0.7,
         maxTokens: 3000,
-        model: 'llama-3.1-8b-instant'
       });
       return { mindmaps: extractJSON(result.text, type) };
     }
@@ -507,7 +503,7 @@ export async function POST(request: NextRequest) {
       chapters: chapterContents,
       chaptersMeta: {
         detectedAt: new Date().toISOString(),
-        detectionModel: 'llama-3.3-70b-versatile',
+        detectionModel: 'gemini-3-flash-preview',
         userModified: true,
         documentAnalysis
       }

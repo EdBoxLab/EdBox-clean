@@ -73,6 +73,7 @@ const FORCE_LOG = (level: string, ...args: any[]) => {
 
 const CONFIG = {
   MAX_FILE_SIZE: 25 * 1024 * 1024, // 25MB
+  GEMINI_DIRECT_LIMIT: 5 * 1024 * 1024, // 5MB — files under this go to Gemini
   LLAMA_TIMEOUT: 120000, // 2 minutes
   FALLBACK_CHAR_LIMIT: 100000,
   PREMIUM_THRESHOLD: 10 * 1024 * 1024, // 10MB
@@ -221,6 +222,65 @@ function normalizeToBuffer(content: string, mimeType: string, fileName: string):
 }
 
 // ---------------------------------------------------------------------------
+// GEMINI DIRECT PARSING (for files ≤ 5MB)
+// ---------------------------------------------------------------------------
+
+async function parseWithGemini(
+  buffer: Buffer,
+  fileName: string,
+  mimeType: string
+): Promise<string> {
+  FORCE_LOG('INFO', `=== GEMINI PARSE START: ${fileName} (${(buffer.length / 1024).toFixed(1)}KB) ===`);
+
+  try {
+    const { getGeminiKeys } = await import('@/lib/ai-providers');
+    const keys = getGeminiKeys();
+    if (!keys.length) throw new Error('No Gemini API key available');
+
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(keys[0]);
+    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+
+    const ext = fileName.toLowerCase().split('.').pop() || '';
+    const geminiMime = mimeType || {
+      pdf: 'application/pdf',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      doc: 'application/msword',
+      ppt: 'application/vnd.ms-powerpoint',
+      xls: 'application/vnd.ms-excel',
+    }[ext] || 'application/octet-stream';
+
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: geminiMime,
+          data: buffer.toString('base64'),
+        },
+      },
+      {
+        text: `Extract ALL text content from this document. Preserve the original structure using markdown formatting:
+- Use # headers for titles/sections
+- Use | tables for tabular data
+- Use - or numbered lists for list items
+- Preserve paragraph breaks
+- Include all text, captions, footnotes
+
+Output ONLY the extracted markdown text, no commentary.`,
+      },
+    ]);
+
+    const text = result.response.text();
+    FORCE_LOG('INFO', `Gemini parse SUCCESS: ${text.length} chars extracted`);
+    return text;
+  } catch (error) {
+    FORCE_LOG('ERROR', 'Gemini parse FAILED', error);
+    throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // LLAMAPARSE ENGINE
 // ---------------------------------------------------------------------------
 
@@ -260,7 +320,7 @@ async function parseWithLlamaParse(
       const reader = new LlamaParseReader({
         apiKey,
         resultType: "markdown",
-        verbose: true, // Enable verbose for debugging
+        verbose: true,
         parsingInstruction: `Extract all text preserving document structure. Use markdown tables for tabular data.`,
       });
 
@@ -276,7 +336,6 @@ async function parseWithLlamaParse(
 
       const result = documents
         .map((doc: any, idx: number) => {
-          // Handle different document formats
           const text = doc.text ||
             (typeof doc.getContent === 'function' ? doc.getContent() : '') ||
             (doc.content) ||
@@ -298,7 +357,6 @@ async function parseWithLlamaParse(
     }
   })();
 
-  // Timeout protection
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => {
       FORCE_LOG('ERROR', `LlamaParse TIMEOUT after ${CONFIG.LLAMA_TIMEOUT / 1000}s`);
@@ -520,24 +578,36 @@ export async function processFileContent(
       FORCE_LOG('INFO', '[STEP 3/4] Processing as STRUCTURED DOCUMENT');
       let markdown: string;
 
-      try {
-        FORCE_LOG('DEBUG', 'Primary: Attempting LlamaParse...');
-        markdown = await parseWithLlamaParse(buffer, fileName, mimeType);
-        FORCE_LOG('INFO', '✓ LlamaParse succeeded');
-      } catch (parseError) {
-        FORCE_LOG('WARN', '✗ LlamaParse failed, switching to fallback');
-        markdown = await fallbackTextExtraction(buffer, fileName);
+      if (buffer.length <= CONFIG.GEMINI_DIRECT_LIMIT) {
+        FORCE_LOG('INFO', `File ≤ 5MB (${(buffer.length / 1024 / 1024).toFixed(1)}MB) — using Gemini direct`);
+        try {
+          markdown = await parseWithGemini(buffer, fileName, mimeType);
+          FORCE_LOG('INFO', '✓ Gemini parse succeeded');
+        } catch (geminiError) {
+          FORCE_LOG('WARN', '✗ Gemini parse failed, switching to fallback');
+          markdown = await fallbackTextExtraction(buffer, fileName);
+        }
+      } else {
+        FORCE_LOG('INFO', `File > 5MB (${(buffer.length / 1024 / 1024).toFixed(1)}MB) — using LlamaParse`);
+        try {
+          markdown = await parseWithLlamaParse(buffer, fileName, mimeType);
+          FORCE_LOG('INFO', '✓ LlamaParse succeeded');
+        } catch (parseError) {
+          FORCE_LOG('WARN', '✗ LlamaParse failed, switching to fallback');
+          markdown = await fallbackTextExtraction(buffer, fileName);
+        }
       }
 
       const processingTime = Date.now() - startTime;
       FORCE_LOG('INFO', `[STEP 4/4] Formatting output...`);
 
+      const parserUsed = buffer.length <= CONFIG.GEMINI_DIRECT_LIMIT ? 'Gemini Direct' : 'LlamaParse + Fallback';
       const result = `<DOCUMENT_CONTEXT>
   <METADATA>
     <FILENAME>${fileName}</FILENAME>
     <TYPE>${mimeType}</TYPE>
     <SIZE_KB>${(buffer.length / 1024).toFixed(1)}</SIZE_KB>
-    <PARSER>LlamaParse + Fallback</PARSER>
+    <PARSER>${parserUsed}</PARSER>
     <PROCESSING_TIME_MS>${processingTime}</PROCESSING_TIME_MS>
   </METADATA>
   <CONTENT>

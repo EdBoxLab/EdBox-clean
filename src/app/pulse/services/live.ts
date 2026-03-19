@@ -68,7 +68,7 @@ export class LiveGenieService {
       const responseModality = 'AUDIO' as any;
 
       const sessionPromise = this.ai.live.connect({
-        model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+        model: 'gemini-3-pro-preview',
         callbacks: {
           onopen: () => {
             console.log("Live Session Opened");

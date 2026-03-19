@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       meta: {
         contentLength: contentToAnalyze.length,
         detectedAt: new Date().toISOString(),
-        detectionModel: 'llama-3.3-70b-versatile'
+        detectionModel: 'gemini-3-flash-preview'
       }
     });
 

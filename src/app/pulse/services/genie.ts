@@ -1,72 +1,26 @@
 import { SYSTEM_INSTRUCTION, GENIE_TOOLS } from './genie-tooling';
 import { PulseWindow } from '../types';
-import { getNextGroqKey, getGroqKeys } from '@/lib/ai-providers';
+import { getNextGeminiKey, getGeminiKeys } from '@/lib/ai-providers';
 
-interface ChatMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
-  tool_call_id?: string;
-  name?: string;
+interface GeminiMessage {
+  role: 'user' | 'model';
+  parts: any[];
 }
-
-interface GroqToolCall {
-  id: string;
-  type: 'function';
-  function: {
-    name: string;
-    arguments: string;
-  };
-}
-
-function convertToGroqTools(geminiTools: any[]): any[] {
-  const tools: any[] = [];
-  
-  for (const tool of geminiTools) {
-    if (tool.functionDeclarations) {
-      for (const decl of tool.functionDeclarations) {
-        tools.push({
-          type: 'function',
-          function: {
-            name: decl.name,
-            description: decl.description,
-            parameters: {
-              type: 'object',
-              properties: decl.parameters?.properties || {},
-              required: decl.parameters?.required || []
-            }
-          }
-        });
-      }
-    }
-  }
-  
-  return tools;
-}
-
-const GROQ_TOOLS = convertToGroqTools(GENIE_TOOLS);
 
 class GenieService {
-  private messages: ChatMessage[] = [];
+  private history: GeminiMessage[] = [];
   private isInitialized = false;
 
   private initialize() {
     if (this.isInitialized) return;
     this.isInitialized = true;
-    
-    this.messages = [{
-      role: 'system',
-      content: SYSTEM_INSTRUCTION
-    }];
-  }
-
-  private hasGroqKey(): boolean {
-    return getGroqKeys().length > 0;
+    this.history = [];
   }
 
   async sendMessage(message: string, currentWindows: PulseWindow[], onToolCall: (toolName: string, args: any) => void): Promise<string> {
     this.initialize();
-    
-    if (!this.hasGroqKey()) {
+
+    if (getGeminiKeys().length === 0) {
       if (message.toLowerCase().includes('neuron') || message.toLowerCase().includes('brain')) {
         setTimeout(() => onToolCall('deploy_neuron_visualizer', { topic: 'Neuron' }), 800);
         return "I've deployed an interactive Neuron Visualizer. Try adjusting the bias to see how it affects the activation threshold.";
@@ -92,87 +46,87 @@ class GenieService {
     }
 
     const messageWithContext = message + contextString;
-    this.messages.push({ role: 'user', content: messageWithContext });
+    this.history.push({ role: 'user', parts: [{ text: messageWithContext }] });
 
     try {
-      const Groq = (await import('groq-sdk')).default;
-      const apiKey = getNextGroqKey();
-      const groq = new Groq({ apiKey });
+      const apiKey = getNextGeminiKey();
+      if (!apiKey) throw new Error('No Gemini keys available');
 
-      const response = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: this.messages as any,
-        tools: GROQ_TOOLS,
-        tool_choice: 'auto',
-        temperature: 0.7,
-        max_tokens: 4096,
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-3-pro-preview',
+        systemInstruction: SYSTEM_INSTRUCTION,
+        tools: GENIE_TOOLS as any,
       });
 
-      const assistantMessage = response.choices[0]?.message;
-      
-      if (!assistantMessage) {
-        return "I'm having trouble connecting to the neural link. Let's try that again.";
-      }
+      const result = await model.generateContent({
+        contents: this.history,
+        generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
+      });
 
-      let responseText = assistantMessage.content || "";
+      const response = result.response;
+      const candidate = response.candidates?.[0];
+      if (!candidate) throw new Error('No response from Gemini');
 
-      if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-        const toolCallsMessage: ChatMessage = {
-          role: 'assistant',
-          content: assistantMessage.content || '',
-          tool_call_id: undefined
-        };
-        
-        const toolResults: ChatMessage[] = [];
+      const functionCalls = candidate.content?.parts?.filter((p: any) => p.functionCall) || [];
+      const textParts = candidate.content?.parts?.filter((p: any) => p.text) || [];
+      let responseText = textParts.map((p: any) => p.text).join('') || '';
 
-        for (const call of assistantMessage.tool_calls as GroqToolCall[]) {
-          const args = JSON.parse(call.function.arguments);
-          onToolCall(call.function.name, args);
+      this.history.push({
+        role: 'model',
+        parts: candidate.content?.parts || [{ text: responseText }]
+      });
 
-          let result = 'Widget deployed successfully';
-          if (call.function.name === 'write_code') result = 'Code updated in editor';
-          if (call.function.name === 'run_code') result = 'Code execution started';
-          if (call.function.name === 'close_widget') result = 'Widget closed';
-          if (call.function.name === 'update_widget') result = 'Widget state updated';
-
-          toolResults.push({
-            role: 'tool',
-            tool_call_id: call.id,
-            name: call.function.name,
-            content: JSON.stringify({ result })
-          });
+      if (functionCalls.length > 0) {
+        for (const part of functionCalls) {
+          const fc = (part as any).functionCall;
+          onToolCall(fc.name, fc.args);
         }
 
-        this.messages.push(toolCallsMessage as any);
-        this.messages.push(...toolResults as any);
-
-        const finalResponse = await groq.chat.completions.create({
-          model: 'llama-3.3-70b-versatile',
-          messages: this.messages as any,
-          temperature: 0.7,
-          max_tokens: 4096,
+        const functionResponses = functionCalls.map((part: any) => {
+          const fc = part.functionCall;
+          let resultText = 'Widget deployed successfully';
+          if (fc.name === 'write_code') resultText = 'Code updated in editor';
+          if (fc.name === 'run_code') resultText = 'Code execution started';
+          if (fc.name === 'close_widget') resultText = 'Widget closed';
+          if (fc.name === 'update_widget') resultText = 'Widget state updated';
+          return {
+            functionResponse: {
+              name: fc.name,
+              response: { result: resultText }
+            }
+          };
         });
 
-        responseText = finalResponse.choices[0]?.message?.content || "";
-        
-        if (finalResponse.choices[0]?.message) {
-          this.messages.push({
-            role: 'assistant',
-            content: responseText
-          });
+        this.history.push({ role: 'user', parts: functionResponses });
+
+        const followUp = await model.generateContent({
+          contents: this.history,
+          generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
+        });
+
+        const followUpCandidate = followUp.response.candidates?.[0];
+        if (followUpCandidate) {
+          const followUpText = followUpCandidate.content?.parts
+            ?.filter((p: any) => p.text)
+            .map((p: any) => p.text)
+            .join('') || '';
+
+          if (followUpText) {
+            this.history.push({
+              role: 'model',
+              parts: followUpCandidate.content?.parts || [{ text: followUpText }]
+            });
+            responseText = responseText ? `${responseText}\n\n${followUpText}` : followUpText;
+          }
         }
-      } else {
-        this.messages.push({
-          role: 'assistant',
-          content: responseText
-        });
       }
 
       return responseText;
-
     } catch (error: any) {
-      console.error("Genie Error:", error);
-      this.messages.pop();
+      console.error("Gemini failed:", error);
+      this.history.pop();
       return "I'm having trouble connecting to the neural link. Let's try that again.";
     }
   }

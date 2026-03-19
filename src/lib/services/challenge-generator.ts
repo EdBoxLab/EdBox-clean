@@ -320,7 +320,6 @@ export class ChallengeGenerator {
           generateWithFallback({
             systemPrompt,
             prompt: userPrompt,
-            model: (process.env.GROQ_MODEL as any) || 'llama-3.1-8b-instant'
           }),
           new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('Generation timeout')), this.config.timeoutMs)

@@ -127,7 +127,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({ item, onClose, onApiKe
             const textToSpeak = cleanContentForTTS(item.full_article_content);
 
             const response = await ai.models.generateContent({
-                model: "gemini-2.5-flash-preview-tts",
+                model: "gemini-3-pro-preview",
                 contents: [{ parts: [{ text: textToSpeak }] }],
                 config: {
                     responseModalities: [Modality.AUDIO],

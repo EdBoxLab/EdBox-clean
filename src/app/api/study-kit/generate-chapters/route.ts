@@ -503,7 +503,7 @@ export async function POST(request: NextRequest) {
       chapters: chapterContents,
       chaptersMeta: {
         detectedAt: new Date().toISOString(),
-        detectionModel: 'gemini-3-flash-preview',
+        detectionModel: 'gemini-3.1-flash-lite-preview',
         userModified: true,
         documentAnalysis
       }

@@ -4,7 +4,7 @@ import { buildPrompt, buildNotePrompt } from './prompts';
 import { extractJSON, cleanMarkdown, sendEvent } from './utils';
 import type { DetectedChapter, ChapterContent } from '@/types/chapters';
 
-const STUDY_KIT_MODEL = 'gemini-3-flash-preview';
+const STUDY_KIT_MODEL = 'gemini-3.1-flash-lite-preview';
 
 const NOTE_TYPES: NoteType[] = ['deepExplanation', 'cheatsheet', 'application', 'tables'];
 

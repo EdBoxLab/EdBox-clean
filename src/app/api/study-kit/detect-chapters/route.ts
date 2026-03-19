@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       meta: {
         contentLength: contentToAnalyze.length,
         detectedAt: new Date().toISOString(),
-        detectionModel: 'gemini-3-flash-preview'
+        detectionModel: 'gemini-3.1-flash-lite-preview'
       }
     });
 

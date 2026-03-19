@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       configured: true,
       apiKey,
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3.1-pro-preview',
       systemInstruction: toolingConfig.systemInstruction,
       tools: toolingConfig.tools,
       voiceName: 'Kore'

@@ -135,7 +135,7 @@ async function researchGoalFromWeb(goal: string): Promise<string> {
   try {
     const ai = await getGoogleGenAIClient();
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3.1-pro-preview',
       contents: `Research the following learning goal and provide a comprehensive summary of:
 1. Key skills and sub-topics that should be covered
 2. Current industry standards and best practices (as of 2025-2026)

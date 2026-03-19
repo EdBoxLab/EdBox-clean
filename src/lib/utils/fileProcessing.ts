@@ -239,7 +239,7 @@ async function parseWithGemini(
 
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const genAI = new GoogleGenerativeAI(keys[0]);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' });
 
     const ext = fileName.toLowerCase().split('.').pop() || '';
     const geminiMime = mimeType || {

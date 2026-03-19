@@ -305,7 +305,7 @@ export async function* streamWithFallback(options: GenerateOptions): AsyncGenera
       const { GoogleGenerativeAI } = await import("@google/generative-ai");
       const genAI = new GoogleGenerativeAI(key);
       const geminiModel = genAI.getGenerativeModel({
-        model: options.geminiModel || 'gemini-3-pro-preview',
+        model: options.geminiModel || 'gemini-3.1-pro-preview',
         systemInstruction: systemPrompt
       });
 
@@ -588,7 +588,7 @@ export async function generateWithFallback(options: GenerateOptions): Promise<Ge
       }
 
       const geminiModel = genAI.getGenerativeModel({
-        model: options.geminiModel || 'gemini-3-pro-preview',
+        model: options.geminiModel || 'gemini-3.1-pro-preview',
         systemInstruction: systemPrompt
       });
 
@@ -778,7 +778,7 @@ export async function generateChat(options: ChatOptions): Promise<GenerateResult
       if (jsonMode) config.responseMimeType = 'application/json';
 
       const geminiModel = genAI.getGenerativeModel({
-        model: options.geminiModel || 'gemini-3-pro-preview',
+        model: options.geminiModel || 'gemini-3.1-pro-preview',
         systemInstruction: systemMsg,
       });
 

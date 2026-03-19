@@ -1,6 +1,6 @@
 import { generateWithRetry } from './ai-providers';
 
-const STUDY_KIT_MODEL = 'gemini-3-flash-preview';
+const STUDY_KIT_MODEL = 'gemini-3.1-flash-lite-preview';
 import type {
   DetectedChapter,
   ChapterDetectionResult,

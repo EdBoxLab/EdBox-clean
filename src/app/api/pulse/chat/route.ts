@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3.1-pro-preview',
       systemInstruction: SYSTEM_INSTRUCTION,
       tools: GENIE_TOOLS as any,
     });

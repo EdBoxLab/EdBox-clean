@@ -18,7 +18,7 @@ const SharedContentCard = ({ content }: { content: any }) => {
     if (isStudyKit && content.id) {
       router.push(`/tools/study-kit?id=${content.id}`);
     } else if (isCourse && content.id) {
-      router.push(`/courses/${content.id}`);
+      router.push(`/pulse?type=COURSE&id=${content.id}`);
     }
   };
 

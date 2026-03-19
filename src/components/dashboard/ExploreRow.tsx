@@ -140,8 +140,7 @@ export const ExploreRow: React.FC<ExploreRowProps> = ({
                     <div key={item.id} className="relative group/card">
                         <Link href={item.href || '#'} className="block">
                             <motion.div
-                                className="flex-shrink-0 w-64 border border-zinc-800 hover:border-zinc-600 rounded-lg p-4 flex flex-col justify-between transition-colors bg-zinc-900/50 group"
-                                style={{ minHeight: showProgress ? '180px' : '160px' }}
+                                className={`flex-shrink-0 w-64 border border-zinc-800 hover:border-zinc-600 rounded-lg p-4 flex flex-col justify-between transition-colors bg-zinc-900/50 group ${showProgress ? 'min-h-[180px]' : 'min-h-[160px]'}`}
                                 variants={cardVariants}
                                 initial="hidden"
                                 animate="visible"

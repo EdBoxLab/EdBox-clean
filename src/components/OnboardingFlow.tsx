@@ -34,7 +34,7 @@ export const OnboardingFlow = () => {
 
             // Redirect to the generated course page
             if (data.graph?.id) {
-                router.push(`/courses/${data.graph.id}`);
+                router.push(`/pulse?type=COURSE&id=${data.graph.id}`);
             } else {
                 throw new Error('No course ID returned');
             }

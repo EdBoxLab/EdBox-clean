@@ -314,7 +314,7 @@ export default function InteractiveCourseSession({
     };
 
     setShowActionButtons(false);
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev: ChatMessage[]) => [...prev, userMessage]);
     if (!isAuto) setInputMessage('');
     setIsLoading(true);
 
@@ -327,7 +327,7 @@ export default function InteractiveCourseSession({
       type: 'message'
     };
 
-    setMessages(prev => [...prev, genieMessage]);
+    setMessages((prev: ChatMessage[]) => [...prev, genieMessage]);
 
     try {
       const response = await fetch('/api/genie/interactive-course/stream', {
@@ -367,19 +367,19 @@ export default function InteractiveCourseSession({
               const data = JSON.parse(line.slice(6));
               if (data.type === 'content') {
                 fullContent += data.content;
-                setMessages(prev => prev.map(msg =>
+                setMessages((prev: ChatMessage[]) => prev.map((msg: ChatMessage) =>
                   msg.id === genieMessageId ? { ...msg, content: fullContent } : msg
                 ));
               } else if (data.type === 'roadmap') {
-                setMessages(prev => prev.map(msg =>
+                setMessages((prev: ChatMessage[]) => prev.map((msg: ChatMessage) =>
                   msg.id === genieMessageId ? { ...msg, type: 'roadmap' as any, roadmapData: data.roadmapData } : msg
                 ));
               } else if (data.type === 'quiz') {
-                setMessages(prev => prev.map(msg =>
+                setMessages((prev: ChatMessage[]) => prev.map((msg: ChatMessage) =>
                   msg.id === genieMessageId ? { ...msg, type: 'quiz', quizData: data.quizData, content: data.quizData.question } : msg
                 ));
               } else if (data.type === 'challenge_trigger') {
-                setMessages(prev => prev.map(msg =>
+                setMessages((prev: ChatMessage[]) => prev.map((msg: ChatMessage) =>
                   msg.id === genieMessageId ? { ...msg, type: 'challenge_trigger', challengeData: data.challengeData, content: data.challengeData.description } : msg
                 ));
               } else if (data.type === 'goals_updated') {
@@ -411,7 +411,7 @@ export default function InteractiveCourseSession({
                     }
                   });
                 }
-                setSession(prev => {
+                setSession((prev: SessionType | null) => {
                   if (!prev) return prev;
                   return {
                     ...prev,
@@ -433,7 +433,7 @@ export default function InteractiveCourseSession({
       setShowActionButtons(true);
     } catch (error) {
       console.error(error);
-      setMessages(prev => prev.map(msg =>
+      setMessages((prev: ChatMessage[]) => prev.map((msg: ChatMessage) =>
         msg.id === genieMessageId ? {
           ...msg,
           type: 'error' as any,
@@ -483,7 +483,7 @@ export default function InteractiveCourseSession({
         }}
         onFail={() => {
           const title = activeChallenge.title;
-          setConsecutiveFails(prev => prev + 1);
+          setConsecutiveFails((prev: number) => prev + 1);
           posthog.capture('challenge_completed', {
             course_id: courseId,
             course_title: courseTitle,
@@ -671,7 +671,7 @@ export default function InteractiveCourseSession({
               )}
             </AnimatePresence>
             <AnimatePresence>
-              {messages.map((message) => (
+              {messages.map((message: ChatMessage) => (
                 <motion.div
                   key={message.id}
                   initial={{ opacity: 0, y: 10 }}
@@ -705,7 +705,7 @@ export default function InteractiveCourseSession({
                           if (corr) {
                             setConsecutiveFails(0);
                           } else {
-                            setConsecutiveFails(prev => prev + 1);
+                            setConsecutiveFails((prev: number) => prev + 1);
                           }
                           posthog.capture('quiz_answered', {
                             course_id: courseId,
@@ -752,11 +752,11 @@ export default function InteractiveCourseSession({
                           type="button"
                           onClick={() => {
                             // Find the user message before this error and retry it
-                            const errorIdx = messages.findIndex(m => m.id === message.id);
+                            const errorIdx = messages.findIndex((m: ChatMessage) => m.id === message.id);
                             if (errorIdx > 0) {
                               const lastUserMsg = messages[errorIdx - 1];
                               // Remove just the error message, keep the user's message
-                              setMessages(prev => prev.filter(m => m.id !== message.id));
+                              setMessages((prev: ChatMessage[]) => prev.filter((m: ChatMessage) => m.id !== message.id));
                               setTimeout(() => handleSendMessage(lastUserMsg.content, true), 100);
                             }
                           }}

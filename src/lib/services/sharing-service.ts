@@ -36,7 +36,7 @@ export function generateShareUrl(content: ShareableContent, options?: ShareOptio
   let contentUrl = '';
   switch (content.type) {
     case 'course':
-      contentUrl = `${baseUrl}/courses/${content.id}`;
+      contentUrl = `${baseUrl}/pulse?type=COURSE&id=${content.id}`;
       break;
     case 'studylist':
       // Use the actual route that works: /tools/study-kit?id=...

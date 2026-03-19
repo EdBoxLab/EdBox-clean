@@ -30,7 +30,7 @@ export function generateOGTags(content: ShareableContent, customUrl?: string): O
   if (!contentUrl) {
     switch (content.type) {
       case 'course':
-        contentUrl = `${baseUrl}/courses/${content.id}`;
+        contentUrl = `${baseUrl}/pulse?type=COURSE&id=${content.id}`;
         break;
       case 'studylist':
         contentUrl = `${baseUrl}/studylist/${content.id}`;

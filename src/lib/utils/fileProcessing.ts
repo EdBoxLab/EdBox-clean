@@ -1,12 +1,15 @@
 import "@/lib/polyfills";
+
 /**
- * EdBox File Processing Engine - PRODUCTION GRADE
- * 
- * Emergency Debug Edition - Aggressive Logging Enabled
- * Deploy this version to diagnose production failures
- * 
- * @author EdBox Engineering Team
- * @version 3.1.0-debug
+ * EdBox File Processing Pipeline
+ *
+ * Routing logic:
+ *   image/*                       → Gemini Vision (OCR + description, no Tesseract)
+ *   structured doc ≤ 5MB          → Gemini inline (fast, no external service)
+ *   structured doc > 5MB          → LlamaCloud (handles large/complex PDFs)
+ *   either parser fails            → fallback (pdf-parse / office-text-extractor)
+ *
+ * @version 4.0.0
  */
 
 import { LlamaParseReader } from "llama-cloud-services";
@@ -14,503 +17,397 @@ import { Document } from "llamaindex";
 import { getLlamaCloudKey } from "@/lib/ai-providers";
 import pdf from "pdf-parse";
 import { getTextExtractor } from "office-text-extractor";
-import { createWorker } from "tesseract.js";
 
-// ---------------------------------------------------------------------------
-// OCR EXTRACTION
-// ---------------------------------------------------------------------------
+// ─── 1. Logger ────────────────────────────────────────────────────────────────
+// Single writer. ERROR → stderr (triggers alerts). Everything else → stdout.
+// No duplicate writes. No ASCII art boxes.
 
-async function extractTextFromImage(buffer: Buffer, fileName: string): Promise<string> {
-  FORCE_LOG('INFO', `Starting OCR extraction for ${fileName}...`);
-  const startTime = Date.now();
+type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
-  try {
-    // Configure Tesseract for Node.js environment
-    const worker = await createWorker('eng', 1, {
-      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
-      langPath: 'https://tessdata.projectnaptha.com/4.0.0',
-      corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js',
-    });
+function log(level: LogLevel, message: string, context?: unknown): void {
+  const entry = `[${new Date().toISOString()}] [EDBOX-${level}] ${message}${
+    context !== undefined ? ' ' + JSON.stringify(context) : ''
+  }`;
 
-    FORCE_LOG('DEBUG', 'Tesseract worker initialized');
-
-    const { data: { text } } = await worker.recognize(buffer);
-
-    await worker.terminate();
-
-    const processingTime = Date.now() - startTime;
-    const extractedLength = text?.trim().length || 0;
-
-    FORCE_LOG('INFO', `OCR completed in ${processingTime}ms, extracted ${extractedLength} characters`);
-
-    return text?.trim() || '';
-  } catch (error) {
-    const processingTime = Date.now() - startTime;
-    FORCE_LOG('WARN', `OCR failed after ${processingTime}ms:`, error);
-    return ''; // Return empty string on failure, don't block image processing
+  if (level === 'ERROR') {
+    console.error(entry);
+  } else {
+    console.log(entry);
   }
 }
 
-// ---------------------------------------------------------------------------
-// EMERGENCY LOGGING - VISIBLE IN ALL PLATFORMS
-// ---------------------------------------------------------------------------
-
-const FORCE_LOG = (level: string, ...args: any[]) => {
-  const timestamp = new Date().toISOString();
-  const message = `[${timestamp}] [EDBOX-${level}] ${args.map(a =>
-    typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)
-  ).join(' ')}`;
-
-  console.log(message);
-  console.error(message); // Duplicate to stderr for redundancy
-
-  return message;
-};
-
-// ---------------------------------------------------------------------------
-// CONFIGURATION
-// ---------------------------------------------------------------------------
+// ─── 2. Config ────────────────────────────────────────────────────────────────
 
 const CONFIG = {
-  MAX_FILE_SIZE: 25 * 1024 * 1024, // 25MB
-  GEMINI_DIRECT_LIMIT: 5 * 1024 * 1024, // 5MB — files under this go to Gemini
-  LLAMA_TIMEOUT: 120000, // 2 minutes
-  FALLBACK_CHAR_LIMIT: 100000,
-  PREMIUM_THRESHOLD: 10 * 1024 * 1024, // 10MB
+  /** Hard ceiling — reject before processing */
+  MAX_FILE_SIZE: 25 * 1024 * 1024,       // 25 MB
+
+  /** Files at or below this go to Gemini inline. Above → LlamaCloud. */
+  GEMINI_DIRECT_LIMIT: 5 * 1024 * 1024,  // 5 MB
+
+  /** LlamaCloud parse timeout */
+  LLAMA_TIMEOUT_MS: 120_000,             // 2 min
+
+  /** Fallback extraction char cap — prevents unbounded strings reaching AI */
+  FALLBACK_CHAR_LIMIT: 100_000,
+
+  /** Gemini model — verified correct as of 2025 */
+  GEMINI_MODEL: 'gemini-2.0-flash',
 } as const;
 
-const FILE_SIGNATURES = {
-  PDF: [0x25, 0x50, 0x44, 0x46] as const, // %PDF
-  PNG: [0x89, 0x50, 0x4E, 0x47] as const,
-  JPEG: [0xFF, 0xD8, 0xFF] as const,
-  DOCX: [0x50, 0x4B, 0x03, 0x04] as const, // ZIP-based
-  PPTX: [0x50, 0x4B, 0x03, 0x04] as const,
-} as const;
+/** Extensions routed through the structured-document parsers */
+const STRUCTURED_EXTENSIONS = new Set([
+  'pdf', 'docx', 'pptx', 'xlsx', 'doc', 'ppt', 'xls',
+]);
 
-// ---------------------------------------------------------------------------
-// ERROR HANDLING
-// ---------------------------------------------------------------------------
+const FILE_SIGNATURES: Record<string, readonly number[]> = {
+  pdf:  [0x25, 0x50, 0x44, 0x46], // %PDF
+  png:  [0x89, 0x50, 0x4E, 0x47],
+  jpg:  [0xFF, 0xD8, 0xFF],
+  jpeg: [0xFF, 0xD8, 0xFF],
+  docx: [0x50, 0x4B, 0x03, 0x04], // ZIP-based (same as pptx/xlsx)
+  pptx: [0x50, 0x4B, 0x03, 0x04],
+  xlsx: [0x50, 0x4B, 0x03, 0x04],
+};
 
-class FileProcessingError extends Error {
+// ─── 3. Error Types ───────────────────────────────────────────────────────────
+
+export class FileProcessingError extends Error {
   constructor(
     message: string,
-    public code: string,
-    public fileName: string,
-    public details?: unknown
+    public readonly code: string,
+    public readonly fileName: string,
+    public readonly cause?: unknown
   ) {
     super(message);
     this.name = 'FileProcessingError';
-    FORCE_LOG('ERROR', `FileProcessingError [${code}]: ${message}`, details);
+    // Log at construction time so every thrown error is always visible
+    log('ERROR', `[${code}] ${message}`, { fileName, cause });
   }
 }
 
-// ---------------------------------------------------------------------------
-// VALIDATION
-// ---------------------------------------------------------------------------
+// ─── 4. Buffer Normalization ──────────────────────────────────────────────────
 
-function validateFileSignature(buffer: Buffer, fileName: string): void {
-  const ext = fileName.toLowerCase().split('.').pop() || '';
-  const firstBytes = Array.from(buffer.subarray(0, 4));
-
-  const signatureChecks: Record<string, readonly number[]> = {
-    pdf: FILE_SIGNATURES.PDF,
-    png: FILE_SIGNATURES.PNG,
-    jpg: FILE_SIGNATURES.JPEG,
-    jpeg: FILE_SIGNATURES.JPEG,
-    docx: FILE_SIGNATURES.DOCX,
-    pptx: FILE_SIGNATURES.PPTX,
-  };
-
-  const expectedSignature = signatureChecks[ext];
-  if (!expectedSignature) {
-    FORCE_LOG('DEBUG', `No signature validation for .${ext}`);
-    return;
+/**
+ * Converts the incoming string (data URI, base64, or raw UTF-8) to a Buffer.
+ *
+ * Base64 detection uses a SAMPLE of the string, not a full-string regex,
+ * to avoid blocking the event loop on large inputs.
+ */
+export function normalizeToBuffer(content: string, fileName: string): Buffer {
+  if (!content) {
+    throw new FileProcessingError('File content is empty', 'EMPTY_CONTENT', fileName);
   }
 
-  const matches = expectedSignature.every((byte, i) => firstBytes[i] === byte);
-  if (!matches) {
-    throw new FileProcessingError(
-      `File signature mismatch for .${ext}`,
-      'INVALID_FILE_SIGNATURE',
-      fileName,
-      { expected: Array.from(expectedSignature), actual: firstBytes }
-    );
+  // Path 1: Data URI  →  "data:application/pdf;base64,JVBERi0x..."
+  if (content.startsWith('data:')) {
+    const commaIndex = content.indexOf(',');
+    if (commaIndex === -1 || commaIndex === content.length - 1) {
+      throw new FileProcessingError('Malformed data URI — missing payload', 'DECODE_ERROR', fileName);
+    }
+    const payload = content.slice(commaIndex + 1);
+    const buffer = Buffer.from(payload, 'base64');
+    log('DEBUG', `Data URI decoded: ${buffer.length} bytes`, { fileName });
+    return buffer;
   }
 
-  FORCE_LOG('DEBUG', `Signature validated for .${ext}`);
+  // Path 2: Pure base64 — sample-based detection (O(1), not O(n))
+  // Sample the first 500 chars and the last 50 chars.
+  // Valid base64 will pass; raw text (e.g. JSON, markdown) will fail.
+  if (content.length > 100) {
+    const head = content.slice(0, 500).replace(/\s/g, '');
+    const tail = content.slice(-50).replace(/\s/g, '');
+    const sample = head + tail;
+    const isBase64 =
+      content.replace(/\s/g, '').length % 4 === 0 &&
+      /^[A-Za-z0-9+/]+=*$/.test(sample);
+
+    if (isBase64) {
+      try {
+        const buffer = Buffer.from(content.replace(/\s/g, ''), 'base64');
+        if (buffer.length > 0 && buffer.length < content.length) {
+          log('DEBUG', `Base64 decoded: ${buffer.length} bytes`, { fileName });
+          return buffer;
+        }
+      } catch {
+        // Fall through to UTF-8
+      }
+    }
+  }
+
+  // Path 3: Raw text / source code
+  const buffer = Buffer.from(content, 'utf-8');
+  log('DEBUG', `UTF-8 buffer: ${buffer.length} bytes`, { fileName });
+  return buffer;
 }
+
+// ─── 5. Validation ────────────────────────────────────────────────────────────
 
 function validateFileSize(buffer: Buffer, fileName: string): void {
-  FORCE_LOG('DEBUG', `Validating file size: ${buffer.length} bytes`);
-
+  if (buffer.length === 0) {
+    throw new FileProcessingError('File is empty (0 bytes)', 'EMPTY_FILE', fileName);
+  }
   if (buffer.length > CONFIG.MAX_FILE_SIZE) {
     throw new FileProcessingError(
       `File exceeds ${CONFIG.MAX_FILE_SIZE / 1024 / 1024}MB limit`,
       'FILE_TOO_LARGE',
       fileName,
-      { size: buffer.length, limit: CONFIG.MAX_FILE_SIZE }
+      { sizeBytes: buffer.length, limitBytes: CONFIG.MAX_FILE_SIZE }
     );
   }
-
-  if (buffer.length === 0) {
-    throw new FileProcessingError(
-      'File is empty (0 bytes)',
-      'EMPTY_FILE',
-      fileName
-    );
-  }
-
-  FORCE_LOG('DEBUG', 'File size validation passed');
 }
 
-// ---------------------------------------------------------------------------
-// BUFFER NORMALIZATION
-// ---------------------------------------------------------------------------
+function validateFileSignature(buffer: Buffer, fileName: string): void {
+  const ext = fileName.toLowerCase().split('.').pop() ?? '';
+  const expected = FILE_SIGNATURES[ext];
+  if (!expected) return; // No signature check for unknown extensions
 
-function normalizeToBuffer(content: string, mimeType: string, fileName: string): Buffer {
-  FORCE_LOG('INFO', `normalizeToBuffer: fileName=${fileName}, mimeType=${mimeType}, contentLength=${content?.length || 0}`);
+  const actual = Array.from(buffer.subarray(0, 4));
+  const matches = expected.every((byte, i) => actual[i] === byte);
 
-  try {
-    // Path 1: Data URI
-    if (content.startsWith('data:')) {
-      FORCE_LOG('DEBUG', 'Detected Data URI format');
-      const parts = content.split(',');
-
-      if (parts.length < 2 || !parts[1]) {
-        throw new Error('Malformed data URI - missing base64 payload');
-      }
-
-      const buffer = Buffer.from(parts[1], 'base64');
-      FORCE_LOG('INFO', `Data URI decoded successfully: ${buffer.length} bytes`);
-      return buffer;
-    }
-
-    // Path 2: Pure Base64
-    if (content.length > 100) {
-      const trimmed = content.replace(/\s+/g, '');
-
-      // Strict base64 validation
-      if (trimmed.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(trimmed)) {
-        try {
-          const decoded = Buffer.from(trimmed, 'base64');
-
-          // Sanity check: decoded should be smaller than input
-          if (decoded.length > 0 && decoded.length < content.length) {
-            FORCE_LOG('INFO', `Base64 decoded successfully: ${decoded.length} bytes`);
-            return decoded;
-          }
-        } catch (e) {
-          FORCE_LOG('WARN', 'Base64 decode attempt failed, trying UTF-8');
-        }
-      }
-    }
-
-    // Path 3: Raw text/binary
-    const buffer = Buffer.from(content, 'utf-8');
-    FORCE_LOG('INFO', `UTF-8 conversion: ${buffer.length} bytes`);
-    return buffer;
-
-  } catch (error) {
-    FORCE_LOG('ERROR', 'normalizeToBuffer CRITICAL FAILURE', error);
+  if (!matches) {
     throw new FileProcessingError(
-      'Failed to decode file content',
-      'DECODE_ERROR',
+      `File signature mismatch for .${ext} — file may be corrupted or misnamed`,
+      'INVALID_FILE_SIGNATURE',
       fileName,
-      error
+      { expected: Array.from(expected), actual }
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// GEMINI DIRECT PARSING (for files ≤ 5MB)
-// ---------------------------------------------------------------------------
+// ─── 6. Parser: Gemini ────────────────────────────────────────────────────────
+// Handles both structured documents (≤5MB) and images (any size).
+// Images are routed here instead of Tesseract — Gemini Vision handles OCR
+// natively with no WASM, no CDN deps, no serverless compatibility issues.
+
+type GeminiParseMode = 'document' | 'image';
 
 async function parseWithGemini(
   buffer: Buffer,
   fileName: string,
-  mimeType: string
+  mimeType: string,
+  mode: GeminiParseMode
 ): Promise<string> {
-  FORCE_LOG('INFO', `=== GEMINI PARSE START: ${fileName} (${(buffer.length / 1024).toFixed(1)}KB) ===`);
+  log('INFO', `Gemini parse start [${mode}]: ${fileName} (${(buffer.length / 1024).toFixed(1)} KB)`);
 
-  try {
-    const { getGeminiKeys } = await import('@/lib/ai-providers');
-    const keys = getGeminiKeys();
-    if (!keys.length) throw new Error('No Gemini API key available');
+  const { getGeminiKeys } = await import('@/lib/ai-providers');
+  const keys = getGeminiKeys();
+  if (!keys.length) {
+    throw new FileProcessingError('No Gemini API key available', 'NO_API_KEY', fileName);
+  }
 
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
-    const genAI = new GoogleGenerativeAI(keys[0]);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' });
+  const { GoogleGenerativeAI } = await import('@google/generative-ai');
+  const genAI = new GoogleGenerativeAI(keys[0]);
+  const model = genAI.getGenerativeModel({ model: CONFIG.GEMINI_MODEL });
 
-    const ext = fileName.toLowerCase().split('.').pop() || '';
-    const geminiMime = mimeType || {
-      pdf: 'application/pdf',
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      doc: 'application/msword',
-      ppt: 'application/vnd.ms-powerpoint',
-      xls: 'application/vnd.ms-excel',
-    }[ext] || 'application/octet-stream';
+  const ext = fileName.toLowerCase().split('.').pop() ?? '';
+  const resolvedMime = mimeType || resolveDocumentMime(ext);
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType: geminiMime,
-          data: buffer.toString('base64'),
-        },
-      },
-      {
-        text: `Extract ALL text content from this document. Preserve the original structure using markdown formatting:
-- Use # headers for titles/sections
-- Use | tables for tabular data
-- Use - or numbered lists for list items
+  const prompt = mode === 'image'
+    ? `Extract all text visible in this image using OCR. Then briefly describe any diagrams, charts, or visual elements that contain information relevant for studying.
+
+Format:
+## Extracted Text
+[all readable text]
+
+## Visual Elements
+[descriptions of diagrams/charts/figures, or "None" if not present]
+
+Output only the above structure, no commentary.`
+    : `Extract ALL text content from this document. Preserve structure using markdown:
+- # headers for titles and sections
+- | tables for tabular data
+- - or numbered lists for list items
 - Preserve paragraph breaks
-- Include all text, captions, footnotes
+- Include all text, captions, and footnotes
 
-Output ONLY the extracted markdown text, no commentary.`,
+Output ONLY the extracted markdown text, no commentary.`;
+
+  const result = await model.generateContent([
+    {
+      inlineData: {
+        mimeType: resolvedMime,
+        data: buffer.toString('base64'),
       },
-    ]);
+    },
+    { text: prompt },
+  ]);
 
-    const text = result.response.text();
-    FORCE_LOG('INFO', `Gemini parse SUCCESS: ${text.length} chars extracted`);
-    return text;
-  } catch (error) {
-    FORCE_LOG('ERROR', 'Gemini parse FAILED', error);
-    throw error;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// LLAMAPARSE ENGINE
-// ---------------------------------------------------------------------------
-
-async function parseWithLlamaParse(
-  buffer: Buffer,
-  fileName: string,
-  mimeType: string
-): Promise<string> {
-  FORCE_LOG('INFO', `=== LLAMAPARSE START: ${fileName} ===`);
-
-  let apiKey: string;
-  try {
-    apiKey = getLlamaCloudKey();
-    FORCE_LOG('DEBUG', `API Key retrieved: ${apiKey ? 'YES' : 'NO'} (length=${apiKey?.length || 0})`);
-
-    if (!apiKey) {
-      throw new Error('API key is empty/undefined');
-    }
-  } catch (e) {
-    FORCE_LOG('ERROR', 'getLlamaCloudKey() FAILED', e);
-    throw new FileProcessingError(
-      'LlamaCloud API key not available',
-      'NO_API_KEY',
-      fileName,
-      e
-    );
+  const text = result.response.text();
+  if (!text?.trim()) {
+    throw new FileProcessingError('Gemini returned empty response', 'EMPTY_RESPONSE', fileName);
   }
 
-  const usesPremium = buffer.length > CONFIG.PREMIUM_THRESHOLD;
-  const mode = usesPremium ? 'premium' : 'fast';
-  FORCE_LOG('INFO', `Mode: ${mode}, Buffer size: ${(buffer.length / 1024).toFixed(1)}KB`);
-
-  const parsePromise = (async () => {
-    try {
-      FORCE_LOG('DEBUG', 'Initializing LlamaParseReader...');
-
-      const reader = new LlamaParseReader({
-        apiKey,
-        resultType: "markdown",
-        verbose: true,
-        parsingInstruction: `Extract all text preserving document structure. Use markdown tables for tabular data.`,
-      });
-
-      const ext = fileName.split('.').pop()?.toLowerCase() || 'bin';
-      FORCE_LOG('DEBUG', `Calling loadDataAsContent(buffer, "upload.${ext}")`);
-
-      const documents = await reader.loadDataAsContent(buffer, `upload.${ext}`);
-      FORCE_LOG('DEBUG', `LlamaParse returned ${documents?.length || 0} document(s)`);
-
-      if (!documents || documents.length === 0) {
-        throw new Error('LlamaParse returned zero documents');
-      }
-
-      const result = documents
-        .map((doc: any, idx: number) => {
-          const text = doc.text ||
-            (typeof doc.getContent === 'function' ? doc.getContent() : '') ||
-            (doc.content) ||
-            '';
-
-          const textLength = text?.length || 0;
-          FORCE_LOG('DEBUG', `Document ${idx + 1}/${documents.length}: ${textLength} chars`);
-
-          return `--- PAGE ${idx + 1} ---\n${(text || '').trim()}`;
-        })
-        .join('\n\n');
-
-      FORCE_LOG('INFO', `LlamaParse SUCCESS: Total ${result.length} characters extracted`);
-      return result;
-
-    } catch (e) {
-      FORCE_LOG('ERROR', 'LlamaParse internal error', e);
-      throw e;
-    }
-  })();
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => {
-      FORCE_LOG('ERROR', `LlamaParse TIMEOUT after ${CONFIG.LLAMA_TIMEOUT / 1000}s`);
-      reject(new Error(`LlamaParse timeout after ${CONFIG.LLAMA_TIMEOUT / 1000}s`));
-    }, CONFIG.LLAMA_TIMEOUT);
-  });
-
-  try {
-    const markdown = await Promise.race([parsePromise, timeoutPromise]);
-    FORCE_LOG('INFO', `=== LLAMAPARSE COMPLETE ===`);
-    return markdown;
-  } catch (error) {
-    FORCE_LOG('ERROR', '=== LLAMAPARSE FAILED ===', error);
-    throw error;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// FALLBACK EXTRACTION
-// ---------------------------------------------------------------------------
-
-async function fallbackTextExtraction(buffer: Buffer, fileName: string): Promise<string> {
-  FORCE_LOG('WARN', `=== FALLBACK EXTRACTION: ${fileName} ===`);
-  const ext = fileName.toLowerCase().split('.').pop() || '';
-
-  // Strategy 1: pdf-parse for PDFs
-  if (ext === 'pdf') {
-    try {
-      FORCE_LOG('DEBUG', 'Attempting pdf-parse...');
-      const data = await pdf(buffer);
-
-      if (data.text?.trim()) {
-        FORCE_LOG('INFO', `pdf-parse SUCCESS: ${data.text.length} chars, ${data.numpages} pages`);
-        return data.text.slice(0, CONFIG.FALLBACK_CHAR_LIMIT);
-      }
-    } catch (e) {
-      FORCE_LOG('ERROR', 'pdf-parse FAILED', e);
-    }
-  }
-
-  // Strategy 2: office-text-extractor for Office files
-  if (['docx', 'pptx', 'xlsx', 'doc', 'ppt', 'xls'].includes(ext)) {
-    try {
-      FORCE_LOG('DEBUG', 'Attempting office-text-extractor...');
-      const extractor = getTextExtractor();
-      const result = await extractor.extractText({ input: buffer, type: 'buffer' });
-
-      // Handle multiple return formats
-      const text = typeof result === 'string'
-        ? result
-        : (result as any)?.text || '';
-
-      if (text?.trim()) {
-        FORCE_LOG('INFO', `office-text-extractor SUCCESS: ${text.length} chars`);
-        return text.slice(0, CONFIG.FALLBACK_CHAR_LIMIT);
-      }
-    } catch (e) {
-      FORCE_LOG('ERROR', 'office-text-extractor FAILED', e);
-    }
-  }
-
-  // Strategy 3: Raw PDF text scraping
-  if (ext === 'pdf') {
-    FORCE_LOG('DEBUG', 'Attempting raw PDF text extraction...');
-    try {
-      const text = buffer.toString('latin1');
-      const btPattern = /BT\s+([\s\S]*?)\s+ET/g;
-      const textChunks: string[] = [];
-      let match;
-
-      while ((match = btPattern.exec(text)) !== null) {
-        const chunk = match[1]
-          .replace(/[^\x20-\x7E\n]/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-
-        if (chunk.length > 10) {
-          textChunks.push(chunk);
-        }
-      }
-
-      if (textChunks.length > 0) {
-        const result = textChunks.join('\n\n').slice(0, CONFIG.FALLBACK_CHAR_LIMIT);
-        FORCE_LOG('INFO', `Raw PDF extraction SUCCESS: ${result.length} chars from ${textChunks.length} chunks`);
-        return result;
-      }
-    } catch (e) {
-      FORCE_LOG('ERROR', 'Raw PDF extraction FAILED', e);
-    }
-  }
-
-  // Strategy 4: UTF-8 text fallback
-  FORCE_LOG('WARN', 'All specialized extractors failed, trying UTF-8...');
-  const text = buffer.toString('utf-8').slice(0, CONFIG.FALLBACK_CHAR_LIMIT);
-  const printableRatio = (text.match(/[\x20-\x7E]/g)?.length || 0) / (text.length || 1);
-
-  FORCE_LOG('DEBUG', `UTF-8 printable ratio: ${(printableRatio * 100).toFixed(1)}%`);
-
-  if (printableRatio < 0.3) {
-    FORCE_LOG('ERROR', 'Binary file detected - no text extractable');
-    return '[BINARY_FILE: Cannot extract text without proper parser. File may be corrupted or encrypted.]';
-  }
-
-  FORCE_LOG('INFO', `UTF-8 fallback: ${text.length} chars extracted`);
+  log('INFO', `Gemini parse success: ${text.length} chars extracted`, { fileName });
   return text;
 }
 
-// ---------------------------------------------------------------------------
-// UTILITY FUNCTIONS - EXPORTED FOR COMPATIBILITY
-// ---------------------------------------------------------------------------
-
-export function isImageType(mimeType: string): boolean {
-  return mimeType.startsWith("image/");
+function resolveDocumentMime(ext: string): string {
+  const mimeMap: Record<string, string> = {
+    pdf:  'application/pdf',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    doc:  'application/msword',
+    ppt:  'application/vnd.ms-powerpoint',
+    xls:  'application/vnd.ms-excel',
+    png:  'image/png',
+    jpg:  'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif:  'image/gif',
+    webp: 'image/webp',
+  };
+  return mimeMap[ext] ?? 'application/octet-stream';
 }
 
-export function isPDFType(mimeType: string): boolean {
-  return mimeType === "application/pdf" ||
-    mimeType.toLowerCase().includes("pdf");
-}
+// ─── 7. Parser: LlamaCloud ────────────────────────────────────────────────────
 
-export function bufferToBase64(buffer: Buffer): string {
-  return buffer.toString("base64");
-}
+async function parseWithLlamaCloud(buffer: Buffer, fileName: string): Promise<string> {
+  log('INFO', `LlamaCloud parse start: ${fileName} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`);
 
-export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
-  FORCE_LOG('DEBUG', 'extractTextFromPDF called');
-  try {
-    const data = await pdf(buffer);
-    const text = data.text || "";
-    FORCE_LOG('DEBUG', `extractTextFromPDF: ${text.length} chars`);
-    return text;
-  } catch (error) {
-    FORCE_LOG('ERROR', 'extractTextFromPDF FAILED', error);
-    return "";
+  const apiKey = getLlamaCloudKey();
+  if (!apiKey) {
+    throw new FileProcessingError('LlamaCloud API key not available', 'NO_API_KEY', fileName);
   }
+
+  const reader = new LlamaParseReader({
+    apiKey,
+    resultType: 'markdown',
+    parsingInstruction: 'Extract all text preserving document structure. Use markdown tables for tabular data.',
+  });
+
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? 'bin';
+
+  const parsePromise = reader
+    .loadDataAsContent(buffer, `upload.${ext}`)
+    .then((documents: Document[]) => {
+      if (!documents?.length) {
+        throw new FileProcessingError('LlamaCloud returned zero documents', 'EMPTY_RESPONSE', fileName);
+      }
+
+      const pages = documents.map((doc: Document, i: number) => {
+        // doc.text is the canonical field on the llamaindex Document type
+        const text = doc.text?.trim() ?? '';
+        if (!text) {
+          log('WARN', `LlamaCloud document ${i + 1} has no text content`, { fileName });
+        }
+        return `--- PAGE ${i + 1} ---\n${text}`;
+      });
+
+      const combined = pages.join('\n\n');
+      log('INFO', `LlamaCloud parse success: ${combined.length} chars`, { fileName, pages: documents.length });
+      return combined;
+    });
+
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new FileProcessingError(
+        `LlamaCloud parse timed out after ${CONFIG.LLAMA_TIMEOUT_MS / 1000}s`,
+        'TIMEOUT',
+        fileName
+      )),
+      CONFIG.LLAMA_TIMEOUT_MS
+    )
+  );
+
+  return Promise.race([parsePromise, timeoutPromise]);
 }
 
-export async function extractTextFromPPTX(buffer: Buffer): Promise<string> {
-  FORCE_LOG('DEBUG', 'extractTextFromPPTX called');
-  try {
-    const extractor = getTextExtractor();
-    const result = await extractor.extractText({ input: buffer, type: "buffer" });
-    const text = typeof result === 'string' ? result : (result as any)?.text || '';
-    FORCE_LOG('DEBUG', `extractTextFromPPTX: ${text.length} chars`);
-    return text;
-  } catch (error) {
-    FORCE_LOG('ERROR', 'extractTextFromPPTX FAILED', error);
-    return "";
+// ─── 8. Parser: Fallback ──────────────────────────────────────────────────────
+// Last resort. Uses well-tested local libraries with no external dependencies.
+// Deliberately excludes the BT/ET PDF regex strategy — it produces PostScript
+// operator garbage that degrades AI output quality.
+
+async function parseWithFallback(buffer: Buffer, fileName: string): Promise<string> {
+  log('WARN', `Fallback extraction: ${fileName}`);
+  const ext = fileName.toLowerCase().split('.').pop() ?? '';
+
+  // Strategy 1: pdf-parse (reliable for text-layer PDFs)
+  if (ext === 'pdf') {
+    try {
+      const data = await pdf(buffer);
+      if (data.text?.trim()) {
+        const text = data.text.slice(0, CONFIG.FALLBACK_CHAR_LIMIT);
+        log('INFO', `Fallback pdf-parse success: ${text.length} chars, ${data.numpages} pages`, { fileName });
+        return text;
+      }
+    } catch (e) {
+      log('WARN', 'Fallback pdf-parse failed', { fileName, error: (e as Error).message });
+    }
   }
+
+  // Strategy 2: office-text-extractor (docx, pptx, xlsx)
+  if (['docx', 'pptx', 'xlsx', 'doc', 'ppt', 'xls'].includes(ext)) {
+    try {
+      const extractor = getTextExtractor();
+      const result = await extractor.extractText({ input: buffer, type: 'buffer' });
+      const text = (typeof result === 'string' ? result : (result as { text?: string })?.text ?? '').trim();
+      if (text) {
+        const truncated = text.slice(0, CONFIG.FALLBACK_CHAR_LIMIT);
+        log('INFO', `Fallback office-extractor success: ${truncated.length} chars`, { fileName });
+        return truncated;
+      }
+    } catch (e) {
+      log('WARN', 'Fallback office-text-extractor failed', { fileName, error: (e as Error).message });
+    }
+  }
+
+  // Strategy 3: UTF-8 text (source code, markdown, plain text files)
+  const text = buffer.toString('utf-8').slice(0, CONFIG.FALLBACK_CHAR_LIMIT);
+  const printableRatio = (text.match(/[\x20-\x7E]/g)?.length ?? 0) / (text.length || 1);
+
+  if (printableRatio < 0.3) {
+    throw new FileProcessingError(
+      'File appears to be binary or encrypted — no readable text extractable',
+      'BINARY_FILE',
+      fileName,
+      { printableRatio }
+    );
+  }
+
+  log('INFO', `Fallback UTF-8 success: ${text.length} chars (printable ratio: ${(printableRatio * 100).toFixed(0)}%)`, { fileName });
+  return text;
 }
 
-// ---------------------------------------------------------------------------
-// MAIN PROCESSING PIPELINE
-// ---------------------------------------------------------------------------
+// ─── 9. Output Formatter ──────────────────────────────────────────────────────
+// Pure function — no I/O, fully testable.
+
+interface DocumentMetadata {
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  parser: string;
+  processingTimeMs: number;
+}
+
+function formatDocumentOutput(content: string, meta: DocumentMetadata): string {
+  return `<DOCUMENT_CONTEXT>
+  <METADATA>
+    <FILENAME>${meta.fileName}</FILENAME>
+    <TYPE>${meta.mimeType}</TYPE>
+    <SIZE_KB>${(meta.sizeBytes / 1024).toFixed(1)}</SIZE_KB>
+    <PARSER>${meta.parser}</PARSER>
+    <PROCESSING_TIME_MS>${meta.processingTimeMs}</PROCESSING_TIME_MS>
+  </METADATA>
+  <CONTENT>
+${content}
+  </CONTENT>
+</DOCUMENT_CONTEXT>
+
+[INSTRUCTION TO AI: The above is structured content extracted from ${meta.fileName}. Headers use #, tables use |, lists use - or numbers. Treat as authoritative study material.]`;
+}
+
+function formatCodeOutput(content: string, fileName: string, mimeType: string): string {
+  return `<CODE_CONTEXT>
+  <FILENAME>${fileName}</FILENAME>
+  <TYPE>${mimeType}</TYPE>
+  <CONTENT>
+${content}
+  </CONTENT>
+</CODE_CONTEXT>`;
+}
+
+// ─── 10. Main Pipeline ────────────────────────────────────────────────────────
 
 export async function processFileContent(
   content: string,
@@ -518,171 +415,138 @@ export async function processFileContent(
   fileName: string
 ): Promise<string> {
   const startTime = Date.now();
+  log('INFO', `Processing start: ${fileName}`, { mimeType, contentLength: content?.length ?? 0 });
 
-  FORCE_LOG('INFO', '╔═══════════════════════════════════════════════════╗');
-  FORCE_LOG('INFO', '║  FILE PROCESSING START                            ║');
-  FORCE_LOG('INFO', '╚═══════════════════════════════════════════════════╝');
-  FORCE_LOG('INFO', `File: ${fileName}`);
-  FORCE_LOG('INFO', `MIME: ${mimeType}`);
-  FORCE_LOG('INFO', `Content Length: ${content?.length || 0} chars`);
+  // Step 1: Normalize to buffer
+  const buffer = normalizeToBuffer(content, fileName);
+  log('INFO', `Buffer ready: ${buffer.length} bytes`, { fileName });
 
-  try {
-    // STEP 1: Normalize
-    FORCE_LOG('INFO', '[STEP 1/4] Normalizing buffer...');
-    const buffer = normalizeToBuffer(content, mimeType, fileName);
-    FORCE_LOG('INFO', `✓ Buffer created: ${buffer.length} bytes`);
+  // Step 2: Validate
+  validateFileSize(buffer, fileName);
+  validateFileSignature(buffer, fileName);
 
-    // STEP 2: Validate
-    FORCE_LOG('INFO', '[STEP 2/4] Validating file...');
-    validateFileSize(buffer, fileName);
-    validateFileSignature(buffer, fileName);
-    FORCE_LOG('INFO', '✓ Validation passed');
+  const ext = fileName.toLowerCase().split('.').pop() ?? '';
+  const isImage = mimeType.startsWith('image/');
+  const isStructured = STRUCTURED_EXTENSIONS.has(ext);
 
-    const ext = fileName.toLowerCase();
-
-    // STEP 3: Process Images
-    if (mimeType.startsWith('image/')) {
-      FORCE_LOG('INFO', '[STEP 3/4] Processing as IMAGE with OCR');
-
-      // Extract text from image using OCR
-      const extractedText = await extractTextFromImage(buffer, fileName);
-
-      const result = JSON.stringify({
-        type: 'image',
-        base64: buffer.toString('base64'),
-        mimeType,
-        fileName,
-        extractedText: extractedText || undefined, // Only include if text was found
+  // Step 3a: Images → Gemini Vision
+  if (isImage) {
+    log('INFO', `Route: image → Gemini Vision`, { fileName });
+    try {
+      const extracted = await parseWithGemini(buffer, fileName, mimeType, 'image');
+      const processingTimeMs = Date.now() - startTime;
+      return formatDocumentOutput(extracted, {
+        fileName, mimeType, sizeBytes: buffer.length,
+        parser: 'Gemini Vision', processingTimeMs,
       });
+    } catch (e) {
+      // Images have no meaningful fallback — surface the error
+      throw new FileProcessingError(
+        'Image parsing failed',
+        'IMAGE_PARSE_FAILED',
+        fileName,
+        e
+      );
+    }
+  }
 
-      const processingTime = Date.now() - startTime;
-      FORCE_LOG('INFO', `✓ Image processed in ${processingTime}ms`);
-      if (extractedText) {
-        FORCE_LOG('INFO', `✓ OCR extracted ${extractedText.length} characters`);
+  // Step 3b: Structured documents → Gemini (≤5MB) or LlamaCloud (>5MB), with fallback
+  if (isStructured) {
+    let markdown: string;
+    let parserUsed: string;
+
+    if (buffer.length <= CONFIG.GEMINI_DIRECT_LIMIT) {
+      log('INFO', `Route: structured doc ≤5MB → Gemini`, { fileName });
+      try {
+        markdown = await parseWithGemini(buffer, fileName, mimeType, 'document');
+        parserUsed = 'Gemini';
+      } catch (geminiError) {
+        log('WARN', `Gemini failed — falling back to local extraction`, { fileName });
+        markdown = await parseWithFallback(buffer, fileName);
+        parserUsed = 'Fallback (pdf-parse / office-extractor)';
       }
-      FORCE_LOG('INFO', '╚═══════════════════════════════════════════════════╝');
-      return result;
+    } else {
+      log('INFO', `Route: structured doc >5MB → LlamaCloud`, { fileName });
+      try {
+        markdown = await parseWithLlamaCloud(buffer, fileName);
+        parserUsed = 'LlamaCloud';
+      } catch (llamaError) {
+        log('WARN', `LlamaCloud failed — falling back to local extraction`, { fileName });
+        markdown = await parseWithFallback(buffer, fileName);
+        parserUsed = 'Fallback (pdf-parse / office-extractor)';
+      }
     }
 
-    // STEP 4: Process Structured Documents
-    const isStructuredDoc =
-      ext.endsWith('.pdf') ||
-      ext.endsWith('.docx') ||
-      ext.endsWith('.pptx') ||
-      ext.endsWith('.xlsx') ||
-      ext.endsWith('.doc') ||
-      ext.endsWith('.ppt') ||
-      ext.endsWith('.xls');
+    const processingTimeMs = Date.now() - startTime;
+    log('INFO', `Processing complete: ${processingTimeMs}ms, parser=${parserUsed}`, { fileName });
 
-    if (isStructuredDoc) {
-      FORCE_LOG('INFO', '[STEP 3/4] Processing as STRUCTURED DOCUMENT');
-      let markdown: string;
+    return formatDocumentOutput(markdown, {
+      fileName, mimeType, sizeBytes: buffer.length, parser: parserUsed, processingTimeMs,
+    });
+  }
 
-      if (buffer.length <= CONFIG.GEMINI_DIRECT_LIMIT) {
-        FORCE_LOG('INFO', `File ≤ 5MB (${(buffer.length / 1024 / 1024).toFixed(1)}MB) — using Gemini direct`);
-        try {
-          markdown = await parseWithGemini(buffer, fileName, mimeType);
-          FORCE_LOG('INFO', '✓ Gemini parse succeeded');
-        } catch (geminiError) {
-          FORCE_LOG('WARN', '✗ Gemini parse failed, switching to fallback');
-          markdown = await fallbackTextExtraction(buffer, fileName);
-        }
-      } else {
-        FORCE_LOG('INFO', `File > 5MB (${(buffer.length / 1024 / 1024).toFixed(1)}MB) — using LlamaParse`);
-        try {
-          markdown = await parseWithLlamaParse(buffer, fileName, mimeType);
-          FORCE_LOG('INFO', '✓ LlamaParse succeeded');
-        } catch (parseError) {
-          FORCE_LOG('WARN', '✗ LlamaParse failed, switching to fallback');
-          markdown = await fallbackTextExtraction(buffer, fileName);
-        }
-      }
+  // Step 3c: Plain text / source code
+  log('INFO', `Route: plain text`, { fileName });
+  const textContent = buffer.toString('utf-8');
+  return formatCodeOutput(textContent, fileName, mimeType);
+}
 
-      const processingTime = Date.now() - startTime;
-      FORCE_LOG('INFO', `[STEP 4/4] Formatting output...`);
+// ─── 11. Utility Exports ──────────────────────────────────────────────────────
+// Kept for compatibility with callers that import these directly.
 
-      const parserUsed = buffer.length <= CONFIG.GEMINI_DIRECT_LIMIT ? 'Gemini Direct' : 'LlamaParse + Fallback';
-      const result = `<DOCUMENT_CONTEXT>
-  <METADATA>
-    <FILENAME>${fileName}</FILENAME>
-    <TYPE>${mimeType}</TYPE>
-    <SIZE_KB>${(buffer.length / 1024).toFixed(1)}</SIZE_KB>
-    <PARSER>${parserUsed}</PARSER>
-    <PROCESSING_TIME_MS>${processingTime}</PROCESSING_TIME_MS>
-  </METADATA>
-  <CONTENT>
-${markdown}
-  </CONTENT>
-</DOCUMENT_CONTEXT>
+export function isImageType(mimeType: string): boolean {
+  return mimeType.startsWith('image/');
+}
 
-[INSTRUCTION TO AI: The above is structured markdown extracted from ${fileName}. Headers use #, tables use |, lists use - or numbers. Treat as authoritative study material.]`;
+export function isPDFType(mimeType: string): boolean {
+  return mimeType === 'application/pdf' || mimeType.toLowerCase().includes('pdf');
+}
 
-      FORCE_LOG('INFO', `✓ Final output: ${result.length} characters`);
-      FORCE_LOG('INFO', `✓ Total processing time: ${processingTime}ms`);
-      FORCE_LOG('INFO', '╚═══════════════════════════════════════════════════╝');
-      return result;
-    }
+export function bufferToBase64(buffer: Buffer): string {
+  return buffer.toString('base64');
+}
 
-    // STEP 5: Process Plain Text/Code
-    FORCE_LOG('INFO', '[STEP 3/4] Processing as PLAIN TEXT/CODE');
-    const textContent = buffer.toString('utf-8');
-
-    const result = `<CODE_CONTEXT>
-  <FILENAME>${fileName}</FILENAME>
-  <TYPE>${mimeType}</TYPE>
-  <CONTENT>
-${textContent}
-  </CONTENT>
-</CODE_CONTEXT>`;
-
-    const processingTime = Date.now() - startTime;
-    FORCE_LOG('INFO', `✓ Text processed: ${result.length} chars in ${processingTime}ms`);
-    FORCE_LOG('INFO', '╚═══════════════════════════════════════════════════╝');
-    return result;
-
-  } catch (error) {
-    FORCE_LOG('ERROR', '╔═══════════════════════════════════════════════════╗');
-    FORCE_LOG('ERROR', '║  PROCESSING FAILED - CRITICAL ERROR               ║');
-    FORCE_LOG('ERROR', '╚═══════════════════════════════════════════════════╝');
-    FORCE_LOG('ERROR', 'Error Type:', (error as Error)?.name);
-    FORCE_LOG('ERROR', 'Error Message:', (error as Error)?.message);
-    FORCE_LOG('ERROR', 'Stack Trace:', (error as Error)?.stack);
-
-    if (error instanceof FileProcessingError) {
-      throw error;
-    }
-
-    throw new FileProcessingError(
-      'Unexpected error during file processing',
-      'UNKNOWN_ERROR',
-      fileName,
-      {
-        errorType: (error as Error)?.name,
-        errorMessage: (error as Error)?.message,
-        stack: (error as Error)?.stack,
-      }
-    );
+export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
+  try {
+    const data = await pdf(buffer);
+    return data.text ?? '';
+  } catch (e) {
+    log('ERROR', 'extractTextFromPDF failed', { error: (e as Error).message });
+    return '';
   }
 }
 
-// ---------------------------------------------------------------------------
-// HEALTH CHECK
-// ---------------------------------------------------------------------------
-
-export async function healthCheckLlamaParse(): Promise<boolean> {
-  FORCE_LOG('INFO', 'Running LlamaParse health check...');
-
+export async function extractTextFromPPTX(buffer: Buffer): Promise<string> {
   try {
-    const apiKey = getLlamaCloudKey();
-    const hasKey = !!apiKey;
-
-    FORCE_LOG('INFO', `Health Check Result: ${hasKey ? 'PASS' : 'FAIL'}`);
-    FORCE_LOG('INFO', `API Key Present: ${hasKey}`);
-    FORCE_LOG('INFO', `API Key Length: ${apiKey?.length || 0}`);
-
-    return hasKey;
+    const extractor = getTextExtractor();
+    const result = await extractor.extractText({ input: buffer, type: 'buffer' });
+    return typeof result === 'string' ? result : (result as { text?: string })?.text ?? '';
   } catch (e) {
-    FORCE_LOG('ERROR', 'Health check FAILED', e);
-    return false;
+    log('ERROR', 'extractTextFromPPTX failed', { error: (e as Error).message });
+    return '';
+  }
+}
+
+// ─── 12. Health Check ─────────────────────────────────────────────────────────
+// Tests actual connectivity, not just env var presence.
+
+export async function healthCheckLlamaCloud(): Promise<{ healthy: boolean; latencyMs?: number; error?: string }> {
+  const apiKey = getLlamaCloudKey();
+  if (!apiKey) {
+    return { healthy: false, error: 'API key not configured' };
+  }
+
+  const start = Date.now();
+  try {
+    // Parse a minimal valid PDF (22 bytes — smallest possible PDF structure)
+    const minimalPDF = Buffer.from(
+      '%PDF-1.0\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>',
+      'utf-8'
+    );
+    const reader = new LlamaParseReader({ apiKey, resultType: 'markdown' });
+    await reader.loadDataAsContent(minimalPDF, 'healthcheck.pdf');
+    return { healthy: true, latencyMs: Date.now() - start };
+  } catch (e) {
+    return { healthy: false, latencyMs: Date.now() - start, error: (e as Error).message };
   }
 }

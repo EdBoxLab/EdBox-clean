@@ -129,6 +129,7 @@ export default function RootLayout({
       <body className={`${inter.variable} font-primary antialiased bg-slate-900 text-white`}>
         <ClientLayout>{children}</ClientLayout>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

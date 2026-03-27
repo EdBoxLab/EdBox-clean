@@ -153,7 +153,7 @@ export function isProgrammingTopic(prompt: string): boolean {
 }
 
 export function extractContextForType(type: ContentType, fullPrompt: string): string {
-    const maxLength = 1500;
+    const maxLength = 4000;
     if (fullPrompt.length <= maxLength) return fullPrompt;
 
     switch (type) {
@@ -164,7 +164,7 @@ export function extractContextForType(type: ContentType, fullPrompt: string): st
         case 'mindmaps':
             return `Topic structure and relationships: ${fullPrompt.substring(0, maxLength)}...`;
         case 'notes':
-            return fullPrompt.substring(0, 2000);
+            return fullPrompt.substring(0, 6000);
         default:
             return fullPrompt.substring(0, maxLength);
     }

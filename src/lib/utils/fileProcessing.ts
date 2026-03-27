@@ -25,9 +25,8 @@ import { getTextExtractor } from "office-text-extractor";
 type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 function log(level: LogLevel, message: string, context?: unknown): void {
-  const entry = `[${new Date().toISOString()}] [EDBOX-${level}] ${message}${
-    context !== undefined ? ' ' + JSON.stringify(context) : ''
-  }`;
+  const entry = `[${new Date().toISOString()}] [EDBOX-${level}] ${message}${context !== undefined ? ' ' + JSON.stringify(context) : ''
+    }`;
 
   if (level === 'ERROR') {
     console.error(entry);
@@ -51,8 +50,8 @@ const CONFIG = {
   /** Fallback extraction char cap — prevents unbounded strings reaching AI */
   FALLBACK_CHAR_LIMIT: 100_000,
 
-  /** Gemini model — verified correct as of 2025 */
-  GEMINI_MODEL: 'gemini-2.0-flash',
+  /** Gemini model for document parsing */
+  GEMINI_MODEL: 'gemini-2.5-flash',
 } as const;
 
 /** Extensions routed through the structured-document parsers */
@@ -61,9 +60,9 @@ const STRUCTURED_EXTENSIONS = new Set([
 ]);
 
 const FILE_SIGNATURES: Record<string, readonly number[]> = {
-  pdf:  [0x25, 0x50, 0x44, 0x46], // %PDF
-  png:  [0x89, 0x50, 0x4E, 0x47],
-  jpg:  [0xFF, 0xD8, 0xFF],
+  pdf: [0x25, 0x50, 0x44, 0x46], // %PDF
+  png: [0x89, 0x50, 0x4E, 0x47],
+  jpg: [0xFF, 0xD8, 0xFF],
   jpeg: [0xFF, 0xD8, 0xFF],
   docx: [0x50, 0x4B, 0x03, 0x04], // ZIP-based (same as pptx/xlsx)
   pptx: [0x50, 0x4B, 0x03, 0x04],
@@ -244,17 +243,17 @@ Output ONLY the extracted markdown text, no commentary.`;
 
 function resolveDocumentMime(ext: string): string {
   const mimeMap: Record<string, string> = {
-    pdf:  'application/pdf',
+    pdf: 'application/pdf',
     docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    doc:  'application/msword',
-    ppt:  'application/vnd.ms-powerpoint',
-    xls:  'application/vnd.ms-excel',
-    png:  'image/png',
-    jpg:  'image/jpeg',
+    doc: 'application/msword',
+    ppt: 'application/vnd.ms-powerpoint',
+    xls: 'application/vnd.ms-excel',
+    png: 'image/png',
+    jpg: 'image/jpeg',
     jpeg: 'image/jpeg',
-    gif:  'image/gif',
+    gif: 'image/gif',
     webp: 'image/webp',
   };
   return mimeMap[ext] ?? 'application/octet-stream';
@@ -460,8 +459,8 @@ export async function processFileContent(
       try {
         markdown = await parseWithGemini(buffer, fileName, mimeType, 'document');
         parserUsed = 'Gemini';
-      } catch (geminiError) {
-        log('WARN', `Gemini failed — falling back to local extraction`, { fileName });
+      } catch (geminiError: any) {
+        log('WARN', `Gemini failed — falling back to local extraction`, { fileName, error: geminiError?.message || String(geminiError) });
         markdown = await parseWithFallback(buffer, fileName);
         parserUsed = 'Fallback (pdf-parse / office-extractor)';
       }

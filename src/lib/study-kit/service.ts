@@ -26,7 +26,7 @@ export async function generateChapterContent(
 ): Promise<ChapterContent> {
     const chapterContext = chapter.sourceContext || '';
     // Enhanced chapter prompt logic
-    const chapterPrompt = `Chapter: ${chapter.title}\n\nSummary: ${chapter.summary}\n\nKey Topics: ${chapter.keyTopics.join(', ')}\n\nLearning Objectives: ${chapter.learningObjectives?.join(', ') || ''}\n\nContent:\n${chapterContext.substring(0, 5000)}`;
+    const chapterPrompt = `Chapter: ${chapter.title}\n\nSummary: ${chapter.summary}\n\nKey Topics: ${chapter.keyTopics.join(', ')}\n\nLearning Objectives: ${chapter.learningObjectives?.join(', ') || ''}\n\nContent:\n${chapterContext.substring(0, 8000)}`;
 
     const result: ChapterContent = {
         id: chapter.id,

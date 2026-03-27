@@ -387,6 +387,14 @@ export async function POST(request: NextRequest) {
       return handleKitUpdate(body, user.id, supabase);
     }
 
+    // ── Route: generate content for confirmed chapters ─────────────────────────
+    // Checked BEFORE the prompt/file guard because chapter requests carry
+    // content inside each chapter's sourceContext, not in prompt/fileContent.
+    if (body.useChapters && body.chapters && body.chapters.length > 0) {
+      const finalPrompt = body.prompt ?? body.chapters[0]?.title ?? 'Generate study materials';
+      return handleChapterGeneration(body, user.id, finalPrompt, supabase);
+    }
+
     // ── Guard: must have either prompt or file content ─────────────────────────
     if (!body.prompt && !body.fileContent) {
       return NextResponse.json({ error: 'Missing required field: prompt or fileContent' }, { status: 400 });
@@ -430,11 +438,6 @@ export async function POST(request: NextRequest) {
     // ── Route: explicit chapter detection request ──────────────────────────────
     if (body.useChapters && !body.chapters && extractedText) {
       return handleChapterDetection(extractedText, body.fileName, /* forced */ false);
-    }
-
-    // ── Route: generate content for confirmed chapters ─────────────────────────
-    if (body.useChapters && body.chapters && body.chapters.length > 0) {
-      return handleChapterGeneration(body, user.id, finalPrompt, supabase);
     }
 
     // ── Route: single-pass generation ─────────────────────────────────────────

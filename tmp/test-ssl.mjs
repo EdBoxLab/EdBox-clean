@@ -1,6 +1,6 @@
 
 async function testFetch() {
-  const url = 'https://fiviygonxineoynebhxy.supabase.co/auth/v1/user';
+  const url = 'https://[project name].supabase.co/auth/v1/user';
   console.log(`Testing fetch to ${url}...`);
   try {
     const response = await fetch(url, {

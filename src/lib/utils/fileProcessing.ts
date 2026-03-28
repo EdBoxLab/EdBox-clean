@@ -12,7 +12,6 @@ import "@/lib/polyfills";
  * @version 4.0.0
  */
 
-import { LlamaCloud } from "@llamaindex/llama-cloud";
 import { getLlamaCloudKey } from "@/lib/ai-providers";
 import pdf from "pdf-parse";
 import { getTextExtractor } from "office-text-extractor";
@@ -260,16 +259,38 @@ function resolveDocumentMime(ext: string): string {
 }
 
 // ─── 7. Parser: LlamaCloud ────────────────────────────────────────────────────
-// @llamaindex/llama-cloud is a raw REST client — no LlamaParseReader, no
-// loadDataAsContent. The flow is:
-//   1. Upload file → get job_id
-//   2. Poll job status until SUCCESS or ERROR
-//   3. Fetch markdown result pages
+// Uses the LlamaParse REST API directly via fetch — no package client, no type
+// fights. The documented API flow is:
+//   POST /api/parsing/upload      → { id: jobId }
+//   GET  /api/parsing/job/{id}    → { status: 'PENDING'|'SUCCESS'|'ERROR' }
+//   GET  /api/parsing/job/{id}/result/markdown → { pages: [{ md }] }
 //
-// All three steps are wrapped in a single timeout race.
+// All steps run inside a single timeout race against CONFIG.LLAMA_TIMEOUT_MS.
 
-const POLL_INTERVAL_MS = 2_000;   // check status every 2s
-const POLL_MAX_ATTEMPTS = 55;     // 55 × 2s = 110s max poll time (within 120s timeout)
+const LLAMA_BASE_URL = 'https://api.cloud.llamaindex.ai';
+const POLL_INTERVAL_MS = 2_000;  // poll every 2s
+const POLL_MAX_ATTEMPTS = 55;    // 55 × 2s = 110s — safely within 120s timeout
+
+async function llamaFetch<T>(
+  path: string,
+  apiKey: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const res = await fetch(`${LLAMA_BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      ...options.headers,
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`LlamaParse ${options.method ?? 'GET'} ${path} → ${res.status}: ${body}`);
+  }
+
+  return res.json() as Promise<T>;
+}
 
 async function parseWithLlamaCloud(buffer: Buffer, fileName: string): Promise<string> {
   log('INFO', `LlamaCloud parse start: ${fileName} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`);
@@ -280,43 +301,49 @@ async function parseWithLlamaCloud(buffer: Buffer, fileName: string): Promise<st
   }
 
   const parsePromise = (async () => {
-    const client = new LlamaCloud({ token: apiKey });
     const ext = fileName.split('.').pop()?.toLowerCase() ?? 'bin';
     const mimeType = resolveDocumentMime(ext);
 
-    // Step 1: Upload
-    log('DEBUG', `LlamaCloud: uploading file`, { fileName, ext, mimeType });
-    const uploadResponse = await client.parsing.uploadFile({
-      file: new File([buffer], `upload.${ext}`, { type: mimeType }),
-      parsingInstruction: 'Extract all text preserving document structure. Use markdown tables for tabular data.',
-    });
+    // Step 1: Upload file
+    const form = new FormData();
+    form.append('file', new Blob([buffer], { type: mimeType }), `upload.${ext}`);
+    form.append('parsing_instruction', 'Extract all text preserving document structure. Use markdown tables for tabular data.');
+    form.append('result_type', 'markdown');
 
-    const jobId = uploadResponse.id;
+    const upload = await llamaFetch<{ id: string }>(
+      '/api/parsing/upload',
+      apiKey,
+      { method: 'POST', body: form }
+    );
+
+    const jobId = upload.id;
     if (!jobId) {
       throw new FileProcessingError('LlamaCloud upload returned no job ID', 'UPLOAD_FAILED', fileName);
     }
-    log('DEBUG', `LlamaCloud: job created`, { jobId, fileName });
+    log('DEBUG', `LlamaCloud job created: ${jobId}`, { fileName });
 
-    // Step 2: Poll for completion
+    // Step 2: Poll until SUCCESS or terminal failure
     let attempts = 0;
     while (attempts < POLL_MAX_ATTEMPTS) {
-      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
       attempts++;
 
-      const status = await client.parsing.getJobStatus({ jobId });
-      log('DEBUG', `LlamaCloud: poll ${attempts}/${POLL_MAX_ATTEMPTS} — status=${status.status}`, { jobId });
+      const { status } = await llamaFetch<{ status: string }>(
+        `/api/parsing/job/${jobId}`,
+        apiKey
+      );
+      log('DEBUG', `LlamaCloud poll ${attempts}/${POLL_MAX_ATTEMPTS}: ${status}`, { jobId });
 
-      if (status.status === 'SUCCESS') break;
-
-      if (status.status === 'ERROR' || status.status === 'CANCELLED') {
+      if (status === 'SUCCESS') break;
+      if (status === 'ERROR' || status === 'CANCELLED') {
         throw new FileProcessingError(
-          `LlamaCloud job failed with status: ${status.status}`,
+          `LlamaCloud job ended with status: ${status}`,
           'PARSE_FAILED',
           fileName,
-          { jobId, status: status.status }
+          { jobId, status }
         );
       }
-      // PENDING / PROCESSING → keep polling
+      // PENDING | PROCESSING → keep polling
     }
 
     if (attempts >= POLL_MAX_ATTEMPTS) {
@@ -328,13 +355,15 @@ async function parseWithLlamaCloud(buffer: Buffer, fileName: string): Promise<st
       );
     }
 
-    // Step 3: Fetch result
-    const result = await client.parsing.getJobResultJson({ jobId });
+    // Step 3: Fetch markdown result
+    const result = await llamaFetch<{ pages: Array<{ md?: string; text?: string }> }>(
+      `/api/parsing/job/${jobId}/result/markdown`,
+      apiKey
+    );
 
-    // The result contains pages array — each page has an 'md' or 'text' field
-    const pages: string[] = (result.pages ?? []).map((page: any, i: number) => {
+    const pages = (result.pages ?? []).map((page, i) => {
       const text = (page.md ?? page.text ?? '').trim();
-      if (!text) log('WARN', `LlamaCloud page ${i + 1} has no content`, { jobId });
+      if (!text) log('WARN', `LlamaCloud page ${i + 1} empty`, { jobId });
       return `--- PAGE ${i + 1} ---\n${text}`;
     });
 
@@ -343,7 +372,7 @@ async function parseWithLlamaCloud(buffer: Buffer, fileName: string): Promise<st
     }
 
     const combined = pages.join('\n\n');
-    log('INFO', `LlamaCloud parse success: ${combined.length} chars, ${pages.length} pages`, { fileName, jobId });
+    log('INFO', `LlamaCloud parse success: ${combined.length} chars, ${pages.length} pages`, { fileName });
     return combined;
   })();
 
@@ -576,8 +605,8 @@ export async function extractTextFromPPTX(buffer: Buffer): Promise<string> {
 }
 
 // ─── 12. Health Check ─────────────────────────────────────────────────────────
-// Tests actual connectivity by hitting the LlamaCloud status endpoint.
-// Does NOT upload a file — that would cost credits on every health check.
+// Hits the LlamaParse jobs list endpoint — lightweight, read-only, confirms
+// both auth and connectivity without burning parsing credits.
 
 export async function healthCheckLlamaCloud(): Promise<{ healthy: boolean; latencyMs?: number; error?: string }> {
   const apiKey = getLlamaCloudKey();
@@ -587,9 +616,7 @@ export async function healthCheckLlamaCloud(): Promise<{ healthy: boolean; laten
 
   const start = Date.now();
   try {
-    const client = new LlamaCloud({ token: apiKey });
-    // List recent jobs — a lightweight read-only call that confirms auth + connectivity
-    await client.parsing.listJobs({ limit: 1 });
+    await llamaFetch('/api/parsing/job?limit=1', apiKey);
     return { healthy: true, latencyMs: Date.now() - start };
   } catch (e) {
     return { healthy: false, latencyMs: Date.now() - start, error: (e as Error).message };

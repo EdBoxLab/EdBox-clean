@@ -322,7 +322,7 @@ function extractJSON(text: string, type: ContentType) {
 
 function buildPrompt(type: ContentType, context: string, itemCount?: number) {
   const count = itemCount || 10;
-  const truncatedContext = context.slice(0, 3000);
+  const truncatedContext = context.slice(0, 6000);
 
   switch (type) {
     case 'quizzes':
@@ -374,7 +374,7 @@ Format as a JSON array:
 }
 
 function buildNotePrompt(context: string, noteType: NoteType): string {
-  const truncatedContext = context.slice(0, 4000);
+  const truncatedContext = context.slice(0, 6000);
   const template = NOTE_TEMPLATES[noteType];
   return `Topic/Content Source: "${truncatedContext}"\n\n${template}`;
 }

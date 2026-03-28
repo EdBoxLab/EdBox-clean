@@ -43,7 +43,6 @@
     "framer-motion": "^12.34.0",
     "groq-sdk": "^0.37.0",
     "katex": "^0.16.28",
-    "llama-cloud-services": "^0.5.3",
     "llamaindex": "^0.12.1",
     "lucide-react": "^0.563.0",
     "mammoth": "^1.11.0",

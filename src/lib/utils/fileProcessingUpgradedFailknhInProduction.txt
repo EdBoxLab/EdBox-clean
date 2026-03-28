@@ -11,7 +11,7 @@
  * @performance Target: 95th percentile < 8s for 50-page PDFs
  */
 
-import { LlamaParseReader } from "llama-cloud-services";
+import { LlamaParseReader } from "@llamaindex/llama-cloud";
 import { Document } from "llamaindex";
 import { getLlamaCloudKey } from "@/lib/ai-providers";
 import pdf from "pdf-parse";

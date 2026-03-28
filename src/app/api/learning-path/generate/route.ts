@@ -142,11 +142,11 @@ Based on the goal, level, and duration, generate a detailed learning plan analys
   const domain = parsed.domain || 'General Education';
   const category = detectCourseCategory(parsedGoal, domain);
 
-  return { 
-    ...parsed, 
+  return {
+    ...parsed,
     parsedGoal,
     domain,
-    category 
+    category
   };
 }
 
@@ -401,71 +401,71 @@ export async function POST(request: NextRequest) {
       requestData: { goal, context, timeAvailable, fileHash: uploadedFile?.name },
     });
 
-      if (cached && cached.responseData) {
-        console.log('📦 Returning cached course');
+    if (cached && cached.responseData) {
+      console.log('📦 Returning cached course');
 
-        const newId = crypto.randomUUID();
-        const cachedGraph = {
-          ...cached.responseData.skillGraph,
-          id: newId,
+      const newId = crypto.randomUUID();
+      const cachedGraph = {
+        ...cached.responseData.skillGraph,
+        id: newId,
+        userId: user.id,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Defensive check for cached skillPaths
+      if (!cachedGraph.skillPaths || !Array.isArray(cachedGraph.skillPaths)) {
+        console.warn('⚠️ Cached skillGraph is missing skillPaths, falling back to new generation');
+        // If cache is invalid, we continue to generate a new one
+      } else {
+        const allSkills = cachedGraph.skillPaths.flatMap((path: any) => path.skills || []);
+        const skillMastery: LearnerState['skillMastery'] = {};
+        allSkills.forEach((skill: any) => {
+          if (skill && skill.id) {
+            skillMastery[skill.id] = {
+              confidence: 0.0,
+              challengesCompleted: 0,
+              successRate: 0.0,
+              timeSpent: 0,
+              lastPracticed: null,
+              isMastered: false
+            };
+          }
+        });
+
+        const learnerState: LearnerState = {
+          id: crypto.randomUUID(),
           userId: user.id,
-          createdAt: new Date().toISOString(),
+          skillGraphId: cachedGraph.id,
+          skillMastery,
+          currentSkill: null,
+          streak: 0,
+          totalXP: 0,
+          level: 1,
+          badges: [],
+          startedAt: new Date().toISOString()
         };
 
-        // Defensive check for cached skillPaths
-        if (!cachedGraph.skillPaths || !Array.isArray(cachedGraph.skillPaths)) {
-          console.warn('⚠️ Cached skillGraph is missing skillPaths, falling back to new generation');
-          // If cache is invalid, we continue to generate a new one
-        } else {
-          const allSkills = cachedGraph.skillPaths.flatMap((path: any) => path.skills || []);
-          const skillMastery: LearnerState['skillMastery'] = {};
-          allSkills.forEach((skill: any) => {
-            if (skill && skill.id) {
-              skillMastery[skill.id] = {
-                confidence: 0.0,
-                challengesCompleted: 0,
-                successRate: 0.0,
-                timeSpent: 0,
-                lastPracticed: null,
-                isMastered: false
-              };
-            }
-          });
+        const { nodes, edges } = transformToGraph(
+          cachedGraph.skillPaths,
+          cachedGraph.miniProjects || [],
+          cachedGraph.capstone_project || cachedGraph.capstoneProject,
+          ((cached as any).category || CourseCategory.Technology) as CourseCategory
+        );
 
-          const learnerState: LearnerState = {
-            id: crypto.randomUUID(),
-            userId: user.id,
-            skillGraphId: cachedGraph.id,
-            skillMastery,
-            currentSkill: null,
-            streak: 0,
-            totalXP: 0,
-            level: 1,
-            badges: [],
-            startedAt: new Date().toISOString()
-          };
-
-            const { nodes, edges } = transformToGraph(
-              cachedGraph.skillPaths,
-              cachedGraph.miniProjects || [],
-              cachedGraph.capstone_project || cachedGraph.capstoneProject,
-              ((cached as any).category || CourseCategory.Technology) as CourseCategory
-            );
-
-          await supabase.from('skill_graphs').insert([{
-            id: cachedGraph.id,
-            user_id: user.id,
-            goal: cachedGraph.goal,
-            context: cachedGraph.context,
-            total_skills: cachedGraph.totalSkills || allSkills.length,
-            estimated_hours: cachedGraph.estimatedHours,
-            skill_paths: cachedGraph.skillPaths,
-            mini_projects: cachedGraph.miniProjects || [],
-            capstone_project: cachedGraph.capstone_project || cachedGraph.capstoneProject,
-            nodes: cachedGraph.nodes && cachedGraph.nodes.length > 0 ? cachedGraph.nodes : nodes,
-            edges: cachedGraph.edges && cachedGraph.edges.length > 0 ? cachedGraph.edges : edges,
-            created_at: cachedGraph.createdAt
-          }]);
+        await supabase.from('skill_graphs').insert([{
+          id: cachedGraph.id,
+          user_id: user.id,
+          goal: cachedGraph.goal,
+          context: cachedGraph.context,
+          total_skills: cachedGraph.totalSkills || allSkills.length,
+          estimated_hours: cachedGraph.estimatedHours,
+          skill_paths: cachedGraph.skillPaths,
+          mini_projects: cachedGraph.miniProjects || [],
+          capstone_project: cachedGraph.capstone_project || cachedGraph.capstoneProject,
+          nodes: cachedGraph.nodes && cachedGraph.nodes.length > 0 ? cachedGraph.nodes : nodes,
+          edges: cachedGraph.edges && cachedGraph.edges.length > 0 ? cachedGraph.edges : edges,
+          created_at: cachedGraph.createdAt
+        }]);
 
         await supabase.from('learner_states').insert([{
           id: learnerState.id,
@@ -639,17 +639,17 @@ export async function POST(request: NextRequest) {
       },
       {
         skillGraph: {
-            goal: skillGraph.goal,
-            context: skillGraph.context,
-            totalSkills: skillGraph.totalSkills,
-            estimatedHours: skillGraph.estimatedHours,
-            skillPaths: skillGraph.skillPaths,
-            miniProjects: skillGraph.miniProjects,
-            capstone_project: skillGraph.capstone_project,
-            nodes: skillGraph.nodes,
-            edges: skillGraph.edges,
-            adjustedDifficulty: analysis.adjustedDifficulty
-          },
+          goal: skillGraph.goal,
+          context: skillGraph.context,
+          totalSkills: skillGraph.totalSkills,
+          estimatedHours: skillGraph.estimatedHours,
+          skillPaths: skillGraph.skillPaths,
+          miniProjects: skillGraph.miniProjects,
+          capstone_project: skillGraph.capstone_project,
+          nodes: skillGraph.nodes,
+          edges: skillGraph.edges,
+          adjustedDifficulty: analysis.adjustedDifficulty
+        },
       }
     );
 

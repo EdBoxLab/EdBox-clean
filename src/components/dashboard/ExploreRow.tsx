@@ -87,12 +87,14 @@ export const ExploreRow: React.FC<ExploreRowProps> = ({
     if (!items || items.length === 0) {
         return (
             <div className="mb-12">
-                <h2 className="text-2xl font-bold text-white mb-4">{title}</h2>
-                <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-8 text-center">
-                    <p className="text-gray-400 mb-4">{emptyMessage || "No items found."}</p>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-2xl font-bold text-white">{title}</h2>
+                </div>
+                <div className="bg-zinc-900/30 border border-zinc-800 rounded-2xl p-8 text-center shadow-sm">
+                    <p className="text-gray-400 mb-6">{emptyMessage || "No items found."}</p>
                     {createLink && createText && (
-                        <Link href={createLink} className="inline-flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition">
-                            <Plus className="w-4 h-4" /> {createText}
+                        <Link href={createLink} className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold rounded-xl shadow-md hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all duration-300 ease-out">
+                            <Plus className="w-5 h-5" /> {createText}
                         </Link>
                     )}
                 </div>
@@ -103,7 +105,14 @@ export const ExploreRow: React.FC<ExploreRowProps> = ({
     return (
         <div className="mb-12">
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-white">{title}</h2>
+                <div className="flex items-center gap-4">
+                    <h2 className="text-2xl font-bold text-white">{title}</h2>
+                    {createLink && createText && items.length > 0 && (
+                        <Link href={createLink} className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold rounded-xl shadow-sm hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all duration-300 ease-out text-sm">
+                            <Plus className="w-4 h-4" /> {createText}
+                        </Link>
+                    )}
+                </div>
                 {items.length > 3 && (
                     <div className="flex gap-2">
                         <button

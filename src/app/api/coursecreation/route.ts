@@ -451,10 +451,83 @@ export async function POST(request: NextRequest) {
         createdAt: new Date().toISOString(),
       };
 
+      const allSkills = cachedGraph.skillPaths.flatMap((path: any) => path.skills);
+      const totalSkills = allSkills.length;
+      
+      const skillMastery: LearnerState['skillMastery'] = {};
+      allSkills.forEach((skill: any) => {
+        skillMastery[skill.id] = {
+          confidence: 0.0,
+          challengesCompleted: 0,
+          successRate: 0.0,
+          timeSpent: 0,
+          lastPracticed: null,
+          isMastered: false
+        };
+      });
+
+      const learnerState: LearnerState = {
+        id: crypto.randomUUID(),
+        userId: user.id,
+        skillGraphId: cachedGraph.id,
+        skillMastery,
+        currentSkill: null,
+        streak: 0,
+        totalXP: 0,
+        level: 1,
+        badges: [],
+        startedAt: new Date().toISOString()
+      };
+      
+      console.log('💾 Saving cached graph and state to database...');
+      
+      const { error: graphError } = await supabase
+        .from('skill_graphs')
+        .insert([{
+          id: cachedGraph.id,
+          user_id: user.id,
+          goal: cachedGraph.goal,
+          context: cachedGraph.context,
+          total_skills: cachedGraph.totalSkills,
+          estimated_hours: cachedGraph.estimatedHours,
+          skill_paths: cachedGraph.skillPaths,
+          mini_projects: cachedGraph.miniProjects,
+          capstone_project: cachedGraph.capstone_project || cachedGraph.capstoneProject,
+          nodes: cachedGraph.nodes,
+          edges: cachedGraph.edges,
+          created_at: cachedGraph.createdAt
+        }]);
+
+      if (graphError) {
+        console.error('❌ Failed to save cached skill graph:', graphError);
+        throw new Error(`Database error: ${graphError.message}`);
+      }
+
+      const { error: stateError } = await supabase
+        .from('learner_states')
+        .insert([learnerState]);
+
+      if (stateError) {
+        console.error('❌ Failed to save cached learner state:', stateError);
+        throw new Error(`Database error: ${stateError.message}`);
+      }
+
       return NextResponse.json({
         success: true,
         cached: true,
-        skillGraph: cachedGraph
+        skillGraph: {
+          ...cachedGraph,
+          readySkills: allSkills.filter((s: any) => !s.prerequisites || s.prerequisites.length === 0).length,
+          totalProjects: (cachedGraph.miniProjects?.length || 0) + 1,
+        },
+        learnerState: {
+          id: learnerState.id,
+          totalSkills,
+          masteredSkills: 0,
+          currentLevel: 1,
+          totalXP: 0,
+          streak: 0
+        }
       });
     }
 

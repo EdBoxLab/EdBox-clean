@@ -306,7 +306,7 @@ async function parseWithLlamaCloud(buffer: Buffer, fileName: string): Promise<st
 
     // Step 1: Upload file
     const form = new FormData();
-    form.append('file', new Blob([buffer], { type: mimeType }), `upload.${ext}`);
+    form.append('file', new Blob([new Uint8Array(buffer)], { type: mimeType }), `upload.${ext}`);
     form.append('parsing_instruction', 'Extract all text preserving document structure. Use markdown tables for tabular data.');
     form.append('result_type', 'markdown');
 

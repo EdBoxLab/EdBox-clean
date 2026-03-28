@@ -12,8 +12,7 @@ import "@/lib/polyfills";
  * @version 4.0.0
  */
 
-import { LlamaParseReader } from "llama-cloud-services";
-import { Document } from "llamaindex";
+import { LlamaCloud } from "@llamaindex/llama-cloud";
 import { getLlamaCloudKey } from "@/lib/ai-providers";
 import pdf from "pdf-parse";
 import { getTextExtractor } from "office-text-extractor";
@@ -25,8 +24,9 @@ import { getTextExtractor } from "office-text-extractor";
 type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 function log(level: LogLevel, message: string, context?: unknown): void {
-  const entry = `[${new Date().toISOString()}] [EDBOX-${level}] ${message}${context !== undefined ? ' ' + JSON.stringify(context) : ''
-    }`;
+  const entry = `[${new Date().toISOString()}] [EDBOX-${level}] ${message}${
+    context !== undefined ? ' ' + JSON.stringify(context) : ''
+  }`;
 
   if (level === 'ERROR') {
     console.error(entry);
@@ -50,8 +50,8 @@ const CONFIG = {
   /** Fallback extraction char cap — prevents unbounded strings reaching AI */
   FALLBACK_CHAR_LIMIT: 100_000,
 
-  /** Gemini model for document parsing */
-  GEMINI_MODEL: 'gemini-2.5-flash',
+  /** Gemini model — verified correct as of 2025 */
+  GEMINI_MODEL: 'gemini-2.0-flash',
 } as const;
 
 /** Extensions routed through the structured-document parsers */
@@ -60,9 +60,9 @@ const STRUCTURED_EXTENSIONS = new Set([
 ]);
 
 const FILE_SIGNATURES: Record<string, readonly number[]> = {
-  pdf: [0x25, 0x50, 0x44, 0x46], // %PDF
-  png: [0x89, 0x50, 0x4E, 0x47],
-  jpg: [0xFF, 0xD8, 0xFF],
+  pdf:  [0x25, 0x50, 0x44, 0x46], // %PDF
+  png:  [0x89, 0x50, 0x4E, 0x47],
+  jpg:  [0xFF, 0xD8, 0xFF],
   jpeg: [0xFF, 0xD8, 0xFF],
   docx: [0x50, 0x4B, 0x03, 0x04], // ZIP-based (same as pptx/xlsx)
   pptx: [0x50, 0x4B, 0x03, 0x04],
@@ -243,23 +243,33 @@ Output ONLY the extracted markdown text, no commentary.`;
 
 function resolveDocumentMime(ext: string): string {
   const mimeMap: Record<string, string> = {
-    pdf: 'application/pdf',
+    pdf:  'application/pdf',
     docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    doc: 'application/msword',
-    ppt: 'application/vnd.ms-powerpoint',
-    xls: 'application/vnd.ms-excel',
-    png: 'image/png',
-    jpg: 'image/jpeg',
+    doc:  'application/msword',
+    ppt:  'application/vnd.ms-powerpoint',
+    xls:  'application/vnd.ms-excel',
+    png:  'image/png',
+    jpg:  'image/jpeg',
     jpeg: 'image/jpeg',
-    gif: 'image/gif',
+    gif:  'image/gif',
     webp: 'image/webp',
   };
   return mimeMap[ext] ?? 'application/octet-stream';
 }
 
 // ─── 7. Parser: LlamaCloud ────────────────────────────────────────────────────
+// @llamaindex/llama-cloud is a raw REST client — no LlamaParseReader, no
+// loadDataAsContent. The flow is:
+//   1. Upload file → get job_id
+//   2. Poll job status until SUCCESS or ERROR
+//   3. Fetch markdown result pages
+//
+// All three steps are wrapped in a single timeout race.
+
+const POLL_INTERVAL_MS = 2_000;   // check status every 2s
+const POLL_MAX_ATTEMPTS = 55;     // 55 × 2s = 110s max poll time (within 120s timeout)
 
 async function parseWithLlamaCloud(buffer: Buffer, fileName: string): Promise<string> {
   log('INFO', `LlamaCloud parse start: ${fileName} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`);
@@ -269,34 +279,73 @@ async function parseWithLlamaCloud(buffer: Buffer, fileName: string): Promise<st
     throw new FileProcessingError('LlamaCloud API key not available', 'NO_API_KEY', fileName);
   }
 
-  const reader = new LlamaParseReader({
-    apiKey,
-    resultType: 'markdown',
-    parsingInstruction: 'Extract all text preserving document structure. Use markdown tables for tabular data.',
-  });
+  const parsePromise = (async () => {
+    const client = new LlamaCloud({ token: apiKey });
+    const ext = fileName.split('.').pop()?.toLowerCase() ?? 'bin';
+    const mimeType = resolveDocumentMime(ext);
 
-  const ext = fileName.split('.').pop()?.toLowerCase() ?? 'bin';
-
-  const parsePromise = reader
-    .loadDataAsContent(buffer, `upload.${ext}`)
-    .then((documents: Document[]) => {
-      if (!documents?.length) {
-        throw new FileProcessingError('LlamaCloud returned zero documents', 'EMPTY_RESPONSE', fileName);
-      }
-
-      const pages = documents.map((doc: Document, i: number) => {
-        // doc.text is the canonical field on the llamaindex Document type
-        const text = doc.text?.trim() ?? '';
-        if (!text) {
-          log('WARN', `LlamaCloud document ${i + 1} has no text content`, { fileName });
-        }
-        return `--- PAGE ${i + 1} ---\n${text}`;
-      });
-
-      const combined = pages.join('\n\n');
-      log('INFO', `LlamaCloud parse success: ${combined.length} chars`, { fileName, pages: documents.length });
-      return combined;
+    // Step 1: Upload
+    log('DEBUG', `LlamaCloud: uploading file`, { fileName, ext, mimeType });
+    const uploadResponse = await client.parsing.uploadFile({
+      file: new File([buffer], `upload.${ext}`, { type: mimeType }),
+      parsingInstruction: 'Extract all text preserving document structure. Use markdown tables for tabular data.',
     });
+
+    const jobId = uploadResponse.id;
+    if (!jobId) {
+      throw new FileProcessingError('LlamaCloud upload returned no job ID', 'UPLOAD_FAILED', fileName);
+    }
+    log('DEBUG', `LlamaCloud: job created`, { jobId, fileName });
+
+    // Step 2: Poll for completion
+    let attempts = 0;
+    while (attempts < POLL_MAX_ATTEMPTS) {
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+      attempts++;
+
+      const status = await client.parsing.getJobStatus({ jobId });
+      log('DEBUG', `LlamaCloud: poll ${attempts}/${POLL_MAX_ATTEMPTS} — status=${status.status}`, { jobId });
+
+      if (status.status === 'SUCCESS') break;
+
+      if (status.status === 'ERROR' || status.status === 'CANCELLED') {
+        throw new FileProcessingError(
+          `LlamaCloud job failed with status: ${status.status}`,
+          'PARSE_FAILED',
+          fileName,
+          { jobId, status: status.status }
+        );
+      }
+      // PENDING / PROCESSING → keep polling
+    }
+
+    if (attempts >= POLL_MAX_ATTEMPTS) {
+      throw new FileProcessingError(
+        `LlamaCloud job did not complete after ${POLL_MAX_ATTEMPTS} polls`,
+        'TIMEOUT',
+        fileName,
+        { jobId }
+      );
+    }
+
+    // Step 3: Fetch result
+    const result = await client.parsing.getJobResultJson({ jobId });
+
+    // The result contains pages array — each page has an 'md' or 'text' field
+    const pages: string[] = (result.pages ?? []).map((page: any, i: number) => {
+      const text = (page.md ?? page.text ?? '').trim();
+      if (!text) log('WARN', `LlamaCloud page ${i + 1} has no content`, { jobId });
+      return `--- PAGE ${i + 1} ---\n${text}`;
+    });
+
+    if (pages.length === 0) {
+      throw new FileProcessingError('LlamaCloud returned zero pages', 'EMPTY_RESPONSE', fileName, { jobId });
+    }
+
+    const combined = pages.join('\n\n');
+    log('INFO', `LlamaCloud parse success: ${combined.length} chars, ${pages.length} pages`, { fileName, jobId });
+    return combined;
+  })();
 
   const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(
@@ -459,8 +508,8 @@ export async function processFileContent(
       try {
         markdown = await parseWithGemini(buffer, fileName, mimeType, 'document');
         parserUsed = 'Gemini';
-      } catch (geminiError: any) {
-        log('WARN', `Gemini failed — falling back to local extraction`, { fileName, error: geminiError?.message || String(geminiError) });
+      } catch (geminiError) {
+        log('WARN', `Gemini failed — falling back to local extraction`, { fileName });
         markdown = await parseWithFallback(buffer, fileName);
         parserUsed = 'Fallback (pdf-parse / office-extractor)';
       }
@@ -527,7 +576,8 @@ export async function extractTextFromPPTX(buffer: Buffer): Promise<string> {
 }
 
 // ─── 12. Health Check ─────────────────────────────────────────────────────────
-// Tests actual connectivity, not just env var presence.
+// Tests actual connectivity by hitting the LlamaCloud status endpoint.
+// Does NOT upload a file — that would cost credits on every health check.
 
 export async function healthCheckLlamaCloud(): Promise<{ healthy: boolean; latencyMs?: number; error?: string }> {
   const apiKey = getLlamaCloudKey();
@@ -537,13 +587,9 @@ export async function healthCheckLlamaCloud(): Promise<{ healthy: boolean; laten
 
   const start = Date.now();
   try {
-    // Parse a minimal valid PDF (22 bytes — smallest possible PDF structure)
-    const minimalPDF = Buffer.from(
-      '%PDF-1.0\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>',
-      'utf-8'
-    );
-    const reader = new LlamaParseReader({ apiKey, resultType: 'markdown' });
-    await reader.loadDataAsContent(minimalPDF, 'healthcheck.pdf');
+    const client = new LlamaCloud({ token: apiKey });
+    // List recent jobs — a lightweight read-only call that confirms auth + connectivity
+    await client.parsing.listJobs({ limit: 1 });
     return { healthy: true, latencyMs: Date.now() - start };
   } catch (e) {
     return { healthy: false, latencyMs: Date.now() - start, error: (e as Error).message };

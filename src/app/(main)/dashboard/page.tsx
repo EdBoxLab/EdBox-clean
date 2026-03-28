@@ -69,24 +69,28 @@ const Dashboard: React.FC = () => {
           <ExploreRow
             title="Your Courses"
             items={courses}
-            emptyMessage="You haven't enrolled in any courses yet."
+            emptyMessage="Share your expertise with the world. Build engaging, interactive courses in minutes and start growing your learning community from scratch."
             showProgress={true}
             createLink="/creator"
-            createText="Create Your First Course"
+            createText="Create Course"
             isLoading={coursesLoading}
             onDelete={handleDelete}
           />
           <ExploreRow
             title="Your Notes"
             items={notes}
-            emptyMessage="No notes created yet. Use the Note Taker to get started!"
+            emptyMessage="Capture your ideas with zero friction. Write, organize, and access your smart notes from anywhere to keep your thoughts perfectly structured."
+            createLink="/tools/notes"
+            createText="Create Note"
             isLoading={notesLoading}
             onDelete={handleDelete}
           />
           <ExploreRow
             title="Your Study Kits"
             items={studyKits}
-            emptyMessage="No study kits generated yet. Use Study Kit to create one!"
+            emptyMessage="Turn any document into a masterclass. Upload your PDFs or text to instantly generate personalized flashcards, summaries, and quizzes designed to help you study smarter and ace your exams."
+            createLink="/tools/study-kit"
+            createText="Generate Study Kit"
             isLoading={kitsLoading}
             onDelete={handleDelete}
           />

@@ -307,12 +307,15 @@ function StudyKitContent() {
     };
 
     const handleConfirmChapters = async (confirmedChapters: any[]) => {
+        console.log(`[handleConfirmChapters] prompt="${prompt}", fileName="${chapterDetectionMeta?.fileName}", chapterCount=${confirmedChapters?.length}`);
         setShowChapterReview(false);
         setIsGenerating(true);
         setCurrentStep('generating');
 
         try {
             const types = multiSelectedTypes;
+            const firstChapterTitle = confirmedChapters?.[0]?.title;
+            console.log(`[handleConfirmChapters] Sending to API: prompt="${prompt}", useChapters=true, chapters=${confirmedChapters?.length}, firstChapter="${firstChapterTitle}"`);
             const response = await fetch('/api/study-kit/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

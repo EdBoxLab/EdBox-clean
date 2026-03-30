@@ -9,6 +9,7 @@ import type { DetectedChapter } from '@/types/chapters';
 import { getRateLimiter } from '@/lib/rate-limit';
 import { generateChapterContent, generateSingleContent } from '@/lib/study-kit/service';
 import { ContentType } from '@/lib/study-kit/types';
+import { buildStudyKitTitle } from '@/lib/study-kit/utils';
 import {
   LARGE_FILE_THRESHOLD,
   FORCE_CHAPTER_THRESHOLD,
@@ -58,10 +59,6 @@ type RequestBody = z.infer<typeof RequestBodySchema>;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function buildTitle(prompt?: string, fileName?: string): string {
-  const candidate = prompt?.slice(0, MAX_TITLE_LENGTH) ?? fileName?.split('.')[0] ?? 'Study Kit';
-  return candidate.trim().length >= 3 ? candidate.trim() : 'My Study Kit';
-}
 
 async function applyRateLimit(userId: string): Promise<NextResponse | null> {
   const ratelimit = getRateLimiter();
@@ -256,7 +253,12 @@ async function handleChapterGeneration(
     return NextResponse.json({ error: 'All chapter generation failed', failedChapters }, { status: 500 });
   }
 
-  const title = buildTitle(prompt, fileName);
+  console.log(`[handleChapterGeneration] calling buildStudyKitTitle with prompt="${finalPrompt}", fileName="${fileName}"`);
+  const title = buildStudyKitTitle(
+    prompt ?? body.chapters?.[0]?.title ?? fileName,
+    fileName
+  );
+  console.log(`[handleChapterGeneration] title result="${title}"`);
 
   const { data: studyKit, error: insertError } = await supabase
     .from('study_kit_content')
@@ -329,7 +331,7 @@ async function handleSingleGeneration(
     return NextResponse.json({ error: 'All content generation failed', failures }, { status: 500 });
   }
 
-  const title = buildTitle(prompt, fileName);
+  const title = buildStudyKitTitle(prompt, fileName);
 
   const { data: studyKit, error: insertError } = await supabase
     .from('study_kit_content')
@@ -391,7 +393,9 @@ export async function POST(request: NextRequest) {
     // Checked BEFORE the prompt/file guard because chapter requests carry
     // content inside each chapter's sourceContext, not in prompt/fileContent.
     if (body.useChapters && body.chapters && body.chapters.length > 0) {
-      const finalPrompt = body.prompt ?? body.chapters[0]?.title ?? 'Generate study materials';
+      console.log(`[handleChapterGeneration] body.prompt="${body.prompt}", body.fileName="${body.fileName}", body.chapters[0].title="${body.chapters?.[0]?.title}"`);
+      const finalPrompt = body.prompt ?? body.chapters?.[0]?.title ?? 'Generate study materials';
+      console.log(`[handleChapterGeneration] finalPrompt="${finalPrompt}"`);
       return handleChapterGeneration(body, user.id, finalPrompt, supabase);
     }
 

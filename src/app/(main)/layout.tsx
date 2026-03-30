@@ -4,9 +4,10 @@ import Script from 'next/script';
 import SideMenu from '../../components/SideMenu';
 import { Header } from '../../components/Header';
 import Footer from '../../components/Footer';
-import KoalaGenie from '../../components/KoalaGenie';
+import { GlobalGenie } from '../../components/Genie/GlobalGenie';
 import { Toaster } from '../../components/ui/toaster';
 import { AppTour } from '../../components/AppTour';
+
 
 declare global {
   interface Window {
@@ -16,26 +17,45 @@ declare global {
   }
 }
 
+import { motion } from 'framer-motion';
+
+const MotionDiv = motion.div as any;
+
 export default function MainAppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { isOpen, isPinned } = useGenie();
+  const showPadding = isOpen && isPinned;
+
   return (
     <>
       <Script 
         src="https://script.supademo.com/supademo.js" 
         strategy="afterInteractive"
       />
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background overflow-hidden relative">
         <AppTour />
         <SideMenu />
-      <main className="lg:pl-64 min-h-screen overflow-x-hidden overflow-y-auto bg-background pb-20 lg:pb-0">
-        {children}
-      </main>
-      <KoalaGenie />
-      <Toaster />
+        
+        <MotionDiv
+          animate={{ 
+            width: showPadding ? 'calc(100% - 450px)' : '100%',
+          }}
+          transition={{ type: 'spring', damping: 30, stiffness: 200 }}
+          className="min-h-screen"
+        >
+          <main className="lg:pl-64 min-h-screen overflow-x-hidden overflow-y-auto bg-background pb-20 lg:pb-0">
+            {children}
+          </main>
+        </MotionDiv>
+
+        <GlobalGenie />
+        <Toaster />
       </div>
     </>
   );
 }
+
+

@@ -49,8 +49,8 @@ const CONFIG = {
   /** Fallback extraction char cap — prevents unbounded strings reaching AI */
   FALLBACK_CHAR_LIMIT: 100_000,
 
-  /** Gemini model — verified correct as of 2025 */
-  GEMINI_MODEL: 'gemini-2.0-flash',
+  /** Gemini model — v3.1 specifically verified as of March 2026 */
+  GEMINI_MODEL: 'gemini-3.1-pro-preview',
 } as const;
 
 /** Extensions routed through the structured-document parsers */
@@ -221,23 +221,30 @@ Output only the above structure, no commentary.`
 
 Output ONLY the extracted markdown text, no commentary.`;
 
-  const result = await model.generateContent([
-    {
-      inlineData: {
-        mimeType: resolvedMime,
-        data: buffer.toString('base64'),
+  try {
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: resolvedMime,
+          data: buffer.toString('base64'),
+        },
       },
-    },
-    { text: prompt },
-  ]);
+      { text: prompt },
+    ]);
 
-  const text = result.response.text();
-  if (!text?.trim()) {
-    throw new FileProcessingError('Gemini returned empty response', 'EMPTY_RESPONSE', fileName);
+    const response = await result.response;
+    const text = response.text();
+    if (!text?.trim()) {
+      throw new FileProcessingError('Gemini returned empty response', 'EMPTY_RESPONSE', fileName);
+    }
+
+    log('INFO', `Gemini parse success: ${text.length} chars extracted`, { fileName });
+    return text;
+  } catch (error: any) {
+    // Surface the actual reason for failures (e.g. 400 Bad Request if MIME is unsupported)
+    log('ERROR', `Gemini parse raw failure: ${error.message}`, { fileName, mimeType: resolvedMime });
+    throw error;
   }
-
-  log('INFO', `Gemini parse success: ${text.length} chars extracted`, { fileName });
-  return text;
 }
 
 function resolveDocumentMime(ext: string): string {
@@ -527,13 +534,16 @@ export async function processFileContent(
     }
   }
 
-  // Step 3b: Structured documents → Gemini (≤5MB) or LlamaCloud (>5MB), with fallback
+  // Step 3b: Structured documents → Gemini (PDF only ≤5MB) or LlamaCloud (>5MB / Office), with fallback
   if (isStructured) {
     let markdown: string;
     let parserUsed: string;
 
-    if (buffer.length <= CONFIG.GEMINI_DIRECT_LIMIT) {
-      log('INFO', `Route: structured doc ≤5MB → Gemini`, { fileName });
+    // Gemini only supports PDF for direct inlineData document parsing
+    const isGeminiSupportedType = mimeType === 'application/pdf' || ext === 'pdf';
+
+    if (buffer.length <= CONFIG.GEMINI_DIRECT_LIMIT && isGeminiSupportedType) {
+      log('INFO', `Route: structured PDF ≤5MB → Gemini`, { fileName });
       try {
         markdown = await parseWithGemini(buffer, fileName, mimeType, 'document');
         parserUsed = 'Gemini';
@@ -542,7 +552,7 @@ export async function processFileContent(
         markdown = await parseWithFallback(buffer, fileName);
         parserUsed = 'Fallback (pdf-parse / office-extractor)';
       }
-    } else {
+    } else if (buffer.length > CONFIG.GEMINI_DIRECT_LIMIT) {
       log('INFO', `Route: structured doc >5MB → LlamaCloud`, { fileName });
       try {
         markdown = await parseWithLlamaCloud(buffer, fileName);
@@ -552,6 +562,12 @@ export async function processFileContent(
         markdown = await parseWithFallback(buffer, fileName);
         parserUsed = 'Fallback (pdf-parse / office-extractor)';
       }
+    } else {
+      // Small Office files (DOCX, PPTX, XLSX) go directly to LlamaCloud (if set up) or Fallback
+      // since Gemini inlineData doesn't support them.
+      log('INFO', `Route: Small Office file → local extraction`, { fileName });
+      markdown = await parseWithFallback(buffer, fileName);
+      parserUsed = 'Fallback (office-extractor)';
     }
 
     const processingTimeMs = Date.now() - startTime;

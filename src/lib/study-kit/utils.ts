@@ -1,4 +1,5 @@
 import { ContentType } from './types';
+import { MAX_TITLE_LENGTH } from './constants';
 
 export function sanitizeMathText(text: string): string {
     if (typeof text !== 'string') return String(text || '');
@@ -175,4 +176,31 @@ const encoder = new TextEncoder();
 export function sendEvent(controller: ReadableStreamDefaultController, event: string, data: any) {
     const message = `data: ${JSON.stringify({ event, data })}\n\n`;
     controller.enqueue(encoder.encode(message));
+}
+
+/**
+ * Builds a title for a study kit.
+ * Prioritizes the filename (without extension) for uploaded content,
+ * falling back to the prompt or a default title.
+ */
+export function buildStudyKitTitle(prompt?: string, fileName?: string): string {
+    // Priority 1: Filename (requested by user)
+    if (fileName) {
+        const nameWithoutExt = fileName.split('.').slice(0, -1).join('.');
+        if (nameWithoutExt && nameWithoutExt.trim().length >= 3) {
+            return nameWithoutExt.trim().slice(0, MAX_TITLE_LENGTH);
+        }
+        // If filename is too short or invalid after stripping ext, use the full filename trimmed
+        if (fileName.trim().length >= 3) {
+            return fileName.trim().slice(0, MAX_TITLE_LENGTH);
+        }
+    }
+
+    // Priority 2: Prompt
+    if (prompt && prompt.trim().length >= 3) {
+        return prompt.trim().slice(0, MAX_TITLE_LENGTH);
+    }
+
+    // Priority 3: Default
+    return 'My Study Kit';
 }

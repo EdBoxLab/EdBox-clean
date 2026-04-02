@@ -139,14 +139,14 @@ const Canvas: React.FC<CanvasProps> = ({ windows, setWindows, onRunCode, onMinim
           <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.6)] group-hover:scale-125 transition-transform"></div>
           {window.title}
         </span>
-        <button 
+        <button
           onClick={() => handleClose(window.id)}
-          className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-all md:opacity-0 group-hover:opacity-100"
+          className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100"
         >
           <X size={14} />
         </button>
       </div>
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 overflow-auto relative" style={{ WebkitOverflowScrolling: 'touch' }}>
         {renderWidgetContent(window)}
       </div>
     </MotionDiv>

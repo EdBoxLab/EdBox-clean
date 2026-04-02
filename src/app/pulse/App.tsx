@@ -24,7 +24,19 @@ const App: React.FC = () => {
   const [windows, setWindows] = useState<PulseWindow[]>([]);
   const { isOpen: isChatOpen, setIsOpen: setIsChatOpen, isPinned, setIsPinned } = useGenie();
   const [activeTab, setActiveTab] = useState<'genie' | 'workspace'>('workspace');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setIsSidebarOpen(true);
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
 
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -346,7 +358,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen bg-black text-white overflow-hidden font-sans relative">
+    <div className="flex h-screen h-dvh w-screen bg-black text-white overflow-hidden font-sans relative">
       
       {/* Workspace Sidebar - Toggled or Desktop */}
       <div className={`${isSidebarOpen ? 'fixed md:relative inset-0 md:inset-auto z-[300] md:z-auto' : 'hidden md:block'} h-full shrink-0`}>
@@ -376,9 +388,9 @@ const App: React.FC = () => {
       <div className="flex flex-1 relative min-w-0 overflow-hidden h-full">
         
         {/* Workspace Area - Motion Animated */}
-        <MotionDiv 
-          animate={{ 
-            width: isPinned && isChatOpen ? 'calc(100% - 450px)' : '100%',
+        <MotionDiv
+          animate={{
+            width: isPinned && isChatOpen && !isMobile ? 'calc(100% - 450px)' : '100%',
             x: 0,
             opacity: 1,
             scale: 1,
@@ -388,12 +400,12 @@ const App: React.FC = () => {
           className={`relative bg-slate-950 flex flex-col h-full overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)] z-20 ${activeTab === 'genie' ? 'hidden md:flex' : 'flex'}`}
         >
           {/* Mobile Header Bar (Only Canvas Tab) */}
-          <div className="flex md:hidden h-14 bg-black/40 backdrop-blur-md border-b border-white/5 items-center justify-between px-6 shrink-0 z-50">
+          <div className="flex md:hidden h-14 bg-black/40 backdrop-blur-md border-b border-white/5 items-center justify-between px-4 shrink-0 z-50">
              <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.6)]" />
                 <span className="text-[10px] font-black tracking-[0.2em] text-white uppercase italic">Pulse Canvas</span>
              </div>
-             <div className="flex items-center gap-4">
+             <div className="flex items-center gap-3">
                {windows.length > 0 && (
                  <div className="flex -space-x-2">
                    {windows.slice(-3).map(w => (
@@ -403,11 +415,18 @@ const App: React.FC = () => {
                    ))}
                  </div>
                )}
+               <button
+                 onClick={() => setIsSidebarOpen(true)}
+                 className="flex items-center gap-1.5 bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 rounded-xl px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest active:scale-95 transition-all"
+               >
+                 <Layout size={12} />
+                 Tools
+               </button>
              </div>
           </div>
 
           {/* Main Canvas Area */}
-          <div className="flex-1 overflow-hidden relative">
+          <div className="flex-1 overflow-hidden relative pb-28 md:pb-0">
             <Canvas
               windows={windows}
               setWindows={setWindows}

@@ -212,7 +212,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
           initial={{ x: -20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: -20, opacity: 0 }}
-          className="fixed left-6 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-3"
+          className="fixed left-6 top-1/2 -translate-y-1/2 z-50 hidden md:flex flex-col gap-3"
         >
           <button 
             onClick={() => onToggle(true)}

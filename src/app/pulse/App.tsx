@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Layout, Activity, Code, BookOpen, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import Chat from './components/Genie/Chat';
+import Chat from '@/components/Genie/Chat';
 import Canvas from './components/Workspace/Canvas';
 import { PulseWindow, WindowType, ChatMessage, GenieState } from './types';
 import { WIDGET_CONFIGS } from './constants';
@@ -12,11 +12,32 @@ import { liveGenieService } from './services/live';
 import { interactionTracker } from './services/interaction-tracker';
 import { saveWidget, upsertSessionProgress } from './services/widget-persistence';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+import { GenieBubble } from '@/components/Genie/GenieBubble';
+import { ChatOverlay } from '@/components/Genie/ChatOverlay';
+import { MobileNav } from './components/Navigation/MobileNav';
+import { WorkspaceSidebar } from './components/Navigation/WorkspaceSidebar';
+import { useGenie } from '@/lib/contexts/GenieContext';
 
 const MotionDiv = motion.div as any;
 
 const App: React.FC = () => {
   const [windows, setWindows] = useState<PulseWindow[]>([]);
+  const { isOpen: isChatOpen, setIsOpen: setIsChatOpen, isPinned, setIsPinned } = useGenie();
+  const [activeTab, setActiveTab] = useState<'genie' | 'workspace'>('workspace');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setIsSidebarOpen(true);
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: '1', role: 'system', text: 'Welcome to The Pulse. I am your Genie. You can chat with me or start a Live Voice Session.', timestamp: Date.now() }
@@ -26,8 +47,6 @@ const App: React.FC = () => {
   const [isLivePaused, setIsLivePaused] = useState(false);
   const [sessionId] = useState(() => `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
 
-  // Mobile View State
-  const [mobileTab, setMobileTab] = useState<'chat' | 'workspace'>('chat');
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   // --- Persistence & Deep Linking Logic ---
@@ -40,27 +59,24 @@ const App: React.FC = () => {
       const id = params.get('id');
 
       if (type && id) {
-        // If we have a deep link, clear current windows (optional) or just add the new one
         if (type === 'STUDY_KIT') {
           addWindow(WindowType.STUDY_KIT, { kitId: id });
         } else if (type === 'SKILL_SESSION') {
           const skillId = params.get('skillId');
           const graphId = params.get('graphId');
           addWindow(WindowType.SKILL_SESSION, { skillId, graphId }, 'Skill Session');
-          // Add a contextual Genie message
-          const skillTitle = params.get('skillTitle') || 'this skill';
           setMessages(prev => [...prev, {
             id: Date.now().toString(),
             role: 'system',
-            text: `📚 Skill session started for **${decodeURIComponent(skillTitle)}**. I'll guide you from foundation to mastery. When you're ready, click "Start Learning with Genie" in the workspace.`,
+            text: `📚 Skill session started for **${decodeURIComponent(params.get('skillTitle') || 'this skill')}**. I'll guide you from foundation to mastery.`,
             timestamp: Date.now()
           }]);
+          setIsChatOpen(true);
         } else if (type === 'COURSE' || type === 'SKILL_GRAPH') {
           addWindow(WindowType.SKILL_GRAPH, { graphId: id });
         } else if (type === 'NOTE') {
           addWindow(WindowType.NOTE_WRITER, { noteId: id });
         }
-        // Clear search params to prevent re-opening on refresh
         window.history.replaceState({}, '', window.location.pathname);
         return true;
       }
@@ -69,16 +85,12 @@ const App: React.FC = () => {
 
     try {
       const deepLinked = handleDeepLinks();
-
-      // Load Active Session if not a deep link
       if (!deepLinked) {
         const savedWindows = localStorage.getItem('pulse_session_windows');
         const savedMessages = localStorage.getItem('pulse_session_messages');
-
         if (savedWindows) setWindows(JSON.parse(savedWindows));
         if (savedMessages) setMessages(JSON.parse(savedMessages));
       }
-
     } catch (e) {
       console.error("Failed to load persistence data", e);
     }
@@ -93,7 +105,7 @@ const App: React.FC = () => {
     localStorage.setItem('pulse_session_messages', JSON.stringify(messages));
   }, [messages]);
 
-  // Fetch current user for widget persistence
+  // Fetch current user
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -116,33 +128,22 @@ const App: React.FC = () => {
     };
 
     setWindows(prev => {
-      // Auto-collapse logic: If we have 2 visible windows, minimize the oldest visible one
       const visible = prev.filter(w => !w.isMinimized);
       let updated = [...prev];
-
       if (visible.length >= 2) {
         const oldestVisibleId = visible[0].id;
         updated = updated.map(w => w.id === oldestVisibleId ? { ...w, isMinimized: true } : w);
       }
-
       return [...updated, newWindow];
     });
-
-    // Auto-switch to workspace on mobile when a new window is added
-    if (window.innerWidth < 768) {
-      setMobileTab('workspace');
-    }
   };
 
   const toggleMinimize = (id: string) => {
     setWindows(prev => {
       const target = prev.find(w => w.id === id);
       if (!target) return prev;
-
-      // If we are restoring (un-minimizing)
       if (target.isMinimized) {
         const visible = prev.filter(w => !w.isMinimized && w.id !== id);
-        // If we already have 2 visible, minimize the oldest one to make room
         if (visible.length >= 2) {
           const oldestId = visible[0].id;
           return prev.map(w => {
@@ -152,31 +153,21 @@ const App: React.FC = () => {
           });
         }
       }
-
-      // Standard toggle
       return prev.map(w => w.id === id ? { ...w, isMinimized: !w.isMinimized } : w);
     });
   };
 
   const updateActiveWidget = (typeFilter: WindowType | 'ANY', updateFn: (w: PulseWindow) => PulseWindow) => {
     setWindows(prev => {
-      // Find active (non-minimized) first, if not find any.
-      // Prioritize visible widgets for updates
       const visibleIndex = prev.map(w => w).reverse().findIndex(w => (typeFilter === 'ANY' || w.type === typeFilter) && !w.isMinimized);
-
       let targetIndex = -1;
-
       if (visibleIndex !== -1) {
-        // Found a visible one
         targetIndex = prev.length - 1 - visibleIndex;
       } else {
-        // Fallback to any matching widget (even if minimized)
         const anyIndex = prev.map(w => w).reverse().findIndex(w => typeFilter === 'ANY' || w.type === typeFilter);
         if (anyIndex !== -1) targetIndex = prev.length - 1 - anyIndex;
       }
-
       if (targetIndex === -1) return prev;
-
       const updated = [...prev];
       updated[targetIndex] = updateFn(updated[targetIndex]);
       return updated;
@@ -190,7 +181,6 @@ const App: React.FC = () => {
 
   const handleToolCall = (toolName: string, args: any) => {
     console.log("Tool Triggered:", toolName, args);
-
     switch (toolName) {
       case 'create_custom_widget':
         addWindow(WindowType.CUSTOM_GENERATED, { code: args.react_code }, args.title || 'Custom Tool');
@@ -220,7 +210,6 @@ const App: React.FC = () => {
         }
         updateActiveWidget(targetType, (w) => ({ ...w, data: { ...w.data, ...newData } }));
         break;
-      // ... Legacy Handlers 
       case 'update_blackboard':
         handleToolCall('update_widget', { target_type: 'BLACKBOARD', data_json: JSON.stringify({ action: args.action, content: args.content }) });
         break;
@@ -238,40 +227,17 @@ const App: React.FC = () => {
         updateActiveWidget(WindowType.CODE_EDITOR, w => ({ ...w, data: { ...w.data, executionTrigger: (w.data?.executionTrigger || 0) + 1 } }));
         break;
       case 'update_skill_progress': {
-        // Handle Genie's skill mastery progress updates
         const skillSessionWindow = windows.find(w => w.type === WindowType.SKILL_SESSION);
         if (skillSessionWindow && currentUser) {
           const { action, topic, next_stage, signal, confidence, summary } = args;
           const { skillId, graphId } = skillSessionWindow.data || {};
           if (!skillId || !graphId) break;
-
           if (action === 'topic_covered' && topic) {
-            upsertSessionProgress({
-              user_id: currentUser.id,
-              skill_id: skillId,
-              graph_id: graphId,
-              topics_covered: [topic],
-              conversation_summary: summary || '',
-            });
-            console.log('[PULSE] Topic covered:', topic);
+            upsertSessionProgress({ user_id: currentUser.id, skill_id: skillId, graph_id: graphId, topics_covered: [topic], conversation_summary: summary || '' });
           } else if (action === 'advance_stage' && next_stage) {
-            upsertSessionProgress({
-              user_id: currentUser.id,
-              skill_id: skillId,
-              graph_id: graphId,
-              current_stage: next_stage,
-              conversation_summary: summary || '',
-            });
-            console.log('[PULSE] Advanced to stage:', next_stage);
+            upsertSessionProgress({ user_id: currentUser.id, skill_id: skillId, graph_id: graphId, current_stage: next_stage, conversation_summary: summary || '' });
           } else if (action === 'mastery_signal') {
-            upsertSessionProgress({
-              user_id: currentUser.id,
-              skill_id: skillId,
-              graph_id: graphId,
-              mastery_signals: { [signal || 'general']: confidence || 0.5 },
-              conversation_summary: summary || '',
-            });
-            console.log('[PULSE] Mastery signal:', signal, confidence);
+            upsertSessionProgress({ user_id: currentUser.id, skill_id: skillId, graph_id: graphId, mastery_signals: { [signal || 'general']: confidence || 0.5 }, conversation_summary: summary || '' });
           }
         }
         break;
@@ -287,11 +253,8 @@ const App: React.FC = () => {
     setGenieState(prev => ({ ...prev, isThinking: true, mood: 'focused' }));
     interactionTracker.log({ type: 'type', details: `User sent message: ${text.substring(0, 50)}...` });
 
-    console.log('[PULSE] Sending message via API route:', { sessionId, messageLength: text.length });
-
     try {
       const activityContext = interactionTracker.getContextSummary();
-
       const response = await sendChatMessage({
         message: text,
         sessionId,
@@ -299,14 +262,7 @@ const App: React.FC = () => {
         activityContext,
       });
 
-      console.log('[PULSE] API response received:', {
-        success: response.success,
-        responseLength: response.response?.length,
-        toolCallsCount: response.toolCalls?.length
-      });
-
       if (response.toolCalls && response.toolCalls.length > 0) {
-        console.log('[PULSE] Processing tool calls:', response.toolCalls.map(tc => tc.name));
         response.toolCalls.forEach(toolCall => {
           handleToolCall(toolCall.name, toolCall.args);
         });
@@ -324,37 +280,33 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSync = async () => {
+    setGenieState(prev => ({ ...prev, isThinking: true, mood: 'focused' }));
+    const syncPrompt = "SYNC_COMMAND: I am explicitly synchronizing my chat with the current workspace state. Analyze all active widgets and tell me how you can assist based on what I'm currently working on.";
+    
+    setMessages(prev => [...prev, { 
+      id: Date.now().toString(), 
+      role: 'system', 
+      text: '🔄 Synchronizing with workspace context...', 
+      timestamp: Date.now() 
+    }]);
+
+    await handleSendMessage(syncPrompt);
+  };
+
+  const togglePin = () => {
+    setIsPinned(!isPinned);
+    if (!isChatOpen) setIsChatOpen(true);
+  };
+
+
   const handleRunCode = async (code: string, language: string, widgetId: string) => {
     setGenieState(prev => ({ ...prev, isThinking: true, mood: 'focused' }));
     try {
-      const executionPrompt = `SYSTEM_COMMAND: The user is requesting to RUN code in the Code Editor (ID: ${widgetId}).
-          Language: ${language}
-          Code:
-          \`\`\`${language}
-          ${code}
-          \`\`\`
-          
-          TASK:
-          1. Analyze the code logic.
-          2. Simulate the execution and determine the output (stdout/console.log).
-          3. Use the 'update_widget' tool to send the output back to this widget's 'logs' property.
-          4. The 'logs' property must be an array of strings.
-          5. DO NOT just chat the output. Update the widget.
-          `;
-
-      console.log('[PULSE] Running code via API route:', { language, widgetId });
-
-      const response = await sendChatMessage({
-        message: executionPrompt,
-        sessionId,
-        currentWindows: windows,
-      });
-
-      if (response.toolCalls && response.toolCalls.length > 0) {
-        console.log('[PULSE] Code execution tool calls:', response.toolCalls.map(tc => tc.name));
-        response.toolCalls.forEach(toolCall => {
-          handleToolCall(toolCall.name, toolCall.args);
-        });
+      const executionPrompt = `SYSTEM_COMMAND: Run code in Code Editor (ID: ${widgetId}). Language: ${language}\nCode:\n\`\`\`${language}\n${code}\n\`\`\`\nTASK: Analyze, simulate, and update widget logs.`;
+      const response = await sendChatMessage({ message: executionPrompt, sessionId, currentWindows: windows });
+      if (response.toolCalls) {
+        response.toolCalls.forEach(toolCall => handleToolCall(toolCall.name, toolCall.args));
       }
     } catch (err) {
       console.error("[PULSE] Code execution failed:", err);
@@ -377,9 +329,7 @@ const App: React.FC = () => {
         onToolCall: handleToolCall,
         onAudioActivity: (active) => { },
         onError: (err) => {
-          console.error("Live Error", err);
           setIsLiveActive(false);
-          setIsLivePaused(false);
           setMessages(prev => [...prev, { id: Date.now().toString(), role: 'system', text: 'Live connection failed.', timestamp: Date.now() }]);
         },
         onTranscription: (text, role) => {
@@ -394,48 +344,183 @@ const App: React.FC = () => {
   };
 
   const togglePause = () => {
-    if (isLivePaused) {
-      liveGenieService.resume();
-      setIsLivePaused(false);
-    } else {
-      liveGenieService.pause();
-      setIsLivePaused(true);
-    }
+    if (isLivePaused) { liveGenieService.resume(); setIsLivePaused(false); } 
+    else { liveGenieService.pause(); setIsLivePaused(true); }
   };
 
   const getIconForType = (type: WindowType) => {
     switch (type) {
       case WindowType.BLACKBOARD: return <Activity size={16} />;
       case WindowType.CODE_EDITOR: return <Code size={16} />;
-      case WindowType.NEURON_VISUALIZER: return <Activity size={16} />; // Fallback, distinct if needed
       case WindowType.NOTE_WRITER: return <BookOpen size={16} />;
       default: return <Layout size={16} />;
     }
   };
 
   return (
-    <div className="flex h-screen w-screen bg-black text-white overflow-hidden font-sans flex-col md:flex-row">
-
-      {/* Mobile Nav Toggle (Visible only on mobile) */}
-      <div className="md:hidden h-14 bg-slate-900 border-b border-white/10 flex items-center justify-around shrink-0 z-50">
-        <button
-          onClick={() => setMobileTab('chat')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full transition-colors ${mobileTab === 'chat' ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400'}`}
-        >
-          <MessageSquare size={18} />
-          <span className="text-xs font-bold uppercase">Genie</span>
-        </button>
-        <button
-          onClick={() => setMobileTab('workspace')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full transition-colors ${mobileTab === 'workspace' ? 'bg-purple-500/20 text-purple-400' : 'text-slate-400'}`}
-        >
-          <Layout size={18} />
-          <span className="text-xs font-bold uppercase">Workspace</span>
-        </button>
+    <div className="flex h-screen h-dvh w-screen bg-black text-white overflow-hidden font-sans relative">
+      
+      {/* Workspace Sidebar - Toggled or Desktop */}
+      <div className={`${isSidebarOpen ? 'fixed md:relative inset-0 md:inset-auto z-[300] md:z-auto' : 'hidden md:block'} h-full shrink-0`}>
+        {/* Backdrop for mobile */}
+        {isSidebarOpen && (
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm md:hidden" 
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+        <WorkspaceSidebar 
+          isOpen={isSidebarOpen}
+          onToggle={setIsSidebarOpen}
+          onOpenWidget={(type, data) => {
+             addWindow(type, data);
+             if (window.innerWidth < 768) setIsSidebarOpen(false);
+          }}
+          activeWindows={windows.filter(w => !w.isMinimized).map(w => ({ id: w.id, title: w.title, type: w.type }))}
+          onFocusWindow={(id) => {
+             setWindows(prev => prev.map(w => w.id === id ? { ...w, isMinimized: false, zIndex: Math.max(...prev.map(win => win.zIndex)) + 1 } : w));
+             if (window.innerWidth < 768) setIsSidebarOpen(false);
+          }}
+        />
       </div>
 
-      {/* Chat Sidebar */}
-      <div className={`${mobileTab === 'chat' ? 'flex' : 'hidden'} md:flex w-full md:w-96 flex-shrink-0 z-40 border-r border-white/10 relative h-full md:h-auto`}>
+      {/* Main Container - Dynamic Layout with Motion */}
+      <div className="flex flex-1 relative min-w-0 overflow-hidden h-full">
+        
+        {/* Workspace Area - Motion Animated */}
+        <MotionDiv
+          animate={{
+            width: isPinned && isChatOpen && !isMobile ? 'calc(100% - 450px)' : '100%',
+            x: 0,
+            opacity: 1,
+            scale: 1,
+            filter: 'blur(0px)'
+          }}
+          transition={{ type: 'spring', damping: 35, stiffness: 220, mass: 1 }}
+          className={`relative bg-slate-950 flex flex-col h-full overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)] z-20 ${activeTab === 'genie' ? 'hidden md:flex' : 'flex'}`}
+        >
+          {/* Mobile Header Bar (Only Canvas Tab) */}
+          <div className="flex md:hidden h-14 bg-black/40 backdrop-blur-md border-b border-white/5 items-center justify-between px-4 shrink-0 z-50">
+             <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.6)]" />
+                <span className="text-[10px] font-black tracking-[0.2em] text-white uppercase italic">Pulse Canvas</span>
+             </div>
+             <div className="flex items-center gap-3">
+               {windows.length > 0 && (
+                 <div className="flex -space-x-2">
+                   {windows.slice(-3).map(w => (
+                     <div key={w.id} className="w-6 h-6 rounded-full border border-black bg-slate-800 flex items-center justify-center text-[8px] font-bold">
+                       {w.title.charAt(0)}
+                     </div>
+                   ))}
+                 </div>
+               )}
+               <button
+                 onClick={() => setIsSidebarOpen(true)}
+                 className="flex items-center gap-1.5 bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 rounded-xl px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest active:scale-95 transition-all"
+               >
+                 <Layout size={12} />
+                 Tools
+               </button>
+             </div>
+          </div>
+
+          {/* Main Canvas Area */}
+          <div className="flex-1 overflow-hidden relative pb-28 md:pb-0">
+            <Canvas
+              windows={windows}
+              setWindows={setWindows}
+              onRunCode={handleRunCode}
+              onMinimize={toggleMinimize}
+              onSendGenieMessage={handleSendMessage}
+              onOpenWidget={(type, data) => addWindow(type, data)}
+            />
+          </div>
+
+          {/* Dock / Taskbar - Hidden on mobile, as users can switch from the Sidebar */}
+          <div className="hidden md:flex h-24 shrink-0 bg-slate-900/40 backdrop-blur-3xl border-t border-white/5 items-center justify-center px-8 relative z-40">
+            <div className="flex items-center gap-4 bg-white/5 p-2.5 rounded-[24px] border border-white/5 shadow-2xl overflow-x-auto no-scrollbar max-w-full">
+              
+              {/* Permanent Genie Trigger in Dock */}
+              <motion.div
+                onClick={() => {
+                  setIsChatOpen(!isChatOpen);
+                  if (activeTab === 'workspace') setActiveTab('genie');
+                }}
+                className={`group relative flex items-center justify-center w-14 h-14 rounded-2xl border transition-all cursor-pointer flex-shrink-0 ${isChatOpen
+                  ? 'bg-cyan-500/20 border-cyan-500/50 shadow-lg shadow-cyan-500/20'
+                  : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                  }`}
+                whileHover={{ y: -6, scale: 1.05 }}
+                whileTap={{ scale: 0.9 }}
+              >
+                <div className={`${isChatOpen ? 'text-cyan-400' : 'text-slate-400'}`}>
+                  <MessageSquare size={22} />
+                </div>
+                {isChatOpen && (
+                  <div className="absolute -bottom-1.5 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+                )}
+                <div className="absolute -top-12 bg-slate-900 border border-white/10 text-[10px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 pointer-events-none whitespace-nowrap z-50 shadow-2xl">
+                  Genie Chat
+                </div>
+              </motion.div>
+
+              <div className="w-px h-8 bg-white/10 mx-1" />
+
+              {windows.map((win) => (
+                <motion.div
+                  key={win.id}
+                  layoutId={`dock-${win.id}`}
+                  onClick={() => toggleMinimize(win.id)}
+                  className={`group relative flex items-center justify-center w-13 h-13 rounded-xl border transition-all cursor-pointer flex-shrink-0 ${!win.isMinimized
+                    ? 'bg-purple-500/20 border-purple-500/50 shadow-lg shadow-purple-500/20'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                    }`}
+                  whileHover={{ y: -6, scale: 1.05 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <div className={`${!win.isMinimized ? 'text-purple-400' : 'text-slate-400'}`}>
+                    {getIconForType(win.type)}
+                  </div>
+
+                  {!win.isMinimized && (
+                    <div className="absolute -bottom-1.5 w-1.5 h-1.5 bg-purple-400 rounded-full shadow-[0_0_8px_rgba(167,139,250,0.8)]" />
+                  )}
+
+                  <div className="absolute -top-12 bg-slate-900 border border-white/10 text-[10px] font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 pointer-events-none whitespace-nowrap z-50 shadow-2xl">
+                    {win.title}
+                  </div>
+                </motion.div>
+              ))}
+              {windows.length === 0 && (
+                  <div className="px-6 py-2 text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em]">Workspace Empty</div>
+              )}
+            </div>
+          </div>
+        </MotionDiv>
+      </div>
+
+
+      {/* Floating Genie Bubble (Only visible when chat is closed and not pinned) */}
+      {!isPinned && (
+        <GenieBubble 
+          genieState={genieState}
+          isLiveActive={isLiveActive}
+          isLivePaused={isLivePaused}
+          onClick={() => setIsChatOpen(true)}
+          isOpen={isChatOpen}
+        />
+      )}
+
+      {/* Genie Chat Overlay / Pinned Panel */}
+      <ChatOverlay 
+        isOpen={isChatOpen || (isPinned && activeTab === 'genie')} 
+        isPinned={isPinned}
+        onClose={() => {
+            setIsChatOpen(false);
+            if (isPinned) setIsPinned(false);
+        }}
+      >
         <Chat
           messages={messages}
           onSendMessage={handleSendMessage}
@@ -444,59 +529,31 @@ const App: React.FC = () => {
           isLiveActive={isLiveActive}
           isLivePaused={isLivePaused}
           onTogglePause={togglePause}
-          onToggleMode={(mode) => setGenieState(prev => ({ ...prev, mode }))}
+          onSync={handleSync}
+          isPinned={isPinned}
+          onTogglePin={togglePin}
         />
-      </div>
+      </ChatOverlay>
 
-      {/* Workspace Area */}
-      <div className={`${mobileTab === 'workspace' ? 'flex' : 'hidden'} md:flex flex-1 relative bg-slate-950 flex-col h-full md:h-auto`}>
-        {/* Main Canvas Area */}
-        <div className="flex-1 overflow-hidden relative">
-          <Canvas
-            windows={windows}
-            setWindows={setWindows}
-            onRunCode={handleRunCode}
-            onMinimize={toggleMinimize}
-            onSendGenieMessage={handleSendMessage}
-            onOpenWidget={(type, data) => addWindow(type, data)}
-          />
-        </div>
+      {/* Premium Mobile Navigation */}
+      <MobileNav 
+        activeTab={activeTab}
+        onTabChange={(tab: any) => {
+            if (tab === 'tools') {
+               setIsSidebarOpen(true);
+               return;
+            }
+            setActiveTab(tab);
+            if (tab === 'genie') setIsChatOpen(true);
+            else setIsChatOpen(false);
+        }}
+        isVisible={true}
+      />
 
-        {/* Dock / Taskbar */}
-        <div className="h-16 shrink-0 bg-slate-900/80 backdrop-blur-xl border-t border-white/10 flex items-center justify-center px-4 relative z-40 overflow-x-auto">
-          <div className="flex items-center gap-3">
-            {windows.map((win) => (
-              <motion.div
-                key={win.id}
-                layoutId={`dock-${win.id}`}
-                onClick={() => toggleMinimize(win.id)}
-                className={`group relative flex flex-col items-center justify-center w-12 h-12 rounded-xl border transition-all cursor-pointer flex-shrink-0 ${!win.isMinimized
-                  ? 'bg-cyan-500/10 border-cyan-500/50 shadow-[0_0_15px_rgba(34,211,238,0.2)]'
-                  : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
-                  }`}
-                whileHover={{ y: -4, scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <div className={`${!win.isMinimized ? 'text-cyan-400' : 'text-slate-400'}`}>
-                  {getIconForType(win.type)}
-                </div>
-
-                {/* Status Dot */}
-                {!win.isMinimized && (
-                  <div className="absolute -bottom-1 w-1 h-1 bg-cyan-400 rounded-full" />
-                )}
-
-                {/* Tooltip */}
-                <div className="absolute -top-10 bg-slate-800 text-[10px] px-2 py-1 rounded border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                  {win.title}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
 
+
 export default App;
+

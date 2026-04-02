@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { processFileContent } from '@/lib/utils/fileProcessing';
 import type { DetectedChapter } from '@/types/chapters';
 import { getRateLimiter } from '@/lib/rate-limit';
-import { sendEvent } from '@/lib/study-kit/utils';
+import { sendEvent, buildStudyKitTitle } from '@/lib/study-kit/utils';
 import { generateChapterContent, generateSingleContent } from '@/lib/study-kit/service';
 import { ContentType, StudyKitGenerationParams } from '@/lib/study-kit/types';
 
@@ -103,8 +103,9 @@ export async function POST(request: NextRequest) {
             .sort((a, b) => a.index - b.index)
             .map(r => r.chapterContent);
 
-          let title = prompt?.slice(0, 100) || fileName?.split('.')[0] || 'Study Kit';
-          if (title.length < 3) title = 'My Study Kit';
+          console.log(`[generate-stream] chapters mode: prompt="${prompt}", fileName="${fileName}"`);
+          const title = buildStudyKitTitle(prompt || chapters?.[0]?.title, fileName);
+          console.log(`[generate-stream] raw title="${title}"`);
 
           const { data: studyKit } = await supabase
             .from('study_kit_content')
@@ -153,8 +154,7 @@ export async function POST(request: NextRequest) {
             }
           });
 
-          let title = prompt?.slice(0, 100) || fileName?.split('.')[0] || 'Study Kit';
-          if (title.length < 3) title = 'My Study Kit';
+          const title = buildStudyKitTitle(prompt, fileName);
 
           const { data: studyKit } = await supabase
             .from('study_kit_content')

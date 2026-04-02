@@ -127,18 +127,24 @@ const Canvas: React.FC<CanvasProps> = ({ windows, setWindows, onRunCode, onMinim
   const renderPane = (window: PulseWindow, widthPercent: string) => (
     <MotionDiv
       key={window.id}
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.2 }}
+      initial={{ opacity: 0, scale: 0.9, filter: 'blur(10px)' }}
+      animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+      exit={{ opacity: 0, scale: 0.9, filter: 'blur(10px)' }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
       style={{ width: widthPercent }}
-      className="h-full flex flex-col border-r border-white/5 last:border-0 relative bg-slate-900/80 backdrop-blur-md transition-[width] duration-75 ease-linear overflow-hidden shadow-2xl"
+      className="h-full flex flex-col border-r border-white/5 last:border-0 relative bg-slate-900/40 backdrop-blur-3xl transition-[width] duration-500 cubic-bezier(0.16, 1, 0.3, 1) overflow-hidden shadow-2xl"
     >
-      <div className="h-9 flex items-center justify-between px-4 bg-white/5 border-b border-white/10 select-none shrink-0 group">
-        <span className="text-xs font-semibold text-cyan-200/80 uppercase tracking-wider truncate flex-1 flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-cyan-500/50 group-hover:bg-cyan-400 group-hover:shadow-[0_0_10px_rgba(34,211,238,0.5)] transition-all"></div>
+      <div className="h-10 flex items-center justify-between px-5 bg-white/5 border-b border-white/5 select-none shrink-0 group">
+        <span className="text-[10px] font-black text-cyan-200/60 uppercase tracking-[0.2em] truncate flex-1 flex items-center gap-2.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.6)] group-hover:scale-125 transition-transform"></div>
           {window.title}
         </span>
+        <button 
+          onClick={() => handleClose(window.id)}
+          className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-all md:opacity-0 group-hover:opacity-100"
+        >
+          <X size={14} />
+        </button>
       </div>
       <div className="flex-1 overflow-hidden relative">
         {renderWidgetContent(window)}
@@ -158,54 +164,43 @@ const Canvas: React.FC<CanvasProps> = ({ windows, setWindows, onRunCode, onMinim
           {visibleWindows.length === 0 && (
             <MotionDiv
               key="empty-state"
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8"
+              exit={{ opacity: 0 }}
+              className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8 relative"
             >
+              {/* Guidance Beam (pointing left towards sidebar on desktop) */}
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-32 h-64 bg-cyan-500/5 blur-[100px] rounded-full hidden md:block animate-pulse" />
+
               {/* Glowing orb */}
-              <div className="w-24 h-24 bg-cyan-500/10 rounded-full flex items-center justify-center mb-8 relative">
-                <div className="absolute inset-0 bg-cyan-500/20 rounded-full animate-ping opacity-20" />
-                <Sparkles size={48} className="text-cyan-400" />
+              <div className="w-32 h-32 bg-cyan-500/10 rounded-full flex items-center justify-center mb-10 relative">
+                <div className="absolute inset-0 bg-cyan-500/20 rounded-full animate-ping opacity-10" />
+                <Sparkles size={56} className="text-cyan-400/80" />
               </div>
 
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-3 tracking-tight">Welcome to Pulse</h1>
-              <p className="text-slate-400 mb-8 max-w-md text-center text-lg leading-relaxed">
-                Your immersive AI-powered learning environment.
+              <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tighter italic">
+                PULSE <span className="text-cyan-500 text-3xl align-top not-italic font-bold">OS</span>
+              </h1>
+              <p className="text-slate-500 mb-12 max-w-lg text-center text-lg leading-relaxed font-medium">
+                Your high-context neural workspace for immersive learning.
               </p>
 
               {/* Primary CTA */}
-              <button
-                onClick={() => setShowSkillPicker(true)}
-                className="group relative flex items-center gap-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-8 py-4 rounded-full font-bold text-lg shadow-lg hover:shadow-cyan-500/25 transition-all overflow-hidden mb-6"
-              >
-                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 pointer-events-none" />
-                <BookOpen size={22} />
-                <span>Start Course with Genie</span>
-                <ArrowRight className="group-hover:translate-x-1 transition-transform" />
-              </button>
-
-              {/* Quick-launch tools */}
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-slate-600 mr-1">or open a tool:</p>
+              <div className="flex flex-col items-center gap-6 w-full max-w-xs md:max-w-none">
                 <button
-                  onClick={() => onOpenWidget?.(WindowType.CODE_EDITOR)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-xs text-slate-400 hover:text-slate-200 transition-all"
+                  onClick={() => setShowSkillPicker(true)}
+                  className="group relative flex items-center justify-center gap-4 bg-white text-black w-full md:w-auto px-10 py-5 rounded-full font-black text-lg shadow-[0_20px_50px_rgba(255,255,255,0.1)] hover:scale-105 active:scale-95 transition-all overflow-hidden"
                 >
-                  <Code size={12} /> Code Editor
+                  <BookOpen size={22} className="group-hover:rotate-12 transition-transform" />
+                  <span>INITIALIZE COURSE</span>
+                  <ArrowRight className="group-hover:translate-x-2 transition-transform" />
                 </button>
-                <button
-                  onClick={() => onOpenWidget?.(WindowType.BLACKBOARD)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-xs text-slate-400 hover:text-slate-200 transition-all"
-                >
-                  <Sparkles size={12} /> Blackboard
-                </button>
-                <button
-                  onClick={() => onOpenWidget?.(WindowType.NOTE_WRITER)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-xs text-slate-400 hover:text-slate-200 transition-all"
-                >
-                  <PenLine size={12} /> Notes
-                </button>
+                
+                <p className="text-[8px] md:text-[10px] font-bold text-slate-600 uppercase tracking-[0.3em] flex items-center gap-3">
+                   <div className="w-4 md:w-8 h-px bg-white/5" />
+                   OR OPEN A TOOL IN THE SIDEBAR
+                   <div className="w-4 md:w-8 h-px bg-white/5" />
+                </p>
               </div>
             </MotionDiv>
           )}

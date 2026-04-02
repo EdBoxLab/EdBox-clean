@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Mic, MicOff, Radio, Pause, Play, Square, RefreshCcw, PanelRight, Maximize2, Pin, PinOff } from 'lucide-react';
+import { Send, Sparkles, Mic, MicOff, Radio, Pause, Play, Square, RefreshCcw, PanelRight, Maximize2, Pin, PinOff, Zap } from 'lucide-react';
 
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -27,32 +27,32 @@ const MotionDiv = motion.div as any;
 const FormattedMessage = ({ text, role }: { text: string; role: 'user' | 'model' | 'system' }) => {
   return (
     <div
-      className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed shadow-sm overflow-hidden ${role === 'user'
-        ? 'bg-cyan-500/10 border border-cyan-400/20 text-cyan-50 rounded-tr-none'
-        : 'bg-white/5 border border-white/10 text-slate-100 rounded-tl-none'
+      className={`max-w-[90%] p-5 rounded-[28px] text-sm leading-relaxed shadow-sm overflow-hidden ${role === 'user'
+        ? 'bg-cyan-500/10 border border-cyan-400/20 text-cyan-50 rounded-tr-none self-end'
+        : 'bg-white/5 border border-white/10 text-slate-100 rounded-tl-none self-start'
         }`}
     >
-      <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-black/40">
+      <div className="prose prose-invert prose-sm max-w-none 
+        prose-p:leading-relaxed prose-p:text-slate-200
+        prose-strong:text-cyan-400 prose-strong:font-bold
+        prose-code:text-emerald-300 prose-code:bg-white/5 prose-code:px-1.5 prose-code:rounded-md
+        prose-pre:bg-black/40 prose-pre:border prose-pre:border-white/5 prose-pre:rounded-2xl
+        prose-a:text-cyan-400 prose-a:no-underline hover:prose-a:underline
+      ">
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkMath]}
           rehypePlugins={[rehypeKatex]}
           components={{
-            p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
-            ul: ({ node, ...props }) => <ul className="list-disc pl-4 mb-3 space-y-1.5" {...props} />,
-            ol: ({ node, ...props }) => <ol className="list-decimal pl-4 mb-3 space-y-1.5" {...props} />,
+            p: ({ node, ...props }) => <p className="mb-4 last:mb-0" {...props} />,
+            ul: ({ node, ...props }) => <ul className="list-disc pl-4 mb-4 space-y-2" {...props} />,
+            ol: ({ node, ...props }) => <ol className="list-decimal pl-4 mb-4 space-y-2" {...props} />,
             li: ({ node, ...props }) => <li className="pl-1" {...props} />,
-            strong: ({ node, ...props }) => <strong className="font-bold text-cyan-300" {...props} />,
-            em: ({ node, ...props }) => <em className="text-purple-300 not-italic border-b border-purple-500/30" {...props} />,
-            code: ({ node, ...props }) => <code className="bg-slate-900/50 rounded px-1.5 py-0.5 font-mono text-xs text-yellow-100 border border-white/10" {...props} />,
-            blockquote: ({ node, ...props }) => <blockquote className="border-l-3 border-cyan-500/40 pl-4 italic text-slate-400 my-4 bg-white/5 py-2 rounded-r-lg" {...props} />,
-            h1: ({ node, ...props }) => <h1 className="text-lg font-bold text-white mb-4 mt-2 tracking-tight" {...props} />,
-            h2: ({ node, ...props }) => <h2 className="text-base font-bold text-white mb-3 mt-2" {...props} />,
-            table: ({ node, ...props }) => <div className="overflow-x-auto my-4 rounded-xl border border-white/10"><table className="min-w-full divide-y divide-white/10" {...props} /></div>,
-            thead: ({ node, ...props }) => <thead className="bg-white/5" {...props} />,
-            th: ({ node, ...props }) => <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-widest" {...props} />,
-            tbody: ({ node, ...props }) => <tbody className="divide-y divide-white/5" {...props} />,
-            tr: ({ node, ...props }) => <tr className="hover:bg-white/5 transition-colors" {...props} />,
-            td: ({ node, ...props }) => <td className="px-4 py-3 text-sm text-slate-400 whitespace-normal" {...props} />,
+            blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-cyan-500/30 pl-5 italic text-slate-400 my-5 bg-white/5 py-3 rounded-r-2xl" {...props} />,
+            h1: ({ node, ...props }) => <h1 className="text-xl font-bold text-white mb-5 mt-2 tracking-tight" {...props} />,
+            h2: ({ node, ...props }) => <h2 className="text-lg font-bold text-white mb-4 mt-2" {...props} />,
+            table: ({ node, ...props }) => <div className="overflow-x-auto my-5 rounded-2xl border border-white/10 shadow-2xl"><table className="min-w-full divide-y divide-white/10" {...props} /></div>,
+            th: ({ node, ...props }) => <th className="px-5 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-widest bg-white/5" {...props} />,
+            td: ({ node, ...props }) => <td className="px-5 py-4 text-sm text-slate-300 border-t border-white/5" {...props} />,
           }}
         >
           {text}
@@ -94,48 +94,57 @@ const Chat: React.FC<ChatProps> = ({
   return (
     <div className="flex flex-col h-full w-full bg-transparent overflow-hidden">
       {/* Premium Header - Refactored for switching */}
-      <div className="flex items-center justify-between px-6 h-20 shrink-0 border-b border-white/10 bg-slate-900/40 backdrop-blur-3xl">
-        <div className="flex items-center gap-4">
-          <Orb state={isLiveActive && !isLivePaused ? 'speaking' : (genieState.isThinking ? 'focused' : 'neutral')} size="sm" />
-          <div className="flex flex-col">
-            <h2 className="text-[10px] font-bold tracking-[0.2em] text-cyan-400 uppercase">
+      <div className="flex items-center justify-between px-8 h-24 shrink-0 border-b border-white/5 bg-slate-900/20 backdrop-blur-3xl">
+        <div className="flex items-center gap-5">
+           <div className="relative">
+              <Orb state={isLiveActive && !isLivePaused ? 'speaking' : (genieState.isThinking ? 'focused' : 'neutral')} size="sm" />
+              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+           </div>
+           <div className="flex flex-col">
+            <h2 className="text-[11px] font-black tracking-[0.25em] text-cyan-400 uppercase italic">
               Genie OS
             </h2>
-            <div className="flex items-center gap-2 h-4 mt-0.5">
+            <div className="flex items-center gap-2 h-4 mt-1">
               {isLiveActive ? (
-                <span className="text-[9px] text-red-500 font-bold uppercase tracking-wider animate-pulse">Live Link</span>
+                <div className="flex items-center gap-1.5">
+                   <div className="w-1 h-1 rounded-full bg-red-500 animate-ping" />
+                   <span className="text-[9px] text-red-400 font-bold uppercase tracking-widest">Live Link</span>
+                </div>
               ) : genieState.isThinking ? (
-                <span className="text-[9px] text-cyan-200 font-medium uppercase tracking-widest animate-pulse">Syncing...</span>
+                <span className="text-[9px] text-cyan-200/60 font-medium uppercase tracking-widest animate-pulse">Analyzing Canvas...</span>
               ) : (
-                <span className="text-[9px] text-slate-500 font-medium uppercase tracking-widest">Connected</span>
+                <div className="flex items-center gap-1.5">
+                   <Zap size={8} className="text-emerald-400" />
+                   <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Neural Link Active</span>
+                </div>
               )}
             </div>
           </div>
         </div>
 
         {/* Action Buttons: Sync & Pin */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             onClick={onSync}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 transition-all hover:scale-105 active:scale-95"
+            className="group flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 text-slate-300 transition-all hover:-translate-y-0.5 active:scale-95"
             title="Synchronize Pulse"
           >
-            <RefreshCcw size={14} className={genieState.isThinking ? 'animate-spin' : ''} />
-            {!isPinned && <span className="text-[10px] font-bold uppercase tracking-tight">Sync</span>}
+            <RefreshCcw size={14} className={`${genieState.isThinking ? 'animate-spin' : ''} group-hover:text-cyan-400 transition-colors`} />
+            {!isPinned && <span className="text-[10px] font-bold uppercase tracking-widest">Sync</span>}
           </button>
 
           <button
             onClick={onTogglePin}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all hover:scale-105 active:scale-95 ${
+            className={`group flex items-center gap-2.5 px-4 py-2 rounded-2xl border transition-all hover:-translate-y-0.5 active:scale-95 ${
                 isPinned 
-                ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400' 
-                : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'
+                ? 'bg-cyan-500/20 border-cyan-500/30 text-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.2)]' 
+                : 'bg-white/5 border-white/5 text-slate-300 hover:bg-white/10'
             }`}
             title={isPinned ? "Unpin to Center" : "Pin to Side"}
           >
-            {isPinned ? <Maximize2 size={14} /> : <PanelRight size={14} />}
+            {isPinned ? <Maximize2 size={15} /> : <PanelRight size={15} />}
 
-            {!isPinned && <span className="text-[10px] font-bold uppercase tracking-tight">Pin</span>}
+            {!isPinned && <span className="text-[10px] font-bold uppercase tracking-widest">Pin Portal</span>}
           </button>
         </div>
       </div>

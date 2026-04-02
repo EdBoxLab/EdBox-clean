@@ -18,24 +18,38 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, onTabChange, is
     <AnimatePresence>
       {isVisible && (
         <MotionDiv
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 100, opacity: 0 }}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] md:hidden"
+          initial={{ y: 50, opacity: 0, scale: 0.9 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          exit={{ y: 50, opacity: 0, scale: 0.9 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] md:hidden w-[90%]"
         >
           {/* Floating Island Container */}
-          <div className="flex items-center gap-1 bg-slate-900/90 backdrop-blur-3xl p-1.5 rounded-full border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+          <div className="flex items-center justify-between gap-1 bg-slate-900/60 backdrop-blur-3xl p-2 rounded-[32px] border border-white/5 shadow-[0_25px_50px_rgba(0,0,0,0.6)]">
             <NavButton 
               active={activeTab === 'genie'} 
               onClick={() => onTabChange('genie')}
-              icon={<MessageSquare size={18} />}
+              icon={<MessageSquare size={20} />}
               label="Genie"
             />
-            <div className="w-px h-6 bg-white/5 mx-1" />
+            
+            <div className="flex items-center justify-center">
+               <button 
+                onClick={() => onTabChange('tools' as any)}
+                className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-90 ${
+                  activeTab as any === 'tools' 
+                    ? 'bg-cyan-500 shadow-cyan-500/40 text-white' 
+                    : 'bg-gradient-to-br from-slate-800 to-slate-900 border border-white/10 text-cyan-400 shadow-black/40'
+                }`}
+               >
+                  <Zap size={22} className={activeTab as any === 'tools' ? 'animate-pulse' : ''} />
+               </button>
+            </div>
+
             <NavButton 
               active={activeTab === 'workspace'} 
               onClick={() => onTabChange('workspace')}
-              icon={<Layout size={18} />}
+              icon={<Layout size={20} />}
               label="Canvas"
             />
           </div>
@@ -48,15 +62,15 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, onTabChange, is
 const NavButton = ({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-2 px-5 py-2.5 rounded-full transition-all duration-300 ${
+    className={`flex flex-col items-center gap-1 px-6 py-2.5 rounded-[24px] transition-all duration-500 ${
       active 
-        ? 'bg-white/10 text-cyan-400 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]' 
-        : 'text-slate-400 hover:text-white'
+        ? 'bg-white/5 text-cyan-400' 
+        : 'text-slate-500 hover:text-white'
     }`}
   >
-    <div className={`transition-transform duration-300 ${active ? 'scale-110' : 'scale-100'}`}>
+    <div className={`transition-all duration-500 ${active ? 'scale-110 translate-y-[-2px]' : 'scale-100'}`}>
       {icon}
     </div>
-    <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
+    <span className={`text-[8px] font-black uppercase tracking-[0.2em] transition-all ${active ? 'opacity-100' : 'opacity-40'}`}>{label}</span>
   </button>
 );

@@ -1,5 +1,6 @@
 'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useGenie } from '@/lib/contexts/GenieContext';
 import Script from 'next/script';
 import SideMenu from '../../components/SideMenu';
 import { Header } from '../../components/Header';
@@ -27,7 +28,17 @@ export default function MainAppLayout({
   children: React.ReactNode;
 }) {
   const { isOpen, isPinned } = useGenie();
+  const [isMobile, setIsMobile] = useState(false);
   const showPadding = isOpen && isPinned;
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const showWorkspacePadding = showPadding && !isMobile;
 
   return (
     <>
@@ -41,10 +52,10 @@ export default function MainAppLayout({
         
         <MotionDiv
           animate={{ 
-            width: showPadding ? 'calc(100% - 450px)' : '100%',
+            width: showWorkspacePadding ? 'calc(100% - 450px)' : '100%',
           }}
           transition={{ type: 'spring', damping: 30, stiffness: 200 }}
-          className="min-h-screen"
+          className={`min-h-screen ${isPinned ? 'md:pl-0' : ''}`}
         >
           <main className="lg:pl-64 min-h-screen overflow-x-hidden overflow-y-auto bg-background pb-20 lg:pb-0">
             {children}

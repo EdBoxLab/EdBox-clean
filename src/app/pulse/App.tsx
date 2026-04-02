@@ -15,7 +15,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { GenieBubble } from '@/components/Genie/GenieBubble';
 import { ChatOverlay } from '@/components/Genie/ChatOverlay';
 import { MobileNav } from './components/Navigation/MobileNav';
-
+import { WorkspaceSidebar } from './components/Navigation/WorkspaceSidebar';
 import { useGenie } from '@/lib/contexts/GenieContext';
 
 const MotionDiv = motion.div as any;
@@ -24,6 +24,7 @@ const App: React.FC = () => {
   const [windows, setWindows] = useState<PulseWindow[]>([]);
   const { isOpen: isChatOpen, setIsOpen: setIsChatOpen, isPinned, setIsPinned } = useGenie();
   const [activeTab, setActiveTab] = useState<'genie' | 'workspace'>('workspace');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
 
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -347,19 +348,63 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen w-screen bg-black text-white overflow-hidden font-sans relative">
       
+      {/* Workspace Sidebar - Toggled or Desktop */}
+      <div className={`${isSidebarOpen ? 'fixed md:relative inset-0 md:inset-auto z-[300] md:z-auto' : 'hidden md:block'} h-full shrink-0`}>
+        {/* Backdrop for mobile */}
+        {isSidebarOpen && (
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm md:hidden" 
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+        <WorkspaceSidebar 
+          isOpen={isSidebarOpen}
+          onToggle={setIsSidebarOpen}
+          onOpenWidget={(type, data) => {
+             addWindow(type, data);
+             if (window.innerWidth < 768) setIsSidebarOpen(false);
+          }}
+          activeWindows={windows.filter(w => !w.isMinimized).map(w => ({ id: w.id, title: w.title, type: w.type }))}
+          onFocusWindow={(id) => {
+             setWindows(prev => prev.map(w => w.id === id ? { ...w, isMinimized: false, zIndex: Math.max(...prev.map(win => win.zIndex)) + 1 } : w));
+             if (window.innerWidth < 768) setIsSidebarOpen(false);
+          }}
+        />
+      </div>
+
       {/* Main Container - Dynamic Layout with Motion */}
-      <div className="flex flex-1 relative min-w-0 overflow-hidden">
+      <div className="flex flex-1 relative min-w-0 overflow-hidden h-full">
         
         {/* Workspace Area - Motion Animated */}
         <MotionDiv 
           animate={{ 
             width: isPinned && isChatOpen ? 'calc(100% - 450px)' : '100%',
-            x: 0 
+            x: 0,
+            opacity: 1,
+            scale: 1,
+            filter: 'blur(0px)'
           }}
-          transition={{ type: 'spring', damping: 30, stiffness: 200 }}
-          className={`relative bg-slate-950 flex flex-col h-full overflow-hidden ${activeTab === 'genie' ? 'hidden md:flex' : 'flex'}`}
+          transition={{ type: 'spring', damping: 35, stiffness: 220, mass: 1 }}
+          className={`relative bg-slate-950 flex flex-col h-full overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)] z-20 ${activeTab === 'genie' ? 'hidden md:flex' : 'flex'}`}
         >
-
+          {/* Mobile Header Bar (Only Canvas Tab) */}
+          <div className="flex md:hidden h-14 bg-black/40 backdrop-blur-md border-b border-white/5 items-center justify-between px-6 shrink-0 z-50">
+             <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.6)]" />
+                <span className="text-[10px] font-black tracking-[0.2em] text-white uppercase italic">Pulse Canvas</span>
+             </div>
+             <div className="flex items-center gap-4">
+               {windows.length > 0 && (
+                 <div className="flex -space-x-2">
+                   {windows.slice(-3).map(w => (
+                     <div key={w.id} className="w-6 h-6 rounded-full border border-black bg-slate-800 flex items-center justify-center text-[8px] font-bold">
+                       {w.title.charAt(0)}
+                     </div>
+                   ))}
+                 </div>
+               )}
+             </div>
+          </div>
 
           {/* Main Canvas Area */}
           <div className="flex-1 overflow-hidden relative">
@@ -373,8 +418,8 @@ const App: React.FC = () => {
             />
           </div>
 
-          {/* Dock / Taskbar */}
-          <div className="h-24 shrink-0 bg-slate-900/40 backdrop-blur-3xl border-t border-white/5 flex items-center justify-center px-8 relative z-40">
+          {/* Dock / Taskbar - Hidden on mobile, as users can switch from the Sidebar */}
+          <div className="hidden md:flex h-24 shrink-0 bg-slate-900/40 backdrop-blur-3xl border-t border-white/5 items-center justify-center px-8 relative z-40">
             <div className="flex items-center gap-4 bg-white/5 p-2.5 rounded-[24px] border border-white/5 shadow-2xl overflow-x-auto no-scrollbar max-w-full">
               
               {/* Permanent Genie Trigger in Dock */}
@@ -474,7 +519,11 @@ const App: React.FC = () => {
       {/* Premium Mobile Navigation */}
       <MobileNav 
         activeTab={activeTab}
-        onTabChange={(tab) => {
+        onTabChange={(tab: any) => {
+            if (tab === 'tools') {
+               setIsSidebarOpen(true);
+               return;
+            }
             setActiveTab(tab);
             if (tab === 'genie') setIsChatOpen(true);
             else setIsChatOpen(false);

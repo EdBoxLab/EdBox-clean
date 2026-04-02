@@ -536,20 +536,20 @@ const App: React.FC = () => {
       </ChatOverlay>
 
       {/* Premium Mobile Navigation */}
-      <MobileNav 
-        activeTab={activeTab}
-        onTabChange={(tab: any) => {
-            if (tab === 'tools') {
-               setIsSidebarOpen(true);
-               return;
-            }
-            setActiveTab(tab);
-            if (tab === 'genie') setIsChatOpen(true);
-            else setIsChatOpen(false);
-        }}
-        isVisible={true}
-      />
-
+     <MobileNav 
+  activeTab={activeTab}
+  onTabChange={(tab: any) => {
+    if (tab === 'tools') {
+      setIsSidebarOpen(true);
+      return;
+    }
+    setActiveTab(tab);
+    if (tab === 'genie') setIsChatOpen(true);
+    else setIsChatOpen(false);
+  }}
+  isVisible={true}
+  onOpenWidgets={() => setIsSidebarOpen(true)}
+/>
     </div>
   );
 };

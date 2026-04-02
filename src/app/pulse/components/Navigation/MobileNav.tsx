@@ -2,18 +2,18 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layout, MessageSquare, Zap } from 'lucide-react';
-import { GenieIcon } from '@/components/GenieIcon';
+import { Layout, MessageSquare, Layers } from 'lucide-react';
 
 interface MobileNavProps {
   activeTab: 'genie' | 'workspace';
   onTabChange: (tab: 'genie' | 'workspace') => void;
   isVisible: boolean;
+  onOpenWidgets?: () => void;
 }
 
 const MotionDiv = motion.div as any;
 
-export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, onTabChange, isVisible }) => {
+export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, onTabChange, isVisible, onOpenWidgets }) => {
   return (
     <AnimatePresence>
       {isVisible && (
@@ -34,16 +34,12 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, onTabChange, is
             />
             
             <div className="flex items-center justify-center">
-               <button 
-                onClick={() => onTabChange('tools' as any)}
-                className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-90 ${
-                  activeTab as any === 'tools' 
-                    ? 'bg-cyan-500 shadow-cyan-500/40 text-white' 
-                    : 'bg-gradient-to-br from-slate-800 to-slate-900 border border-white/10 text-cyan-400 shadow-black/40'
-                }`}
-               >
-                  <Zap size={22} className={activeTab as any === 'tools' ? 'animate-pulse' : ''} />
-               </button>
+              <button 
+                onClick={onOpenWidgets}
+                className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-90 bg-gradient-to-br from-slate-800 to-slate-900 border border-white/10 text-cyan-400 shadow-black/40 hover:bg-cyan-500/20 hover:border-cyan-500/30"
+              >
+                <Layers size={22} />
+              </button>
             </div>
 
             <NavButton 

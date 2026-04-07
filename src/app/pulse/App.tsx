@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Layout, Activity, Code, BookOpen, MessageSquare } from 'lucide-react';
+import { Layout, Activity, Code, BookOpen, MessageSquare, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Chat from '@/components/Genie/Chat';
 import Canvas from './components/Workspace/Canvas';
@@ -31,7 +31,8 @@ const App: React.FC = () => {
     const check = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-      if (!mobile) setIsSidebarOpen(true);
+      // Default to collapsed sidebar to keep UI clean and intuitive
+      // (User can manually open it when they need specific tools)
     };
     check();
     window.addEventListener('resize', check);
@@ -90,6 +91,13 @@ const App: React.FC = () => {
         const savedMessages = localStorage.getItem('pulse_session_messages');
         if (savedWindows) setWindows(JSON.parse(savedWindows));
         if (savedMessages) setMessages(JSON.parse(savedMessages));
+      }
+      
+      // Make Genie Chat the intuitive default when entering Pulse
+      setIsChatOpen(true);
+      setActiveTab('genie');
+      if (window.innerWidth >= 768) {
+         setIsPinned(true);
       }
     } catch (e) {
       console.error("Failed to load persistence data", e);
@@ -381,6 +389,9 @@ const App: React.FC = () => {
              setWindows(prev => prev.map(w => w.id === id ? { ...w, isMinimized: false, zIndex: Math.max(...prev.map(win => win.zIndex)) + 1 } : w));
              if (window.innerWidth < 768) setIsSidebarOpen(false);
           }}
+          onCloseWindow={(id) => {
+             setWindows(prev => prev.filter(w => w.id !== id));
+          }}
         />
       </div>
 
@@ -472,16 +483,25 @@ const App: React.FC = () => {
                   key={win.id}
                   layoutId={`dock-${win.id}`}
                   onClick={() => toggleMinimize(win.id)}
-                  className={`group relative flex items-center justify-center w-13 h-13 rounded-xl border transition-all cursor-pointer flex-shrink-0 ${!win.isMinimized
+                  className={`group relative flex items-center justify-center w-13 h-13 rounded-xl border transition-all cursor-pointer flex-shrink-0 opacity-100 scale-100 ${!win.isMinimized
                     ? 'bg-purple-500/20 border-purple-500/50 shadow-lg shadow-purple-500/20'
                     : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
                     }`}
                   whileHover={{ y: -6, scale: 1.05 }}
                   whileTap={{ scale: 0.9 }}
                 >
-                  <div className={`${!win.isMinimized ? 'text-purple-400' : 'text-slate-400'}`}>
+                  <div className={`w-full h-full flex flex-col items-center justify-center ${!win.isMinimized ? 'text-purple-400' : 'text-slate-400'}`}>
                     {getIconForType(win.type)}
                   </div>
+                  
+                  {/* Delete Button */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setWindows(prev => prev.filter(w => w.id !== win.id)); }}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-50 shadow-md hover:scale-110 border border-white/20"
+                    title="Delete Widget"
+                  >
+                    <X size={10} strokeWidth={3} />
+                  </button>
 
                   {!win.isMinimized && (
                     <div className="absolute -bottom-1.5 w-1.5 h-1.5 bg-purple-400 rounded-full shadow-[0_0_8px_rgba(167,139,250,0.8)]" />

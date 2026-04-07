@@ -13,6 +13,7 @@ import DynamicWidget from '../Widgets/DynamicWidget';
 import SkillGraphWidget from '../Widgets/SkillGraphWidget';
 import SkillSessionWidget from '../Widgets/SkillSessionWidget';
 import SkillPickerModal from '../Widgets/SkillPickerModal';
+import { GenieIcon } from '@/components/GenieIcon';
 
 interface CanvasProps {
   windows: PulseWindow[];
@@ -172,34 +173,34 @@ const Canvas: React.FC<CanvasProps> = ({ windows, setWindows, onRunCode, onMinim
               {/* Guidance Beam (pointing left towards sidebar on desktop) */}
               <div className="absolute left-0 top-1/2 -translate-y-1/2 w-32 h-64 bg-cyan-500/5 blur-[100px] rounded-full hidden md:block animate-pulse" />
 
-              {/* Glowing orb */}
-              <div className="w-32 h-32 bg-cyan-500/10 rounded-full flex items-center justify-center mb-10 relative">
-                <div className="absolute inset-0 bg-cyan-500/20 rounded-full animate-ping opacity-10" />
-                <Sparkles size={56} className="text-cyan-400/80" />
+              {/* Premium Core Icon */}
+              <div className="w-24 h-24 rounded-[32px] bg-white/5 border border-white/10 shadow-2xl flex items-center justify-center mb-10 relative backdrop-blur-3xl group transition-all duration-300 hover:scale-105">
+                <div className="absolute inset-0 bg-cyan-500/10 rounded-[32px] animate-pulse opacity-50 group-hover:opacity-100 transition-opacity" />
+                <GenieIcon className="w-12 h-12 text-cyan-400" />
               </div>
 
-              <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tighter italic">
-                PULSE <span className="text-cyan-500 text-3xl align-top not-italic font-bold">OS</span>
+              <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tighter">
+                Welcome to <span className="text-cyan-500">Pulse</span>
               </h1>
-              <p className="text-slate-500 mb-12 max-w-lg text-center text-lg leading-relaxed font-medium">
-                Your high-context neural workspace for immersive learning.
+              <p className="text-slate-400 mb-12 max-w-md text-center text-lg leading-relaxed font-medium">
+                A quiet space to focus, explore, and learn side-by-side with Genie.
               </p>
 
               {/* Primary CTA */}
               <div className="flex flex-col items-center gap-6 w-full max-w-xs md:max-w-none">
                 <button
                   onClick={() => setShowSkillPicker(true)}
-                  className="group relative flex items-center justify-center gap-4 bg-white text-black w-full md:w-auto px-10 py-5 rounded-full font-black text-lg shadow-[0_20px_50px_rgba(255,255,255,0.1)] hover:scale-105 active:scale-95 transition-all overflow-hidden"
+                  className="group relative flex items-center justify-center gap-4 bg-white text-black w-full md:w-auto px-10 py-4 rounded-full font-bold text-lg shadow-[0_20px_50px_rgba(255,255,255,0.1)] hover:scale-105 active:scale-95 transition-all overflow-hidden"
                 >
                   <BookOpen size={22} className="group-hover:rotate-12 transition-transform" />
-                  <span>INITIALIZE COURSE</span>
+                  <span>Start Learning</span>
                   <ArrowRight className="group-hover:translate-x-2 transition-transform" />
                 </button>
                 
-                <p className="text-[8px] md:text-[10px] font-bold text-slate-600 uppercase tracking-[0.3em] flex items-center gap-3">
-                   <div className="w-4 md:w-8 h-px bg-white/5" />
-                   OR OPEN A TOOL IN THE SIDEBAR
-                   <div className="w-4 md:w-8 h-px bg-white/5" />
+                <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-3">
+                   <div className="w-4 md:w-8 h-px bg-white/10" />
+                   OR OPEN A TOOL
+                   <div className="w-4 md:w-8 h-px bg-white/10" />
                 </p>
               </div>
             </MotionDiv>

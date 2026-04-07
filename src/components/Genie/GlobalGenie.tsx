@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Layout, Activity, Code, BookOpen, Sparkles } from 'lucide-react';
-import { GenieBubble } from './GenieBubble';
+
 import { ChatOverlay } from './ChatOverlay';
 import Chat from './Chat';
 import Canvas from '@/app/pulse/components/Workspace/Canvas';
@@ -277,18 +277,8 @@ export const GlobalGenie: React.FC = () => {
 
   return (
     <>
-      {!isPinned && (
-        <GenieBubble
-          genieState={genieState}
-          isLiveActive={isLiveActive}
-          isLivePaused={isLivePaused}
-          onClick={() => {
-            setIsOpen(true);
-            setActiveTab('genie');
-          }}
-          isOpen={isOpen}
-        />
-      )}
+      {/* GenieBubble floating button removed as requested */}
+
 
       {isPinned && (
         <div className="fixed inset-0 flex z-[100] pointer-events-none">

@@ -14,7 +14,7 @@ const GenieContext = createContext<GenieContextType | undefined>(undefined);
 
 export const GenieProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isPinned, setIsPinned] = useState(true); // Default to pinned as requested
+  const [isPinned, setIsPinned] = useState(false); // Default to unpinned so it doesn't overlay dashboard on start
 
   const toggleChat = () => setIsOpen(prev => !prev);
 

@@ -127,6 +127,17 @@ const SideMenu = () => {
                   </Link>
                 );
               })}
+
+              <Link
+                href="/pulse"
+                onClick={() => setSidebarOpen(false)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${pathname === '/pulse' ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" : "text-gray-400 hover:bg-zinc-800/50 hover:text-white border border-transparent"}`}
+              >
+                <div className={pathname === '/pulse' ? "text-cyan-400" : "text-gray-400"}>
+                  <GenieIcon className="w-5 h-5 flex-shrink-0" />
+                </div>
+                <span>Ask Genie</span>
+              </Link>
             </nav>
 
             {/* Spacer to push bottom sections down */}
@@ -250,6 +261,19 @@ const SideMenu = () => {
               </li>
             );
           })}
+
+          <li key="genie-mobile">
+            <Link
+              href="/pulse"
+              aria-label="Genie Workspace"
+              className={`flex flex-col items-center justify-center px-3 py-2 rounded-md transition-colors ${pathname === '/pulse' ? 'text-cyan-400' : 'text-gray-400 hover:text-white group'}`}
+            >
+              <div className="flex items-center justify-center w-6 h-6">
+                <GenieIcon className={`w-5 h-5 flex-shrink-0 ${pathname === '/pulse' ? 'fill-cyan-400' : ''}`} />
+              </div>
+              <span className="text-[10px] mt-1">Pulse</span>
+            </Link>
+          </li>
         </ul>
       </nav>
 

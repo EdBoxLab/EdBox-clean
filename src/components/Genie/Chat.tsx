@@ -181,7 +181,7 @@ const Chat: React.FC<ChatProps> = ({
       </div>
 
       {/* Input Area */}
-      <div className="p-6 border-t border-white/5 bg-slate-900/20">
+      <div className="p-6 pb-36 md:pb-6 border-t border-white/5 bg-slate-900/20 relative z-10 shrink-0">
         <div className="flex items-center gap-4">
           <button
             onClick={onToggleLive}

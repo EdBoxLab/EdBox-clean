@@ -16,7 +16,8 @@ import {
   Cpu,
   Calculator,
   FlaskConical,
-  Palette
+  Palette,
+  X
 } from 'lucide-react';
 import { WindowType } from '../../types';
 
@@ -26,6 +27,7 @@ interface WorkspaceSidebarProps {
   onFocusWindow: (id: string) => void;
   isOpen: boolean;
   onToggle: (val: boolean) => void;
+  onCloseWindow?: (id: string) => void;
 }
 
 const CATEGORIES = [
@@ -40,29 +42,6 @@ const CATEGORIES = [
       { type: WindowType.NOTE_WRITER, label: 'Note Writer', icon: <PenLine size={16} /> },
       { type: WindowType.NEURON_VISUALIZER, label: 'Neuron Map', icon: <Cpu size={16} /> },
     ]
-  },
-  {
-    id: 'stem',
-    label: 'STEM Labs',
-    icon: <FlaskConical size={18} />,
-    color: 'text-purple-400',
-    widgets: [
-      { type: WindowType.STEM_PERIODIC_TABLE, label: 'Periodic Table', icon: <Layers size={14} /> },
-      { type: WindowType.STEM_MOLECULE, label: '3D Molecules', icon: <Layers size={14} /> },
-      { type: WindowType.STEM_CIRCUIT, label: 'Circuit Sim', icon: <Layers size={14} /> },
-      { type: WindowType.STEM_SOLAR, label: 'Solar System', icon: <Layers size={14} /> },
-    ]
-  },
-  {
-    id: 'math',
-    label: 'Mathematics',
-    icon: <Calculator size={18} />,
-    color: 'text-emerald-400',
-    widgets: [
-      { type: WindowType.MATH_GRAPHING_CALC, label: 'Graphing Calc', icon: <Layers size={14} /> },
-      { type: WindowType.MATH_GEOMETRY, label: 'Geometry Engine', icon: <Layers size={14} /> },
-      { type: WindowType.MATH_FRACTAL, label: 'Fractal Explorer', icon: <Layers size={14} /> },
-    ]
   }
 ];
 
@@ -73,7 +52,8 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   activeWindows, 
   onFocusWindow,
   isOpen,
-  onToggle
+  onToggle,
+  onCloseWindow
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCats, setExpandedCats] = useState<string[]>(['core']);
@@ -138,15 +118,22 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                 </h3>
                 <div className="space-y-1">
                   {activeWindows.map(win => (
-                    <button
+                    <div
                       key={win.id}
-                      onClick={() => onFocusWindow(win.id)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-100 text-xs text-left hover:bg-cyan-500/20 transition-all group"
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-100 text-xs text-left hover:bg-cyan-500/20 transition-all group relative pr-1"
                     >
-                      <Sparkles size={14} className="text-cyan-400 animate-pulse" />
-                      <span className="truncate flex-1">{win.title}</span>
-                      <ChevronRight size={12} className="opacity-0 group-hover:opacity-100 transition-opacity translate-x-0 group-hover:translate-x-1" />
-                    </button>
+                      <button onClick={() => onFocusWindow(win.id)} className="flex items-center gap-3 flex-1 overflow-hidden">
+                        <Sparkles size={14} className="text-cyan-400 animate-pulse shrink-0" />
+                        <span className="truncate flex-1">{win.title}</span>
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onCloseWindow?.(win.id); }}
+                        className="p-1.5 hover:bg-red-500/20 rounded-md text-slate-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all cursor-pointer z-10 shrink-0"
+                        title="Close Tool"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -220,24 +207,6 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
             title="Open Workspace"
           >
             <ChevronRight size={20} className="group-hover:translate-x-0.5 transition-transform" />
-          </button>
-          
-          <div className="w-12 h-px bg-white/5" />
-          
-          <button 
-            onClick={() => onOpenWidget(WindowType.SMART_BOARD)}
-            className="w-12 h-12 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 flex items-center justify-center text-slate-500 hover:text-emerald-400 hover:bg-emerald-400/10 hover:border-emerald-400/20 transition-all shadow-xl"
-            title="Quick Blackboard"
-          >
-            <Palette size={18} />
-          </button>
-          
-          <button 
-            onClick={() => onOpenWidget(WindowType.CODE_EDITOR)}
-            className="w-12 h-12 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 flex items-center justify-center text-slate-500 hover:text-cyan-400 hover:bg-cyan-400/10 hover:border-cyan-400/20 transition-all shadow-xl"
-            title="Quick Code"
-          >
-            <Code size={18} />
           </button>
         </MotionDiv>
       )}

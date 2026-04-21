@@ -19,7 +19,7 @@ export const HeroSection = () => {
 
                 <ScrollReveal delayMs={50}>
                     <h1 className="max-w-4xl text-5xl leading-[0.95] tracking-[-2.2px] text-white font-black md:text-7xl">
-                        Study smarter. Grade better.
+                        Study smarter with EdBox and gain Better grades .
                     </h1>
                 </ScrollReveal>
 

@@ -2,12 +2,11 @@
 
 import React from 'react';
 import OnboardingForm from '@/components/OnboardingForm';
-import { FileText, Zap } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import { StreakCard } from '@/components/StreakXP';
 import { DiscoverFeed } from '@/components/feed/DiscoverFeed';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { ExploreRow } from '@/components/dashboard/ExploreRow';
-import { FocusSession } from '@/components/dashboard/FocusSession';
 
 const Dashboard: React.FC = () => {
   const {
@@ -15,19 +14,13 @@ const Dashboard: React.FC = () => {
     profile,
     setProfile,
     loading,
-    courses,
-    notes,
     studyKits,
-    recentCourse,
-    coursesLoading,
-    notesLoading,
     kitsLoading,
     handleDelete
   } = useDashboardData();
 
   const tools = [
-    { id: 't2', title: 'Note Taker', type: 'Tool', href: '/tools/notes', icon: <FileText className="w-8 h-8 text-green-300" /> },
-    { id: 't3', title: 'Study Kit', type: 'Tool', href: '/tools/study-kit', icon: <Zap className="w-8 h-8 text-yellow-300" /> },
+    { id: 't3', title: 'Create StudyKit', type: 'Action', href: '/tools/study-kit', icon: <Zap className="w-8 h-8 text-yellow-300" /> },
   ];
 
   if (loading) {
@@ -51,7 +44,7 @@ const Dashboard: React.FC = () => {
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mb-1 sm:mb-2 break-words">
               Welcome, {profile?.username || user?.email?.split('@')[0]}!
             </h1>
-            <p className="text-sm sm:text-base md:text-lg text-gray-400">Let's continue your learning journey.</p>
+            <p className="text-sm sm:text-base md:text-lg text-gray-400">Let's study smarter and finish stronger.</p>
           </div>
           <div className="w-full max-w-full lg:max-w-sm">
             <StreakCard />
@@ -62,39 +55,18 @@ const Dashboard: React.FC = () => {
           <DiscoverFeed />
         </div>
 
-        <FocusSession recentCourse={recentCourse} />
-
         <div>
           <h2 className="text-3xl font-bold text-white mb-6">Explore</h2>
           <ExploreRow
-            title="Your Courses"
-            items={courses}
-            emptyMessage="Share your expertise with the world. Build engaging, interactive courses in minutes and start growing your learning community from scratch."
-            showProgress={true}
-            createLink="/creator"
-            createText="Create Course"
-            isLoading={coursesLoading}
-            onDelete={handleDelete}
-          />
-          <ExploreRow
-            title="Your Notes"
-            items={notes}
-            emptyMessage="Capture your ideas with zero friction. Write, organize, and access your smart notes from anywhere to keep your thoughts perfectly structured."
-            createLink="/tools/notes"
-            createText="Create Note"
-            isLoading={notesLoading}
-            onDelete={handleDelete}
-          />
-          <ExploreRow
             title="Your Study Kits"
             items={studyKits}
-            emptyMessage="Turn any document into a masterclass. Upload your PDFs or text to instantly generate personalized flashcards, summaries, and quizzes designed to help you study smarter and ace your exams."
+            emptyMessage="Upload your PDF, link, or topic to generate AI quizzes, flashcards, notes, and mind maps."
             createLink="/tools/study-kit"
             createText="Generate Study Kit"
             isLoading={kitsLoading}
             onDelete={handleDelete}
           />
-          <ExploreRow title="Tools" items={tools} />
+          <ExploreRow title="Create StudyKit" items={tools} />
         </div>
       </div>
     </div>

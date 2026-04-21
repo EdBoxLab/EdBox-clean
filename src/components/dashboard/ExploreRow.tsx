@@ -147,6 +147,10 @@ export const ExploreRow: React.FC<ExploreRowProps> = ({
             >
                 {items.map((item, i) => (
                     <div key={item.id} className="relative group/card">
+                        {(() => {
+                            const itemTypeLabel = item.type === 'Course' ? 'Pulse Session' : item.type;
+
+                            return (
                         <Link href={item.href || '#'} className="block">
                             <motion.div
                                 className={`flex-shrink-0 w-64 border border-zinc-800 hover:border-zinc-600 rounded-lg p-4 flex flex-col justify-between transition-colors bg-zinc-900/50 group ${showProgress ? 'min-h-[180px]' : 'min-h-[160px]'}`}
@@ -159,7 +163,7 @@ export const ExploreRow: React.FC<ExploreRowProps> = ({
                             >
                                 <div className="flex items-start justify-between">
                                     <div className="flex-grow min-w-0 pr-2">
-                                        <p className="text-sm text-gray-400 uppercase tracking-wide font-medium">{item.type}</p>
+                                        <p className="text-sm text-gray-400 uppercase tracking-wide font-medium">{itemTypeLabel}</p>
                                         <h3 className="font-bold text-lg text-white mt-1 line-clamp-2 break-words">{item.title}</h3>
                                     </div>
                                     {item.icon && <div className="flex-shrink-0 ml-2">{item.icon}</div>}
@@ -184,6 +188,8 @@ export const ExploreRow: React.FC<ExploreRowProps> = ({
                                 </div>
                             </motion.div>
                         </Link>
+                            );
+                        })()}
 
                         {onDelete && (
                             <button

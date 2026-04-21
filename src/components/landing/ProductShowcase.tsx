@@ -84,7 +84,7 @@ export const ProductShowcase = () => {
                                 </div>
                                 <h3 className="text-4xl font-black text-white mb-6">Genie AI Assistant</h3>
                                 <p className="text-zinc-400 text-lg leading-relaxed max-w-md">
-                                    Your AI study partner. It makes hard topics easy to understand and helps you remember what you learn.
+                                    Ask Genie in plain language and get instant visuals, concept maps, and clear explanations you can actually use.
                                 </p>
                             </div>
 
@@ -118,7 +118,7 @@ export const ProductShowcase = () => {
                         </div>
                     </motion.div>
 
-                    {/* 2. Course Generator (High Impact) */}
+                    {/* 2. Study Asset Generator (High Impact) */}
                     <motion.div
                         initial={{ opacity: 0, y: 40 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -136,16 +136,16 @@ export const ProductShowcase = () => {
                                 <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20 mb-10 shadow-[0_0_20px_rgba(99,102,241,0.2)]">
                                     <Wand2 className="w-6 h-6" />
                                 </div>
-                                <h3 className="text-3xl font-black text-white mb-4 leading-tight">Instant Courses</h3>
+                                <h3 className="text-3xl font-black text-white mb-4 leading-tight">Instant Study Assets</h3>
                                 <p className="text-zinc-500 font-medium leading-relaxed">
-                                    Drop a PDF, Link, or Topic. Watch EdBox build a full course in seconds.
+                                    Drop a PDF, link, or topic. EdBox generates quizzes, flashcards, notes, and mind maps in seconds.
                                 </p>
                             </div>
 
                             {/* Alive Progress Visualization */}
                             <div className="mt-16 relative">
                                 <div className="flex justify-between text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-3">
-                                    <span>Building Course</span>
+                                    <span>Building Study Kit</span>
                                     <span>89%</span>
                                 </div>
                                 <div className="h-3 w-full bg-black/40 rounded-full p-1 overflow-hidden border border-white/[0.02]">
@@ -156,7 +156,7 @@ export const ProductShowcase = () => {
                                     />
                                 </div>
                                 <div className="mt-6 flex flex-wrap gap-2">
-                                    {['Nodes', 'Flow', 'Edge Cases'].map((tag, i) => (
+                                    {['Quizzes', 'Flashcards', 'Mind Maps'].map((tag, i) => (
                                         <span key={i} className="px-3 py-1 bg-white/[0.03] border border-white/[0.05] rounded-full text-[9px] font-black text-zinc-500 uppercase tracking-widest">{tag}</span>
                                     ))}
                                 </div>
@@ -264,7 +264,7 @@ const StudyKitMockup = () => (
                 <div>
                     <div className="w-10 h-10 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center mb-4 text-xl">⚡</div>
                     <h3 className="text-xl font-bold text-white mb-2">Flashcards</h3>
-                    <p className="text-gray-400 text-sm">Master concepts with spaced repetition.</p>
+                    <p className="text-gray-400 text-sm">Break topics into quick quiz-ready memory cards.</p>
                 </div>
                 <div className="flex items-center text-sm font-medium text-white/50 group-hover:text-white transition-colors">
                     24 Cards Due <ChevronRight className="w-4 h-4 ml-1" />

@@ -11,6 +11,8 @@ interface FocusSessionProps {
 export const FocusSession: React.FC<FocusSessionProps> = ({ recentCourse }) => {
     if (!recentCourse) return null;
 
+    const activeLabel = recentCourse.type === 'Course' ? 'Pulse Session' : recentCourse.type;
+
     return (
         <div className="mb-12">
             <h2 className="text-sm font-bold text-zinc-500 uppercase tracking-[0.2em] mb-4">Focus Session</h2>
@@ -25,7 +27,7 @@ export const FocusSession: React.FC<FocusSessionProps> = ({ recentCourse }) => {
                         <div className="flex items-center gap-2 mb-3">
                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
                             <p className="text-[10px] uppercase tracking-[0.15em] text-zinc-400 font-bold">
-                                {recentCourse.type} Active
+                                {activeLabel} Active
                             </p>
                         </div>
                         <h3 className="text-3xl sm:text-4xl font-bold text-white mb-6 tracking-tight">

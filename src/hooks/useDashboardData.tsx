@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import React from 'react';
-import { FileText, Zap } from 'lucide-react';
+import { Zap } from 'lucide-react';
 
 export interface DashboardItem {
     id: string;
@@ -21,10 +21,8 @@ export const useDashboardData = () => {
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
-    const [notes, setNotes] = useState<DashboardItem[]>([]);
     const [studyKits, setStudyKits] = useState<DashboardItem[]>([]);
 
-    const [notesLoading, setNotesLoading] = useState(true);
     const [kitsLoading, setKitsLoading] = useState(true);
 
     useEffect(() => {
@@ -56,26 +54,6 @@ export const useDashboardData = () => {
 
                 setLoading(false);
 
-                const fetchNotes = async () => {
-                    try {
-                        const notesRes = await fetch('/api/notes');
-                        const notesJson = await notesRes.json();
-                        if (Array.isArray(notesJson)) {
-                            setNotes(notesJson.map((n: any) => ({
-                                id: n.id,
-                                title: n.title || 'Untitled Note',
-                                type: 'Note',
-                                href: `/tools/notes?id=${n.id}`,
-                                icon: <FileText className="w-8 h-8 text-green-300" />
-                            })));
-                        }
-                    } catch (error) {
-                        console.error("Error fetching notes:", error);
-                    } finally {
-                        setNotesLoading(false);
-                    }
-                };
-
                 const fetchStudyKits = async () => {
                     try {
                         const kitsRes = await fetch('/api/study-kit/list');
@@ -96,7 +74,6 @@ export const useDashboardData = () => {
                     }
                 };
 
-                fetchNotes();
                 fetchStudyKits();
 
             } catch (error) {
@@ -112,17 +89,14 @@ export const useDashboardData = () => {
         if (!confirm(`Are you sure you want to delete this ${type}?`)) return;
 
         let endpoint = '';
-        if (type === 'Note') endpoint = `/api/notes/${id}`;
-        else if (type === 'Study Kit') endpoint = `/api/study-kit/${id}`;
+        if (type === 'Study Kit') endpoint = `/api/study-kit/${id}`;
 
         if (!endpoint) return;
 
         try {
             const res = await fetch(endpoint, { method: 'DELETE' });
             if (res.ok || res.status === 204) {
-                if (type === 'Note') {
-                    setNotes(prev => prev.filter(n => n.id !== id));
-                } else if (type === 'Study Kit') {
+                if (type === 'Study Kit') {
                     setStudyKits(prev => prev.filter(k => k.id !== id));
                 }
             } else {
@@ -139,9 +113,7 @@ export const useDashboardData = () => {
         profile,
         setProfile,
         loading,
-        notes,
         studyKits,
-        notesLoading,
         kitsLoading,
         handleDelete
     };

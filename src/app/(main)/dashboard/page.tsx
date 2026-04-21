@@ -2,7 +2,7 @@
 
 import React from 'react';
 import OnboardingForm from '@/components/OnboardingForm';
-import { FileText, Zap } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import { StreakCard } from '@/components/StreakXP';
 import { DiscoverFeed } from '@/components/feed/DiscoverFeed';
 import { useDashboardData } from '@/hooks/useDashboardData';
@@ -14,15 +14,12 @@ const Dashboard: React.FC = () => {
     profile,
     setProfile,
     loading,
-    notes,
     studyKits,
-    notesLoading,
     kitsLoading,
     handleDelete
   } = useDashboardData();
 
   const tools = [
-    { id: 't2', title: 'Note Taker', type: 'Tool', href: '/tools/notes', icon: <FileText className="w-8 h-8 text-green-300" /> },
     { id: 't3', title: 'Study Kit', type: 'Tool', href: '/tools/study-kit', icon: <Zap className="w-8 h-8 text-yellow-300" /> },
   ];
 
@@ -60,15 +57,6 @@ const Dashboard: React.FC = () => {
 
         <div>
           <h2 className="text-3xl font-bold text-white mb-6">Explore</h2>
-          <ExploreRow
-            title="Your Notes"
-            items={notes}
-            emptyMessage="Capture your ideas with zero friction. Write, organize, and access your smart notes from anywhere to keep your thoughts perfectly structured."
-            createLink="/tools/notes"
-            createText="Create Note"
-            isLoading={notesLoading}
-            onDelete={handleDelete}
-          />
           <ExploreRow
             title="Your Study Kits"
             items={studyKits}

@@ -20,7 +20,7 @@ const Dashboard: React.FC = () => {
   } = useDashboardData();
 
   const tools = [
-    { id: 't3', title: 'Study Kit', type: 'Tool', href: '/tools/study-kit', icon: <Zap className="w-8 h-8 text-yellow-300" /> },
+    { id: 't3', title: 'Create StudyKit', type: 'Action', href: '/tools/study-kit', icon: <Zap className="w-8 h-8 text-yellow-300" /> },
   ];
 
   if (loading) {
@@ -66,7 +66,7 @@ const Dashboard: React.FC = () => {
             isLoading={kitsLoading}
             onDelete={handleDelete}
           />
-          <ExploreRow title="Tools" items={tools} />
+          <ExploreRow title="Create StudyKit" items={tools} />
         </div>
       </div>
     </div>

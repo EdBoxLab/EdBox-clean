@@ -46,3 +46,31 @@ This script is automatically run every hour via GitHub Actions. See `.github/wor
 ### Documentation
 
 For detailed setup instructions, see [`docs/email-job-setup.md`](../docs/email-job-setup.md).
+
+## Exam Demo Seeder
+
+### Files
+
+- `scripts/exam-demo.insurance-us.json` - Sample investor-demo dataset for the exam engine
+- `scripts/import-exam-demo.js` - Imports exam config, domains, materials, and questions into Supabase
+
+### Usage
+
+```bash
+node scripts/import-exam-demo.js scripts/exam-demo.insurance-us.json --reset
+```
+
+### Environment Variables
+
+Required:
+- `NEXT_PUBLIC_SUPABASE_URL` or `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+### Demo Flow
+
+0. Apply exam schema migration in Supabase SQL editor:
+	- `supabase/migrations/20260426000000_exam_engine.sql`
+1. Run the importer command
+2. Open `/exam` or `/exams/insurance-us`
+3. Go to study map and open quiz shell
+4. Submit answers to create real attempt records

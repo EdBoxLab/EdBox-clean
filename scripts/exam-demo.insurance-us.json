@@ -1,0 +1,192 @@
+{
+  "exam": {
+    "slug": "insurance-us",
+    "name": "Insurance Licensing Exam",
+    "jurisdiction": ["US", "Canada"],
+    "passingScore": 70,
+    "priceCents": 4900,
+    "active": true,
+    "estimatedPrepHours": "24-32 hours",
+    "description": "Investor demo dataset for the EdBox Exam Engine.",
+    "highlights": [
+      "Adaptive MCQ engine",
+      "AI explanations",
+      "Readiness tracking"
+    ],
+    "included": [
+      "Topic map",
+      "Quiz session",
+      "Attempt scoring"
+    ]
+  },
+  "domains": [
+    {
+      "slug": "property-insurance",
+      "name": "Property Insurance",
+      "weight": 0.25,
+      "orderIndex": 0,
+      "readiness": 35
+    },
+    {
+      "slug": "liability-coverage",
+      "name": "Liability Coverage",
+      "weight": 0.2,
+      "orderIndex": 1,
+      "readiness": 45
+    },
+    {
+      "slug": "policy-terms",
+      "name": "Policy Terms and Conditions",
+      "weight": 0.3,
+      "orderIndex": 2,
+      "readiness": 55
+    },
+    {
+      "slug": "regulation",
+      "name": "Regulation and Ethics",
+      "weight": 0.25,
+      "orderIndex": 3,
+      "readiness": 62
+    }
+  ],
+  "materials": [
+    {
+      "domainSlug": "property-insurance",
+      "title": "Property Insurance Fundamentals",
+      "sourceType": "manual",
+      "contentText": "Property insurance protects physical assets against covered perils such as fire, theft, and wind. Actual cash value reimburses replacement cost minus depreciation, while replacement cost reimburses without depreciation up to policy limits."
+    },
+    {
+      "domainSlug": "liability-coverage",
+      "title": "Liability Coverage Basics",
+      "sourceType": "manual",
+      "contentText": "Liability coverage responds to legal obligations for bodily injury and property damage caused by the insured. Insurers generally provide defense costs, settlement negotiations, and indemnity up to policy limits."
+    },
+    {
+      "domainSlug": "policy-terms",
+      "title": "Policy Structure and Conditions",
+      "sourceType": "manual",
+      "contentText": "An insurance policy contains declarations, insuring agreement, conditions, exclusions, and endorsements. Conditions impose duties such as notice of loss and cooperation during claims."
+    },
+    {
+      "domainSlug": "regulation",
+      "title": "Insurance Regulation and Ethics",
+      "sourceType": "manual",
+      "contentText": "State regulators oversee licensing, solvency, and market conduct. Ethical practice includes disclosure, suitability, fair claims handling, and anti-fraud compliance."
+    }
+  ],
+  "questions": [
+    {
+      "domainSlug": "property-insurance",
+      "questionType": "mcq",
+      "questionText": "What is the core purpose of property insurance?",
+      "options": [
+        "To protect physical assets from covered losses",
+        "To guarantee investment returns",
+        "To eliminate all business risk",
+        "To replace liability insurance"
+      ],
+      "correctAnswer": "To protect physical assets from covered losses",
+      "explanation": "Property insurance is designed to cover covered damage or loss to physical property.",
+      "difficulty": 2
+    },
+    {
+      "domainSlug": "property-insurance",
+      "questionType": "mcq",
+      "questionText": "How does replacement cost coverage differ from actual cash value?",
+      "options": [
+        "Replacement cost pays without depreciation, ACV includes depreciation",
+        "They are identical under all policies",
+        "ACV always pays more than replacement cost",
+        "Replacement cost only applies to liability claims"
+      ],
+      "correctAnswer": "Replacement cost pays without depreciation, ACV includes depreciation",
+      "explanation": "ACV accounts for depreciation while replacement cost typically does not, subject to policy terms.",
+      "difficulty": 3
+    },
+    {
+      "domainSlug": "liability-coverage",
+      "questionType": "mcq",
+      "questionText": "Liability coverage primarily applies when the insured is: ",
+      "options": [
+        "Legally responsible for injury or damage",
+        "Replacing personal property",
+        "Paying life insurance premiums",
+        "Applying for a mortgage"
+      ],
+      "correctAnswer": "Legally responsible for injury or damage",
+      "explanation": "Liability insurance responds to legal responsibility for third-party bodily injury or property damage.",
+      "difficulty": 2
+    },
+    {
+      "domainSlug": "liability-coverage",
+      "questionType": "mcq",
+      "questionText": "Which item is commonly included in liability policy benefits?",
+      "options": [
+        "Defense costs",
+        "Guaranteed tax refunds",
+        "Automatic claim approval",
+        "Unlimited indemnity"
+      ],
+      "correctAnswer": "Defense costs",
+      "explanation": "Many liability forms include legal defense within policy provisions, subject to terms.",
+      "difficulty": 2
+    },
+    {
+      "domainSlug": "policy-terms",
+      "questionType": "mcq",
+      "questionText": "Which section lists key coverage details such as named insured and limits?",
+      "options": [
+        "Declarations",
+        "Exclusions",
+        "Endorsements",
+        "Conditions"
+      ],
+      "correctAnswer": "Declarations",
+      "explanation": "The declarations page contains core policy details including insured information and limits.",
+      "difficulty": 2
+    },
+    {
+      "domainSlug": "policy-terms",
+      "questionType": "mcq",
+      "questionText": "What is the function of policy conditions?",
+      "options": [
+        "State duties required to maintain coverage rights",
+        "Define premium discounts only",
+        "Eliminate all exclusions",
+        "List insurance regulators"
+      ],
+      "correctAnswer": "State duties required to maintain coverage rights",
+      "explanation": "Conditions set obligations like prompt notice and cooperation during claims handling.",
+      "difficulty": 3
+    },
+    {
+      "domainSlug": "regulation",
+      "questionType": "mcq",
+      "questionText": "Who generally regulates insurance licensing and market conduct in the US?",
+      "options": [
+        "State insurance departments",
+        "Only federal courts",
+        "Private rating agencies",
+        "Local city councils"
+      ],
+      "correctAnswer": "State insurance departments",
+      "explanation": "Insurance is primarily regulated at the state level in the US.",
+      "difficulty": 2
+    },
+    {
+      "domainSlug": "regulation",
+      "questionType": "mcq",
+      "questionText": "Which behavior best reflects ethical insurance practice?",
+      "options": [
+        "Clear disclosure and suitable recommendations",
+        "Concealing policy exclusions",
+        "Ignoring claim documentation",
+        "Promising benefits outside contract terms"
+      ],
+      "correctAnswer": "Clear disclosure and suitable recommendations",
+      "explanation": "Ethical conduct requires transparency, suitability, and fair treatment of policyholders.",
+      "difficulty": 2
+    }
+  ]
+}
